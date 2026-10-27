@@ -36,7 +36,8 @@ export async function POST(request: Request) {
       VALUES (${session.id}::uuid, ${parsed.data.body})
       RETURNING id, body, created_at AS "createdAt", expires_at AS "expiresAt"
     `;
-    return NextResponse.json({ story: { ...rows[0], displayName: session.displayName, handle: session.handle } }, { status: 201 });
+    const userRows = await sql`SELECT display_name AS "displayName", handle FROM users WHERE id = ${session.id}::uuid LIMIT 1`;
+    return NextResponse.json({ story: { ...rows[0], ...userRows[0] } }, { status: 201 });
   } catch (error) {
     console.error("UCENO story create error", error);
     return NextResponse.json({ error: "Could not publish story" }, { status: 503 });
