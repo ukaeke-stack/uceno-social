@@ -49,3 +49,36 @@ CREATE TABLE IF NOT EXISTS comments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS comments_post_created_idx ON comments (post_id, created_at ASC);
+
+CREATE TABLE IF NOT EXISTS conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type VARCHAR(12) NOT NULL CHECK (type IN ('direct','group','channel')),
+  title VARCHAR(100),
+  direct_key TEXT UNIQUE,
+  created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT direct_key_only_for_direct CHECK ((type = 'direct') = (direct_key IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS conversations_updated_idx ON conversations (updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS conversation_members (
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role VARCHAR(12) NOT NULL DEFAULT 'member' CHECK (role IN ('member','admin','owner')),
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_read_at TIMESTAMPTZ,
+  PRIMARY KEY (conversation_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS conversation_members_user_idx ON conversation_members (user_id, joined_at DESC);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body VARCHAR(5000) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  edited_at TIMESTAMPTZ,
+  deleted_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS messages_conversation_created_idx ON messages (conversation_id, created_at DESC);
