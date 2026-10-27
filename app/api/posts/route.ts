@@ -11,6 +11,18 @@ const createPostSchema = z.object({
 }).refine((value) => Boolean(value.body || value.mediaUrl), { message: "A post needs text or media" })
   .refine((value) => Boolean(value.mediaUrl) === Boolean(value.mediaType), { message: "Media URL and type must be provided together" });
 
+function isOwnedCloudinaryAsset(urlValue: string, mediaType: "image" | "video", userId: string) {
+  try {
+    const url = new URL(urlValue);
+    const resourcePath = mediaType === "video" ? "/video/upload/" : "/image/upload/";
+    return url.protocol === "https:" && url.hostname === "res.cloudinary.com"
+      && url.pathname.includes(resourcePath)
+      && url.pathname.includes("/uceno/" + userId + "/");
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const session = await readSession();
@@ -54,6 +66,9 @@ export async function POST(request: Request) {
   try {
     const input = createPostSchema.safeParse(await request.json());
     if (!input.success) return NextResponse.json({ error: input.error.issues[0]?.message ?? "Invalid post" }, { status: 400 });
+    if (input.data.mediaUrl && input.data.mediaType && !isOwnedCloudinaryAsset(input.data.mediaUrl, input.data.mediaType, session.id)) {
+      return NextResponse.json({ error: "Media must be uploaded to your UCENO Cloudinary folder before publishing" }, { status: 400 });
+    }
     const sql = getDb();
     const rows = await sql`
       INSERT INTO posts (user_id, body, visibility, media_url, media_type)
