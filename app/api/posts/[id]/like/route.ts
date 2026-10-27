@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
+import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 const idSchema = z.string().uuid();
@@ -25,7 +26,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       )
       SELECT EXISTS (SELECT 1 FROM inserted) AS liked
     `;
-    return NextResponse.json({ liked: Boolean(rows[0]?.liked) });
+    const liked = Boolean(rows[0]?.liked);
+    if (liked) {
+      const owner = await sql`SELECT user_id FROM posts WHERE id = ${id}::uuid LIMIT 1`;
+      if (owner[0]?.user_id) await createNotification({ recipientId: String(owner[0].user_id), actorId: session.id, type: "like", entityId: id, message: session.handle + " liked your post" });
+    }
+    return NextResponse.json({ liked });
   } catch (error) {
     console.error("UCENO like error", error);
     return NextResponse.json({ error: "Could not update like. Check server configuration." }, { status: 503 });
