@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
+import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 const idSchema = z.string().uuid();
@@ -41,7 +42,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       RETURNING id, body, created_at AS "createdAt"
     `;
     if (!rows.length) return NextResponse.json({ error: "Post not found" }, { status: 404 });
-    return NextResponse.json({ comment: { ...rows[0], handle: session.handle } }, { status: 201 });
+    const owner = await sql`SELECT user_id FROM posts WHERE id = ${id}::uuid LIMIT 1`;
+    if (owner[0]?.user_id) await createNotification({ recipientId: String(owner[0].user_id), actorId: session.id, type: "comment", entityId: id, message: session.handle + " commented on your post" });
+    return NextResponse.json({ comment: { ...rows[0], handle: session.handle, displayName: session.displayName } }, { status: 201 });
   } catch (error) {
     console.error("UCENO comment create error", error);
     return NextResponse.json({ error: "Could not publish comment" }, { status: 503 });
