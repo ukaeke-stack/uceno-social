@@ -16,6 +16,7 @@ export default function CallsPage() {
   const localRef = useRef<HTMLDivElement>(null);
   const remoteRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => { const params = new URLSearchParams(window.location.search); const room = params.get('room'); const requestedMode = params.get('mode'); if (room && /^[a-zA-Z0-9_-]{3,80}$/.test(room)) setRoomName(room); if (requestedMode === 'audio' || requestedMode === 'video') setMode(requestedMode); }, []);
   useEffect(() => () => { void roomRef.current?.disconnect(); }, []);
 
   function mountTrack(track: Track, participant: 'local'|'remote') {
