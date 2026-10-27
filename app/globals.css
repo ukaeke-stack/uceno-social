@@ -93,3 +93,34 @@ body:has(.account-page) .global-account-link{display:none}
 .profile-menu button:hover{border-color:#a99aff55;background:#a99aff12}
 .top-profile-button{display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:transparent;cursor:pointer}
 .top-profile-button:focus-visible,.profile-switch:focus-visible{outline:2px solid #a99aff;outline-offset:3px}
+
+/* UCENO notifications, navigation, and exit controls */
+.notification-bell{position:relative}
+.notification-bell i{position:absolute;right:-4px;top:-4px;min-width:17px;height:17px;padding:0 4px;display:grid;place-items:center;border-radius:999px;background:#f07191;color:#fff;font-style:normal;font-size:9px;font-weight:800;border:2px solid var(--bg)}
+.nav-back,.nav-exit{display:grid;place-items:center}
+.notifications-panel{position:fixed;z-index:90;right:22px;top:72px;width:min(410px,calc(100vw - 24px));max-height:min(78vh,690px);display:flex;flex-direction:column;overflow:hidden;border:1px solid #ffffff20;border-radius:18px;background:#141925;box-shadow:0 24px 90px #0009}
+.notifications-panel-head{display:flex;align-items:center;justify-content:space-between;padding:17px 17px 12px;border-bottom:1px solid var(--line)}
+.notifications-panel-head small{color:#a99aff;font-size:9px;letter-spacing:1.5px;font-weight:800}
+.notifications-panel-head h2{margin:5px 0 0;font:700 19px Manrope,sans-serif}
+.notifications-panel-head h2 span{margin-left:5px;padding:4px 7px;border-radius:7px;background:#9b8cff22;color:#cfc5ff;font:600 10px 'DM Sans',sans-serif}
+.notification-settings{display:flex;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.notification-settings button{display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid #ffffff17;border-radius:9px;background:#ffffff05;color:#d8dcec;font-size:10px}
+.notification-settings button:hover{border-color:#9b8cff77;background:#9b8cff12}
+.notifications-list{overflow-y:auto;min-height:120px}
+.notification-item{display:flex;align-items:flex-start;gap:11px;padding:13px 15px;border-bottom:1px solid #ffffff0a}
+.notification-item.unread{background:#9b8cff0a}
+.notification-type{width:34px;height:34px;flex-shrink:0;display:grid;place-items:center;border-radius:11px;background:#ffffff0b;color:#b9b0ff}
+.notification-type.like{color:#ff8aa7;background:#ff7e9e13}.notification-type.comment{color:#8ddfc0;background:#8ddfc013}.notification-type.repost{color:#a5a0ff;background:#9b8cff13}.notification-type.message{color:#84c9ff;background:#84c9ff13}
+.notification-item>div{flex:1;min-width:0}.notification-item p{margin:1px 0 5px;font-size:12px;line-height:1.5;color:#edf0fa;overflow-wrap:anywhere}.notification-item small{color:#8d95a9;font-size:9px}
+.notification-item>i{width:7px;height:7px;flex-shrink:0;margin-top:6px;border-radius:50%;background:#a99aff}
+.notifications-empty{min-height:190px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:9px;text-align:center;padding:24px;color:#8d95a9}
+.notifications-empty svg{color:#a99aff}.notifications-empty strong{color:#e9eaf4;font-size:13px}.notifications-empty span{max-width:240px;font-size:10px;line-height:1.6}
+.exit-dialog{width:min(390px,calc(100vw - 30px));padding:25px;border:1px solid #ffffff20;border-radius:20px;background:#151a26;box-shadow:0 25px 90px #0009}
+.exit-dialog-icon{width:44px;height:44px;display:grid;place-items:center;border-radius:14px;background:#9b8cff1a;color:#c3b8ff}
+.exit-dialog h2{font:800 23px Manrope,sans-serif;margin:18px 0 8px}.exit-dialog p{font-size:12px;line-height:1.7;color:var(--muted);margin:0 0 20px}
+.exit-dialog>div{display:flex;gap:9px}.exit-dialog>div button{flex:1;justify-content:center;display:flex;align-items:center;gap:8px}
+.exit-screen{min-height:100dvh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 10%,#7867e82b,transparent 38%),#0d1018;color:#f0f2fa}
+.exit-screen-card{width:min(440px,100%);text-align:center;padding:34px 26px;border:1px solid #ffffff15;border-radius:24px;background:#151a26}
+.exit-screen-card img{width:76px;height:76px;margin:0 auto 20px}.exit-screen-card h1{font:800 28px Manrope,sans-serif;margin:0 0 10px}.exit-screen-card p{color:var(--muted);font-size:13px;line-height:1.7;margin:0 auto 23px;max-width:310px}
+.exit-screen-card a{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:12px 18px;border-radius:11px;background:linear-gradient(100deg,#9b8cff,#7568eb);font-weight:700;font-size:12px}
+@media(max-width:600px){.notifications-panel{top:65px;right:12px;width:calc(100vw - 24px);max-height:75vh}.nav-back,.nav-exit{width:32px;height:34px}.notification-settings{flex-wrap:wrap}}
