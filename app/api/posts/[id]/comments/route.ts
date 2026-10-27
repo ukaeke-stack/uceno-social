@@ -42,9 +42,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       RETURNING id, body, created_at AS "createdAt"
     `;
     if (!rows.length) return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    const profile = await sql`SELECT display_name AS "displayName" FROM users WHERE id = ${session.id}::uuid LIMIT 1`;
     const owner = await sql`SELECT user_id FROM posts WHERE id = ${id}::uuid LIMIT 1`;
     if (owner[0]?.user_id) await createNotification({ recipientId: String(owner[0].user_id), actorId: session.id, type: "comment", entityId: id, message: session.handle + " commented on your post" });
-    return NextResponse.json({ comment: { ...rows[0], handle: session.handle, displayName: session.displayName } }, { status: 201 });
+    return NextResponse.json({ comment: { ...rows[0], handle: session.handle, displayName: profile[0]?.displayName ?? session.handle } }, { status: 201 });
   } catch (error) {
     console.error("UCENO comment create error", error);
     return NextResponse.json({ error: "Could not publish comment" }, { status: 503 });
