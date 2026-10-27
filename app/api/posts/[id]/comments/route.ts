@@ -6,7 +6,7 @@ import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 const idSchema = z.string().uuid();
-const commentSchema = z.object({ body: z.string().trim().min(1, "A comment cannot be empty").max(2000) });
+const commentSchema = z.object({ body: z.string().trim().min(1, "A comment cannot be empty").max(2000), parentCommentId: z.string().uuid().optional().nullable() });
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -14,7 +14,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   try {
     const sql = getDb();
     const rows = await sql`
-      SELECT c.id, c.body, c.created_at AS "createdAt", u.display_name AS "displayName", u.handle
+      SELECT c.id, c.body, c.parent_comment_id AS "parentCommentId", c.created_at AS "createdAt", u.display_name AS "displayName", u.handle,
+        (SELECT COUNT(*)::int FROM comment_likes cl WHERE cl.comment_id = c.id) AS likes
       FROM comments c JOIN users u ON u.id = c.user_id
       WHERE c.post_id = ${id}::uuid
       ORDER BY c.created_at ASC LIMIT 100
@@ -35,17 +36,22 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const input = commentSchema.safeParse(await request.json());
     if (!input.success) return NextResponse.json({ error: input.error.issues[0]?.message ?? "Invalid comment" }, { status: 400 });
     const sql = getDb();
+    const parentCommentId = input.data.parentCommentId ?? null;
+    if (parentCommentId) {
+      const parent = await sql`SELECT id FROM comments WHERE id = ${parentCommentId}::uuid AND post_id = ${id}::uuid LIMIT 1`;
+      if (!parent.length) return NextResponse.json({ error: "Reply target was not found on this post" }, { status: 404 });
+    }
     const rows = await sql`
-      INSERT INTO comments (post_id, user_id, body)
-      SELECT ${id}::uuid, ${session.id}::uuid, ${input.data.body}
+      INSERT INTO comments (post_id, user_id, body, parent_comment_id)
+      SELECT ${id}::uuid, ${session.id}::uuid, ${input.data.body}, ${parentCommentId}::uuid
       WHERE EXISTS (SELECT 1 FROM posts WHERE id = ${id}::uuid AND visibility = 'public')
-      RETURNING id, body, created_at AS "createdAt"
+      RETURNING id, body, parent_comment_id AS "parentCommentId", created_at AS "createdAt"
     `;
     if (!rows.length) return NextResponse.json({ error: "Post not found" }, { status: 404 });
     const profile = await sql`SELECT display_name AS "displayName" FROM users WHERE id = ${session.id}::uuid LIMIT 1`;
     const owner = await sql`SELECT user_id FROM posts WHERE id = ${id}::uuid LIMIT 1`;
     if (owner[0]?.user_id) await createNotification({ recipientId: String(owner[0].user_id), actorId: session.id, type: "comment", entityId: id, message: session.handle + " commented on your post" });
-    return NextResponse.json({ comment: { ...rows[0], handle: session.handle, displayName: profile[0]?.displayName ?? session.handle } }, { status: 201 });
+    return NextResponse.json({ comment: { ...rows[0], likes: 0, handle: session.handle, displayName: profile[0]?.displayName ?? session.handle } }, { status: 201 });
   } catch (error) {
     console.error("UCENO comment create error", error);
     return NextResponse.json({ error: "Could not publish comment" }, { status: 503 });
