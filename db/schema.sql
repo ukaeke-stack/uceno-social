@@ -25,8 +25,11 @@ CREATE INDEX IF NOT EXISTS follows_following_idx ON follows (following_id, creat
 CREATE TABLE IF NOT EXISTS posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  body VARCHAR(5000) NOT NULL,
+  body VARCHAR(5000) NOT NULL DEFAULT '',
+  media_url TEXT,
+  media_type VARCHAR(10) CHECK (media_type IS NULL OR media_type IN ('image','video')),
   visibility VARCHAR(12) NOT NULL DEFAULT 'public' CHECK (visibility IN ('public','followers','private')),
+  CONSTRAINT posts_media_url_pair_check CHECK ((media_url IS NULL AND media_type IS NULL) OR (media_url IS NOT NULL AND media_type IS NOT NULL)),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
