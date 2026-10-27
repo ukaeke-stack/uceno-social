@@ -5,8 +5,11 @@ import { readSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 const createPostSchema = z.object({
-  body: z.string().trim().min(1, "A post cannot be empty").max(5000),
-});
+  body: z.string().trim().max(5000).default(""),
+  mediaUrl: z.string().url().optional().nullable(),
+  mediaType: z.enum(["image", "video"]).optional().nullable(),
+}).refine((value) => Boolean(value.body || value.mediaUrl), { message: "A post needs text or media" })
+  .refine((value) => Boolean(value.mediaUrl) === Boolean(value.mediaType), { message: "Media URL and type must be provided together" });
 
 export async function GET(request: Request) {
   try {
@@ -18,7 +21,7 @@ export async function GET(request: Request) {
     const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(50, Math.floor(rawLimit))) : 20;
     const sql = getDb();
     const rows = await sql`
-      SELECT p.id, p.body, p.created_at AS "createdAt",
+      SELECT p.id, p.body, p.media_url AS "mediaUrl", p.media_type AS "mediaType", p.created_at AS "createdAt",
         u.display_name AS "displayName", u.handle,
         COALESCE(l.like_count, 0)::int AS likes,
         COALESCE(c.comment_count, 0)::int AS comments,
@@ -53,9 +56,9 @@ export async function POST(request: Request) {
     if (!input.success) return NextResponse.json({ error: input.error.issues[0]?.message ?? "Invalid post" }, { status: 400 });
     const sql = getDb();
     const rows = await sql`
-      INSERT INTO posts (user_id, body, visibility)
-      VALUES (${session.id}::uuid, ${input.data.body}, 'public')
-      RETURNING id, body, created_at AS "createdAt"
+      INSERT INTO posts (user_id, body, visibility, media_url, media_type)
+      VALUES (${session.id}::uuid, ${input.data.body}, 'public', ${input.data.mediaUrl ?? null}, ${input.data.mediaType ?? null})
+      RETURNING id, body, media_url AS "mediaUrl", media_type AS "mediaType", created_at AS "createdAt"
     `;
     return NextResponse.json({ post: { ...rows[0], handle: session.handle, likes: 0, comments: 0 } }, { status: 201 });
   } catch (error) {
