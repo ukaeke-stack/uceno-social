@@ -57,7 +57,7 @@ async function toggleRepost(p:Post){
   const data=await response.json();
   if(!response.ok)throw new Error(data.error||'Could not update repost');
   setReposted(old=>data.reposted?(old.includes(p.id)?old:[...old,p.id]):old.filter(id=>id!==p.id));
-  setPosts(old=>old.map(item=>item.id===p.id?{...item,reposts:data.reposts}:item));
+  setPosts(old=>old.map(item=>item.id===p.id?{...item,reposts:Math.max(0,data.reposts-(data.reposted?1:0))}:item));
   toast(data.reposted?'Reposted.':'Repost removed.');
  }catch(e){toast(e instanceof Error?e.message:'Could not update repost');}
 }
