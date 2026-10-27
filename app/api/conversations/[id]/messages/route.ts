@@ -50,7 +50,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!rows.length) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
     await sql`UPDATE conversations SET updated_at = NOW() WHERE id = ${id}::uuid`;
     const recipients = await sql`SELECT user_id FROM conversation_members WHERE conversation_id = ${id}::uuid AND user_id <> ${session.id}::uuid`;
-    await Promise.all(recipients.map((recipient: { user_id: string }) => createNotification({ recipientId: String(recipient.user_id), actorId: session.id, type: "message", entityId: id, message: "New message from @" + session.handle })));
+    await Promise.all(recipients.map((recipient) => createNotification({ recipientId: String(recipient.user_id), actorId: session.id, type: "message", entityId: id, message: "New message from @" + session.handle })));
     return NextResponse.json({ message: { ...rows[0], senderName: "You", senderHandle: session.handle } }, { status: 201 });
   } catch (error) {
     console.error("UCENO message send error", error);
