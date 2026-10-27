@@ -6,7 +6,7 @@
 - Password hashes using bcrypt with 12 rounds.
 - Signed seven-day HTTP-only session cookie with SameSite=Lax.
 - Sign-in, current-session lookup and logout endpoints.
-- Server-side input validation and generic invalid-credentials response.
+- Responsive account screen at /account, connected to the API.
 
 ## Required setup
 1. Create a PostgreSQL database in Neon or another PostgreSQL provider.
