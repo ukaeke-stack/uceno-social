@@ -1,11 +1,12 @@
 import { SignJWT } from "jose";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 const schema = z.object({
-  room: z.string().trim().min(3).max(80).regex(/^[a-zA-Z0-9_-]+$/),
+  room: z.string().uuid(),
   mode: z.enum(["audio", "video"]).default("video"),
 });
 
@@ -20,6 +21,17 @@ export async function POST(request: Request) {
   }
   const input = schema.safeParse(await request.json().catch(() => null));
   if (!input.success) return NextResponse.json({ error: "Enter a valid call room and mode" }, { status: 400 });
+  const sql = getDb();
+  const memberships = await sql`
+    SELECT c.id
+    FROM conversations c
+    JOIN conversation_members cm ON cm.conversation_id = c.id
+    WHERE c.id = ${input.data.room}::uuid AND cm.user_id = ${session.id}::uuid
+    LIMIT 1
+  `;
+  if (!memberships.length) {
+    return NextResponse.json({ error: "You must belong to this conversation to join its call" }, { status: 403 });
+  }
   const now = Math.floor(Date.now() / 1000);
   const token = await new SignJWT({
     video: { roomJoin: true, room: input.data.room, canPublish: true, canSubscribe: true, canPublishData: true },
