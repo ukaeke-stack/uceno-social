@@ -187,3 +187,7 @@ body:has(.account-page) .global-account-link{display:none}
 .user-edit-form textarea{resize:vertical;line-height:1.6}
 .user-profile-meta{margin:5px 0;color:#aab3c6;font-size:12px;overflow-wrap:anywhere}.user-profile-meta a{color:#b8aaff;text-decoration:underline}
 .user-avatar-large img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+
+
+/* Keep the mobile app toolbar clear of the Android status bar. */
+@media(max-width:700px){.center .topbar{margin-top:max(22px,env(safe-area-inset-top));top:max(22px,env(safe-area-inset-top))}.user-page{padding-top:max(30px,env(safe-area-inset-top))}}
