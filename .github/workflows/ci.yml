@@ -29,7 +29,7 @@ jobs:
 
   android-shell:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,6 +47,30 @@ jobs:
           npx cap sync android
       - name: Compile Android debug APK
         run: cd android && ./gradlew assembleDebug
+      - name: Launch APK on Android emulator and check for startup crash
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            set -e
+            APK="android/app/build/outputs/apk/debug/app-debug.apk"
+            adb install -r "$APK"
+            adb logcat -c
+            adb shell monkey -p com.ukaeke.uceno 1
+            sleep 25
+            adb logcat -d -t 5000 > /tmp/uceno-android-logcat.txt
+            if ! adb shell pidof com.ukaeke.uceno >/dev/null 2>&1; then
+              echo "::error::UCENO process exited after launch. Recent Android logs:"
+              grep -Ei "FATAL EXCEPTION|AndroidRuntime|com\\.ukaeke\\.uceno|chromium|Capacitor" /tmp/uceno-android-logcat.txt | tail -n 180 || tail -n 180 /tmp/uceno-android-logcat.txt
+              exit 1
+            fi
+            if grep -E "FATAL EXCEPTION|Process: com\\.ukaeke\\.uceno.*has died" /tmp/uceno-android-logcat.txt; then
+              echo "::error::Android logs show a startup crash."
+              exit 1
+            fi
+            echo "UCENO remained running for 25 seconds after launch."
       - uses: actions/upload-artifact@v4
         with:
           name: uceno-android-debug-smoke
