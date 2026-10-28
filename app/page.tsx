@@ -1,5 +1,8 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { registerNativePush } from '@/lib/native-push';
 import { Activity, ArrowLeft, ArrowUpRight, Bell, Bookmark, Check, ChevronDown, Compass, Flame, Hash, Heart, Home, Image, LogOut, Menu, MessageCircle, MoreHorizontal, Plus, Radio, Repeat2, Search, Send, Settings2, ShieldCheck, Sparkles, Users, Video, Volume2, VolumeX, X, Share2 } from 'lucide-react';
 type Post = { id:string|number; name:string; handle:string; time:string; avatar:string; verified?:boolean; body:string; image?:string; mediaUrl?:string|null; mediaType?:'image'|'video'|null; likes:number; comments:number; reposts:number; tag?:string };
@@ -13,6 +16,7 @@ const nav=[{label:'Home',icon:Home},{label:'Discover',icon:Compass},{label:'Mess
 function Avatar({src,name,size='md'}:{src:string;name:string;size?:string}){return src?<img className={'avatar avatar-'+size} src={src} alt={name}/>:<span className={'avatar avatar-'+size+' avatar-logo'}><Sparkles size={size==='lg'?21:17}/></span>}
 function count(n:number){return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace('.0','')+'K':String(n)}
 export default function HomePage(){
+const router = useRouter();
 const [active,setActive]=useState('Home'),[mode,setMode]=useState('For you'),[posts,setPosts]=useState(seed),[draft,setDraft]=useState(''),[search,setSearch]=useState(''),[likes,setLikes]=useState<Array<string|number>>([]),[saved,setSaved]=useState<Array<string|number>>([]),[followed,setFollowed]=useState<string[]>([]),[composer,setComposer]=useState(false),[menu,setMenu]=useState(false),[notice,setNotice]=useState(''),[story,setStory]=useState(''),[realStories,setRealStories]=useState<Array<{id:string;body:string;displayName:string;handle:string}>>([]),[mediaFile,setMediaFile]=useState<File|null>(null),[mediaPreview,setMediaPreview]=useState(''),[mediaType,setMediaType]=useState<'image'|'video'|null>(null),[mediaUploading,setMediaUploading]=useState(false);
 const [currentUser,setCurrentUser]=useState<{id:string;displayName:string;handle:string;email?:string|null;phone?:string|null}|null>(null),[isBackendFeed,setIsBackendFeed]=useState(false),[authChecked,setAuthChecked]=useState(false),[profileOpen,setProfileOpen]=useState(false);
 const [profileData,setProfileData]=useState<any>(null),[profileLoading,setProfileLoading]=useState(false),[profileError,setProfileError]=useState(''),[profileFollowBusy,setProfileFollowBusy]=useState(false);
@@ -31,7 +35,7 @@ function navigateTo(label:string){if(label==='Calls'){window.location.assign('/c
 async function openUserProfile(rawHandle:string){
  const handle=rawHandle.replace(/^@/,'').trim().toLowerCase();
  if(!/^[a-z0-9_]{3,24}$/.test(handle)){toast('This profile link is not valid.');return}
- window.location.assign('/u/'+encodeURIComponent(handle));
+ router.push('/u/'+encodeURIComponent(handle));
 }
 async function toggleProfileFollow(){
  if(!profileData?.profile?.handle||profileFollowBusy)return;
@@ -42,7 +46,42 @@ async function toggleProfileFollow(){
 }
 function goBack(){if(exitPrompt){setExitPrompt(false);return}if(notificationsOpen){setNotificationsOpen(false);return}if(story){setStory('');return}if(composer){setComposer(false);return}if(openCommentPost!==null){setOpenCommentPost(null);return}if(menu){setMenu(false);return}const prior=navHistoryRef.current.pop();setPreviousActive([...navHistoryRef.current]);setActive(prior||'Home')}
 function exitApp(){setExitPrompt(false);window.location.assign('/exit')}
-const lastHardwareBackRef=useRef(0);useEffect(()=>{const handlePopState=()=>{const now=Date.now();if(now-lastHardwareBackRef.current<1800){window.location.assign('/exit');return}lastHardwareBackRef.current=now;setNotificationsOpen(false);setStory('');setComposer(false);setOpenCommentPost(null);setMenu(false);const prior=navHistoryRef.current.pop();setPreviousActive([...navHistoryRef.current]);setActive(prior||'Home');window.history.pushState({uceno:true},'','#uceno')};window.history.pushState({uceno:true},'','#uceno');window.addEventListener('popstate',handlePopState);return()=>window.removeEventListener('popstate',handlePopState)},[]);
+// Android uses Capacitor's native Back event so a quick double press really exits.
+const lastHardwareBackRef = useRef(0);
+useEffect(() => {
+  const unwindFeed = () => {
+    setNotificationsOpen(false);
+    setStory('');
+    setComposer(false);
+    setOpenCommentPost(null);
+    setMenu(false);
+    const prior = navHistoryRef.current.pop();
+    setPreviousActive([...navHistoryRef.current]);
+    setActive(prior || 'Home');
+  };
+
+  if (Capacitor.isNativePlatform()) {
+    const listener = App.addListener('backButton', () => {
+      const now = Date.now();
+      if (now - lastHardwareBackRef.current < 1800) {
+        void App.exitApp();
+        return;
+      }
+      lastHardwareBackRef.current = now;
+      unwindFeed();
+    });
+    return () => { void listener.then(handle => handle.remove()); };
+  }
+
+  // Browser fallback: preserve normal history and never pretend a website can close itself.
+  const handlePopState = () => {
+    unwindFeed();
+    window.history.pushState({ uceno: true }, '', '#uceno');
+  };
+  window.history.pushState({ uceno: true }, '', '#uceno');
+  window.addEventListener('popstate', handlePopState);
+  return () => window.removeEventListener('popstate', handlePopState);
+}, []);
 const results=useMemo(()=>posts.filter(p=>(p.body+p.name+p.handle+(p.tag||'')).toLowerCase().includes(search.toLowerCase())),[posts,search]);
 function toast(s:string){setNotice(s);window.setTimeout(()=>setNotice(''),2600)}
 async function publishStory(){
