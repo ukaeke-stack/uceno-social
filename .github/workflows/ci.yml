@@ -14,3 +14,15 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
+      - name: Start production build for smoke checks
+        run: npm run start -- --hostname 127.0.0.1 > /tmp/uceno.log 2>&1 & echo $! > /tmp/uceno.pid
+      - name: Wait for production server
+        run: |
+          for i in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:3000/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/uceno.log
+          exit 1
+      - name: Verify public routes and authentication boundaries
+        run: UCENO_BASE_URL=http://127.0.0.1:3000 npm run test:smoke
