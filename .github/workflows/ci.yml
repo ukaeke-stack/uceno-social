@@ -57,11 +57,7 @@ jobs:
             set -eu
             echo "Workspace: $GITHUB_WORKSPACE"
             APK="$(find "$GITHUB_WORKSPACE" -type f -path '*/app/build/outputs/apk/debug/app-debug.apk' -print -quit)"
-            if [ -z "$APK" ] || [ ! -f "$APK" ]; then
-              echo "::error::Debug APK was not found. Listing APK outputs:"
-              find "$GITHUB_WORKSPACE" -type f -name '*.apk' -print
-              exit 1
-            fi
+            [ -n "$APK" ] && [ -f "$APK" ] || { echo "::error::Debug APK was not found. Listing APK outputs:"; find "$GITHUB_WORKSPACE" -type f -name '*.apk' -print; exit 1; }
             echo "Installing APK: $APK"
             adb install -r "$APK"
             adb logcat -c
@@ -69,15 +65,8 @@ jobs:
             sleep 25
             adb logcat -d -t 8000 > "$GITHUB_WORKSPACE/uceno-android-logcat.txt"
             adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/uceno-android-activities.txt"
-            if ! adb shell pidof com.ukaeke.uceno >/dev/null 2>&1; then
-              echo "::error::UCENO process exited after launch. Log excerpt:"
-              grep -Ei "FATAL EXCEPTION|AndroidRuntime|com\\.ukaeke\\.uceno|chromium|Capacitor" "$GITHUB_WORKSPACE/uceno-android-logcat.txt" | tail -n 180 || tail -n 180 "$GITHUB_WORKSPACE/uceno-android-logcat.txt"
-              exit 1
-            fi
-            if grep -E "FATAL EXCEPTION|Process: com\\.ukaeke\\.uceno.*has died" "$GITHUB_WORKSPACE/uceno-android-logcat.txt"; then
-              echo "::error::Android logs show a startup crash."
-              exit 1
-            fi
+            adb shell pidof com.ukaeke.uceno >/dev/null 2>&1 || { echo "::error::UCENO process exited after launch. Log excerpt:"; grep -Ei "FATAL EXCEPTION|AndroidRuntime|com\\.ukaeke\\.uceno|chromium|Capacitor" "$GITHUB_WORKSPACE/uceno-android-logcat.txt" | tail -n 180 || tail -n 180 "$GITHUB_WORKSPACE/uceno-android-logcat.txt"; exit 1; }
+            ! grep -E "FATAL EXCEPTION|Process: com\\.ukaeke\\.uceno.*has died" "$GITHUB_WORKSPACE/uceno-android-logcat.txt" || { echo "::error::Android logs show a startup crash."; exit 1; }
             echo "UCENO remained running for 25 seconds after launch."
       - name: Upload APK and Android diagnostics
         if: always()
