@@ -45,6 +45,36 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+      - name: Configure native Firebase for Android push
+        env:
+          FIREBASE_JSON: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON }}
+        run: |
+          test -n "$FIREBASE_JSON" || { echo "::error::Missing FIREBASE_GOOGLE_SERVICES_JSON secret; Android Firebase cannot initialize without the native config."; exit 1; }
+          mkdir -p android/app
+          printf '%s' "$FIREBASE_JSON" > android/app/google-services.json
+          node -e "JSON.parse(require('fs').readFileSync('android/app/google-services.json','utf8'))"
+          node <<'NODE'
+          const fs = require('fs');
+          const root = 'android/build.gradle';
+          let r = fs.readFileSync(root, 'utf8');
+          if (!r.includes('com.google.gms:google-services')) {
+            if (!r.includes('dependencies {')) throw new Error('Google Services Gradle dependency block not found');
+            r = r.replace('dependencies {', "dependencies {\n        classpath 'com.google.gms:google-services:4.4.2'");
+            fs.writeFileSync(root, r);
+          }
+          const file = 'android/app/build.gradle';
+          let a = fs.readFileSync(file, 'utf8');
+          if (!a.includes('com.google.gms.google-services')) {
+            a += "\napply plugin: 'com.google.gms.google-services'\n";
+            fs.writeFileSync(file, a);
+          }
+          const config = JSON.parse(fs.readFileSync('android/app/google-services.json', 'utf8'));
+          const clients = config.client || [];
+          if (!clients.some(c => c.client_info?.android_client_info?.package_name === 'com.ukaeke.uceno')) {
+            throw new Error('google-services.json has no Android client for com.ukaeke.uceno');
+          }
+          console.log('Native Firebase config validated for com.ukaeke.uceno.');
+          NODE
       - name: Compile Android debug APK
         run: cd android && ./gradlew assembleDebug
       - name: Launch APK on Android emulator and collect crash diagnostics
@@ -55,11 +85,9 @@ jobs:
           profile: pixel_2
           script: |
             set -eu
-            echo "Workspace: $GITHUB_WORKSPACE"
             APK="$GITHUB_WORKSPACE/android/app/build/outputs/apk/debug/app-debug.apk"
             ls -l "$APK"
             test -f "$APK"
-            echo "Installing APK: $APK"
             adb install -r "$APK"
             adb logcat -c
             adb shell monkey -p com.ukaeke.uceno 1
