@@ -1,0 +1,9 @@
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS bio VARCHAR(280) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS avatar_url TEXT,
+  ADD COLUMN IF NOT EXISTS location VARCHAR(120) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS website VARCHAR(240) NOT NULL DEFAULT '';
+
+ALTER TABLE users
+  ADD CONSTRAINT users_website_https_check
+  CHECK (website = '' OR website ~ '^https://[^[:space:]]+$');
