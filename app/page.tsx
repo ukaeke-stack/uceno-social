@@ -44,7 +44,30 @@ async function toggleProfileFollow(){
 }
 function goBack(){if(exitPrompt){setExitPrompt(false);return}if(notificationsOpen){setNotificationsOpen(false);return}if(story){setStory('');return}if(composer){setComposer(false);return}if(openCommentPost!==null){setOpenCommentPost(null);return}if(menu){setMenu(false);return}const prior=navHistoryRef.current.pop();setPreviousActive([...navHistoryRef.current]);setActive(prior||'Home')}
 function exitApp(){setExitPrompt(false);window.location.assign('/exit')}
-// Let the browser and Capacitor history handle hardware Back so nested pages unwind naturally.
+// On the feed, keep a history sentinel so Android hardware Back unwinds in-app panels/tabs.
+const lastHardwareBackRef = useRef(0);
+useEffect(() => {
+  const handlePopState = () => {
+    const now = Date.now();
+    if (now - lastHardwareBackRef.current < 1800) {
+      window.location.assign('/exit');
+      return;
+    }
+    lastHardwareBackRef.current = now;
+    setNotificationsOpen(false);
+    setStory('');
+    setComposer(false);
+    setOpenCommentPost(null);
+    setMenu(false);
+    const prior = navHistoryRef.current.pop();
+    setPreviousActive([...navHistoryRef.current]);
+    setActive(prior || 'Home');
+    window.history.pushState({ uceno: true }, '', '#uceno');
+  };
+  window.history.pushState({ uceno: true }, '', '#uceno');
+  window.addEventListener('popstate', handlePopState);
+  return () => window.removeEventListener('popstate', handlePopState);
+}, []);
 const results=useMemo(()=>posts.filter(p=>(p.body+p.name+p.handle+(p.tag||'')).toLowerCase().includes(search.toLowerCase())),[posts,search]);
 function toast(s:string){setNotice(s);window.setTimeout(()=>setNotice(''),2600)}
 async function publishStory(){
