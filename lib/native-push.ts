@@ -18,6 +18,10 @@ export async function registerNativePush(): Promise<void> {
     return;
   }
 
+  if (Capacitor.getPlatform() === 'android') {
+    await PushNotifications.createChannel({ id: 'uceno_notifications', name: 'UCENO notifications', importance: 5, sound: 'default' });
+  }
+
   await PushNotifications.addListener('registration', async ({ value }) => {
     try {
       await fetch('/api/push/register', {
