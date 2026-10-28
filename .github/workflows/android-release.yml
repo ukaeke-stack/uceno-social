@@ -48,6 +48,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Generate Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+
       - name: Configure Firebase
         env:
           FIREBASE_JSON: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON }}
@@ -55,11 +60,6 @@ jobs:
           mkdir -p android/app
           printf '%s' "$FIREBASE_JSON" > android/app/google-services.json
           node -e "JSON.parse(require('fs').readFileSync('android/app/google-services.json','utf8'))"
-
-      - name: Generate Android project
-        run: |
-          npx cap add android
-          npx cap sync android
 
       - name: Configure Google Services and release version
         env:
