@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { registerNativePush } from '@/lib/native-push';
 import { Activity, ArrowLeft, ArrowUpRight, Bell, Bookmark, Check, ChevronDown, Compass, Flame, Hash, Heart, Home, Image, LogOut, Menu, MessageCircle, MoreHorizontal, Plus, Radio, Repeat2, Search, Send, Settings2, ShieldCheck, Sparkles, Users, Video, Volume2, VolumeX, X, Share2 } from 'lucide-react';
 type Post = { id:string|number; name:string; handle:string; time:string; avatar:string; verified?:boolean; body:string; image?:string; mediaUrl?:string|null; mediaType?:'image'|'video'|null; likes:number; comments:number; reposts:number; tag?:string };
@@ -44,16 +46,10 @@ async function toggleProfileFollow(){
 }
 function goBack(){if(exitPrompt){setExitPrompt(false);return}if(notificationsOpen){setNotificationsOpen(false);return}if(story){setStory('');return}if(composer){setComposer(false);return}if(openCommentPost!==null){setOpenCommentPost(null);return}if(menu){setMenu(false);return}const prior=navHistoryRef.current.pop();setPreviousActive([...navHistoryRef.current]);setActive(prior||'Home')}
 function exitApp(){setExitPrompt(false);window.location.assign('/exit')}
-// On the feed, keep a history sentinel so Android hardware Back unwinds in-app panels/tabs.
+// Android uses Capacitor's native Back event so a quick double press really exits.
 const lastHardwareBackRef = useRef(0);
 useEffect(() => {
-  const handlePopState = () => {
-    const now = Date.now();
-    if (now - lastHardwareBackRef.current < 1800) {
-      window.location.assign('/exit');
-      return;
-    }
-    lastHardwareBackRef.current = now;
+  const unwindFeed = () => {
     setNotificationsOpen(false);
     setStory('');
     setComposer(false);
@@ -62,6 +58,24 @@ useEffect(() => {
     const prior = navHistoryRef.current.pop();
     setPreviousActive([...navHistoryRef.current]);
     setActive(prior || 'Home');
+  };
+
+  if (Capacitor.isNativePlatform()) {
+    const listener = App.addListener('backButton', () => {
+      const now = Date.now();
+      if (now - lastHardwareBackRef.current < 1800) {
+        void App.exitApp();
+        return;
+      }
+      lastHardwareBackRef.current = now;
+      unwindFeed();
+    });
+    return () => { void listener.then(handle => handle.remove()); };
+  }
+
+  // Browser fallback: preserve normal history and never pretend a website can close itself.
+  const handlePopState = () => {
+    unwindFeed();
     window.history.pushState({ uceno: true }, '', '#uceno');
   };
   window.history.pushState({ uceno: true }, '', '#uceno');
