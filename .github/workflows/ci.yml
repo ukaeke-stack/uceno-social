@@ -29,7 +29,7 @@ jobs:
 
   android-shell:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,11 +45,93 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+      - name: Configure native Firebase for Android push
+        env:
+          FIREBASE_JSON: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON }}
+        run: |
+          test -n "$FIREBASE_JSON" || { echo "::error::Missing FIREBASE_GOOGLE_SERVICES_JSON secret; Android Firebase cannot initialize without the native config."; exit 1; }
+          mkdir -p android/app
+          printf '%s' "$FIREBASE_JSON" > android/app/google-services.json
+          node -e "JSON.parse(require('fs').readFileSync('android/app/google-services.json','utf8'))"
+          node <<'NODE'
+          const fs = require('fs');
+          const root = 'android/build.gradle';
+          let r = fs.readFileSync(root, 'utf8');
+          if (!r.includes('com.google.gms:google-services')) {
+            if (!r.includes('dependencies {')) throw new Error('Google Services Gradle dependency block not found');
+            r = r.replace('dependencies {', "dependencies {\n        classpath 'com.google.gms:google-services:4.4.2'");
+            fs.writeFileSync(root, r);
+          }
+          const file = 'android/app/build.gradle';
+          let a = fs.readFileSync(file, 'utf8');
+          if (!a.includes('com.google.gms.google-services')) {
+            a += "\napply plugin: 'com.google.gms.google-services'\n";
+            fs.writeFileSync(file, a);
+          }
+          const config = JSON.parse(fs.readFileSync('android/app/google-services.json', 'utf8'));
+          const clients = config.client || [];
+          if (!clients.some(c => c.client_info?.android_client_info?.package_name === 'com.ukaeke.uceno')) {
+            throw new Error('google-services.json has no Android client for com.ukaeke.uceno');
+          }
+          console.log('Native Firebase config validated for com.ukaeke.uceno.');
+          NODE
       - name: Compile Android debug APK
         run: cd android && ./gradlew assembleDebug
-      - uses: actions/upload-artifact@v4
+      - name: Launch APK on Android emulator and collect crash diagnostics
+        uses: reactivecircus/android-emulator-runner@v2
         with:
-          name: uceno-android-debug-smoke
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            set -eu
+            mkdir -p diagnostics
+            trap 'mkdir -p diagnostics; timeout 20s adb logcat -d -v threadtime > diagnostics/uceno-android-logcat.txt 2>&1 || true; timeout 20s adb shell dumpsys activity activities > diagnostics/uceno-android-activities.txt 2>&1 || true; timeout 20s adb shell dumpsys package com.ukaeke.uceno > diagnostics/uceno-package.txt 2>&1 || true' EXIT
+            echo "Working directory: $PWD"
+            APK="android/app/build/outputs/apk/debug/app-debug.apk"
+            if [ ! -f "$APK" ]; then echo "::error::Compiled APK not found at $APK"; echo "APK output directory contents:"; find android/app/build/outputs -maxdepth 5 -type f -print 2>/dev/null || true; exit 1; fi
+            ls -lh "$APK"
+            echo "Waiting for emulator boot to complete"
+            timeout 120s adb wait-for-device
+            for i in $(seq 1 60); do
+              BOOTED="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+              if [ "$BOOTED" = "1" ]; then break; fi
+              sleep 2
+            done
+            test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" || { echo "::error::Emulator did not finish booting"; exit 1; }
+            adb shell input keyevent 82 || true
+            adb logcat -c
+            echo "Installing UCENO APK"
+            timeout 90s adb install -r "$APK"
+            echo "Installed package:"
+            adb shell pm path com.ukaeke.uceno
+            echo "Launching UCENO"
+            timeout 30s adb shell monkey -v -p com.ukaeke.uceno 1 2>&1 | tee diagnostics/uceno-launch.txt
+            sleep 5
+            if ! adb shell pidof com.ukaeke.uceno >/dev/null 2>&1; then
+              echo "::error::UCENO process is not running after launch; capturing immediate diagnostics"
+              adb logcat -d -v threadtime > diagnostics/uceno-android-logcat.txt || true
+              adb shell dumpsys activity activities > diagnostics/uceno-android-activities.txt || true
+              grep -Ei 'FATAL EXCEPTION|AndroidRuntime|com\.ukaeke\.uceno|chromium|Capacitor|Firebase|Exception|SIGABRT|SIGSEGV' diagnostics/uceno-android-logcat.txt | tail -n 240 || true
+              exit 1
+            fi
+            sleep 25
+            adb logcat -d -v threadtime > diagnostics/uceno-android-logcat.txt
+            adb shell dumpsys activity activities > diagnostics/uceno-android-activities.txt
+            adb shell dumpsys package com.ukaeke.uceno > diagnostics/uceno-package.txt
+            if grep -E 'FATAL EXCEPTION|Process: com\.ukaeke\.uceno.*has died' diagnostics/uceno-android-logcat.txt; then
+              echo "::error::Android logs show a UCENO startup crash."
+              exit 1
+            fi
+            echo "UCENO remained running for 25 seconds after launch."
+      - name: Upload APK and Android diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uceno-android-diagnostics
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            diagnostics/
+          if-no-files-found: warn
           retention-days: 7
