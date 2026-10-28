@@ -86,24 +86,24 @@ jobs:
           disable-animations: false
           script: |
             set -eu
-            mkdir -p "$GITHUB_WORKSPACE/diagnostics"
-            trap 'mkdir -p "$GITHUB_WORKSPACE/diagnostics"; adb logcat -d -t 8000 > "$GITHUB_WORKSPACE/diagnostics/uceno-android-logcat.txt" 2>&1 || true; adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/diagnostics/uceno-android-activities.txt" 2>&1 || true' EXIT
-            APK="$GITHUB_WORKSPACE/android/app/build/outputs/apk/debug/app-debug.apk"
+            mkdir -p "diagnostics"
+            trap 'mkdir -p "diagnostics"; adb logcat -d -t 8000 > "diagnostics/uceno-android-logcat.txt" 2>&1 || true; adb shell dumpsys activity activities > "diagnostics/uceno-android-activities.txt" 2>&1 || true' EXIT
+            APK="android/app/build/outputs/apk/debug/app-debug.apk"
             ls -l "$APK"
             test -f "$APK"
             adb install -r "$APK"
             adb logcat -c
             adb shell monkey -p com.ukaeke.uceno 1
             sleep 25
-            mkdir -p "$GITHUB_WORKSPACE/diagnostics"
-            adb logcat -d -t 8000 > "$GITHUB_WORKSPACE/diagnostics/uceno-android-logcat.txt"
-            adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/diagnostics/uceno-android-activities.txt"
+            mkdir -p "diagnostics"
+            adb logcat -d -t 8000 > "diagnostics/uceno-android-logcat.txt"
+            adb shell dumpsys activity activities > "diagnostics/uceno-android-activities.txt"
             if ! adb shell pidof com.ukaeke.uceno >/dev/null 2>&1; then
               echo "::error::UCENO process exited after launch. Log excerpt:"
-              grep -Ei "FATAL EXCEPTION|AndroidRuntime|com\\.ukaeke\\.uceno|chromium|Capacitor|Firebase" "$GITHUB_WORKSPACE/diagnostics/uceno-android-logcat.txt" | tail -n 180 || tail -n 180 "$GITHUB_WORKSPACE/diagnostics/uceno-android-logcat.txt"
+              grep -Ei "FATAL EXCEPTION|AndroidRuntime|com\\.ukaeke\\.uceno|chromium|Capacitor|Firebase" "diagnostics/uceno-android-logcat.txt" | tail -n 180 || tail -n 180 "diagnostics/uceno-android-logcat.txt"
               exit 1
             fi
-            if grep -E "FATAL EXCEPTION|Process: com\\.ukaeke\\.uceno.*has died" "$GITHUB_WORKSPACE/diagnostics/uceno-android-logcat.txt"; then
+            if grep -E "FATAL EXCEPTION|Process: com\\.ukaeke\\.uceno.*has died" "diagnostics/uceno-android-logcat.txt"; then
               echo "::error::Android logs show a startup crash."
               exit 1
             fi
