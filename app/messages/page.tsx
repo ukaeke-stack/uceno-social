@@ -44,7 +44,10 @@ export default function MessagesPage() {
       const data = await response.json();
       if (response.status === 401) { window.location.replace('/account'); return; }
       if (!response.ok) throw new Error(data.error || 'Could not load conversations');
-      setConversations(Array.isArray(data.conversations) ? data.conversations : []);
+      const items = Array.isArray(data.conversations) ? data.conversations as Conversation[] : [];
+      setConversations(items);
+      const requestedId = new URLSearchParams(window.location.search).get('conversation');
+      if (requestedId) { const requested = items.find(item => item.id === requestedId); if (requested) setSelected(requested); }
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load conversations');

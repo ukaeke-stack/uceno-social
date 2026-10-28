@@ -1,0 +1,30 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft, MessageCircle, Phone, Video, UserRound, CalendarDays, Users, FileText, Heart, MessageSquare } from 'lucide-react';
+
+type Profile = { id:string; displayName:string; handle:string; joinedAt:string; followers:number; following:number; postCount:number; isFollowing:boolean; isOwnProfile?:boolean; bio?:string; location?:string; website?:string; avatarUrl?:string|null };
+type Post = { id:string; body:string; createdAt:string; likes:number; comments:number; mediaUrl?:string|null; mediaType?:'image'|'video'|null };
+
+export default function UserHomePage() {
+  const params = useParams<{handle:string}>(); const router = useRouter();
+  const [data,setData] = useState<{profile:Profile;posts:Post[]}|null>(null);
+  const [busy,setBusy] = useState(false); const [error,setError] = useState('');
+  const handle = String(params.handle||'').replace(/^@/,'').toLowerCase();
+  useEffect(()=>{let cancelled=false;fetch('/api/users/'+encodeURIComponent(handle),{cache:'no-store'}).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load this user');return d}).then(d=>{if(!cancelled)setData(d)}).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:'Could not load this user')});return()=>{cancelled=true}},[handle]);
+  async function follow(){if(!data||busy)return;setBusy(true);try{const r=await fetch('/api/users/'+encodeURIComponent(handle)+'/follow',{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Follow failed');setData(old=>old?({...old,profile:{...old.profile,isFollowing:!!d.following,followers:Math.max(0,old.profile.followers+(d.following?1:-1))}}):old)}catch(e){setError(e instanceof Error?e.message:'Follow failed')}finally{setBusy(false)}}
+  async function messageOrCall(mode?:'audio'|'video'){setBusy(true);setError('');try{const r=await fetch('/api/conversations',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({handle})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not start conversation');if(!mode){router.push('/messages?conversation='+encodeURIComponent(d.conversation.id));return}router.push('/calls?room='+encodeURIComponent(d.conversation.id)+'&mode='+mode)}catch(e){setError(e instanceof Error?e.message:'Could not start conversation')}finally{setBusy(false)}}
+  if(error&&!data)return <main className="user-page"><button className="user-back" onClick={()=>router.back()}><ArrowLeft size={17}/> Back</button><p role="alert">{error}</p></main>;
+  if(!data)return <main className="user-page"><p>Loading user homepage…</p></main>;
+  const p=data.profile;
+  return <main className="user-page"><header className="user-page-top"><button className="user-back" onClick={()=>router.back()}><ArrowLeft size={17}/> Back</button><strong>UCENO · @{p.handle}</strong></header>
+    <section className="user-cover"><div className="user-cover-glow"/><div className="user-avatar-large">{p.avatarUrl?<img src={p.avatarUrl} alt={p.displayName}/>:<UserRound size={35}/>}</div><div className="user-cover-actions"><button onClick={()=>router.push('/u/'+encodeURIComponent(handle)+'/profile')}>View full profile</button></div></section>
+    <section className="user-home-card"><div className="user-name-row"><div><h1>{p.displayName}</h1><p>@{p.handle}</p></div>{!p.isOwnProfile&&<button className="user-follow-button" onClick={()=>void follow()} disabled={busy}>{p.isFollowing?'Following':'Follow'}</button>}</div>{p.bio&&<p className="user-profile-intro">{p.bio}</p>}{p.location&&<p className="user-profile-meta">Location: {p.location}</p>}{p.website&&<p className="user-profile-meta"><a href={p.website} target="_blank" rel="noreferrer">{p.website}</a></p>}
+      <div className="user-stats"><span><FileText size={17}/><b>{p.postCount}</b> posts</span><span><Users size={17}/><b>{p.followers}</b> followers</span><span><Users size={17}/><b>{p.following}</b> following</span></div>
+      {!p.isOwnProfile&&<div className="user-action-row"><button onClick={()=>void messageOrCall()} disabled={busy}><MessageCircle size={17}/> Message</button><button onClick={()=>void messageOrCall('audio')} disabled={busy}><Phone size={17}/> Audio call</button><button onClick={()=>void messageOrCall('video')} disabled={busy}><Video size={17}/> Video call</button></div>}
+    </section>
+    <section className="user-posts-section"><div className="user-section-heading"><h2>Homepage</h2><p>Posts shared by @{p.handle}</p></div>{data.posts.length?data.posts.map(post=><article className="user-post-card" key={post.id}><div className="user-post-meta"><strong>{p.displayName}</strong><span>{new Date(post.createdAt).toLocaleString()}</span></div>{post.body&&<p>{post.body}</p>}{post.mediaType==='video'&&post.mediaUrl&&<video src={post.mediaUrl} controls playsInline/>}{post.mediaType==='image'&&post.mediaUrl&&<img src={post.mediaUrl} alt="Post media"/>}<div className="user-post-engagement"><span><Heart size={15}/> {post.likes} likes</span><span><MessageSquare size={15}/> {post.comments} comments</span></div></article>):<div className="user-empty"><FileText size={25}/><strong>No public posts yet</strong><span>When this person shares a post, it will appear here.</span></div>}</section>
+    {error&&<p className="user-inline-error" role="alert">{error}</p>}
+  </main>;
+}
