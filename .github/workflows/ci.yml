@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -45,6 +45,28 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+      - name: Configure Firebase for Android
+        env:
+          FIREBASE_JSON: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON }}
+        run: |
+          test -n "$FIREBASE_JSON" || { echo "::error::Missing FIREBASE_GOOGLE_SERVICES_JSON secret; cannot validate Firebase initialization."; exit 1; }
+          mkdir -p android/app
+          printf '%s' "$FIREBASE_JSON" > android/app/google-services.json
+          node -e "const j=JSON.parse(require('fs').readFileSync('android/app/google-services.json','utf8')); if (!j.project_info?.project_id || !j.client?.length) throw new Error('Firebase config is missing project_info or client'); if (!j.client.some(c => c.client_info?.android_client_info?.package_name === 'com.ukaeke.uceno')) throw new Error('google-services.json does not contain package com.ukaeke.uceno');"
+          node <<'NODE'
+          const fs = require('fs');
+          const root = 'android/build.gradle';
+          let r = fs.readFileSync(root, 'utf8');
+          if (!r.includes('com.google.gms:google-services')) {
+            if (!r.includes('dependencies {')) throw new Error('Google Services Gradle dependency block not found');
+            r = r.replace('dependencies {', "dependencies {\n        classpath 'com.google.gms:google-services:4.4.2'");
+            fs.writeFileSync(root, r);
+          }
+          const file = 'android/app/build.gradle';
+          let a = fs.readFileSync(file, 'utf8');
+          if (!a.includes("com.google.gms.google-services")) a += "\napply plugin: 'com.google.gms.google-services'\n";
+          fs.writeFileSync(file, a);
+          NODE
       - name: Compile Android debug APK
         run: cd android && ./gradlew assembleDebug
       - name: Launch APK on Android emulator and collect crash diagnostics
@@ -55,17 +77,14 @@ jobs:
           profile: pixel_2
           script: |
             set -eu
-            echo "Workspace: $GITHUB_WORKSPACE"
-            APK="$(find "$GITHUB_WORKSPACE" -type f -path '*/app/build/outputs/apk/debug/app-debug.apk' -print -quit)"
-            [ -n "$APK" ] && [ -f "$APK" ] || { echo "::error::Debug APK was not found. Listing APK outputs:"; find "$GITHUB_WORKSPACE" -type f -name '*.apk' -print; exit 1; }
-            echo "Installing APK: $APK"
-            adb install -r "$APK"
+            echo "Installing generated UCENO APK"
+            adb install -r "$GITHUB_WORKSPACE/android/app/build/outputs/apk/debug/app-debug.apk"
             adb logcat -c
             adb shell monkey -p com.ukaeke.uceno 1
             sleep 25
             adb logcat -d -t 8000 > "$GITHUB_WORKSPACE/uceno-android-logcat.txt"
             adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/uceno-android-activities.txt"
-            adb shell pidof com.ukaeke.uceno >/dev/null 2>&1 || { echo "::error::UCENO process exited after launch. Log excerpt:"; grep -Ei "FATAL EXCEPTION|AndroidRuntime|com\\.ukaeke\\.uceno|chromium|Capacitor" "$GITHUB_WORKSPACE/uceno-android-logcat.txt" | tail -n 180 || tail -n 180 "$GITHUB_WORKSPACE/uceno-android-logcat.txt"; exit 1; }
+            adb shell pidof com.ukaeke.uceno >/dev/null 2>&1 || { echo "::error::UCENO process exited after launch."; grep -Ei "FATAL EXCEPTION|AndroidRuntime|FirebaseApp|com\\.ukaeke\\.uceno|chromium|Capacitor" "$GITHUB_WORKSPACE/uceno-android-logcat.txt" | tail -n 180 || true; exit 1; }
             ! grep -E "FATAL EXCEPTION|Process: com\\.ukaeke\\.uceno.*has died" "$GITHUB_WORKSPACE/uceno-android-logcat.txt" || { echo "::error::Android logs show a startup crash."; exit 1; }
             echo "UCENO remained running for 25 seconds after launch."
       - name: Upload APK and Android diagnostics
