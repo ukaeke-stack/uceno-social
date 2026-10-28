@@ -83,8 +83,11 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_2
+          disable-animations: false
           script: |
             set -eu
+            mkdir -p "$GITHUB_WORKSPACE/diagnostics"
+            trap 'mkdir -p "$GITHUB_WORKSPACE/diagnostics"; adb logcat -d -t 8000 > "$GITHUB_WORKSPACE/diagnostics/uceno-android-logcat.txt" 2>&1 || true; adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/diagnostics/uceno-android-activities.txt" 2>&1 || true' EXIT
             APK="$GITHUB_WORKSPACE/android/app/build/outputs/apk/debug/app-debug.apk"
             ls -l "$APK"
             test -f "$APK"
