@@ -30,7 +30,7 @@ export async function GET(_request: Request, context: { params: Promise<{ handle
     }
 
     const posts = await sql`
-      SELECT p.id, p.body, p.created_at AS "createdAt",
+      SELECT p.id, p.body, p.media_url AS "mediaUrl", p.media_type AS "mediaType", p.created_at AS "createdAt",
         (SELECT COUNT(*)::int FROM post_likes l WHERE l.post_id = p.id) AS likes,
         (SELECT COUNT(*)::int FROM comments c WHERE c.post_id = p.id) AS comments
       FROM posts p
