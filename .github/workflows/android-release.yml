@@ -1,6 +1,12 @@
 name: UCENO Android Release
 
 on:
+  # Run the signed release build when this workflow is updated on main, so a
+  # release can still be produced if the manual workflow-dispatch UI fails.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-release.yml'
   workflow_dispatch:
     inputs:
       version_name:
@@ -36,8 +42,8 @@ jobs:
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          VERSION_CODE: ${{ inputs.version_code }}
-          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code || '1000' }}
+          VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
         run: |
           test -n "$FIREBASE_JSON" || (echo "::error::Missing FIREBASE_GOOGLE_SERVICES_JSON secret"; exit 1)
           test -n "$KEYSTORE" || (echo "::error::Missing ANDROID_KEYSTORE_BASE64 secret"; exit 1)
@@ -75,8 +81,8 @@ jobs:
 
       - name: Configure Google Services and release version
         env:
-          VERSION_CODE: ${{ inputs.version_code }}
-          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code || '1000' }}
+          VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
         run: |
           node <<'NODE'
           const fs = require('fs');
@@ -140,7 +146,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: uceno-android-release-${{ inputs.version_name }}-code-${{ inputs.version_code }}
+          name: uceno-android-release-${{ inputs.version_name || '1.0.0' }}-code-${{ inputs.version_code || '1000' }}
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
