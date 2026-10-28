@@ -87,17 +87,26 @@ jobs:
           script: |
             set -eu
             mkdir -p "diagnostics"
-            trap 'mkdir -p "diagnostics"; adb logcat -d -t 8000 > "diagnostics/uceno-android-logcat.txt" 2>&1 || true; adb shell dumpsys activity activities > "diagnostics/uceno-android-activities.txt" 2>&1 || true' EXIT
+            trap 'mkdir -p "diagnostics"; timeout 20s adb logcat -d -t 8000 > "diagnostics/uceno-android-logcat.txt" 2>&1 || true; timeout 20s adb shell dumpsys activity activities > "diagnostics/uceno-android-activities.txt" 2>&1 || true' EXIT
             APK="android/app/build/outputs/apk/debug/app-debug.apk"
+            echo "::group::Verify APK path"
+            pwd
             ls -l "$APK"
             test -f "$APK"
-            adb install -r "$APK"
-            adb logcat -c
-            adb shell monkey -p com.ukaeke.uceno 1
+            echo "::endgroup::"
+            echo "::group::Install APK"
+            timeout 60s adb install -r "$APK"
+            echo "::endgroup::"
+            timeout 20s adb logcat -c
+            echo "::group::Launch UCENO"
+            timeout 30s adb shell monkey -p com.ukaeke.uceno 1
+            echo "::endgroup::"
             sleep 25
             mkdir -p "diagnostics"
-            adb logcat -d -t 8000 > "diagnostics/uceno-android-logcat.txt"
-            adb shell dumpsys activity activities > "diagnostics/uceno-android-activities.txt"
+            echo "::group::Capture Android logs"
+            timeout 30s adb logcat -d -t 8000 > "diagnostics/uceno-android-logcat.txt"
+            timeout 30s adb shell dumpsys activity activities > "diagnostics/uceno-android-activities.txt"
+            echo "::endgroup::"
             if ! adb shell pidof com.ukaeke.uceno >/dev/null 2>&1; then
               echo "::error::UCENO process exited after launch. Log excerpt:"
               grep -Ei "FATAL EXCEPTION|AndroidRuntime|com\\.ukaeke\\.uceno|chromium|Capacitor|Firebase" "diagnostics/uceno-android-logcat.txt" | tail -n 180 || tail -n 180 "diagnostics/uceno-android-logcat.txt"
