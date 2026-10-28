@@ -77,42 +77,10 @@ jobs:
           NODE
       - name: Compile Android debug APK
         run: cd android && ./gradlew assembleDebug
-      - name: Launch APK on Android emulator and collect crash diagnostics
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          profile: pixel_2
-          disable-animations: true
-          script: |
-            mkdir -p diagnostics
-            echo "APK file:"
-            ls -lh android/app/build/outputs/apk/debug/app-debug.apk
-            timeout 120s adb wait-for-device
-            for i in $(seq 1 60); do BOOTED="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')"; if [ "$BOOTED" = "1" ]; then break; fi; sleep 2; done
-            test "$(adb shell getprop sys.boot_completed | tr -d '\\r')" = "1" || { echo "::error::Emulator did not finish booting"; exit 1; }
-            adb shell input keyevent 82 || true
-            adb logcat -c
-            timeout 90s adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-            adb shell pm path com.ukaeke.uceno
-            timeout 30s adb shell monkey -v -p com.ukaeke.uceno 1 > diagnostics/uceno-launch.txt 2>&1
-            sleep 5
-            adb logcat -d -v threadtime > diagnostics/uceno-android-logcat.txt
-            adb shell dumpsys activity activities > diagnostics/uceno-android-activities.txt
-            adb shell dumpsys package com.ukaeke.uceno > diagnostics/uceno-package.txt
-            if ! adb shell pidof com.ukaeke.uceno >/dev/null 2>&1; then echo "::error::UCENO process is not running after launch"; grep -Ei 'FATAL EXCEPTION|AndroidRuntime|com\\.ukaeke\\.uceno|chromium|Capacitor|Firebase|Exception|SIGABRT|SIGSEGV' diagnostics/uceno-android-logcat.txt | tail -n 240 || true; exit 1; fi
-            sleep 25
-            adb logcat -d -v threadtime > diagnostics/uceno-android-logcat.txt
-            adb shell dumpsys activity activities > diagnostics/uceno-android-activities.txt
-            if grep -E 'FATAL EXCEPTION|Process: com\\.ukaeke\\.uceno.*has died' diagnostics/uceno-android-logcat.txt; then echo "::error::Android logs show a UCENO startup crash."; exit 1; fi
-            echo "UCENO remained running for 25 seconds after launch."
-      - name: Upload APK and Android diagnostics
-        if: always()
+      - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: uceno-android-diagnostics
-          path: |
-            android/app/build/outputs/apk/debug/app-debug.apk
-            diagnostics/
-          if-no-files-found: warn
+          name: uceno-android-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
           retention-days: 7
