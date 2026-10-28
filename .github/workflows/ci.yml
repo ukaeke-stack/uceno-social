@@ -56,17 +56,26 @@ jobs:
           script: |
             set -eu
             echo "Workspace: $GITHUB_WORKSPACE"
-            APK="$(find "$GITHUB_WORKSPACE" -type f -path '*/app/build/outputs/apk/debug/app-debug.apk' -print -quit)"
-            [ -n "$APK" ] && [ -f "$APK" ] || { echo "::error::Debug APK was not found. Listing APK outputs:"; find "$GITHUB_WORKSPACE" -type f -name '*.apk' -print; exit 1; }
+            APK="$GITHUB_WORKSPACE/android/app/build/outputs/apk/debug/app-debug.apk"
+            ls -l "$APK"
+            test -f "$APK"
             echo "Installing APK: $APK"
             adb install -r "$APK"
             adb logcat -c
             adb shell monkey -p com.ukaeke.uceno 1
             sleep 25
-            adb logcat -d -t 8000 > "$GITHUB_WORKSPACE/uceno-android-logcat.txt"
-            adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/uceno-android-activities.txt"
-            adb shell pidof com.ukaeke.uceno >/dev/null 2>&1 || { echo "::error::UCENO process exited after launch. Log excerpt:"; grep -Ei "FATAL EXCEPTION|AndroidRuntime|com\\.ukaeke\\.uceno|chromium|Capacitor" "$GITHUB_WORKSPACE/uceno-android-logcat.txt" | tail -n 180 || tail -n 180 "$GITHUB_WORKSPACE/uceno-android-logcat.txt"; exit 1; }
-            ! grep -E "FATAL EXCEPTION|Process: com\\.ukaeke\\.uceno.*has died" "$GITHUB_WORKSPACE/uceno-android-logcat.txt" || { echo "::error::Android logs show a startup crash."; exit 1; }
+            mkdir -p "$GITHUB_WORKSPACE/diagnostics"
+            adb logcat -d -t 8000 > "$GITHUB_WORKSPACE/diagnostics/uceno-android-logcat.txt"
+            adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/diagnostics/uceno-android-activities.txt"
+            if ! adb shell pidof com.ukaeke.uceno >/dev/null 2>&1; then
+              echo "::error::UCENO process exited after launch. Log excerpt:"
+              grep -Ei "FATAL EXCEPTION|AndroidRuntime|com\\.ukaeke\\.uceno|chromium|Capacitor|Firebase" "$GITHUB_WORKSPACE/diagnostics/uceno-android-logcat.txt" | tail -n 180 || tail -n 180 "$GITHUB_WORKSPACE/diagnostics/uceno-android-logcat.txt"
+              exit 1
+            fi
+            if grep -E "FATAL EXCEPTION|Process: com\\.ukaeke\\.uceno.*has died" "$GITHUB_WORKSPACE/diagnostics/uceno-android-logcat.txt"; then
+              echo "::error::Android logs show a startup crash."
+              exit 1
+            fi
             echo "UCENO remained running for 25 seconds after launch."
       - name: Upload APK and Android diagnostics
         if: always()
@@ -75,7 +84,7 @@ jobs:
           name: uceno-android-diagnostics
           path: |
             android/app/build/outputs/apk/debug/app-debug.apk
-            uceno-android-logcat.txt
-            uceno-android-activities.txt
+            diagnostics/uceno-android-logcat.txt
+            diagnostics/uceno-android-activities.txt
           if-no-files-found: warn
           retention-days: 7
