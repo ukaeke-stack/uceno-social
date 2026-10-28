@@ -38,7 +38,7 @@ export async function createNotification(input: {
   if (!messaging) return;
   try {
     const devices = await sql`SELECT token FROM push_tokens WHERE user_id = ${input.recipientId}::uuid`;
-    const tokens = devices.map((row: { token: string }) => String(row.token)).filter(Boolean);
+    const tokens = devices.map((row) => String(row.token)).filter(Boolean);
     if (!tokens.length) return;
     const url = input.type === "message" ? "/?section=messages"
       : input.type === "follow" ? "/?section=profile"
