@@ -29,21 +29,33 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Check required secrets and version code
+      - name: Check required secrets and release inputs
         env:
           FIREBASE_JSON: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON }}
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          VERSION_NAME: ${{ inputs.version_name }}
         run: |
           test -n "$FIREBASE_JSON" || (echo "::error::Missing FIREBASE_GOOGLE_SERVICES_JSON secret"; exit 1)
           test -n "$KEYSTORE" || (echo "::error::Missing ANDROID_KEYSTORE_BASE64 secret"; exit 1)
           test -n "$STORE_PASSWORD" || (echo "::error::Missing ANDROID_KEYSTORE_PASSWORD secret"; exit 1)
           test -n "$KEY_ALIAS" || (echo "::error::Missing ANDROID_KEY_ALIAS secret"; exit 1)
           test -n "$KEY_PASSWORD" || (echo "::error::Missing ANDROID_KEY_PASSWORD secret"; exit 1)
-          case "${{ inputs.version_code }}" in ''|*[!0-9]*) echo "::error::version_code must be numeric"; exit 1;; esac
-          test "${{ inputs.version_code }}" -gt 0
+          node <<'NODE'
+          const code = process.env.VERSION_CODE ?? '';
+          const name = process.env.VERSION_NAME ?? '';
+          if (!/^[0-9]+$/.test(code)) throw new Error('version_code must contain digits only');
+          const n = Number(code);
+          if (!Number.isSafeInteger(n) || n < 1 || n > 2100000000) {
+            throw new Error('version_code must be an integer between 1 and 2100000000');
+          }
+          if (!/^[0-9]+(?:\.[0-9]+){1,3}(?:[-+][0-9A-Za-z.-]+)?$/.test(name)) {
+            throw new Error('version_name must look like 1.0.0 or 1.0.0-beta.1');
+          }
+          NODE
 
       - name: Install dependencies
         run: npm install
@@ -68,6 +80,15 @@ jobs:
         run: |
           node <<'NODE'
           const fs = require('fs');
+          const code = Number(process.env.VERSION_CODE);
+          const name = process.env.VERSION_NAME;
+          if (!Number.isSafeInteger(code) || code < 1 || code > 2100000000) {
+            throw new Error('Invalid version code');
+          }
+          if (!/^[0-9]+(?:\.[0-9]+){1,3}(?:[-+][0-9A-Za-z.-]+)?$/.test(name ?? '')) {
+            throw new Error('Invalid version name');
+          }
+
           const root = 'android/build.gradle';
           let r = fs.readFileSync(root, 'utf8');
           if (!r.includes('com.google.gms:google-services')) {
@@ -75,18 +96,23 @@ jobs:
             r = r.replace('dependencies {', "dependencies {\n        classpath 'com.google.gms:google-services:4.4.2'");
             fs.writeFileSync(root, r);
           }
+
           const file = 'android/app/build.gradle';
           let a = fs.readFileSync(file, 'utf8');
           if (!a.includes("com.google.gms.google-services")) a += "\napply plugin: 'com.google.gms.google-services'\n";
-          a = a.replace(/versionCode\s+\d+/, 'versionCode ' + process.env.VERSION_CODE);
-          a = a.replace(/versionName\s+["'][^"']+["']/, 'versionName "' + process.env.VERSION_NAME.replace(/["\\]/g, '') + '"');
+          if (!/versionCode\s+\d+/.test(a)) throw new Error('Android versionCode setting not found');
+          if (!/versionName\s+["'][^"']+["']/.test(a)) throw new Error('Android versionName setting not found');
+          a = a.replace(/versionCode\s+\d+/, 'versionCode ' + code);
+          a = a.replace(/versionName\s+["'][^"']+["']/, 'versionName "' + name + '"');
           fs.writeFileSync(file, a);
           NODE
 
       - name: Decode signing keystore
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/uceno-release.keystore"
+        run: |
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/uceno-release.keystore"
+          test -s "$RUNNER_TEMP/uceno-release.keystore"
 
       - name: Build signed release APK
         env:
@@ -101,10 +127,16 @@ jobs:
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
 
-      - name: Verify APK
+      - name: Verify APK signature
+        shell: bash
         run: |
-          test -s android/app/build/outputs/apk/release/app-release.apk
-          jarsigner -verify android/app/build/outputs/apk/release/app-release.apk
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          test -x "$APKSIGNER" || (echo "::error::Android apksigner tool was not found"; exit 1)
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          echo "APK signature verification passed."
 
       - uses: actions/upload-artifact@v4
         with:
