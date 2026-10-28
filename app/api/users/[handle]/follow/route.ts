@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
+import { createNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 const handleSchema = z.string().regex(/^[a-z0-9_]{3,24}$/);
@@ -31,9 +32,13 @@ export async function POST(_request: Request, context: { params: Promise<{ handl
         RETURNING 1
       )
       SELECT EXISTS (SELECT 1 FROM target) AS "userExists",
+             (SELECT id FROM target LIMIT 1) AS "targetId",
              EXISTS (SELECT 1 FROM inserted) AS following
     `;
     if (!rows[0]?.userExists) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    if (rows[0]?.following && rows[0]?.targetId) {
+      await createNotification({ recipientId: String(rows[0].targetId), actorId: session.id, type: "follow", message: session.handle + " followed you" });
+    }
     return NextResponse.json({ following: Boolean(rows[0].following) });
   } catch (error) {
     console.error("UCENO follow error", error);

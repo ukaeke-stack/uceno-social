@@ -7,20 +7,27 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:smoke": "node scripts/smoke-test.mjs"
+    "test:smoke": "node scripts/smoke-test.mjs",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/push-notifications": "^7.0.3",
     "@neondatabase/serverless": "^1.0.1",
     "bcryptjs": "^2.4.3",
+    "firebase-admin": "^13.5.0",
     "jose": "^6.0.8",
     "lucide-react": "^0.468.0",
+    "livekit-client": "^2.15.6",
     "next": "^15.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zod": "^3.24.2",
-    "livekit-client": "^2.15.6"
+    "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.4.3",
     "@tailwindcss/postcss": "^4.0.6",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.13.0",
