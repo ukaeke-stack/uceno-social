@@ -31,10 +31,7 @@ function navigateTo(label:string){if(label==='Calls'){window.location.assign('/c
 async function openUserProfile(rawHandle:string){
  const handle=rawHandle.replace(/^@/,'').trim().toLowerCase();
  if(!/^[a-z0-9_]{3,24}$/.test(handle)){toast('This profile link is not valid.');return}
- setProfileData(null);setProfileError('');setProfileLoading(true);
- try{const response=await fetch('/api/users/'+encodeURIComponent(handle),{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error||'Could not load profile');setProfileData(data);setActive('Profile');setNotificationsOpen(false)}
- catch(e){setProfileError(e instanceof Error?e.message:'Could not load profile');toast(e instanceof Error?e.message:'Could not load profile')}
- finally{setProfileLoading(false)}
+ window.location.assign('/u/'+encodeURIComponent(handle));
 }
 async function toggleProfileFollow(){
  if(!profileData?.profile?.handle||profileFollowBusy)return;
