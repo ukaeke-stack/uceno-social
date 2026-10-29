@@ -1,5 +1,6 @@
 package com.ukaeke.uceno;
 
+import android.Manifest;
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioDeviceInfo;
@@ -13,11 +14,37 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
-@CapacitorPlugin(name = "CallAudioRoute")
+@CapacitorPlugin(name = "CallAudioRoute", permissions = {
+    @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }),
+    @Permission(alias = "microphone", strings = { Manifest.permission.RECORD_AUDIO })
+})
 public class CallAudioRoutePlugin extends Plugin {
     private Ringtone ringtone;
+
+    @PluginMethod
+    public void requestMediaPermissions(PluginCall call) {
+        if (getPermissionState("camera") == PermissionState.GRANTED
+                && getPermissionState("microphone") == PermissionState.GRANTED) {
+            call.resolve();
+            return;
+        }
+        requestPermissionForAliases(new String[] { "camera", "microphone" }, call, "mediaPermissionsCallback");
+    }
+
+    @PermissionCallback
+    private void mediaPermissionsCallback(PluginCall call) {
+        if (getPermissionState("camera") == PermissionState.GRANTED
+                && getPermissionState("microphone") == PermissionState.GRANTED) {
+            call.resolve();
+        } else {
+            call.reject("Camera and microphone permissions are required to answer calls");
+        }
+    }
 
     @PluginMethod
     public void startRingtone(PluginCall call) {
