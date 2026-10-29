@@ -4,12 +4,12 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.app.Person;
 import android.content.Intent;
 import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
-import android.os.Bundle;
 import androidx.core.app.NotificationCompat;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
@@ -42,20 +42,45 @@ public class UcenoCallMessagingService extends FirebaseMessagingService {
         PendingIntent content = PendingIntent.getActivity(this, id.hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         PendingIntent answer = actionPendingIntent(id, "accept", 1);
         PendingIntent decline = actionPendingIntent(id, "reject", 2);
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(getApplicationInfo().icon)
-            .setContentTitle(data.getOrDefault("title", "Incoming " + mode + " call"))
-            .setContentText(data.getOrDefault("body", "@" + caller + " is calling you"))
-            .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(true)
-            .setOngoing(true)
-            .setContentIntent(content)
-            .addAction(android.R.drawable.sym_action_call, "Answer", answer)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", decline);
-        manager.notify(id.hashCode(), builder.build());
+
+        Notification notification;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Android 12+ gives incoming calls dedicated, prominent Answer and Decline controls.
+            Person callerPerson = new Person.Builder()
+                .setName("@" + caller)
+                .setImportant(true)
+                .build();
+            Notification.CallStyle callStyle = Notification.CallStyle.forIncomingCall(callerPerson, decline, answer)
+                .setIsVideo("video".equalsIgnoreCase(mode));
+            notification = new Notification.Builder(this, channelId)
+                .setSmallIcon(getApplicationInfo().icon)
+                .setContentTitle(data.getOrDefault("title", "Incoming " + mode + " call"))
+                .setContentText(data.getOrDefault("body", "@" + caller + " is calling you"))
+                .setCategory(Notification.CATEGORY_CALL)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .setContentIntent(content)
+                .setStyle(callStyle)
+                .build();
+        } else {
+            notification = new NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(getApplicationInfo().icon)
+                .setContentTitle(data.getOrDefault("title", "Incoming " + mode + " call"))
+                .setContentText(data.getOrDefault("body", "@" + caller + " is calling you"))
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setAutoCancel(false)
+                .setOngoing(true)
+                .setContentIntent(content)
+                .addAction(android.R.drawable.sym_action_call, "Answer", answer)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", decline)
+                .build();
+        }
+        manager.notify(id.hashCode(), notification);
     }
+
     private PendingIntent actionPendingIntent(String invitationId, String action, int requestCode) {
         Intent intent = new Intent(this, MainActivity.class);
         intent.setAction(Intent.ACTION_VIEW);
