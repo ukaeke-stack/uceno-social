@@ -65,6 +65,45 @@ export default function CallsPage() {
 
   useEffect(() => () => { cancelledRef.current = true; stopRinging(); void resetNativeCallAudio(); void roomRef.current?.disconnect(); }, []);
 
+  function startOutgoingRingback() {
+    if (ringingRef.current) return;
+    ringingRef.current = true;
+    const pulse = (ctx: AudioContext) => {
+      if (ctx.state !== 'running' || !ringingRef.current) return;
+      const now = ctx.currentTime;
+      for (const offset of [0, 0.18]) {
+        for (const frequency of [440, 480]) {
+          const oscillator = ctx.createOscillator();
+          const gain = ctx.createGain();
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(frequency, now + offset);
+          gain.gain.setValueAtTime(0.0001, now + offset);
+          gain.gain.exponentialRampToValueAtTime(0.055, now + offset + 0.04);
+          gain.gain.setValueAtTime(0.055, now + offset + 0.62);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.72);
+          oscillator.connect(gain); gain.connect(ctx.destination);
+          oscillator.start(now + offset); oscillator.stop(now + offset + 0.74);
+          oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+        }
+      }
+    };
+    try {
+      const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtor) { ringingRef.current = false; startRinging(); return; }
+      const ctx = ringAudioRef.current || new AudioCtor();
+      ringAudioRef.current = ctx;
+      void ctx.resume().then(() => {
+        if (!ringingRef.current) return;
+        pulse(ctx);
+        ringTimerRef.current = window.setInterval(() => pulse(ctx), 4000);
+      }).catch(() => {
+        if (Capacitor.isNativePlatform()) void startNativeCallRingtone();
+      });
+    } catch {
+      if (Capacitor.isNativePlatform()) void startNativeCallRingtone();
+    }
+  }
+
   function startRinging() {
     if (ringingRef.current) return;
     ringingRef.current = true;
@@ -151,7 +190,7 @@ export default function CallsPage() {
         activeInvitationRef.current = inviteData.invitationId;
         setStatus('Ringing @' + handle + '… Waiting for them to answer');
         outgoingRingingRef.current = true;
-        startRinging();
+        startOutgoingRingback();
         const deadline = Date.now() + 60000;
         let accepted = false;
         while (Date.now() < deadline && !cancelledRef.current) {
@@ -172,6 +211,7 @@ export default function CallsPage() {
         mountTrack(track, participant.identity === room.localParticipant.identity ? 'local' : 'remote');
       });
       room.on(RoomEvent.TrackUnsubscribed, track => track.detach().forEach(el => el.remove()));
+      room.on(RoomEvent.ParticipantDisconnected, () => { void leaveCall(); });
       room.on(RoomEvent.Disconnected, () => { setConnected(false); setStatus('Call ended'); });
       const response = await fetch('/api/calls/token', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -254,6 +294,7 @@ export default function CallsPage() {
         roomRef.current = room;
         room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => mountTrack(track, participant.identity === room.localParticipant.identity ? 'local' : 'remote'));
         room.on(RoomEvent.TrackUnsubscribed, track => track.detach().forEach(el => el.remove()));
+        room.on(RoomEvent.ParticipantDisconnected, () => { void leaveCall(); });
         room.on(RoomEvent.Disconnected, () => { setConnected(false); setStatus('Call ended'); });
         await room.connect(data.url, data.token);
         const tracks = await createLocalTracks({ audio: true, video: requestedMode === 'video' });
@@ -270,9 +311,10 @@ export default function CallsPage() {
     outgoingRingingRef.current = false;
     stopRinging();
     const invitationId = activeInvitationRef.current;
+    const action = connected || roomRef.current ? 'end' : 'cancel';
     activeInvitationRef.current = null;
     if (invitationId) {
-      await fetch('/api/calls/invitations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cancel', invitationId }) }).catch(() => {});
+      await fetch('/api/calls/invitations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, invitationId }) }).catch(() => {});
     }
     await roomRef.current?.disconnect();
     roomRef.current = null;
