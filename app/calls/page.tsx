@@ -24,6 +24,7 @@ export default function CallsPage() {
   const remoteRef = useRef<HTMLDivElement>(null);
   const activeInvitationRef = useRef<string|null>(null);
   const cancelledRef = useRef(false);
+  const autoStartRef = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -31,9 +32,6 @@ export default function CallsPage() {
     const requestedMode = params.get('mode');
     if (handle && /^[a-zA-Z0-9_]{3,24}$/.test(handle)) { setTargetHandle(handle); setLockedTarget(true); }
     if (requestedMode === 'audio' || requestedMode === 'video') setMode(requestedMode);
-    if (handle && params.get('start') === '1' && /^[a-zA-Z0-9_]{3,24}$/.test(handle)) {
-      window.setTimeout(() => document.getElementById('call-start')?.click(), 0);
-    }
   }, []);
 
   useEffect(() => {
@@ -124,6 +122,14 @@ export default function CallsPage() {
       setError(e instanceof Error ? e.message : 'Call could not start');
     } finally { setBusy(false); }
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (lockedTarget && targetHandle && params.get('start') === '1' && !autoStartRef.current) {
+      autoStartRef.current = true;
+      void joinCall();
+    }
+  }, [lockedTarget, targetHandle]);
 
   async function respondToInvitation(invitation: Invitation, action: 'accept'|'reject') {
     setError('');
