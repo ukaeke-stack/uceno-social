@@ -20,8 +20,8 @@ async function database() {
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`;
-  ALTER TABLE call_invitations DROP CONSTRAINT IF EXISTS call_invitations_status_check;
-  ALTER TABLE call_invitations ADD CONSTRAINT call_invitations_status_check CHECK (status IN ('pending','accepted','rejected','cancelled','missed'));
+  await sql`ALTER TABLE call_invitations DROP CONSTRAINT IF EXISTS call_invitations_status_check`;
+  await sql`ALTER TABLE call_invitations ADD CONSTRAINT call_invitations_status_check CHECK (status IN ('pending','accepted','rejected','cancelled','missed'))`;
   return sql;
 }
 
