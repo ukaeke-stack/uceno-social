@@ -22,15 +22,25 @@ export async function POST(request: Request) {
   const input = schema.safeParse(await request.json().catch(() => null));
   if (!input.success) return NextResponse.json({ error: "Enter a valid UCENO username and call mode" }, { status: 400 });
   const sql = getDb();
-  const targets = await sql`SELECT id, handle FROM users WHERE handle = ${input.data.targetHandle} LIMIT 1`;
+  const targets = await sql\`SELECT id, handle FROM users WHERE handle = \${input.data.targetHandle} LIMIT 1\`;
   if (!targets.length) return NextResponse.json({ error: "UCENO user not found" }, { status: 404 });
   const target = targets[0] as { id: string; handle: string };
   if (String(target.id) === String(session.id)) {
     return NextResponse.json({ error: "You cannot call yourself" }, { status: 400 });
   }
 
-  // A deterministic private room for this pair means neither person needs to
-  // belong to a shared chat, group, or community to establish the same call.
+  // A LiveKit token is issued only after the recipient has accepted a recent
+  // invitation for this exact pair and call mode.
+  const accepted = await sql\`SELECT id FROM call_invitations
+    WHERE status = 'accepted' AND mode = \${input.data.mode}
+      AND created_at > NOW() - INTERVAL '10 minutes'
+      AND ((caller_id = \${session.id} AND callee_id = \${target.id})
+        OR (caller_id = \${target.id} AND callee_id = \${session.id}))
+    ORDER BY updated_at DESC LIMIT 1\`;
+  if (!accepted.length) {
+    return NextResponse.json({ error: "The other person must answer your call before the connection can start." }, { status: 403 });
+  }
+
   const participants = [String(session.id), String(target.id)].sort();
   const roomName = "direct-" + participants.join("-");
   const now = Math.floor(Date.now() / 1000);
