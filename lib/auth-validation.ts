@@ -6,6 +6,7 @@ const phone = z.string().trim().regex(/^\+[1-9]\d{7,14}$/, "Use international ph
 
 export const registerSchema = z.object({
   displayName: z.string().trim().min(2).max(70),
+  accountType: z.enum(["person", "page"]).default("person"),
   handle: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,24}$/, "Handle must be 3–24 letters, numbers or underscores"),
   contactType: z.enum(["email", "phone"]),
   email: email.optional(),

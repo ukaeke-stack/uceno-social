@@ -187,14 +187,17 @@ export default function CallsPage() {
 
   async function leaveCall() {
     cancelledRef.current = true;
-    if (activeInvitationRef.current) {
-      await fetch('/api/calls/invitations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cancel', invitationId: activeInvitationRef.current }) }).catch(() => {});
+    const invitationId = activeInvitationRef.current;
+    activeInvitationRef.current = null;
+    if (invitationId) {
+      await fetch('/api/calls/invitations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cancel', invitationId }) }).catch(() => {});
     }
     await roomRef.current?.disconnect();
     roomRef.current = null;
     if (localRef.current) localRef.current.replaceChildren();
     if (remoteRef.current) remoteRef.current.replaceChildren();
     setConnected(false);
+    setBusy(false);
     setStatus('Call ended');
   }
 
@@ -229,7 +232,7 @@ export default function CallsPage() {
       <input id="call-target" value={targetHandle} onChange={e=>setTargetHandle(e.target.value.replace(/^@/, '').replace(/[^a-zA-Z0-9_]/g,'').slice(0,24))} placeholder="Enter the person’s username" disabled={connected || busy} autoComplete="off" />
       <p>Select a person from their profile to call without entering a username.</p></>}
       <div className="call-mode"><button className={mode==='audio'?'selected':''} onClick={()=>setMode('audio')} disabled={connected||busy}><Mic size={16}/> Audio</button><button className={mode==='video'?'selected':''} onClick={()=>setMode('video')} disabled={connected||busy}><Video size={16}/> Video</button></div>
-      {!connected ? <button id="call-start" className="call-primary" onClick={()=>void joinCall()} disabled={busy||!(/^[a-zA-Z0-9_]{3,24}$/.test(targetHandle.trim().replace(/^@/,'')))}><PhoneCall size={17}/> {busy ? 'Calling…' : 'Call now'}</button> : <div className="call-controls"><button onClick={()=>void toggleMute()}>{muted?<MicOff size={17}/>:<Mic size={17}/>} {muted?'Unmute':'Mute'}</button>{mode==='video'&&<button onClick={()=>void toggleCamera()}>{cameraOff?<VideoOff size={17}/>:<Video size={17}/>} {cameraOff?'Turn camera on':'Turn camera off'}</button>}<button className="hangup" onClick={()=>void leaveCall()}><PhoneOff size={17}/> End call</button></div>}
+      {busy && !connected ? <div className="call-controls"><span role="status">{status}</span><button type="button" className="hangup" onClick={()=>void leaveCall()}><PhoneOff size={17}/> Cancel call</button></div> : !connected ? <button id="call-start" className="call-primary" onClick={()=>void joinCall()} disabled={!(/^[a-zA-Z0-9_]{3,24}$/.test(targetHandle.trim().replace(/^@/,'')))}><PhoneCall size={17}/> Call now</button> : <div className="call-controls"><button onClick={()=>void toggleMute()}>{muted?<MicOff size={17}/>:<Mic size={17}/>} {muted?'Unmute':'Mute'}</button>{mode==='video'&&<button onClick={()=>void toggleCamera()}>{cameraOff?<VideoOff size={17}/>:<Video size={17}/>} {cameraOff?'Turn camera on':'Turn camera off'}</button>}<button className="hangup" onClick={()=>void leaveCall()}><PhoneOff size={17}/> End call</button></div>}
       <p role="status">{status}</p>{error&&<p className="call-error" role="alert">{error}</p>}
     </section>
     {missedCalls.length > 0 && <section className="call-setup" aria-label="Missed calls"><h2>Missed calls</h2>{missedCalls.map(call => <div className="call-controls" key={call.id}><p><strong>@{call.callerHandle}</strong> · {call.mode} · {new Date(call.createdAt).toLocaleString()}</p><button className="call-primary" onClick={() => { window.location.href = '/calls?handle=' + encodeURIComponent(call.callerHandle) + '&mode=' + call.mode + '&start=1'; }}> <PhoneCall size={16}/> Call back</button></div>)}</section>}

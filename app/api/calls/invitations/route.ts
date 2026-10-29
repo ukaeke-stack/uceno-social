@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 async function database() {
   const sql = getDb();
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'person'`;
   await sql`CREATE TABLE IF NOT EXISTS call_invitations (
     id TEXT PRIMARY KEY,
     caller_id TEXT NOT NULL,
@@ -19,6 +20,16 @@ async function database() {
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','rejected','cancelled','missed')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS mutual_connections (
+    id TEXT PRIMARY KEY,
+    requester_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (requester_id, recipient_id),
+    CHECK (requester_id <> recipient_id)
   )`;
   await sql`ALTER TABLE call_invitations DROP CONSTRAINT IF EXISTS call_invitations_status_check`;
   await sql`ALTER TABLE call_invitations ADD CONSTRAINT call_invitations_status_check CHECK (status IN ('pending','accepted','rejected','cancelled','missed'))`;
@@ -59,10 +70,19 @@ export async function POST(request: Request) {
   try {
     const sql = await database();
     if (parsed.data.action === "create") {
-      const found = await sql`SELECT id, handle FROM users WHERE handle = ${parsed.data.targetHandle} LIMIT 1`;
+      const found = await sql`SELECT id, handle, account_type AS "accountType" FROM users WHERE handle = ${parsed.data.targetHandle} LIMIT 1`;
       if (!found.length) return NextResponse.json({ error: "UCENO user not found" }, { status: 404 });
-      const target = found[0] as { id: string; handle: string };
+      const target = found[0] as { id: string; handle: string; accountType?: string };
       if (String(target.id) === String(session.id)) return NextResponse.json({ error: "You cannot call yourself" }, { status: 400 });
+      if (target.accountType === "page") return NextResponse.json({ error: "Pages cannot receive direct personal calls. Call an accepted personal mutual instead." }, { status: 403 });
+      const callerRows = await sql`SELECT account_type AS "accountType" FROM users WHERE id = ${session.id}::uuid LIMIT 1`;
+      if (callerRows[0]?.accountType === "page") return NextResponse.json({ error: "Pages cannot start direct personal calls." }, { status: 403 });
+      const mutual = await sql`SELECT id FROM mutual_connections
+        WHERE status = 'accepted'
+          AND ((requester_id = ${session.id}::uuid AND recipient_id = ${target.id}::uuid)
+            OR (requester_id = ${target.id}::uuid AND recipient_id = ${session.id}::uuid))
+        LIMIT 1`;
+      if (!mutual.length) return NextResponse.json({ error: "You can call only an accepted mutual connection. Send or accept a mutual request first." }, { status: 403 });
       await sql`UPDATE call_invitations SET status = 'cancelled', updated_at = NOW() WHERE caller_id = ${session.id} AND status = 'pending'`;
       const id = crypto.randomUUID();
       await sql`INSERT INTO call_invitations (id, caller_id, caller_handle, callee_id, callee_handle, mode) VALUES (${id}, ${session.id}, ${session.handle}, ${target.id}, ${target.handle}, ${parsed.data.mode})`;

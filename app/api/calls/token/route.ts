@@ -22,12 +22,32 @@ export async function POST(request: Request) {
   const input = schema.safeParse(await request.json().catch(() => null));
   if (!input.success) return NextResponse.json({ error: "Enter a valid UCENO username and call mode" }, { status: 400 });
   const sql = getDb();
-  const targets = await sql`SELECT id, handle FROM users WHERE handle = ${input.data.targetHandle} LIMIT 1`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'person'`;
+  const targets = await sql`SELECT id, handle, account_type AS "accountType" FROM users WHERE handle = ${input.data.targetHandle} LIMIT 1`;
   if (!targets.length) return NextResponse.json({ error: "UCENO user not found" }, { status: 404 });
-  const target = targets[0] as { id: string; handle: string };
+  const target = targets[0] as { id: string; handle: string; accountType?: string };
   if (String(target.id) === String(session.id)) {
     return NextResponse.json({ error: "You cannot call yourself" }, { status: 400 });
   }
+  if (target.accountType === "page") return NextResponse.json({ error: "Pages cannot receive direct personal calls." }, { status: 403 });
+  const callerRows = await sql`SELECT account_type AS "accountType" FROM users WHERE id = ${session.id}::uuid LIMIT 1`;
+  if (callerRows[0]?.accountType === "page") return NextResponse.json({ error: "Pages cannot start direct personal calls." }, { status: 403 });
+  await sql`CREATE TABLE IF NOT EXISTS mutual_connections (
+    id TEXT PRIMARY KEY,
+    requester_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (requester_id, recipient_id),
+    CHECK (requester_id <> recipient_id)
+  )`;
+  const mutual = await sql`SELECT id FROM mutual_connections
+    WHERE status = 'accepted'
+      AND ((requester_id = ${session.id}::uuid AND recipient_id = ${target.id}::uuid)
+        OR (requester_id = ${target.id}::uuid AND recipient_id = ${session.id}::uuid))
+    LIMIT 1`;
+  if (!mutual.length) return NextResponse.json({ error: "Calling is available only between accepted mutual connections." }, { status: 403 });
 
   // Only issue a LiveKit token after the recipient accepts a recent invitation
   // for this exact pair and call mode.
