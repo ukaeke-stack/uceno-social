@@ -76,12 +76,10 @@ export async function notifyIncomingCall(input: {
   const url = "/calls?incoming=" + encodeURIComponent(input.invitationId);
   const result = await messaging.sendEachForMulticast({
     tokens,
-    notification: {
-      title: input.mode === "video" ? "Incoming video call" : "Incoming audio call",
-      body: "@" + input.callerHandle + " is calling you",
-    },
     data: {
       type: "call",
+      title: input.mode === "video" ? "Incoming video call" : "Incoming audio call",
+      body: "@" + input.callerHandle + " is calling you",
       invitationId: input.invitationId,
       callerHandle: input.callerHandle,
       mode: input.mode,
@@ -91,9 +89,11 @@ export async function notifyIncomingCall(input: {
       priority: "high",
       ttl: 60 * 1000,
       notification: {
-        channelId: "uceno_notifications",
+        channelId: "uceno_incoming_calls_v2",
         sound: "default",
         priority: "max",
+        visibility: "public",
+        tag: "uceno-call-" + input.invitationId,
         clickAction: "FCM_PLUGIN_ACTIVITY",
       },
     },

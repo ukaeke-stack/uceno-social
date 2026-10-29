@@ -54,12 +54,41 @@ jobs:
           const main = execFileSync('find', ['android/app/src/main/java', '-name', 'MainActivity.java', '-print', '-quit'], { encoding: 'utf8' }).trim();
           if (!main) throw new Error('Capacitor MainActivity.java was not generated');
           fs.copyFileSync('native/android/CallAudioRoutePlugin.java', path.join(path.dirname(main), 'CallAudioRoutePlugin.java'));
+          fs.copyFileSync('native/android/UcenoCallMessagingService.java', path.join(path.dirname(main), 'UcenoCallMessagingService.java'));
           let source = fs.readFileSync(main, 'utf8');
           if (!source.includes('registerPlugin(CallAudioRoutePlugin.class)')) {
             if (!source.includes('import android.os.Bundle;')) source = source.replace(/package [^;]+;\s*/, match => match + '\n\nimport android.os.Bundle;');
             const declaration = 'public class MainActivity extends BridgeActivity {';
             if (!source.includes(declaration)) throw new Error('Unexpected Capacitor MainActivity template');
             source = source.replace(declaration, declaration + '\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(CallAudioRoutePlugin.class);\n        super.onCreate(savedInstanceState);\n    }');
+          }
+          const launchIntentHandler = `
+          android.content.Intent launchIntent = getIntent();
+          String launchTarget = launchIntent == null ? null : launchIntent.getStringExtra("url");
+          if (launchTarget != null && getBridge() != null) {
+          final String safeLaunchTarget = launchTarget.startsWith("/") && !launchTarget.startsWith("//") ? launchTarget : "/";
+          getBridge().getWebView().post(() -> getBridge().getWebView().evaluateJavascript(
+          "window.location.assign(" + org.json.JSONObject.quote(safeLaunchTarget) + ")", null));
+          }
+          `;
+          if (!source.includes('String launchTarget = launchIntent == null')) {
+          source = source.replace('super.onCreate(savedInstanceState);', 'super.onCreate(savedInstanceState);' + launchIntentHandler);
+          }
+          const newIntentHandler = `
+          @Override
+          protected void onNewIntent(android.content.Intent intent) {
+          super.onNewIntent(intent);
+          setIntent(intent);
+          String target = intent.getStringExtra("url");
+          if (target != null && getBridge() != null) {
+          final String safeTarget = target.startsWith("/") && !target.startsWith("//") ? target : "/";
+          getBridge().getWebView().post(() -> getBridge().getWebView().evaluateJavascript(
+          "window.location.assign(" + org.json.JSONObject.quote(safeTarget) + ")", null));
+          }
+          }
+          `;
+          if (!source.includes('protected void onNewIntent(android.content.Intent intent)')) {
+            source = source.replace('public class MainActivity extends BridgeActivity {', 'public class MainActivity extends BridgeActivity {' + newIntentHandler);
           }
           fs.writeFileSync(main, source);
           const manifest = 'android/app/src/main/AndroidManifest.xml';
@@ -68,6 +97,8 @@ jobs:
             const declaration = '<uses-permission android:name="' + permission + '" />';
             if (!xml.includes(declaration)) xml = xml.replace('<application', '    ' + declaration + '\n    <application');
           }
+          const callService = '<service android:name=".UcenoCallMessagingService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter></service>';
+          if (!xml.includes('UcenoCallMessagingService')) xml = xml.replace('</application>', '        ' + callService + '\n    </application>');
           fs.writeFileSync(manifest, xml);
           NODE
       - name: Configure native Firebase for Android push
@@ -91,8 +122,13 @@ jobs:
           let a = fs.readFileSync(file, 'utf8');
           if (!a.includes('com.google.gms.google-services')) {
             a += "\napply plugin: 'com.google.gms.google-services'\n";
-            fs.writeFileSync(file, a);
           }
+          if (!a.includes('com.google.firebase:firebase-messaging')) {
+            const dependency = "    implementation 'com.google.firebase:firebase-messaging:24.0.0'\n";
+            if (!a.includes('dependencies {')) throw new Error('App Gradle dependencies block not found');
+            a = a.replace('dependencies {', 'dependencies {\n' + dependency);
+          }
+          fs.writeFileSync(file, a);
           const config = JSON.parse(fs.readFileSync('android/app/google-services.json', 'utf8'));
           const clients = config.client || [];
           if (!clients.some(c => c.client_info?.android_client_info?.package_name === 'com.ukaeke.uceno')) {

@@ -1,7 +1,10 @@
 'use client';
 
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+
+type CallAudioRoutePlugin = { createIncomingCallChannel(): Promise<void> };
+const CallAudioRoute = registerPlugin<CallAudioRoutePlugin>('CallAudioRoute');
 
 let initialized = false;
 
@@ -19,7 +22,8 @@ export async function registerNativePush(): Promise<void> {
   }
 
   if (Capacitor.getPlatform() === 'android') {
-    await PushNotifications.createChannel({ id: 'uceno_notifications', name: 'UCENO notifications', importance: 5, sound: 'default' });
+    await PushNotifications.createChannel({ id: 'uceno_notifications', name: 'UCENO notifications', importance: 4, sound: 'default' });
+    try { await CallAudioRoute.createIncomingCallChannel(); } catch (error) { console.error('UCENO call notification channel setup failed', error); }
   }
 
   await PushNotifications.addListener('registration', async ({ value }) => {
