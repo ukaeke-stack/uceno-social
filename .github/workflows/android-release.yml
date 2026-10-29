@@ -76,10 +76,10 @@ jobs:
           fs.copyFileSync('native/android/CallAudioRoutePlugin.java', path.join(path.dirname(main), 'CallAudioRoutePlugin.java'));
           let source = fs.readFileSync(main, 'utf8');
           if (!source.includes('registerPlugin(CallAudioRoutePlugin.class)')) {
-            if (!source.includes('import android.os.Bundle;')) source = source.replace(/package [^;]+;\\s*/, match => match + '\\n\\nimport android.os.Bundle;');
+            if (!source.includes('import android.os.Bundle;')) source = source.replace(/package [^;]+;\s*/, match => match + '\n\nimport android.os.Bundle;');
             const declaration = 'public class MainActivity extends BridgeActivity {';
             if (!source.includes(declaration)) throw new Error('Unexpected Capacitor MainActivity template');
-            source = source.replace(declaration, declaration + '\\n    @Override\\n    public void onCreate(Bundle savedInstanceState) {\\n        registerPlugin(CallAudioRoutePlugin.class);\\n        super.onCreate(savedInstanceState);\\n    }');
+            source = source.replace(declaration, declaration + '\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(CallAudioRoutePlugin.class);\n        super.onCreate(savedInstanceState);\n    }');
           }
           fs.writeFileSync(main, source);
           NODE
