@@ -14,8 +14,9 @@ export async function GET(_request: Request, context: { params: Promise<{ handle
 
   try {
     const sql = getDb();
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'person'`;
     const users = await sql`
-      SELECT u.id, u.display_name AS "displayName", u.handle, u.bio, u.avatar_url AS "avatarUrl", u.location, u.website, u.created_at AS "joinedAt",
+      SELECT u.id, u.display_name AS "displayName", u.handle, u.account_type AS "accountType", u.bio, u.avatar_url AS "avatarUrl", u.location, u.website, u.created_at AS "joinedAt",
         (SELECT COUNT(*)::int FROM follows f WHERE f.following_id = u.id) AS followers,
         (SELECT COUNT(*)::int FROM follows f WHERE f.follower_id = u.id) AS following,
         (SELECT COUNT(*)::int FROM posts p WHERE p.user_id = u.id AND p.visibility = 'public') AS "postCount"
