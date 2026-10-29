@@ -46,7 +46,7 @@ export async function GET() {
     const invitations = await sql`SELECT id, caller_handle AS "callerHandle", callee_handle AS "calleeHandle", mode, status, created_at AS "createdAt"
       FROM call_invitations
       WHERE (callee_id = ${session.id} AND status = 'pending')
-         OR (caller_id = ${session.id} AND status IN ('accepted','rejected'))
+         OR (caller_id = ${session.id} AND status IN ('accepted','rejected','cancelled'))
       ORDER BY created_at DESC LIMIT 10`;
     const missedCalls = await sql`SELECT id, caller_handle AS "callerHandle", mode, created_at AS "createdAt"
       FROM call_invitations WHERE callee_id = ${session.id} AND status = 'missed'
@@ -59,7 +59,7 @@ export async function GET() {
 
 const requestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("create"), targetHandle: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,24}$/), mode: z.enum(["audio","video"]) }),
-  z.object({ action: z.enum(["accept","reject","cancel"]), invitationId: z.string().uuid() }),
+  z.object({ action: z.enum(["accept","reject","cancel","end"]), invitationId: z.string().uuid() }),
 ]);
 
 export async function POST(request: Request) {
@@ -106,8 +106,10 @@ export async function POST(request: Request) {
       changed = await sql`UPDATE call_invitations SET status = 'accepted', updated_at = NOW() WHERE id = ${invitationId} AND callee_id = ${session.id} AND status = 'pending' RETURNING id, caller_handle AS "callerHandle", mode`;
     } else if (action === "reject") {
       changed = await sql`UPDATE call_invitations SET status = 'rejected', updated_at = NOW() WHERE id = ${invitationId} AND callee_id = ${session.id} AND status = 'pending' RETURNING id`;
-    } else {
+    } else if (action === "cancel") {
       changed = await sql`UPDATE call_invitations SET status = 'cancelled', updated_at = NOW() WHERE id = ${invitationId} AND caller_id = ${session.id} AND status IN ('pending','accepted') RETURNING id`;
+    } else {
+      changed = await sql`UPDATE call_invitations SET status = 'cancelled', updated_at = NOW() WHERE id = ${invitationId} AND status = 'accepted' AND (caller_id = ${session.id} OR callee_id = ${session.id}) RETURNING id`;
     }
     if (!changed.length) return NextResponse.json({ error: "Invitation not found or no longer active" }, { status: 404 });
     return NextResponse.json({ ok: true, invitation: changed[0] });
