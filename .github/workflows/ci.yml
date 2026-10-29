@@ -97,7 +97,7 @@ jobs:
             const declaration = '<uses-permission android:name="' + permission + '" />';
             if (!xml.includes(declaration)) xml = xml.replace('<application', '    ' + declaration + '\n    <application');
           }
-          const callService = '<service android:name=".UcenoCallMessagingService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter></service>';
+          const callService = '<service android:name=".UcenoCallMessagingService" android:exported="false"><intent-filter android:priority="1000"><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter></service>';
           if (!xml.includes('UcenoCallMessagingService')) xml = xml.replace('</application>', '        ' + callService + '\n    </application>');
           fs.writeFileSync(manifest, xml);
           NODE
