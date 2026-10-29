@@ -62,7 +62,7 @@ export default function CallsPage() {
     return () => { alive = false; window.clearInterval(timer); };
   }, []);
 
-  useEffect(() => () => { cancelledRef.current = true; stopRinging(); void roomRef.current?.disconnect(); }, []);
+  useEffect(() => () => { cancelledRef.current = true; stopRinging(); void resetNativeCallAudio(); void roomRef.current?.disconnect(); }, []);
 
   function startRinging() {
     if (ringingRef.current) return;
