@@ -203,3 +203,5 @@ body:has(.account-page) .global-account-link{display:none}
 .story-visual:has(.story-image) h2{margin:12px 0;overflow-wrap:anywhere}
 .moment-ring.real-story img{object-fit:cover}
 @media(max-width:640px){.story-composer-modal{width:calc(100vw - 28px);padding:18px}.story-image{max-height:42vh}}
+
+.profile-call-actions{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap}.profile-call-actions button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line,#d8dce5);border-radius:12px;padding:10px 14px;background:var(--surface,#fff);color:var(--text,#18202c);font-weight:700}.profile-call-actions button:hover{border-color:var(--accent,#6d5ce8);background:var(--surface-soft,#f6f4ff)}
