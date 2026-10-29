@@ -91,9 +91,11 @@ export async function notifyIncomingCall(input: {
       priority: "high",
       ttl: 60 * 1000,
       notification: {
-        channelId: "uceno_notifications",
+        channelId: "uceno_incoming_calls_v2",
         sound: "default",
         priority: "max",
+        visibility: "public",
+        tag: "uceno-call-" + input.invitationId,
         clickAction: "FCM_PLUGIN_ACTIVITY",
       },
     },
