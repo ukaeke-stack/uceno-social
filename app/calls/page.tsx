@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Room, RoomEvent, Track, createLocalTracks } from 'livekit-client';
-import { ArrowLeft, Mic, MicOff, PhoneCall, PhoneOff, Video, VideoOff, PhoneIncoming, X } from 'lucide-react';
+import { ArrowLeft, Mic, MicOff, PhoneCall, PhoneOff, Video, VideoOff, PhoneIncoming, X, Volume2 } from 'lucide-react';
 
 type Invitation = { id: string; callerHandle: string; calleeHandle: string; mode: 'audio'|'video'; status: string; createdAt: string };
 type MissedCall = { id: string; callerHandle: string; mode: 'audio'|'video'; createdAt: string };
@@ -15,6 +15,7 @@ export default function CallsPage() {
   const [connected, setConnected] = useState(false);
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(false);
   const [incoming, setIncoming] = useState<Invitation[]>([]);
   const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
   const [lockedTarget, setLockedTarget] = useState(false);
@@ -25,6 +26,10 @@ export default function CallsPage() {
   const activeInvitationRef = useRef<string|null>(null);
   const cancelledRef = useRef(false);
   const autoStartRef = useRef(false);
+  const ringAudioRef = useRef<AudioContext | null>(null);
+  const ringTimerRef = useRef<number | null>(null);
+  const ringingRef = useRef(false);
+  const outgoingRingingRef = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -41,7 +46,12 @@ export default function CallsPage() {
         const response = await fetch('/api/calls/invitations', { cache: 'no-store' });
         if (!response.ok) return;
         const data = await response.json();
-        if (alive && Array.isArray(data.invitations)) setIncoming(data.invitations.filter((item: Invitation) => item.status === 'pending'));
+        if (alive && Array.isArray(data.invitations)) {
+          const pending = data.invitations.filter((item: Invitation) => item.status === 'pending');
+          setIncoming(pending);
+          if (pending.length) startRinging();
+          else if (!outgoingRingingRef.current) stopRinging();
+        }
         if (alive && Array.isArray(data.missedCalls)) setMissedCalls(data.missedCalls);
       } catch { /* transient network failure; retry on next poll */ }
     };
@@ -50,7 +60,53 @@ export default function CallsPage() {
     return () => { alive = false; window.clearInterval(timer); };
   }, []);
 
-  useEffect(() => () => { cancelledRef.current = true; void roomRef.current?.disconnect(); }, []);
+  useEffect(() => () => { cancelledRef.current = true; stopRinging(); void roomRef.current?.disconnect(); }, []);
+
+  function startRinging() {
+    if (ringingRef.current) return;
+    ringingRef.current = true;
+    const pulse = (ctx: AudioContext) => {
+      if (ctx.state !== 'running') return;
+      const now = ctx.currentTime;
+      for (const frequency of [440, 480]) {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(frequency, now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.08, now + 0.04);
+        gain.gain.setValueAtTime(0.08, now + 0.55);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+        oscillator.connect(gain); gain.connect(ctx.destination);
+        oscillator.start(now); oscillator.stop(now + 0.72);
+        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+      }
+      try { if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate([250, 150, 250]); } catch {}
+    };
+    try {
+      const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtor) { ringTimerRef.current = window.setInterval(() => { try { navigator.vibrate?.([250, 150, 250]); } catch {} }, 1800); return; }
+      const ctx = ringAudioRef.current || new AudioCtor();
+      ringAudioRef.current = ctx;
+      void ctx.resume().then(() => {
+        if (!ringingRef.current) return;
+        pulse(ctx);
+        ringTimerRef.current = window.setInterval(() => { if (ringingRef.current) pulse(ctx); }, 1800);
+      }).catch(() => {
+        try { navigator.vibrate?.([250, 150, 250]); } catch {}
+      });
+    } catch { try { navigator.vibrate?.([250, 150, 250]); } catch {} }
+  }
+
+  function stopRinging() {
+    ringingRef.current = false;
+    if (ringTimerRef.current !== null) window.clearInterval(ringTimerRef.current);
+    ringTimerRef.current = null;
+    try { navigator.vibrate?.(0); } catch {}
+    const ctx = ringAudioRef.current;
+    ringAudioRef.current = null;
+    if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => {});
+  }
 
   function mountTrack(track: Track, participant: 'local'|'remote') {
     const host = participant === 'local' ? localRef.current : remoteRef.current;
@@ -79,18 +135,20 @@ export default function CallsPage() {
         if (!inviteResponse.ok) throw new Error(inviteData.error || 'Could not start call');
         activeInvitationRef.current = inviteData.invitationId;
         setStatus('Ringing @' + handle + '… Waiting for them to answer');
+        outgoingRingingRef.current = true;
+        startRinging();
         const deadline = Date.now() + 60000;
         let accepted = false;
         while (Date.now() < deadline && !cancelledRef.current) {
           const poll = await fetch('/api/calls/invitations', { cache: 'no-store' });
           const pollData = await poll.json();
           const current = (pollData.invitations || []).find((item: Invitation) => item.id === inviteData.invitationId);
-          if (current?.status === 'accepted') { accepted = true; break; }
-          if (current?.status === 'rejected' || current?.status === 'cancelled') throw new Error('The call was declined or cancelled');
+          if (current?.status === 'accepted') { accepted = true; outgoingRingingRef.current = false; stopRinging(); break; }
+          if (current?.status === 'rejected' || current?.status === 'cancelled') { outgoingRingingRef.current = false; stopRinging(); throw new Error('The call was declined or cancelled'); }
           await new Promise(resolve => window.setTimeout(resolve, 1500));
         }
         if (cancelledRef.current) return;
-        if (!accepted) throw new Error('No answer. Try calling again later.');
+        if (!accepted) { outgoingRingingRef.current = false; stopRinging(); throw new Error('No answer. Try calling again later.'); }
       }
 
       const room = new Room({ adaptiveStream: true, dynacast: true });
@@ -102,7 +160,7 @@ export default function CallsPage() {
       room.on(RoomEvent.Disconnected, () => { setConnected(false); setStatus('Call ended'); });
       const response = await fetch('/api/calls/token', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetHandle: handle, mode })
+        body: JSON.stringify({ targetHandle: handle, mode, invitationId: activeInvitationRef.current })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not create call');
@@ -115,6 +173,8 @@ export default function CallsPage() {
       setConnected(true);
       setStatus('Connected with @' + handle);
     } catch (e) {
+      outgoingRingingRef.current = false;
+      stopRinging();
       await roomRef.current?.disconnect();
       roomRef.current = null;
       setConnected(false);
@@ -133,6 +193,7 @@ export default function CallsPage() {
 
   async function respondToInvitation(invitation: Invitation, action: 'accept'|'reject') {
     setError('');
+    stopRinging();
     try {
       const response = await fetch('/api/calls/invitations', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -166,7 +227,7 @@ export default function CallsPage() {
       try {
         const response = await fetch('/api/calls/token', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetHandle: handle, mode: requestedMode })
+          body: JSON.stringify({ targetHandle: handle, mode: requestedMode, invitationId: id })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Could not join call');
@@ -187,6 +248,8 @@ export default function CallsPage() {
 
   async function leaveCall() {
     cancelledRef.current = true;
+    outgoingRingingRef.current = false;
+    stopRinging();
     const invitationId = activeInvitationRef.current;
     activeInvitationRef.current = null;
     if (invitationId) {
@@ -217,6 +280,23 @@ export default function CallsPage() {
     setCameraOff(next);
   }
 
+  async function toggleSpeaker() {
+    const room = roomRef.current;
+    if (!room) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const outputs = devices.filter(device => device.kind === 'audiooutput');
+      const speaker = outputs.find(device => /speaker|loudspeaker/i.test(device.label));
+      if (!speaker || typeof (room as any).switchActiveDevice !== 'function') {
+        setError('This Android WebView does not expose speakerphone routing. A native audio-route integration is required for this device.');
+        return;
+      }
+      await (room as any).switchActiveDevice('audiooutput', speakerOn ? 'default' : speaker.deviceId);
+      setSpeakerOn(!speakerOn);
+      setError('');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not change audio output'); }
+  }
+
   return <main className="calls-page">
     <header><a href="/"><ArrowLeft size={18}/> UCENO</a><div><small>REAL-TIME CONVERSATION</small><h1>Audio & video calls</h1></div></header>
     {incoming.length > 0 && <section className="call-setup" aria-label="Incoming calls">
@@ -232,7 +312,7 @@ export default function CallsPage() {
       <input id="call-target" value={targetHandle} onChange={e=>setTargetHandle(e.target.value.replace(/^@/, '').replace(/[^a-zA-Z0-9_]/g,'').slice(0,24))} placeholder="Enter the person’s username" disabled={connected || busy} autoComplete="off" />
       <p>Select a person from their profile to call without entering a username.</p></>}
       <div className="call-mode"><button className={mode==='audio'?'selected':''} onClick={()=>setMode('audio')} disabled={connected||busy}><Mic size={16}/> Audio</button><button className={mode==='video'?'selected':''} onClick={()=>setMode('video')} disabled={connected||busy}><Video size={16}/> Video</button></div>
-      {busy && !connected ? <div className="call-controls"><span role="status">{status}</span><button type="button" className="hangup" onClick={()=>void leaveCall()}><PhoneOff size={17}/> Cancel call</button></div> : !connected ? <button id="call-start" className="call-primary" onClick={()=>void joinCall()} disabled={!(/^[a-zA-Z0-9_]{3,24}$/.test(targetHandle.trim().replace(/^@/,'')))}><PhoneCall size={17}/> Call now</button> : <div className="call-controls"><button onClick={()=>void toggleMute()}>{muted?<MicOff size={17}/>:<Mic size={17}/>} {muted?'Unmute':'Mute'}</button>{mode==='video'&&<button onClick={()=>void toggleCamera()}>{cameraOff?<VideoOff size={17}/>:<Video size={17}/>} {cameraOff?'Turn camera on':'Turn camera off'}</button>}<button className="hangup" onClick={()=>void leaveCall()}><PhoneOff size={17}/> End call</button></div>}
+      {busy && !connected ? <div className="call-controls"><span role="status">{status}</span><button type="button" className="hangup" onClick={()=>void leaveCall()}><PhoneOff size={17}/> Cancel call</button></div> : !connected ? <button id="call-start" className="call-primary" onClick={()=>void joinCall()} disabled={!(/^[a-zA-Z0-9_]{3,24}$/.test(targetHandle.trim().replace(/^@/,'')))}><PhoneCall size={17}/> Call now</button> : <div className="call-controls"><button onClick={()=>void toggleMute()}>{muted?<MicOff size={17}/>:<Mic size={17}/>} {muted?'Unmute':'Mute'}</button>{mode==='video'&&<button onClick={()=>void toggleCamera()}>{cameraOff?<VideoOff size={17}/>:<Video size={17}/>} {cameraOff?'Turn camera on':'Turn camera off'}</button>}<button type="button" onClick={()=>void toggleSpeaker()}><Volume2 size={17}/> {speakerOn?'Speaker on':'Speakerphone'}</button><button className="hangup" onClick={()=>void leaveCall()}><PhoneOff size={17}/> End call</button></div>}
       <p role="status">{status}</p>{error&&<p className="call-error" role="alert">{error}</p>}
     </section>
     {missedCalls.length > 0 && <section className="call-setup" aria-label="Missed calls"><h2>Missed calls</h2>{missedCalls.map(call => <div className="call-controls" key={call.id}><p><strong>@{call.callerHandle}</strong> · {call.mode} · {new Date(call.createdAt).toLocaleString()}</p><button className="call-primary" onClick={() => { window.location.href = '/calls?handle=' + encodeURIComponent(call.callerHandle) + '&mode=' + call.mode + '&start=1'; }}> <PhoneCall size={16}/> Call back</button></div>)}</section>}
