@@ -1,12 +1,6 @@
 name: UCENO Android Release
 
 on:
-  # Run the signed release build when this workflow is updated on main, so a
-  # release can still be produced if the manual workflow-dispatch UI fails.
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/android-release.yml'
   workflow_dispatch:
     inputs:
       version_name:
@@ -19,7 +13,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-release-apk:
@@ -153,7 +147,26 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: uceno-android-release-${{ inputs.version_name || '1.0.0' }}-code-${{ inputs.version_code || '1000' }}
+          name: uceno-android-release-${{ inputs.version_name }}-code-${{ inputs.version_code }}
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish APK as a GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version_name }}
+          name: UCENO Android v${{ inputs.version_name }}
+          body: |
+            UCENO Android release v${{ inputs.version_name }}.
+
+            Version code: ${{ inputs.version_code }}
+            Package ID: com.ukaeke.uceno
+
+            Install this APK over your existing UCENO installation. Do not uninstall first.
+            Android will ask you to approve the installation.
+          files: android/app/build/outputs/apk/release/app-release.apk
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false
+          make_latest: true
