@@ -191,3 +191,17 @@ body:has(.account-page) .global-account-link{display:none}
 
 /* Keep the mobile app toolbar clear of the Android status bar. */
 @media(max-width:700px){.center .topbar{margin-top:max(22px,env(safe-area-inset-top));top:max(22px,env(safe-area-inset-top))}.user-page{padding-top:max(30px,env(safe-area-inset-top))}}
+
+
+/* Direct-call affordances and picture moments */
+.call-answer{background:#16803c!important;color:#fff!important;border:1px solid #16803c!important;border-radius:12px;padding:10px 16px;font-weight:750;box-shadow:0 5px 16px rgba(22,128,60,.2)}
+.call-answer:hover{background:#11632f!important}
+.story-composer-modal{max-height:min(88vh,760px);overflow-y:auto}
+.story-composer-modal textarea{width:100%;min-height:110px;resize:vertical}
+.story-image{display:block;width:100%;max-height:48vh;object-fit:contain;border-radius:16px;margin:12px auto}
+.story-visual:has(.story-image){display:block;text-align:center}
+.story-visual:has(.story-image) h2{margin:12px 0;overflow-wrap:anywhere}
+.moment-ring.real-story img{object-fit:cover}
+@media(max-width:640px){.story-composer-modal{width:calc(100vw - 28px);padding:18px}.story-image{max-height:42vh}}
+
+.profile-call-actions{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap}.profile-call-actions button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line,#d8dce5);border-radius:12px;padding:10px 14px;background:var(--surface,#fff);color:var(--text,#18202c);font-weight:700}.profile-call-actions button:hover{border-color:var(--accent,#6d5ce8);background:var(--surface-soft,#f6f4ff)}

@@ -4,13 +4,19 @@ import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
 
 export const runtime = "nodejs";
-const storySchema = z.object({ body: z.string().trim().min(1).max(500) });
+const storySchema = z.object({
+  body: z.string().trim().max(500).optional().default(""),
+  mediaUrl: z.string().url().optional(),
+  mediaType: z.enum(["image"]).optional(),
+}).refine(value => Boolean(value.body || value.mediaUrl), { message: "Add text or a picture to your moment" }).refine(value => Boolean(value.mediaUrl) === Boolean(value.mediaType), { message: "Picture details are incomplete" });
 
 export async function GET() {
   try {
     const sql = getDb();
+    await sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS media_url TEXT`;
+    await sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS media_type VARCHAR(10)`;
     const stories = await sql`
-      SELECT s.id, s.body, s.created_at AS "createdAt", s.expires_at AS "expiresAt",
+      SELECT s.id, s.body, s.media_url AS "mediaUrl", s.media_type AS "mediaType", s.created_at AS "createdAt", s.expires_at AS "expiresAt",
              u.display_name AS "displayName", u.handle
       FROM stories s JOIN users u ON u.id = s.user_id
       WHERE s.expires_at > NOW()
@@ -31,10 +37,12 @@ export async function POST(request: Request) {
     const parsed = storySchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid story" }, { status: 400 });
     const sql = getDb();
+    await sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS media_url TEXT`;
+    await sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS media_type VARCHAR(10)`;
     const rows = await sql`
-      INSERT INTO stories (user_id, body)
-      VALUES (${session.id}::uuid, ${parsed.data.body})
-      RETURNING id, body, created_at AS "createdAt", expires_at AS "expiresAt"
+      INSERT INTO stories (user_id, body, media_url, media_type)
+      VALUES (${session.id}::uuid, ${parsed.data.body}, ${parsed.data.mediaUrl ?? null}, ${parsed.data.mediaType ?? null})
+      RETURNING id, body, media_url AS "mediaUrl", media_type AS "mediaType", created_at AS "createdAt", expires_at AS "expiresAt"
     `;
     const userRows = await sql`SELECT display_name AS "displayName", handle FROM users WHERE id = ${session.id}::uuid LIMIT 1`;
     return NextResponse.json({ story: { ...rows[0], ...userRows[0] } }, { status: 201 });

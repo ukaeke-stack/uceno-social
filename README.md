@@ -35,3 +35,10 @@ Production build: `npm run build`, then `npm start`.
 - Use a reviewed end-to-end encryption protocol/library; do not invent cryptography.
 - Verify push, upload, account recovery and deletion flows on real devices.
 - Provide privacy policy, terms, data export/deletion and incident response processes.
+
+
+## Direct calls and picture Moments
+
+Direct audio/video calling uses LiveKit. Configure `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` in the deployment environment with credentials from your LiveKit project; do not commit real secrets. If these values are absent, the API intentionally returns a configuration error and calls cannot connect. Incoming-call push delivery additionally depends on the Firebase server configuration.
+
+Picture Moments use Cloudinary signed uploads. Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in the deployment environment. Moments expire after 24 hours.
