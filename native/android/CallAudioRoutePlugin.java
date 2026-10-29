@@ -7,6 +7,8 @@ import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.net.Uri;
 import android.os.Build;
 
@@ -52,6 +54,39 @@ public class CallAudioRoutePlugin extends Plugin {
             call.reject(requiresCamera
                 ? "Camera and microphone permissions are required to answer video calls"
                 : "Microphone permission is required to answer audio calls");
+        }
+    }
+
+
+    @PluginMethod
+    public void createIncomingCallChannel(PluginCall call) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                NotificationManager manager = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+                if (manager == null) {
+                    call.reject("Android notification service is unavailable");
+                    return;
+                }
+                String channelId = "uceno_incoming_calls_v2";
+                if (manager.getNotificationChannel(channelId) == null) {
+                    NotificationChannel channel = new NotificationChannel(channelId, "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
+                    channel.setDescription("Incoming UCENO audio and video calls");
+                    channel.enableVibration(true);
+                    channel.setVibrationPattern(new long[] { 0, 700, 300, 700 });
+                    Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+                    if (ringtoneUri == null) ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+                    AudioAttributes attributes = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build();
+                    channel.setSound(ringtoneUri, attributes);
+                    channel.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+                    manager.createNotificationChannel(channel);
+                }
+            }
+            call.resolve();
+        } catch (Exception error) {
+            call.reject("Could not configure incoming call notifications", error);
         }
     }
 
