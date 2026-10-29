@@ -89,7 +89,7 @@ export default function CallsPage() {
     };
     try {
       const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtor) { startRinging(); return; }
+      if (!AudioCtor) { ringingRef.current = false; startRinging(); return; }
       const ctx = ringAudioRef.current || new AudioCtor();
       ringAudioRef.current = ctx;
       void ctx.resume().then(() => {
