@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Room, RoomEvent, Track, createLocalTracks } from 'livekit-client';
+import { Capacitor } from '@capacitor/core';
+import { resetNativeCallAudio, setNativeSpeakerphone, startNativeCallRingtone, stopNativeCallRingtone } from '@/lib/call-audio-route';
 import { ArrowLeft, Mic, MicOff, PhoneCall, PhoneOff, Video, VideoOff, PhoneIncoming, X, Volume2 } from 'lucide-react';
 
 type Invitation = { id: string; callerHandle: string; calleeHandle: string; mode: 'audio'|'video'; status: string; createdAt: string };
@@ -83,6 +85,7 @@ export default function CallsPage() {
       }
       try { if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate([250, 150, 250]); } catch {}
     };
+    if (Capacitor.isNativePlatform()) { void startNativeCallRingtone(); return; }
     try {
       const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtor) { ringTimerRef.current = window.setInterval(() => { try { navigator.vibrate?.([250, 150, 250]); } catch {} }, 1800); return; }
@@ -103,6 +106,7 @@ export default function CallsPage() {
     if (ringTimerRef.current !== null) window.clearInterval(ringTimerRef.current);
     ringTimerRef.current = null;
     try { navigator.vibrate?.(0); } catch {}
+    void stopNativeCallRingtone();
     const ctx = ringAudioRef.current;
     ringAudioRef.current = null;
     if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => {});
@@ -257,6 +261,8 @@ export default function CallsPage() {
     }
     await roomRef.current?.disconnect();
     roomRef.current = null;
+    await resetNativeCallAudio();
+    setSpeakerOn(false);
     if (localRef.current) localRef.current.replaceChildren();
     if (remoteRef.current) remoteRef.current.replaceChildren();
     setConnected(false);
@@ -283,6 +289,13 @@ export default function CallsPage() {
   async function toggleSpeaker() {
     const room = roomRef.current;
     if (!room) return;
+    if (Capacitor.isNativePlatform()) {
+      const next = !speakerOn;
+      const changed = await setNativeSpeakerphone(next);
+      if (changed) { setSpeakerOn(next); setError(''); }
+      else setError('Android could not change the speakerphone route. Check call audio permissions and try again.');
+      return;
+    }
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const outputs = devices.filter(device => device.kind === 'audiooutput');
