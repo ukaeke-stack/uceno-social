@@ -2,6 +2,7 @@ package com.ukaeke.uceno;
 
 import android.content.Context;
 import android.media.AudioAttributes;
+import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
@@ -62,7 +63,22 @@ public class CallAudioRoutePlugin extends Plugin {
                 return;
             }
             manager.setMode(AudioManager.MODE_IN_COMMUNICATION);
-            manager.setSpeakerphoneOn(enabled);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AudioDeviceInfo desired = null;
+                for (AudioDeviceInfo device : manager.getAvailableCommunicationDevices()) {
+                    if (enabled && device.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                        desired = device;
+                        break;
+                    }
+                    if (!enabled && device.getType() == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE) desired = device;
+                }
+                if (desired == null || !manager.setCommunicationDevice(desired)) {
+                    call.reject("Requested call audio device is not available");
+                    return;
+                }
+            } else {
+                manager.setSpeakerphoneOn(enabled);
+            }
             JSObject result = new JSObject();
             result.put("speakerOn", enabled);
             call.resolve(result);
@@ -77,6 +93,7 @@ public class CallAudioRoutePlugin extends Plugin {
             stopRingtoneInternal();
             AudioManager manager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
             if (manager != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) manager.clearCommunicationDevice();
                 manager.setSpeakerphoneOn(false);
                 manager.setMode(AudioManager.MODE_NORMAL);
             }
