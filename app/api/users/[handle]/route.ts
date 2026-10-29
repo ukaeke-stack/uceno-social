@@ -35,20 +35,25 @@ export async function GET(_request: Request, context: { params: Promise<{ handle
       UNIQUE (requester_id, recipient_id),
       CHECK (requester_id <> recipient_id)
     )`;
-    let mutualStatus: "self" | "none" | "accepted" | "incoming_pending" | "outgoing_pending" = session && String(session.id) === String(users[0].id) ? "self" : "none";
+    let mutualStatus: "self" | "none" | "accepted" | "incoming_pending" | "outgoing_pending" | "page_account" = session && String(session.id) === String(users[0].id) ? "self" : "none";
     let mutualRequestId: string | null = null;
     if (session && String(session.id) !== String(users[0].id)) {
-      const mutualRows = await sql`SELECT id, requester_id AS "requesterId", recipient_id AS "recipientId", status
-        FROM mutual_connections
-        WHERE (requester_id = ${session.id}::uuid AND recipient_id = ${users[0].id}::uuid)
-           OR (requester_id = ${users[0].id}::uuid AND recipient_id = ${session.id}::uuid)
-        ORDER BY updated_at DESC LIMIT 2`;
-      if (mutualRows.some((row: any) => row.status === "accepted")) mutualStatus = "accepted";
-      else {
-        const incoming = mutualRows.find((row: any) => String(row.requesterId) === String(users[0].id) && String(row.recipientId) === String(session.id) && row.status === "pending");
-        const outgoing = mutualRows.find((row: any) => String(row.requesterId) === String(session.id) && String(row.recipientId) === String(users[0].id) && row.status === "pending");
-        if (incoming) { mutualStatus = "incoming_pending"; mutualRequestId = String(incoming.id); }
-        else if (outgoing) { mutualStatus = "outgoing_pending"; mutualRequestId = String(outgoing.id); }
+      const callerRows = await sql`SELECT account_type AS "accountType" FROM users WHERE id = ${session.id}::uuid LIMIT 1`;
+      if (callerRows[0]?.accountType === "page") {
+        mutualStatus = "page_account";
+      } else {
+        const mutualRows = await sql`SELECT id, requester_id AS "requesterId", recipient_id AS "recipientId", status
+          FROM mutual_connections
+          WHERE (requester_id = ${session.id}::uuid AND recipient_id = ${users[0].id}::uuid)
+             OR (requester_id = ${users[0].id}::uuid AND recipient_id = ${session.id}::uuid)
+          ORDER BY updated_at DESC LIMIT 2`;
+        if (mutualRows.some((row: any) => row.status === "accepted")) mutualStatus = "accepted";
+        else {
+          const incoming = mutualRows.find((row: any) => String(row.requesterId) === String(users[0].id) && String(row.recipientId) === String(session.id) && row.status === "pending");
+          const outgoing = mutualRows.find((row: any) => String(row.requesterId) === String(session.id) && String(row.recipientId) === String(users[0].id) && row.status === "pending");
+          if (incoming) { mutualStatus = "incoming_pending"; mutualRequestId = String(incoming.id); }
+          else if (outgoing) { mutualStatus = "outgoing_pending"; mutualRequestId = String(outgoing.id); }
+        }
       }
     }
     let isFollowing = false;
