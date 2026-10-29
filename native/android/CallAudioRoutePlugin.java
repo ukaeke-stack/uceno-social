@@ -28,21 +28,31 @@ public class CallAudioRoutePlugin extends Plugin {
 
     @PluginMethod
     public void requestMediaPermissions(PluginCall call) {
-        if (getPermissionState("camera") == PermissionState.GRANTED
-                && getPermissionState("microphone") == PermissionState.GRANTED) {
+        boolean requiresCamera = "video".equals(call.getString("mode"));
+        boolean microphoneGranted = getPermissionState("microphone") == PermissionState.GRANTED;
+        boolean cameraGranted = !requiresCamera || getPermissionState("camera") == PermissionState.GRANTED;
+        if (microphoneGranted && cameraGranted) {
             call.resolve();
             return;
         }
-        requestPermissionForAliases(new String[] { "camera", "microphone" }, call, "mediaPermissionsCallback");
+        call.getData().put("requiresCamera", requiresCamera);
+        String[] aliases = requiresCamera
+            ? new String[] { "camera", "microphone" }
+            : new String[] { "microphone" };
+        requestPermissionForAliases(aliases, call, "mediaPermissionsCallback");
     }
 
     @PermissionCallback
     private void mediaPermissionsCallback(PluginCall call) {
-        if (getPermissionState("camera") == PermissionState.GRANTED
-                && getPermissionState("microphone") == PermissionState.GRANTED) {
+        boolean requiresCamera = call.getData().optBoolean("requiresCamera", false);
+        boolean microphoneGranted = getPermissionState("microphone") == PermissionState.GRANTED;
+        boolean cameraGranted = !requiresCamera || getPermissionState("camera") == PermissionState.GRANTED;
+        if (microphoneGranted && cameraGranted) {
             call.resolve();
         } else {
-            call.reject("Camera and microphone permissions are required to answer calls");
+            call.reject(requiresCamera
+                ? "Camera and microphone permissions are required to answer video calls"
+                : "Microphone permission is required to answer audio calls");
         }
     }
 
