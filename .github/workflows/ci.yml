@@ -98,7 +98,7 @@ jobs:
             if (!xml.includes(declaration)) xml = xml.replace('<application', '    ' + declaration + '\n    <application');
           }
           const callService = '<service android:name=".UcenoCallMessagingService" android:exported="false"><intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter></service>';
-          if (!xml.includes('UcenoCallMessagingService')) xml = xml.replace('</application>', '        ' + callService + '\\n    </application>');
+          if (!xml.includes('UcenoCallMessagingService')) xml = xml.replace('</application>', '        ' + callService + '\n    </application>');
           fs.writeFileSync(manifest, xml);
           NODE
       - name: Configure native Firebase for Android push
