@@ -14,7 +14,12 @@ const CallAudioRoute = registerPlugin<CallAudioRoutePlugin>('CallAudioRoute');
 
 export async function requestNativeMediaPermissions(mode: 'audio' | 'video'): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return true;
-  try { await CallAudioRoute.requestMediaPermissions({ mode }); return true; } catch { return false; }
+  try { await CallAudioRoute.requestMediaPermissions({ mode }); return true; } catch (error) {
+    const message = String(error).toLowerCase();
+    // Older installed APKs do not contain this native plugin; fall back to WebView getUserMedia permissions.
+    if (message.includes('not implemented') || message.includes('unimplemented')) return true;
+    return false;
+  }
 }
 
 export async function startNativeCallRingtone(): Promise<boolean> {
