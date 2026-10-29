@@ -5,6 +5,7 @@ import { Room, RoomEvent, Track, createLocalTracks } from 'livekit-client';
 import { ArrowLeft, Mic, MicOff, PhoneCall, PhoneOff, Video, VideoOff, PhoneIncoming, X } from 'lucide-react';
 
 type Invitation = { id: string; callerHandle: string; calleeHandle: string; mode: 'audio'|'video'; status: string; createdAt: string };
+type MissedCall = { id: string; callerHandle: string; mode: 'audio'|'video'; createdAt: string };
 
 export default function CallsPage() {
   const [targetHandle, setTargetHandle] = useState('');
@@ -15,6 +16,8 @@ export default function CallsPage() {
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const [incoming, setIncoming] = useState<Invitation[]>([]);
+  const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
+  const [lockedTarget, setLockedTarget] = useState(false);
   const [busy, setBusy] = useState(false);
   const roomRef = useRef<Room|null>(null);
   const localRef = useRef<HTMLDivElement>(null);
@@ -26,8 +29,11 @@ export default function CallsPage() {
     const params = new URLSearchParams(window.location.search);
     const handle = params.get('handle');
     const requestedMode = params.get('mode');
-    if (handle && /^[a-zA-Z0-9_]{3,24}$/.test(handle)) setTargetHandle(handle);
+    if (handle && /^[a-zA-Z0-9_]{3,24}$/.test(handle)) { setTargetHandle(handle); setLockedTarget(true); }
     if (requestedMode === 'audio' || requestedMode === 'video') setMode(requestedMode);
+    if (handle && params.get('start') === '1' && /^[a-zA-Z0-9_]{3,24}$/.test(handle)) {
+      window.setTimeout(() => document.getElementById('call-start')?.click(), 0);
+    }
   }, []);
 
   useEffect(() => {
@@ -38,6 +44,7 @@ export default function CallsPage() {
         if (!response.ok) return;
         const data = await response.json();
         if (alive && Array.isArray(data.invitations)) setIncoming(data.invitations.filter((item: Invitation) => item.status === 'pending'));
+        if (alive && Array.isArray(data.missedCalls)) setMissedCalls(data.missedCalls);
       } catch { /* transient network failure; retry on next poll */ }
     };
     void refresh();
@@ -207,18 +214,19 @@ export default function CallsPage() {
       <h2><PhoneIncoming size={18}/> Incoming call{incoming.length > 1 ? 's' : ''}</h2>
       {incoming.map(invitation => <div key={invitation.id} className="call-controls">
         <p><strong>@{invitation.callerHandle}</strong> is calling you ({invitation.mode})</p>
-        <button className="call-primary" onClick={() => void respondToInvitation(invitation, 'accept')}>Answer</button>
+        <button className="call-answer" onClick={() => void respondToInvitation(invitation, 'accept')}>Answer</button>
         <button className="hangup" onClick={() => void respondToInvitation(invitation, 'reject')}><X size={16}/> Decline</button>
       </div>)}
     </section>}
     <section className="call-setup">
-      <label htmlFor="call-target">UCENO username</label>
+      {!lockedTarget && <><label htmlFor="call-target">UCENO username</label>
       <input id="call-target" value={targetHandle} onChange={e=>setTargetHandle(e.target.value.replace(/^@/, '').replace(/[^a-zA-Z0-9_]/g,'').slice(0,24))} placeholder="Enter the person’s username" disabled={connected || busy} autoComplete="off" />
-      <p>Tap Call to ring the person directly. They can answer or decline from this screen.</p>
+      <p>Select a person from their profile to call without entering a username.</p></>}
       <div className="call-mode"><button className={mode==='audio'?'selected':''} onClick={()=>setMode('audio')} disabled={connected||busy}><Mic size={16}/> Audio</button><button className={mode==='video'?'selected':''} onClick={()=>setMode('video')} disabled={connected||busy}><Video size={16}/> Video</button></div>
-      {!connected ? <button className="call-primary" onClick={()=>void joinCall()} disabled={busy||!(/^[a-zA-Z0-9_]{3,24}$/.test(targetHandle.trim().replace(/^@/,'')))}><PhoneCall size={17}/> {busy ? 'Calling…' : 'Call now'}</button> : <div className="call-controls"><button onClick={()=>void toggleMute()}>{muted?<MicOff size={17}/>:<Mic size={17}/>} {muted?'Unmute':'Mute'}</button>{mode==='video'&&<button onClick={()=>void toggleCamera()}>{cameraOff?<VideoOff size={17}/>:<Video size={17}/>} {cameraOff?'Turn camera on':'Turn camera off'}</button>}<button className="hangup" onClick={()=>void leaveCall()}><PhoneOff size={17}/> End call</button></div>}
+      {!connected ? <button id="call-start" className="call-primary" onClick={()=>void joinCall()} disabled={busy||!(/^[a-zA-Z0-9_]{3,24}$/.test(targetHandle.trim().replace(/^@/,'')))}><PhoneCall size={17}/> {busy ? 'Calling…' : 'Call now'}</button> : <div className="call-controls"><button onClick={()=>void toggleMute()}>{muted?<MicOff size={17}/>:<Mic size={17}/>} {muted?'Unmute':'Mute'}</button>{mode==='video'&&<button onClick={()=>void toggleCamera()}>{cameraOff?<VideoOff size={17}/>:<Video size={17}/>} {cameraOff?'Turn camera on':'Turn camera off'}</button>}<button className="hangup" onClick={()=>void leaveCall()}><PhoneOff size={17}/> End call</button></div>}
       <p role="status">{status}</p>{error&&<p className="call-error" role="alert">{error}</p>}
     </section>
+    {missedCalls.length > 0 && <section className="call-setup" aria-label="Missed calls"><h2>Missed calls</h2>{missedCalls.map(call => <div className="call-controls" key={call.id}><p><strong>@{call.callerHandle}</strong> · {call.mode} · {new Date(call.createdAt).toLocaleString()}</p><button className="call-primary" onClick={() => { window.location.href = '/calls?handle=' + encodeURIComponent(call.callerHandle) + '&mode=' + call.mode + '&start=1'; }}> <PhoneCall size={16}/> Call back</button></div>)}</section>}
     <section className="call-stage"><div><strong>You</strong><div className="call-video" ref={localRef}>Your camera preview appears here</div></div><div><strong>Other participant</strong><div className="call-video" ref={remoteRef}>Waiting for the other person to answer…</div></div></section>
     <p className="call-note">Incoming calls are checked while this page is open. For calls to ring when UCENO is closed or in the background, the server still needs a verified push-notification delivery path and Android device testing.</p>
   </main>;
