@@ -28,13 +28,16 @@ Create one Android release keystore and keep a secure offline backup. Do not gen
 
 The workflow will fail early if required secrets are absent. Do not put secret values in workflow files, issues, or logs.
 
-## Build a release APK
+## Publish a release APK
 
 1. Configure the Firebase and signing secrets above.
 2. Open Actions → **UCENO Android Release** → Run workflow.
-3. Enter a version name and a version code greater than the last published code.
-4. Download the signed APK from the workflow artifact.
-5. Install the first release manually. For future APK releases, download and open the new APK; Android should offer an update, not require uninstalling, if the signing key/package ID match.
+3. Enter a version name and a version code greater than every previously distributed code.
+4. The workflow builds and verifies the signed APK, then attaches it to a public GitHub Release named `v<version_name>`. The asset filename includes the version code.
+5. The release becomes available to the app update checker at `/updates`; the endpoint reports a release only when the APK asset is present.
+6. Download the signed APK and test it on a physical Android device before sharing the release widely.
+
+The workflow is manual-only so a workflow edit cannot accidentally publish the fallback version 1.0.0 / code 1000.
 
 ## Push delivery requirements
 
