@@ -35,7 +35,6 @@ public class CallAudioRoutePlugin extends Plugin {
             call.resolve();
             return;
         }
-        call.getData().put("requiresCamera", requiresCamera);
         String[] aliases = requiresCamera
             ? new String[] { "camera", "microphone" }
             : new String[] { "microphone" };
@@ -44,7 +43,7 @@ public class CallAudioRoutePlugin extends Plugin {
 
     @PermissionCallback
     private void mediaPermissionsCallback(PluginCall call) {
-        boolean requiresCamera = call.getData().optBoolean("requiresCamera", false);
+        boolean requiresCamera = "video".equals(call.getString("mode"));
         boolean microphoneGranted = getPermissionState("microphone") == PermissionState.GRANTED;
         boolean cameraGranted = !requiresCamera || getPermissionState("camera") == PermissionState.GRANTED;
         if (microphoneGranted && cameraGranted) {
