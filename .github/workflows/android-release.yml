@@ -145,10 +145,16 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$APK"
           echo "APK signature verification passed."
 
+      - name: Prepare versioned APK filename
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: cp android/app/build/outputs/apk/release/app-release.apk "android/app/build/outputs/apk/release/uceno-android-v${VERSION_NAME}-code-${VERSION_CODE}.apk"
+
       - uses: actions/upload-artifact@v4
         with:
           name: uceno-android-release-${{ inputs.version_name }}-code-${{ inputs.version_code }}
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: android/app/build/outputs/apk/release/uceno-android-v${{ inputs.version_name }}-code-${{ inputs.version_code }}.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -165,7 +171,7 @@ jobs:
 
             Install this APK over your existing UCENO installation. Do not uninstall first.
             Android will ask you to approve the installation.
-          files: android/app/build/outputs/apk/release/app-release.apk
+          files: android/app/build/outputs/apk/release/uceno-android-v${{ inputs.version_name }}-code-${{ inputs.version_code }}.apk
           fail_on_unmatched_files: true
           draft: false
           prerelease: false
