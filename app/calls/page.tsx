@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Room, RoomEvent, Track, createLocalTracks } from 'livekit-client';
 import { Capacitor } from '@capacitor/core';
-import { resetNativeCallAudio, setNativeSpeakerphone, startNativeCallRingtone, stopNativeCallRingtone } from '@/lib/call-audio-route';
+import { requestNativeMediaPermissions, resetNativeCallAudio, setNativeSpeakerphone, startNativeCallRingtone, stopNativeCallRingtone } from '@/lib/call-audio-route';
 import { ArrowLeft, Mic, MicOff, PhoneCall, PhoneOff, Video, VideoOff, PhoneIncoming, X, Volume2 } from 'lucide-react';
 
 type Invitation = { id: string; callerHandle: string; calleeHandle: string; mode: 'audio'|'video'; status: string; createdAt: string };
@@ -168,6 +168,8 @@ export default function CallsPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not create call');
+      const mediaPermissionsGranted = await requestNativeMediaPermissions(mode);
+      if (!mediaPermissionsGranted) throw new Error(mode === 'video' ? 'Allow camera and microphone permissions to answer video calls.' : 'Allow microphone permission to answer audio calls.');
       await room.connect(data.url, data.token);
       const tracks = await createLocalTracks({ audio: true, video: mode === 'video' });
       for (const track of tracks) {
@@ -235,6 +237,8 @@ export default function CallsPage() {
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Could not join call');
+        const mediaPermissionsGranted = await requestNativeMediaPermissions(requestedMode as 'audio' | 'video');
+        if (!mediaPermissionsGranted) throw new Error(requestedMode === 'video' ? 'Allow camera and microphone permissions to answer video calls.' : 'Allow microphone permission to answer audio calls.');
         const room = new Room({ adaptiveStream: true, dynacast: true });
         roomRef.current = room;
         room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => mountTrack(track, participant.identity === room.localParticipant.identity ? 'local' : 'remote'));
