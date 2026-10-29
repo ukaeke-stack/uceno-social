@@ -28,6 +28,22 @@ export async function POST(request: Request) {
   if (String(target.id) === String(session.id)) {
     return NextResponse.json({ error: "You cannot call yourself" }, { status: 400 });
   }
+  await sql`CREATE TABLE IF NOT EXISTS mutual_connections (
+    id TEXT PRIMARY KEY,
+    requester_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recipient_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (requester_id, recipient_id),
+    CHECK (requester_id <> recipient_id)
+  )`;
+  const mutual = await sql`SELECT id FROM mutual_connections
+    WHERE status = 'accepted'
+      AND ((requester_id = ${session.id}::uuid AND recipient_id = ${target.id}::uuid)
+        OR (requester_id = ${target.id}::uuid AND recipient_id = ${session.id}::uuid))
+    LIMIT 1`;
+  if (!mutual.length) return NextResponse.json({ error: "Calling is available only between accepted mutual connections." }, { status: 403 });
 
   // Only issue a LiveKit token after the recipient accepts a recent invitation
   // for this exact pair and call mode.
