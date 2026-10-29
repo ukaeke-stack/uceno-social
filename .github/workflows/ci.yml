@@ -122,8 +122,13 @@ jobs:
           let a = fs.readFileSync(file, 'utf8');
           if (!a.includes('com.google.gms.google-services')) {
             a += "\napply plugin: 'com.google.gms.google-services'\n";
-            fs.writeFileSync(file, a);
           }
+          if (!a.includes('com.google.firebase:firebase-messaging')) {
+            const dependency = "    implementation 'com.google.firebase:firebase-messaging:24.0.0'\n";
+            if (!a.includes('dependencies {')) throw new Error('App Gradle dependencies block not found');
+            a = a.replace('dependencies {', 'dependencies {\n' + dependency);
+          }
+          fs.writeFileSync(file, a);
           const config = JSON.parse(fs.readFileSync('android/app/google-services.json', 'utf8'));
           const clients = config.client || [];
           if (!clients.some(c => c.client_info?.android_client_info?.package_name === 'com.ukaeke.uceno')) {
