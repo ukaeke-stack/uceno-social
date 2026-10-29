@@ -142,6 +142,7 @@ export default function CallsPage() {
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('accept');
     if (!id) return;
+    activeInvitationRef.current = id;
     let active = true;
     const acceptAndJoin = async () => {
       const handle = new URLSearchParams(window.location.search).get('handle') || '';
