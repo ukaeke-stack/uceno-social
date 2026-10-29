@@ -166,10 +166,20 @@ export default function CallsPage() {
     const host = participant === 'local' ? localRef.current : remoteRef.current;
     if (!host) return;
     const element = track.attach();
-    element.style.width = '100%';
-    element.style.height = '100%';
-    if (element instanceof HTMLVideoElement) element.style.objectFit = 'cover';
-    host.appendChild(element);
+    if (track.kind === Track.Kind.Video && element instanceof HTMLVideoElement) {
+      host.querySelectorAll('video').forEach(video => video.remove());
+      host.querySelector('.call-video-placeholder')?.remove();
+      element.style.width = '100%';
+      element.style.height = '100%';
+      element.style.objectFit = 'cover';
+      element.style.display = 'block';
+      host.appendChild(element);
+      return;
+    }
+    if (track.kind === Track.Kind.Audio) {
+      element.style.display = 'none';
+      document.body.appendChild(element);
+    }
   }
 
   async function joinCall(skipInvitation = false) {
@@ -386,7 +396,10 @@ export default function CallsPage() {
       <p role="status">{status}</p>{error&&<p className="call-error" role="alert">{error}</p>}
     </section>
     {missedCalls.length > 0 && <section className="call-setup" aria-label="Missed calls"><h2>Missed calls</h2>{missedCalls.map(call => <div className="call-controls" key={call.id}><p><strong>@{call.callerHandle}</strong> · {call.mode} · {new Date(call.createdAt).toLocaleString()}</p><button className="call-primary" onClick={() => { window.location.href = '/calls?handle=' + encodeURIComponent(call.callerHandle) + '&mode=' + call.mode + '&start=1'; }}> <PhoneCall size={16}/> Call back</button></div>)}</section>}
-    <section className="call-stage"><div><strong>You</strong><div className="call-video" ref={localRef}>Your camera preview appears here</div></div><div><strong>Other participant</strong><div className="call-video" ref={remoteRef}>Waiting for the other person to answer…</div></div></section>
+    <section className={"call-stage" + (mode === 'video' ? ' video-call-active' : ' audio-call-active')} aria-label="Call video">
+      <div className="call-video remote-call-video" ref={remoteRef}><span className="call-video-placeholder">Waiting for the other participant…</span></div>
+      {mode === 'video' && <div className="local-call-preview"><span>You</span><div className="call-video local-call-video" ref={localRef}><span className="call-video-placeholder">Your camera</span></div></div>}
+    </section>
     <p className="call-note">Incoming calls are checked while this page is open. For calls to ring when UCENO is closed or in the background, the server still needs a verified push-notification delivery path and Android device testing.</p>
   </main>;
 }
