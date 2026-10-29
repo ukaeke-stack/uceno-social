@@ -86,7 +86,7 @@ jobs:
           let xml = fs.readFileSync(manifest, 'utf8');
           for (const permission of ['android.permission.MODIFY_AUDIO_SETTINGS', 'android.permission.VIBRATE']) {
             const declaration = '<uses-permission android:name="' + permission + '" />';
-            if (!xml.includes(declaration)) xml = xml.replace('<application', '    ' + declaration + '\\n    <application');
+            if (!xml.includes(declaration)) xml = xml.replace('<application', '    ' + declaration + '\n    <application');
           }
           fs.writeFileSync(manifest, xml);
           NODE
