@@ -62,6 +62,18 @@ jobs:
             if (!source.includes(declaration)) throw new Error('Unexpected Capacitor MainActivity template');
             source = source.replace(declaration, declaration + '\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(CallAudioRoutePlugin.class);\n        super.onCreate(savedInstanceState);\n    }');
           }
+          const launchIntentHandler = `
+        android.content.Intent launchIntent = getIntent();
+        String launchTarget = launchIntent == null ? null : launchIntent.getStringExtra("url");
+        if (launchTarget != null && getBridge() != null) {
+            final String safeLaunchTarget = launchTarget.startsWith("/") && !launchTarget.startsWith("//") ? launchTarget : "/";
+            getBridge().getWebView().post(() -> getBridge().getWebView().evaluateJavascript(
+                "window.location.assign(" + org.json.JSONObject.quote(safeLaunchTarget) + ")", null));
+        }
+`;
+          if (!source.includes('String launchTarget = launchIntent == null')) {
+            source = source.replace('super.onCreate(savedInstanceState);', 'super.onCreate(savedInstanceState);' + launchIntentHandler);
+          }
           const newIntentHandler = `
     @Override
     protected void onNewIntent(android.content.Intent intent) {
