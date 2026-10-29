@@ -15,9 +15,10 @@ export async function POST(request: Request) {
     const phone = value.contactType === "phone" ? value.phone! : null;
     const passwordHash = await hash(value.password, 12);
     const sql = getDb();
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'person'`;
     const existing = await sql`SELECT id FROM users WHERE handle = ${value.handle} OR (${email}::text IS NOT NULL AND email = ${email}) OR (${phone}::text IS NOT NULL AND phone = ${phone}) LIMIT 1`;
     if (existing.length) return NextResponse.json({ error: "That handle or contact is already registered" }, { status: 409 });
-    const rows = await sql`INSERT INTO users (display_name, handle, email, phone, password_hash) VALUES (${value.displayName}, ${value.handle}, ${email}, ${phone}, ${passwordHash}) RETURNING id, display_name AS "displayName", handle, email, phone, created_at AS "createdAt"`;
+    const rows = await sql`INSERT INTO users (display_name, handle, email, phone, password_hash, account_type) VALUES (${value.displayName}, ${value.handle}, ${email}, ${phone}, ${passwordHash}, ${value.accountType}) RETURNING id, display_name AS "displayName", handle, email, phone, account_type AS "accountType", created_at AS "createdAt"`;
     await createSession({ id: String(rows[0].id), handle: String(rows[0].handle) });
     return NextResponse.json({ user: rows[0] }, { status: 201 });
   } catch (error) {
