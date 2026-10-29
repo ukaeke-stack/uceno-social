@@ -45,6 +45,31 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+      - name: Install native call audio routing plugin
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const { execFileSync } = require('child_process');
+          const main = execFileSync('find', ['android/app/src/main/java', '-name', 'MainActivity.java', '-print', '-quit'], { encoding: 'utf8' }).trim();
+          if (!main) throw new Error('Capacitor MainActivity.java was not generated');
+          fs.copyFileSync('native/android/CallAudioRoutePlugin.java', path.join(path.dirname(main), 'CallAudioRoutePlugin.java'));
+          let source = fs.readFileSync(main, 'utf8');
+          if (!source.includes('registerPlugin(CallAudioRoutePlugin.class)')) {
+            if (!source.includes('import android.os.Bundle;')) source = source.replace(/package [^;]+;\s*/, match => match + '\n\nimport android.os.Bundle;');
+            const declaration = 'public class MainActivity extends BridgeActivity {';
+            if (!source.includes(declaration)) throw new Error('Unexpected Capacitor MainActivity template');
+            source = source.replace(declaration, declaration + '\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(CallAudioRoutePlugin.class);\n        super.onCreate(savedInstanceState);\n    }');
+          }
+          fs.writeFileSync(main, source);
+          const manifest = 'android/app/src/main/AndroidManifest.xml';
+          let xml = fs.readFileSync(manifest, 'utf8');
+          for (const permission of ['android.permission.MODIFY_AUDIO_SETTINGS', 'android.permission.VIBRATE']) {
+            const declaration = '<uses-permission android:name="' + permission + '" />';
+            if (!xml.includes(declaration)) xml = xml.replace('<application', '    ' + declaration + '\n    <application');
+          }
+          fs.writeFileSync(manifest, xml);
+          NODE
       - name: Configure native Firebase for Android push
         env:
           FIREBASE_JSON: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON }}
