@@ -4,17 +4,24 @@ import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
 
 export const runtime = "nodejs";
+
 const storySchema = z.object({
   body: z.string().trim().max(500).optional().default(""),
   mediaUrl: z.string().url().nullable().optional(),
   mediaType: z.enum(["image"]).optional(),
-}).refine(value => Boolean(value.body || value.mediaUrl), { message: "Add text or a picture to your moment" }).refine(value => Boolean(value.mediaUrl) === Boolean(value.mediaType), { message: "Picture details are incomplete" });
+}).refine(
+  value => Boolean(value.body || value.mediaUrl),
+  { message: "Add text or a picture to your moment" },
+).refine(
+  value => Boolean(value.mediaUrl) === Boolean(value.mediaType),
+  { message: "Picture details are incomplete" },
+);
 
 export async function GET() {
   try {
     const sql = getDb();
-    await sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS media_url TEXT`;
-    await sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS media_type VARCHAR(10)`;
+    // Schema changes belong in reviewed migrations, not the runtime request path.
+    // The production stories table already has media_url and media_type.
     const stories = await sql`
       SELECT s.id, s.body, s.media_url AS "mediaUrl", s.media_type AS "mediaType", s.created_at AS "createdAt", s.expires_at AS "expiresAt",
              u.display_name AS "displayName", u.handle
@@ -37,8 +44,6 @@ export async function POST(request: Request) {
     const parsed = storySchema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid story" }, { status: 400 });
     const sql = getDb();
-    await sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS media_url TEXT`;
-    await sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS media_type VARCHAR(10)`;
     const rows = await sql`
       INSERT INTO stories (user_id, body, media_url, media_type)
       VALUES (${session.id}::uuid, ${parsed.data.body}, ${parsed.data.mediaUrl ?? null}, ${parsed.data.mediaType ?? null})
