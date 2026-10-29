@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { registerNativePush } from '@/lib/native-push';
-import { Activity, ArrowLeft, ArrowUpRight, Bell, Bookmark, Check, ChevronDown, Compass, Flame, Hash, Heart, Home, Image, LogOut, Menu, MessageCircle, MoreHorizontal, Plus, Radio, Repeat2, Search, Send, Settings2, ShieldCheck, Sparkles, UserRound, Users, Video, Volume2, VolumeX, X, Share2 } from 'lucide-react';
+import { Activity, ArrowLeft, ArrowUpRight, Bell, Bookmark, Check, ChevronDown, Compass, Flame, Hash, Heart, Home, Image, LogOut, Menu, MessageCircle, MoreHorizontal, Phone, Plus, Radio, Repeat2, Search, Send, Settings2, ShieldCheck, Sparkles, UserRound, Users, Video, Volume2, VolumeX, X, Share2 } from 'lucide-react';
 type Post = { id:string|number; name:string; handle:string; time:string; avatar:string; verified?:boolean; body:string; image?:string; mediaUrl?:string|null; mediaType?:'image'|'video'|null; likes:number; comments:number; reposts:number; tag?:string };
 const seed:Post[]=[
 {id:1,name:'Amara Okafor',handle:'@amara.builds',time:'12 min',avatar:'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&h=160&fit=crop&crop=faces',verified:true,body:'The best communities don’t just share information. They make people feel like they belong. That’s the internet I want us to build. ✨',likes:1280,comments:86,reposts:42,tag:'Community'},
