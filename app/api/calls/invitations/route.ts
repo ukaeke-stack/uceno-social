@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
+import { notifyIncomingCall } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +59,18 @@ export async function POST(request: Request) {
       await sql`UPDATE call_invitations SET status = 'cancelled', updated_at = NOW() WHERE caller_id = ${session.id} AND status = 'pending'`;
       const id = crypto.randomUUID();
       await sql`INSERT INTO call_invitations (id, caller_id, caller_handle, callee_id, callee_handle, mode) VALUES (${id}, ${session.id}, ${session.handle}, ${target.id}, ${target.handle}, ${parsed.data.mode})`;
+      // Persist the invitation first; push failure must not prevent the call from
+      // appearing in the recipient's in-app incoming-call list.
+      try {
+        await notifyIncomingCall({
+          recipientId: String(target.id),
+          callerHandle: session.handle,
+          invitationId: id,
+          mode: parsed.data.mode,
+        });
+      } catch (error) {
+        console.error("UCENO incoming-call push delivery failed", error);
+      }
       return NextResponse.json({ invitationId: id, targetHandle: target.handle });
     }
     const { action, invitationId } = parsed.data;
