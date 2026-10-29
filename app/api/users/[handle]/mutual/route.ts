@@ -86,7 +86,7 @@ export async function POST(request: Request, context: { params: Promise<{ handle
         await sql`INSERT INTO mutual_connections (id, requester_id, recipient_id, status) VALUES (${requestId}, ${session.id}::uuid, ${target.id}::uuid, 'pending')`;
       }
       try {
-        await createNotification({ recipientId: String(target.id), actorId: session.id, type: "mutual_request", message: session.handle + " sent you a mutual connection request" });
+        await createNotification({ recipientId: String(target.id), actorId: session.id, type: "system", message: session.handle + " sent you a mutual connection request" });
       } catch (error) {
         console.error("UCENO mutual request notification failed", error);
       }
@@ -103,7 +103,7 @@ export async function POST(request: Request, context: { params: Promise<{ handle
       if (!changed.length) return NextResponse.json({ error: "Request not found or no longer pending" }, { status: 404 });
       if (status === "accepted") {
         try {
-          await createNotification({ recipientId: String(target.id), actorId: session.id, type: "mutual_accepted", message: session.handle + " accepted your mutual connection request" });
+          await createNotification({ recipientId: String(target.id), actorId: session.id, type: "system", message: session.handle + " accepted your mutual connection request" });
         } catch (error) {
           console.error("UCENO mutual acceptance notification failed", error);
         }
