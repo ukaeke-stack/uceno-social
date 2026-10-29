@@ -57,3 +57,53 @@ export async function createNotification(input: {
     console.error("UCENO push delivery failed; in-app notification was saved", error);
   }
 }
+
+export async function notifyIncomingCall(input: {
+  recipientId: string;
+  callerHandle: string;
+  invitationId: string;
+  mode: "audio" | "video";
+}) {
+  const messaging = getFirebaseMessaging();
+  if (!messaging) {
+    console.warn("UCENO incoming-call push skipped: FIREBASE_SERVICE_ACCOUNT_JSON is not configured");
+    return { sent: 0, reason: "firebase-not-configured" as const };
+  }
+  const sql = getDb();
+  const devices = await sql`SELECT token FROM push_tokens WHERE user_id = ${input.recipientId}::uuid`;
+  const tokens = devices.map((row) => String(row.token)).filter(Boolean);
+  if (!tokens.length) return { sent: 0, reason: "no-registered-devices" as const };
+  const url = "/calls?incoming=" + encodeURIComponent(input.invitationId);
+  const result = await messaging.sendEachForMulticast({
+    tokens,
+    notification: {
+      title: input.mode === "video" ? "Incoming video call" : "Incoming audio call",
+      body: "@" + input.callerHandle + " is calling you",
+    },
+    data: {
+      type: "call",
+      invitationId: input.invitationId,
+      callerHandle: input.callerHandle,
+      mode: input.mode,
+      url,
+    },
+    android: {
+      priority: "high",
+      ttl: 60 * 1000,
+      notification: {
+        channelId: "uceno_notifications",
+        sound: "default",
+        priority: "max",
+        clickAction: "FCM_PLUGIN_ACTIVITY",
+      },
+    },
+    apns: { payload: { aps: { sound: "default", "content-available": 1 } } },
+  });
+  const invalidTokens = result.responses.flatMap((response, index) =>
+    !response.success && ["messaging/registration-token-not-registered", "messaging/invalid-registration-token"].includes(response.error?.code ?? "")
+      ? [tokens[index]] : []);
+  if (invalidTokens.length) await sql`DELETE FROM push_tokens WHERE token = ANY(${invalidTokens}::text[])`;
+  const sent = result.responses.filter((response) => response.success).length;
+  if (!sent) console.error("UCENO incoming-call push had no successful deliveries", result.responses.map((response) => response.error?.code ?? "unknown"));
+  return { sent, reason: sent ? "sent" as const : "delivery-failed" as const };
+}
