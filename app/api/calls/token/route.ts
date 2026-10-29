@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 const schema = z.object({
   targetHandle: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,24}$/),
   mode: z.enum(["audio", "video"]).default("video"),
+  invitationId: z.string().uuid(),
 });
 
 export async function POST(request: Request) {
@@ -52,11 +53,12 @@ export async function POST(request: Request) {
   // Only issue a LiveKit token after the recipient accepts a recent invitation
   // for this exact pair and call mode.
   const accepted = await sql`SELECT id FROM call_invitations
-    WHERE status = 'accepted' AND mode = ${input.data.mode}
+    WHERE id = ${input.data.invitationId}
+      AND status = 'accepted' AND mode = ${input.data.mode}
       AND created_at > NOW() - INTERVAL '10 minutes'
       AND ((caller_id = ${session.id} AND callee_id = ${target.id})
         OR (caller_id = ${target.id} AND callee_id = ${session.id}))
-    ORDER BY updated_at DESC LIMIT 1`;
+    LIMIT 1`;
   if (!accepted.length) {
     return NextResponse.json({ error: "The other person must answer your call before the connection can start." }, { status: 403 });
   }
