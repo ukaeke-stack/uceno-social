@@ -76,12 +76,10 @@ export async function notifyIncomingCall(input: {
   const url = "/calls?incoming=" + encodeURIComponent(input.invitationId);
   const result = await messaging.sendEachForMulticast({
     tokens,
-    notification: {
-      title: input.mode === "video" ? "Incoming video call" : "Incoming audio call",
-      body: "@" + input.callerHandle + " is calling you",
-    },
     data: {
       type: "call",
+      title: input.mode === "video" ? "Incoming video call" : "Incoming audio call",
+      body: "@" + input.callerHandle + " is calling you",
       invitationId: input.invitationId,
       callerHandle: input.callerHandle,
       mode: input.mode,
