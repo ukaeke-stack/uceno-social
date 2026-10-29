@@ -3,6 +3,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
 type CallAudioRoutePlugin = {
+  requestMediaPermissions(): Promise<void>;
   startRingtone(): Promise<void>;
   stopRingtone(): Promise<void>;
   setSpeakerphone(options: { enabled: boolean }): Promise<{ speakerOn: boolean }>;
@@ -10,6 +11,11 @@ type CallAudioRoutePlugin = {
 };
 
 const CallAudioRoute = registerPlugin<CallAudioRoutePlugin>('CallAudioRoute');
+
+export async function requestNativeMediaPermissions(): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) return true;
+  try { await CallAudioRoute.requestMediaPermissions(); return true; } catch { return false; }
+}
 
 export async function startNativeCallRingtone(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
