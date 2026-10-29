@@ -31,6 +31,7 @@ export default function CallsPage() {
   const ringAudioRef = useRef<AudioContext | null>(null);
   const ringTimerRef = useRef<number | null>(null);
   const ringingRef = useRef(false);
+  const nativeRingtoneFailedRef = useRef(false);
   const outgoingRingingRef = useRef(false);
 
   useEffect(() => {
@@ -85,7 +86,16 @@ export default function CallsPage() {
       }
       try { if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate([250, 150, 250]); } catch {}
     };
-    if (Capacitor.isNativePlatform()) { void startNativeCallRingtone(); return; }
+    if (Capacitor.isNativePlatform() && !nativeRingtoneFailedRef.current) {
+      void startNativeCallRingtone().then(started => {
+        if (!started && ringingRef.current) {
+          nativeRingtoneFailedRef.current = true;
+          ringingRef.current = false;
+          startRinging();
+        }
+      });
+      return;
+    }
     try {
       const AudioCtor = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtor) { ringTimerRef.current = window.setInterval(() => { try { navigator.vibrate?.([250, 150, 250]); } catch {} }, 1800); return; }
@@ -103,6 +113,7 @@ export default function CallsPage() {
 
   function stopRinging() {
     ringingRef.current = false;
+    nativeRingtoneFailedRef.current = false;
     if (ringTimerRef.current !== null) window.clearInterval(ringTimerRef.current);
     ringTimerRef.current = null;
     try { navigator.vibrate?.(0); } catch {}
