@@ -205,3 +205,17 @@ body:has(.account-page) .global-account-link{display:none}
 @media(max-width:640px){.story-composer-modal{width:calc(100vw - 28px);padding:18px}.story-image{max-height:42vh}}
 
 .profile-call-actions{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap}.profile-call-actions button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line,#d8dce5);border-radius:12px;padding:10px 14px;background:var(--surface,#fff);color:var(--text,#18202c);font-weight:700}.profile-call-actions button:hover{border-color:var(--accent,#6d5ce8);background:var(--surface-soft,#f6f4ff)}
+
+
+/* Combined call view: remote video fills the stage; self-preview floats at top-right. */
+.call-stage{position:relative;display:block;width:100%;max-width:900px;min-height:260px;aspect-ratio:16/9;margin:18px 0 0;border:1px solid var(--line);border-radius:18px;background:#05070c;overflow:hidden}
+.call-stage .remote-call-video{position:absolute;inset:0;width:100%;height:100%;min-height:0;aspect-ratio:auto;margin:0;border:0;border-radius:0;background:#05070c}
+.call-stage .remote-call-video>video{width:100%;height:100%;object-fit:cover}
+.call-video-placeholder{padding:18px;text-align:center;color:var(--muted);font-size:12px}
+.local-call-preview{position:absolute;z-index:2;top:12px;right:12px;width:clamp(92px,22%,190px);aspect-ratio:3/4;display:flex;flex-direction:column;gap:5px;padding:5px;border:1px solid #ffffff70;border-radius:13px;background:#111722e8;box-shadow:0 8px 28px #0008;overflow:hidden}
+.local-call-preview>span{padding:2px 4px;color:#f0f2fa;font-size:10px;font-weight:700}
+.call-stage .local-call-video{flex:1;min-height:0;width:100%;height:100%;margin:0;aspect-ratio:auto;border:0;border-radius:8px;background:#080a10}
+.call-stage .local-call-video>video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.audio-call-active{aspect-ratio:16/9;display:grid;place-items:center}
+.audio-call-active .remote-call-video{display:flex;align-items:center;justify-content:center}
+@media(max-width:600px){.call-stage{min-height:220px;aspect-ratio:3/4;border-radius:14px}.local-call-preview{top:9px;right:9px;width:clamp(88px,29%,132px);aspect-ratio:3/4}.call-stage .remote-call-video>video{object-fit:cover}}
