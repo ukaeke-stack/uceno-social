@@ -219,3 +219,11 @@ body:has(.account-page) .global-account-link{display:none}
 .audio-call-active{aspect-ratio:16/9;display:grid;place-items:center}
 .audio-call-active .remote-call-video{display:flex;align-items:center;justify-content:center}
 @media(max-width:600px){.call-stage{min-height:220px;aspect-ratio:3/4;border-radius:14px}.local-call-preview{top:9px;right:9px;width:clamp(88px,29%,132px);aspect-ratio:3/4}.call-stage .remote-call-video>video{object-fit:cover}}
+
+
+/* Incoming-call prompt stays out of the way and can be minimized while it continues ringing. */
+.incoming-call-toast{position:fixed;z-index:10000;right:16px;top:max(16px,env(safe-area-inset-top));width:min(360px,calc(100vw - 32px));pointer-events:none}
+.incoming-call-toast .incoming-call-dialog{position:relative;pointer-events:auto;margin:0;width:100%;box-shadow:0 18px 60px rgba(0,0,0,.28)}
+.incoming-call-dismiss{position:absolute;top:10px;right:10px;display:grid;place-items:center;width:32px;height:32px;border:1px solid var(--line,#d8dce5);border-radius:50%;background:var(--surface,#fff);color:var(--text,#18202c)}
+.incoming-call-minimized{position:fixed;z-index:10000;right:16px;top:max(16px,env(safe-area-inset-top));display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);padding:11px 14px;border:1px solid var(--line,#d8dce5);border-radius:999px;background:var(--surface,#fff);color:var(--text,#18202c);box-shadow:0 8px 28px rgba(0,0,0,.18);font-weight:700}
+@media(max-width:600px){.incoming-call-toast{right:10px;top:max(10px,env(safe-area-inset-top));width:calc(100vw - 20px)}.incoming-call-minimized{right:10px;top:max(10px,env(safe-area-inset-top))}}
