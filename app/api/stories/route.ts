@@ -4,13 +4,17 @@ import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
 
 export const runtime = "nodejs";
-const storySchema = z.object({ body: z.string().trim().min(1).max(500) });
+const storySchema = z.object({
+  body: z.string().trim().max(500).optional().default(""),
+  mediaUrl: z.string().url().optional(),
+  mediaType: z.enum(["image"]).optional(),
+}).refine(value => Boolean(value.body || value.mediaUrl), { message: "Add text or a picture to your moment" }).refine(value => Boolean(value.mediaUrl) === Boolean(value.mediaType), { message: "Picture details are incomplete" });
 
 export async function GET() {
   try {
     const sql = getDb();
     const stories = await sql`
-      SELECT s.id, s.body, s.created_at AS "createdAt", s.expires_at AS "expiresAt",
+      SELECT s.id, s.body, s.media_url AS "mediaUrl", s.media_type AS "mediaType", s.created_at AS "createdAt", s.expires_at AS "expiresAt",
              u.display_name AS "displayName", u.handle
       FROM stories s JOIN users u ON u.id = s.user_id
       WHERE s.expires_at > NOW()
