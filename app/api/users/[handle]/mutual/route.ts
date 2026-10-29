@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 async function ensureTable() {
   const sql = getDb();
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'person'`;
   await sql`CREATE TABLE IF NOT EXISTS mutual_connections (
     id TEXT PRIMARY KEY,
     requester_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -29,10 +30,11 @@ export async function GET(_request: Request, context: { params: Promise<{ handle
   const { handle } = await context.params;
   try {
     const sql = await ensureTable();
-    const targetRows = await sql`SELECT id, handle FROM users WHERE handle = ${handle.toLowerCase()} LIMIT 1`;
+    const targetRows = await sql`SELECT id, handle, account_type AS "accountType" FROM users WHERE handle = ${handle.toLowerCase()} LIMIT 1`;
     if (!targetRows.length) return NextResponse.json({ error: "User not found" }, { status: 404 });
-    const target = targetRows[0] as { id: string; handle: string };
+    const target = targetRows[0] as { id: string; handle: string; accountType?: string };
     if (String(target.id) === String(session.id)) return NextResponse.json({ status: "self" });
+    if (target.accountType === "page") return NextResponse.json({ status: "page" });
     const rows = await sql`SELECT id, requester_id AS "requesterId", recipient_id AS "recipientId", status
       FROM mutual_connections
       WHERE (requester_id = ${session.id}::uuid AND recipient_id = ${target.id}::uuid)
@@ -63,8 +65,11 @@ export async function POST(request: Request, context: { params: Promise<{ handle
     const sql = await ensureTable();
     const targets = await sql`SELECT id, handle FROM users WHERE handle = ${handle.toLowerCase()} LIMIT 1`;
     if (!targets.length) return NextResponse.json({ error: "User not found" }, { status: 404 });
-    const target = targets[0] as { id: string; handle: string };
+    const target = targets[0] as { id: string; handle: string; accountType?: string };
     if (String(target.id) === String(session.id)) return NextResponse.json({ error: "You cannot connect to your own profile" }, { status: 400 });
+    if (target.accountType === "page") return NextResponse.json({ error: "Pages can be followed and messaged but cannot become personal mutual connections." }, { status: 403 });
+    const callerRows = await sql`SELECT account_type AS "accountType" FROM users WHERE id = ${session.id}::uuid LIMIT 1`;
+    if (callerRows[0]?.accountType === "page") return NextResponse.json({ error: "Page accounts cannot send or accept personal mutual requests." }, { status: 403 });
 
     if (body.action === "send") {
       const existing = await sql`SELECT id, requester_id AS "requesterId", recipient_id AS "recipientId", status
