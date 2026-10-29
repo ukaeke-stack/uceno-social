@@ -8,6 +8,7 @@ type Mode = "choose" | "login" | "register";
 export default function AccountPage() {
   const [mode, setMode] = useState<Mode>("choose");
   const [contactType, setContactType] = useState<"email" | "phone">("email");
+  const [accountType, setAccountType] = useState<"person" | "page">("person");
   const [displayName, setDisplayName] = useState("");
   const [handle, setHandle] = useState("");
   const [contact, setContact] = useState("");
@@ -32,7 +33,7 @@ export default function AccountPage() {
     event.preventDefault();
     setBusy(true); setError(""); setSuccess("");
     const payload = mode === "register"
-      ? { displayName, handle, contactType, [contactType]: contact, password }
+      ? { displayName, handle, accountType, contactType, [contactType]: contact, password }
       : { identifier: contact.trim(), password };
     try {
       const response = await fetch(mode === "register" ? "/api/auth/register" : "/api/auth/login", {
@@ -69,7 +70,8 @@ export default function AccountPage() {
         <p className="account-subtitle">{mode === "register" ? "A few details, then your UCENO space is ready." : "Log in to continue to your UCENO space."}</p>
         <form className="account-form" onSubmit={submit}>
           {mode === "register" && <>
-            <label>Display name<input value={displayName} onChange={e => setDisplayName(e.target.value)} required minLength={2} maxLength={70} autoComplete="name" placeholder="How people will know you" /></label>
+            <label>Account type<select value={accountType} onChange={e => setAccountType(e.target.value as "person" | "page")}><option value="person">Personal profile</option><option value="page">Page — business, creator or organization</option></select><small>Personal profiles can connect as mutuals and call after acceptance. Pages can be followed and messaged but cannot make personal calls.</small></label>
+            <label>Display name<input value={displayName} onChange={e => setDisplayName(e.target.value)} required minLength={2} maxLength={70} autoComplete="name" placeholder={accountType === "page" ? "Page or organization name" : "How people will know you"} /></label>
             <label>Username<input value={handle} onChange={e => setHandle(e.target.value.replace(/^@/, ""))} required minLength={3} maxLength={24} pattern="[A-Za-z0-9_]+" autoComplete="username" placeholder="letters, numbers or underscores" /><small>Your public handle, e.g. @yourname</small></label>
             <div className="account-contact-tabs"><button type="button" className={contactType === "email" ? "active" : ""} onClick={() => { setContactType("email"); setContact(""); }}>Email address</button><button type="button" className={contactType === "phone" ? "active" : ""} onClick={() => { setContactType("phone"); setContact(""); }}>Phone number</button></div>
           </>}
