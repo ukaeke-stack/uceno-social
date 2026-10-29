@@ -173,7 +173,7 @@ export default function CallsPage() {
 
   async function leaveCall() {
     cancelledRef.current = true;
-    if (activeInvitationRef.current && !connected) {
+    if (activeInvitationRef.current) {
       await fetch('/api/calls/invitations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cancel', invitationId: activeInvitationRef.current }) }).catch(() => {});
     }
     await roomRef.current?.disconnect();
