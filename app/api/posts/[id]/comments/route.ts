@@ -13,11 +13,15 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (!idSchema.safeParse(id).success) return NextResponse.json({ error: "Invalid post id" }, { status: 400 });
   try {
     const sql = getDb();
+    const session = await readSession();
     const rows = await sql`
       SELECT c.id, c.body, c.parent_comment_id AS "parentCommentId", c.created_at AS "createdAt", u.display_name AS "displayName", u.handle,
         (SELECT COUNT(*)::int FROM comment_likes cl WHERE cl.comment_id = c.id) AS likes
       FROM comments c JOIN users u ON u.id = c.user_id
       WHERE c.post_id = ${id}::uuid
+        AND (${session?.id ?? null}::uuid IS NULL OR NOT EXISTS (
+          SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${session?.id ?? null}::uuid AND b.blocked_id = c.user_id) OR (b.blocker_id = c.user_id AND b.blocked_id = ${session?.id ?? null}::uuid)
+        ))
       ORDER BY c.created_at ASC LIMIT 100
     `;
     return NextResponse.json({ comments: rows });
@@ -37,6 +41,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!input.success) return NextResponse.json({ error: input.error.issues[0]?.message ?? "Invalid comment" }, { status: 400 });
     const sql = getDb();
     const parentCommentId = input.data.parentCommentId ?? null;
+    const postOwner = await sql`SELECT user_id FROM posts WHERE id = ${id}::uuid AND visibility = 'public' LIMIT 1`;
+    if (!postOwner.length) return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    const blocked = await sql`SELECT 1 FROM user_blocks WHERE (blocker_id = ${session.id}::uuid AND blocked_id = ${postOwner[0].user_id}::uuid) OR (blocker_id = ${postOwner[0].user_id}::uuid AND blocked_id = ${session.id}::uuid) LIMIT 1`;
+    if (blocked.length) return NextResponse.json({ error: "You cannot comment on this post" }, { status: 403 });
     if (parentCommentId) {
       const parent = await sql`SELECT id FROM comments WHERE id = ${parentCommentId}::uuid AND post_id = ${id}::uuid LIMIT 1`;
       if (!parent.length) return NextResponse.json({ error: "Reply target was not found on this post" }, { status: 404 });
