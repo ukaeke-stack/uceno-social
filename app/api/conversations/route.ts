@@ -49,6 +49,8 @@ export async function POST(request: Request) {
     if (!targets.length) return NextResponse.json({ error: "User not found" }, { status: 404 });
     const target = targets[0] as { id: string; handle: string };
     if (target.id === session.id) return NextResponse.json({ error: "You cannot message yourself" }, { status: 400 });
+    const blocked = await sql`SELECT 1 FROM user_blocks WHERE (blocker_id = ${session.id}::uuid AND blocked_id = ${target.id}::uuid) OR (blocker_id = ${target.id}::uuid AND blocked_id = ${session.id}::uuid) LIMIT 1`;
+    if (blocked.length) return NextResponse.json({ error: "Messaging is unavailable because one account has blocked the other" }, { status: 403 });
     const directKey = [session.id, target.id].sort().join(":");
     const conversations = await sql`
       INSERT INTO conversations (type, direct_key, created_by)
