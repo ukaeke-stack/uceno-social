@@ -48,6 +48,14 @@ export async function GET(request: Request) {
       LEFT JOIN (SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id) l ON l.post_id = p.id
       LEFT JOIN (SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id) c ON c.post_id = p.id
       WHERE p.visibility = 'public'
+        AND (
+          ${session?.id ?? null}::uuid IS NULL
+          OR NOT EXISTS (
+            SELECT 1 FROM user_blocks b
+            WHERE (b.blocker_id = ${session?.id ?? null}::uuid AND b.blocked_id = p.user_id)
+               OR (b.blocker_id = p.user_id AND b.blocked_id = ${session?.id ?? null}::uuid)
+          )
+        )
         AND (${postId}::uuid IS NULL OR p.id = ${postId}::uuid)
         AND (
           ${feed} = 'all'
