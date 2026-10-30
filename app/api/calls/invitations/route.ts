@@ -74,6 +74,8 @@ export async function POST(request: Request) {
       if (!found.length) return NextResponse.json({ error: "UCENO user not found" }, { status: 404 });
       const target = found[0] as { id: string; handle: string; accountType?: string };
       if (String(target.id) === String(session.id)) return NextResponse.json({ error: "You cannot call yourself" }, { status: 400 });
+      const blocked = await sql`SELECT 1 FROM user_blocks WHERE (blocker_id = ${session.id}::uuid AND blocked_id = ${target.id}::uuid) OR (blocker_id = ${target.id}::uuid AND blocked_id = ${session.id}::uuid) LIMIT 1`;
+      if (blocked.length) return NextResponse.json({ error: "Calling is unavailable because one account has blocked the other" }, { status: 403 });
       if (target.accountType === "page") return NextResponse.json({ error: "Pages cannot receive direct personal calls. Call an accepted personal mutual instead." }, { status: 403 });
       const callerRows = await sql`SELECT account_type AS "accountType" FROM users WHERE id = ${session.id}::uuid LIMIT 1`;
       if (callerRows[0]?.accountType === "page") return NextResponse.json({ error: "Pages cannot start direct personal calls." }, { status: 403 });

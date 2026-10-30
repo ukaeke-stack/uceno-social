@@ -25,6 +25,10 @@ export async function GET(_request: Request, context: { params: Promise<{ handle
     if (!users.length) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     const session = await readSession();
+    if (session && String(session.id) !== String(users[0].id)) {
+      const blocked = await sql`SELECT 1 FROM user_blocks WHERE (blocker_id = ${session.id}::uuid AND blocked_id = ${users[0].id}::uuid) OR (blocker_id = ${users[0].id}::uuid AND blocked_id = ${session.id}::uuid) LIMIT 1`;
+      if (blocked.length) return NextResponse.json({ error: "This profile is unavailable" }, { status: 404 });
+    }
     await sql`CREATE TABLE IF NOT EXISTS mutual_connections (
       id TEXT PRIMARY KEY,
       requester_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
