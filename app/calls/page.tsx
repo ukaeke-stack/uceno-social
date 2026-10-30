@@ -7,7 +7,6 @@ import { requestNativeMediaPermissions, resetNativeCallAudio, setNativeSpeakerph
 import { ArrowLeft, Mic, MicOff, PhoneCall, PhoneOff, Video, VideoOff, PhoneIncoming, X, Volume2 } from 'lucide-react';
 
 type Invitation = { id: string; callerHandle: string; calleeHandle: string; mode: 'audio'|'video'; status: string; createdAt: string };
-type MissedCall = { id: string; callerHandle: string; mode: 'audio'|'video'; createdAt: string };
 
 export default function CallsPage() {
   const [targetHandle, setTargetHandle] = useState('');
@@ -19,7 +18,6 @@ export default function CallsPage() {
   const [cameraOff, setCameraOff] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(false);
   const [incoming, setIncoming] = useState<Invitation[]>([]);
-  const [missedCalls, setMissedCalls] = useState<MissedCall[]>([]);
   const [lockedTarget, setLockedTarget] = useState(false);
   const [busy, setBusy] = useState(false);
   const roomRef = useRef<Room|null>(null);
@@ -55,7 +53,6 @@ export default function CallsPage() {
           if (pending.length) startRinging();
           else if (!outgoingRingingRef.current) stopRinging();
         }
-        if (alive && Array.isArray(data.missedCalls)) setMissedCalls(data.missedCalls);
       } catch { /* transient network failure; retry on next poll */ }
     };
     void refresh();
@@ -395,7 +392,6 @@ export default function CallsPage() {
       {busy && !connected ? <div className="call-controls"><span role="status">{status}</span><button type="button" className="hangup" onClick={()=>void leaveCall()}><PhoneOff size={17}/> Cancel call</button></div> : !connected ? <button id="call-start" className="call-primary" onClick={()=>void joinCall()} disabled={!(/^[a-zA-Z0-9_]{3,24}$/.test(targetHandle.trim().replace(/^@/,'')))}><PhoneCall size={17}/> Call now</button> : <div className="call-controls"><button onClick={()=>void toggleMute()}>{muted?<MicOff size={17}/>:<Mic size={17}/>} {muted?'Unmute':'Mute'}</button>{mode==='video'&&<button onClick={()=>void toggleCamera()}>{cameraOff?<VideoOff size={17}/>:<Video size={17}/>} {cameraOff?'Turn camera on':'Turn camera off'}</button>}<button type="button" onClick={()=>void toggleSpeaker()}><Volume2 size={17}/> {speakerOn?'Speaker on':'Speakerphone'}</button><button className="hangup" onClick={()=>void leaveCall()}><PhoneOff size={17}/> End call</button></div>}
       <p role="status">{status}</p>{error&&<p className="call-error" role="alert">{error}</p>}
     </section>
-    {missedCalls.length > 0 && <section className="call-setup" aria-label="Missed calls"><h2>Missed calls</h2>{missedCalls.map(call => <div className="call-controls" key={call.id}><p><strong>@{call.callerHandle}</strong> · {call.mode} · {new Date(call.createdAt).toLocaleString()}</p><button className="call-primary" onClick={() => { window.location.href = '/calls?handle=' + encodeURIComponent(call.callerHandle) + '&mode=' + call.mode + '&start=1'; }}> <PhoneCall size={16}/> Call back</button></div>)}</section>}
     <section className={"call-stage" + (mode === 'video' ? ' video-call-active' : ' audio-call-active')} aria-label="Call video">
       <div className="call-video remote-call-video" ref={remoteRef}><span className="call-video-placeholder">Waiting for the other participant…</span></div>
       {mode === 'video' && <div className="local-call-preview"><span>You</span><div className="call-video local-call-video" ref={localRef}><span className="call-video-placeholder">Your camera</span></div></div>}
