@@ -17,6 +17,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const sql = getDb();
     const membership = await sql`SELECT 1 FROM conversation_members WHERE conversation_id = ${id}::uuid AND user_id = ${session.id}::uuid LIMIT 1`;
     if (!membership.length) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+    const blocked = await sql`SELECT 1 FROM conversation_members mine JOIN conversation_members other ON other.conversation_id = mine.conversation_id JOIN conversations c ON c.id = mine.conversation_id JOIN user_blocks b ON ((b.blocker_id = mine.user_id AND b.blocked_id = other.user_id) OR (b.blocker_id = other.user_id AND b.blocked_id = mine.user_id)) WHERE mine.conversation_id = ${id}::uuid AND mine.user_id = ${session.id}::uuid AND other.user_id <> mine.user_id AND c.type = 'direct' LIMIT 1`;
+    if (blocked.length) return NextResponse.json({ error: "This conversation is unavailable" }, { status: 403 });
     const rows = await sql`
       SELECT m.id, m.body, m.created_at AS "createdAt", m.sender_id AS "senderId",
         u.display_name AS "senderName", u.handle AS "senderHandle"
@@ -41,10 +43,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const input = messageSchema.safeParse(await request.json());
     if (!input.success) return NextResponse.json({ error: input.error.issues[0]?.message ?? "Invalid message" }, { status: 400 });
     const sql = getDb();
+    const allowed = await sql`SELECT 1 FROM conversation_members mine JOIN conversation_members other ON other.conversation_id = mine.conversation_id JOIN conversations c ON c.id = mine.conversation_id WHERE mine.conversation_id = ${id}::uuid AND mine.user_id = ${session.id}::uuid AND c.type = 'direct' AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = mine.user_id AND b.blocked_id = other.user_id) OR (b.blocker_id = other.user_id AND b.blocked_id = mine.user_id)) LIMIT 1`;
     const rows = await sql`
       INSERT INTO messages (conversation_id, sender_id, body)
       SELECT ${id}::uuid, ${session.id}::uuid, ${input.data.body}
       WHERE EXISTS (SELECT 1 FROM conversation_members WHERE conversation_id = ${id}::uuid AND user_id = ${session.id}::uuid)
+        AND (NOT EXISTS (SELECT 1 FROM conversations WHERE id = ${id}::uuid AND type = 'direct') OR EXISTS (SELECT 1 FROM conversation_members mine JOIN conversation_members other ON other.conversation_id = mine.conversation_id WHERE mine.conversation_id = ${id}::uuid AND mine.user_id = ${session.id}::uuid AND other.user_id <> mine.user_id AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE (b.blocker_id = mine.user_id AND b.blocked_id = other.user_id) OR (b.blocker_id = other.user_id AND b.blocked_id = mine.user_id))))
       RETURNING id, body, created_at AS "createdAt", sender_id AS "senderId"
     `;
     if (!rows.length) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
