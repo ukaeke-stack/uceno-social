@@ -1,6 +1,5 @@
 package com.ukaeke.uceno;
 
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -9,7 +8,6 @@ import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
-import android.os.Bundle;
 import androidx.core.app.NotificationCompat;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
@@ -59,7 +57,7 @@ public class UcenoCallMessagingService extends FirebaseMessagingService {
     private PendingIntent actionPendingIntent(String invitationId, String action, int requestCode) {
         Intent intent = new Intent(this, MainActivity.class);
         intent.setAction(Intent.ACTION_VIEW);
-        intent.putExtra("url", "/?nativeCallAction=" + action + "&invitationId=" + invitationId);
+        intent.putExtra("url", "/calls?nativeCallAction=" + action + "&invitationId=" + invitationId);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return PendingIntent.getActivity(this, invitationId.hashCode() + requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
