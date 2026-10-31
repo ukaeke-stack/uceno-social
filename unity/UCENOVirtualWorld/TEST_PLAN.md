@@ -1,6 +1,6 @@
 # UCENO Virtual World — prototype test plan
 
-This checklist is for the first offline movement prototype. Passing it does not validate multiplayer, production integration, store readiness or release performance.
+This checklist covers the first offline movement prototype only. Passing it does not validate multiplayer, production integration, store readiness or release performance.
 
 ## Editor setup
 
@@ -23,9 +23,12 @@ This checklist is for the first offline movement prototype. Passing it does not 
 
 - [ ] Build and install a Development Build on a physical Android device.
 - [ ] Drag on the left half of the screen; player moves relative to facing direction.
-- [ ] Drag on the right half horizontally and vertically; view rotates both ways without moving the player.
-- [ ] Use both touch zones simultaneously; movement and camera look both respond.
-- [ ] Releasing either finger stops only that input.
+- [ ] Drag on the right half horizontally and vertically; view rotates both ways.
+- [ ] Start one finger in each half and move both simultaneously; movement and camera look both respond.
+- [ ] Release the movement finger while continuing to move the look finger; only movement stops.
+- [ ] Release the look finger while continuing to move the movement finger; only camera look stops.
+- [ ] Cancel a touch (for example, by app interruption) and confirm the control does not remain stuck.
+- [ ] Confirm a new touch can take over after the previous finger is released.
 - [ ] Check frame rate, heat and battery use during a 10-minute test.
 - [ ] Repeat after backgrounding and restoring the app.
 
@@ -35,8 +38,8 @@ For each failure, record device model, Android version, Unity Editor version, re
 
 ## Not covered by this test plan
 
-- Multiplayer or authoritative server validation
-- Login, world-entry token exchange or account moderation checks
-- Persistent world state, inventory, credits, purchases or advertising
-- Avatar customization, animations, voice, chat or user-created content
-- Web build, VR build, release signing, store submission or production deployment
+- Multiplayer or authoritative server validation.
+- Login, world-entry token exchange or account moderation checks.
+- Persistent world state, inventory, credits, purchases or advertising.
+- Avatar customization, animations, voice, chat or user-created content.
+- Web build, VR build, release signing, store submission or production deployment.
