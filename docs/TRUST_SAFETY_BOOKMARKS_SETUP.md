@@ -6,6 +6,7 @@ Apply these additive migrations to the UCENO Neon production database before ena
 
 1. `db/migrations/011_trust_safety.sql` — block relationships and user reports.
 2. `db/migrations/012_bookmarks.sql` — persistent saved posts.
+3. `db/migrations/013_moderation_enforcement.sql` — audited warnings, temporary suspensions, account disabling, and reversible content removal.
 
 The block APIs already depend on migration 011. The report submission and moderator queue also require its `user_reports` table. The Saved Posts page requires migration 012. Do not deploy the UI/API without applying the matching migrations.
 
@@ -29,4 +30,4 @@ Only listed UUIDs can read or update reports through `/api/moderation/reports`. 
 
 ## Moderation scope
 
-The moderation queue supports reviewing, dismissing and recording that a report has been actioned. It does not itself delete content or suspend accounts. A separate audited enforcement workflow is required before treating the queue as a complete content-removal or account-suspension system.
+The moderation queue supports reviewing and dismissing reports, plus audited enforcement actions: user warnings, 1–365 day suspensions, account disabling/restoration, and reported post/comment removal/restoration. Apply migration 013 before deploying the enforcement API. Suspended and disabled accounts cannot use their session; expired suspensions are automatically reactivated on the next session check. Every enforcement action is recorded in `moderation_actions`.
