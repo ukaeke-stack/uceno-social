@@ -8,17 +8,23 @@ namespace UCENO.VirtualWorld
         [Header("Movement")]
         [SerializeField] private float moveSpeed = 4.5f;
         [SerializeField] private float gravity = -20f;
+
+        [Header("Camera look")]
         [SerializeField] private float lookSensitivity = 0.12f;
+        [SerializeField] private float minimumPitch = -10f;
+        [SerializeField] private float maximumPitch = 55f;
 
         private CharacterController controller;
         private float verticalVelocity;
         private float yaw;
+        private float pitch = 12f;
         private Vector2 moveTouchStart;
         private Vector2 moveTouchCurrent;
         private int moveFingerId = -1;
         private int lookFingerId = -1;
 
         public float Yaw => yaw;
+        public float Pitch => pitch;
 
         private void Awake()
         {
@@ -32,6 +38,7 @@ namespace UCENO.VirtualWorld
             Vector2 look = ReadLookInput();
 
             yaw += look.x * lookSensitivity;
+            pitch = Mathf.Clamp(pitch - look.y * lookSensitivity, minimumPitch, maximumPitch);
             transform.rotation = Quaternion.Euler(0f, yaw, 0f);
 
             Vector3 direction = transform.right * move.x + transform.forward * move.y;
