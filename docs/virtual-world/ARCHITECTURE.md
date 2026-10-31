@@ -1,6 +1,6 @@
 # UCENO Virtual World — Architecture and Integration Audit
 
-**Status:** Design baseline only; no Unity implementation or production database changes have been made.  
+**Status:** Architecture baseline plus initial Unity C# source scaffolding. The scripts are not yet Unity-Editor-compiled; no production database or application behavior has changed.  
 **Repository baseline:** `main` at `c810f72e703da12825c595e6bb3349bb6af172f7` (2026-10-31).  
 **Working branch:** `feature/uceno-virtual-world-architecture`
 
@@ -153,7 +153,8 @@ All monetary and credit changes must be transactional and idempotent. A client c
 - [ ] Confirm database branch and backup/restore procedure before any migration.
 
 ### Phase 1 — integration proof of concept
-- [ ] Create a minimal Unity project and source-controlled build configuration.
+- [x] Add source-controlled Unity client folder, initial third-person movement, follow camera and prototype bootstrap scripts.
+- [ ] Create/import the actual Unity Editor project and source-controlled build configuration.
 - [ ] Build a basic Android scene with touch movement.
 - [ ] Build a desktop WebGL scene.
 - [ ] Implement secure single-use entry-code exchange in a non-production environment.
