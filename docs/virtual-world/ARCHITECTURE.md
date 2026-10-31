@@ -153,7 +153,7 @@ All monetary and credit changes must be transactional and idempotent. A client c
 - [ ] Confirm database branch and backup/restore procedure before any migration.
 
 ### Phase 1 — integration proof of concept
-- [x] Add source-controlled Unity client folder, initial third-person movement, follow camera and prototype bootstrap scripts.
+- [x] Add source-controlled Unity client folder, third-person movement, follow camera, local test-world bootstrap and mobile touch-input scripts.
 - [ ] Create/import the actual Unity Editor project and source-controlled build configuration.
 - [ ] Build a basic Android scene with touch movement.
 - [ ] Build a desktop WebGL scene.
