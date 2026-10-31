@@ -67,7 +67,7 @@ public class CallAudioRoutePlugin extends Plugin {
                     call.reject("Android notification service is unavailable");
                     return;
                 }
-                String channelId = "uceno_incoming_calls_v2";
+                String channelId = "uceno_incoming_calls_v3";
                 if (manager.getNotificationChannel(channelId) == null) {
                     NotificationChannel channel = new NotificationChannel(channelId, "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
                     channel.setDescription("Incoming UCENO audio and video calls");
