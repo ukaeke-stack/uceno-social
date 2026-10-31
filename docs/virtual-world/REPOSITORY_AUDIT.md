@@ -10,7 +10,8 @@
 - Audited application baseline: `main` at `c810f72e703da12825c595e6bb3349bb6af172f7`
 - Neon project: `uceno` (`empty-river-03798156`)
 - Primary/default Neon branch: `production` (`br-holy-cloud-b4klj78e`), state `ready`
-- Additional branch `uceno-pr16-staging` exists and is ready. It is not assumed to be the virtual-world staging environment.
+- Additional branch `uceno-pr16-staging` exists and is ready. It is not used for this project.
+- Created isolated Neon branch `uceno-virtual-world-dev` (`br-nameless-tree-b4pgla2u`) from the production branch at parent LSN `0/33B1940`. It is ready and was created without a compute endpoint to avoid idle compute use. No schema changes have been applied to it.
 - Production database inventory contains 22 public base tables. The live inventory includes users, social graph, posts/comments/stories, messaging, communities, notifications, calls, blocks, reports and moderation tables.
 - Live `users` schema includes UUID identity, email/phone, password hash, profile fields and moderation fields (`moderation_status`, `suspended_until`, `moderation_note`, `moderated_at`, `moderated_by`).
 - No world-specific tables were found in the production public schema.
@@ -55,8 +56,9 @@
 - [x] Read production table inventory and relevant user identity/moderation columns.
 - [x] Inspected current auth/session implementation.
 - [x] Inspected Capacitor configuration and CI/release workflow definitions.
-- [ ] Confirm a dedicated virtual-world development branch and backup/restore process.
-- [ ] Inspect all remaining migration files against the live schema.
+- [x] Create a dedicated virtual-world development branch from production (no compute; no schema changes).
+- [ ] Confirm a point-in-time restore procedure and complete a restore drill before migrations.
+- [ ] Review migrations 001–014 against the live schema and confirm exact applied state; no public migration-history table was found.
 - [ ] Create Unity project and authoritative multiplayer proof of concept.
 - [ ] Implement and test secure world-entry exchange in isolated environment.
 
