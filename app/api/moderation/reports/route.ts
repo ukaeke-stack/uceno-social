@@ -133,19 +133,32 @@ export async function PATCH(request: Request) {
         )
         SELECT updated.id, report_update.status FROM updated CROSS JOIN report_update
       `;
-    } else {
+    } else if (report.targetType === "post") {
       changed = await sql`
-        WITH target AS (
-          SELECT id FROM ${report.targetType === "post" ? sql("posts") : sql("comments")} WHERE id = ${report.targetId}::uuid
-        ), updated AS (
-          UPDATE ${report.targetType === "post" ? sql("posts") : sql("comments")} SET
-            moderation_removed_at = CASE WHEN ${input.action} = 'remove_content' THEN NOW() ELSE NULL END,
+        WITH updated AS (
+          UPDATE posts SET moderation_removed_at = CASE WHEN ${input.action} = 'remove_content' THEN NOW() ELSE NULL END,
             moderation_removed_by = CASE WHEN ${input.action} = 'remove_content' THEN ${session.id}::uuid ELSE NULL END
-          WHERE id IN (SELECT id FROM target)
-          RETURNING id
+          WHERE id = ${report.targetId}::uuid RETURNING id
         ), logged AS (
           INSERT INTO moderation_actions (report_id, moderator_id, target_type, target_id, action, reason)
-          SELECT ${report.id}::uuid, ${session.id}::uuid, ${report.targetType}, updated.id, ${input.action}, ${input.reason}
+          SELECT ${report.id}::uuid, ${session.id}::uuid, 'post', updated.id, ${input.action}, ${input.reason}
+          FROM updated RETURNING id
+        ), report_update AS (
+          UPDATE user_reports SET status = 'actioned', reviewed_at = NOW(), reviewed_by = ${session.id}::uuid
+          WHERE id = ${report.id}::uuid AND EXISTS (SELECT 1 FROM logged)
+          RETURNING id, status
+        )
+        SELECT updated.id, report_update.status FROM updated CROSS JOIN report_update
+      `;
+    } else {
+      changed = await sql`
+        WITH updated AS (
+          UPDATE comments SET moderation_removed_at = CASE WHEN ${input.action} = 'remove_content' THEN NOW() ELSE NULL END,
+            moderation_removed_by = CASE WHEN ${input.action} = 'remove_content' THEN ${session.id}::uuid ELSE NULL END
+          WHERE id = ${report.targetId}::uuid RETURNING id
+        ), logged AS (
+          INSERT INTO moderation_actions (report_id, moderator_id, target_type, target_id, action, reason)
+          SELECT ${report.id}::uuid, ${session.id}::uuid, 'comment', updated.id, ${input.action}, ${input.reason}
           FROM updated RETURNING id
         ), report_update AS (
           UPDATE user_reports SET status = 'actioned', reviewed_at = NOW(), reviewed_by = ${session.id}::uuid
