@@ -172,13 +172,17 @@ export async function PATCH(request: Request) {
     if (!changed.length) return NextResponse.json({ error: "The reported account or content no longer exists" }, { status: 404 });
 
     if (input.action === "warn") {
-      await createNotification({
-        recipientId: report.targetId,
-        actorId: session.id,
-        type: "system",
-        entityId: null,
-        message: "UCENO moderation warning: " + (input.reason || "Please review and follow the community rules.")
-      });
+      try {
+        await createNotification({
+          recipientId: report.targetId,
+          actorId: session.id,
+          type: "system",
+          entityId: null,
+          message: "UCENO moderation warning: " + (input.reason || "Please review and follow the community rules.")
+        });
+      } catch (notificationError) {
+        console.error("UCENO moderation warning notification failed", notificationError);
+      }
     }
     return NextResponse.json({ enforcement: { action: input.action, targetId: report.targetId }, report: { id: report.id, status: "actioned" } });
   } catch (error) {
