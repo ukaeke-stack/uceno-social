@@ -85,6 +85,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ report: rows[0] });
     }
 
+    if (!enforcementInput.success) return NextResponse.json({ error: "Invalid enforcement action" }, { status: 400 });
     const input = enforcementInput.data;
     const reportRows = await sql`SELECT id, target_type AS "targetType", target_id AS "targetId"
       FROM user_reports WHERE id = ${input.reportId}::uuid LIMIT 1`;
