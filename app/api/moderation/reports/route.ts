@@ -31,6 +31,7 @@ export async function GET(request: Request) {
   if (!session) return NextResponse.json({ error: "Moderator access required" }, { status: 403 });
   try {
     const sql = getDb();
+    const includeDismissed = new URL(request.url).searchParams.get("all") === "1";
     const reports = await sql`
       SELECT r.id, r.target_type AS "targetType", r.target_id AS "targetId", r.reason, r.details,
         r.status, r.created_at AS "createdAt", r.reviewed_at AS "reviewedAt",
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
       LEFT JOIN users post_owner ON post_owner.id = p.user_id
       LEFT JOIN comments c ON r.target_type = 'comment' AND c.id = r.target_id
       LEFT JOIN users comment_owner ON comment_owner.id = c.user_id
-      WHERE (${new URL(request.url).searchParams.get("all") === "1"} OR r.status <> 'dismissed')
+      WHERE (${includeDismissed} OR r.status <> 'dismissed')
       ORDER BY CASE r.status WHEN 'pending' THEN 0 WHEN 'reviewing' THEN 1 WHEN 'actioned' THEN 2 ELSE 3 END, r.created_at DESC
       LIMIT 500
     `;
