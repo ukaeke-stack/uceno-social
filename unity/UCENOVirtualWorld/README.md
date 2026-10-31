@@ -28,17 +28,23 @@ Unity 6.3 LTS is pinned for reproducible builds. Do not upgrade the editor versi
 
 ## Android cloud build
 
-The repository includes a manually triggered GitHub Actions workflow at `.github/workflows/uceno-unity-android.yml`.
+The repository includes a GitHub Actions/GameCI workflow at `.github/workflows/uceno-unity-android.yml`. It can build from this feature branch without merging the prototype into production.
 
-Before running it, add these GitHub Actions repository secrets under **Settings → Secrets and variables → Actions**:
+Before enabling the build, activate a Unity Personal license through Unity Hub on a computer. Add these GitHub Actions repository secrets under **Settings → Secrets and variables → Actions**:
 
 - `UNITY_LICENSE`: the contents of your Unity Personal license file (`.ulf`).
 - `UNITY_EMAIL`: the email address for the Unity account that owns that license.
 - `UNITY_PASSWORD`: the Unity account password.
 
-Create and activate a Unity Personal license through Unity Hub on a computer first. Never paste license files, account passwords, keystores or other secrets into source files, issues, pull requests or ChatGPT messages.
+Then add this repository Actions variable:
 
-Then open **Actions → UCENO Unity Android Development Build → Run workflow**, select this feature branch and run it. A successful run uploads `UCENO-Virtual-World-dev.apk` as a 14-day workflow artifact. This is a development build, not a store-ready release. The workflow has not been run until the required secrets are configured.
+- `UCENO_UNITY_CI_ENABLED` = `true`
+
+The variable is a safety switch. Until it is set to `true`, pushes to this feature branch skip the Unity build job. Once the secrets and variable are saved, a new commit to `feature/uceno-unity-foundation` starts the build. The manual workflow-dispatch option becomes available after the workflow is merged into the repository's default branch.
+
+Never paste license files, account passwords, keystores or other secrets into source files, issues, pull requests or ChatGPT messages.
+
+A successful run uploads `UCENO-Virtual-World-dev.apk` as a 14-day workflow artifact. This is a development build, not a store-ready release. The workflow has not been run until the required secrets and variable are configured.
 
 ## Current scope and limitations
 
