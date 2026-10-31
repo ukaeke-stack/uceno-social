@@ -44,10 +44,10 @@ export async function GET(request: Request) {
              ELSE EXISTS (SELECT 1 FROM post_likes mine WHERE mine.post_id = p.id AND mine.user_id = ${session?.id ?? null}::uuid)
         END AS "likedByMe"
       FROM posts p
-      JOIN users u ON u.id = p.user_id
+      JOIN users u ON u.id = p.user_id AND u.moderation_status = 'active'
       LEFT JOIN (SELECT post_id, COUNT(*) AS like_count FROM post_likes GROUP BY post_id) l ON l.post_id = p.id
       LEFT JOIN (SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id) c ON c.post_id = p.id
-      WHERE p.visibility = 'public'
+      WHERE p.visibility = 'public' AND p.moderation_removed_at IS NULL
         AND (
           ${session?.id ?? null}::uuid IS NULL
           OR NOT EXISTS (

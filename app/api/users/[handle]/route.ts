@@ -19,8 +19,8 @@ export async function GET(_request: Request, context: { params: Promise<{ handle
       SELECT u.id, u.display_name AS "displayName", u.handle, u.account_type AS "accountType", u.bio, u.avatar_url AS "avatarUrl", u.location, u.website, u.created_at AS "joinedAt",
         (SELECT COUNT(*)::int FROM follows f WHERE f.following_id = u.id) AS followers,
         (SELECT COUNT(*)::int FROM follows f WHERE f.follower_id = u.id) AS following,
-        (SELECT COUNT(*)::int FROM posts p WHERE p.user_id = u.id AND p.visibility = 'public') AS "postCount"
-      FROM users u WHERE u.handle = ${normalizedHandle} LIMIT 1
+        (SELECT COUNT(*)::int FROM posts p WHERE p.user_id = u.id AND p.visibility = 'public' AND p.moderation_removed_at IS NULL) AS "postCount"
+      FROM users u WHERE u.handle = ${normalizedHandle} AND u.moderation_status = 'active' LIMIT 1
     `;
     if (!users.length) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
@@ -71,7 +71,7 @@ export async function GET(_request: Request, context: { params: Promise<{ handle
         (SELECT COUNT(*)::int FROM post_likes l WHERE l.post_id = p.id) AS likes,
         (SELECT COUNT(*)::int FROM comments c WHERE c.post_id = p.id) AS comments
       FROM posts p
-      WHERE p.user_id = ${users[0].id}::uuid AND p.visibility = 'public'
+      WHERE p.user_id = ${users[0].id}::uuid AND p.visibility = 'public' AND p.moderation_removed_at IS NULL
       ORDER BY p.created_at DESC LIMIT 20
     `;
 

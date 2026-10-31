@@ -17,8 +17,8 @@ export async function GET() {
         (SELECT COUNT(*)::int FROM post_likes l WHERE l.post_id = p.id) AS likes,
         (SELECT COUNT(*)::int FROM comments c WHERE c.post_id = p.id) AS comments,
         b.created_at AS "savedAt"
-      FROM post_bookmarks b JOIN posts p ON p.id = b.post_id JOIN users u ON u.id = p.user_id
-      WHERE b.user_id = ${session.id}::uuid AND p.visibility = 'public'
+      FROM post_bookmarks b JOIN posts p ON p.id = b.post_id JOIN users u ON u.id = p.user_id AND u.moderation_status = 'active'
+      WHERE b.user_id = ${session.id}::uuid AND p.visibility = 'public' AND p.moderation_removed_at IS NULL
         AND NOT EXISTS (SELECT 1 FROM user_blocks x WHERE (x.blocker_id = ${session.id}::uuid AND x.blocked_id = p.user_id) OR (x.blocker_id = p.user_id AND x.blocked_id = ${session.id}::uuid))
       ORDER BY b.created_at DESC LIMIT 100
     `;
@@ -36,9 +36,9 @@ export async function POST(request: Request) {
   if (!input.success) return NextResponse.json({ error: "Provide a valid post ID" }, { status: 400 });
   try {
     const sql = getDb();
-    const rows = await sql`INSERT INTO post_bookmarks (user_id, post_id) SELECT ${session.id}::uuid, id FROM posts WHERE id = ${input.data.postId}::uuid AND visibility = 'public' ON CONFLICT DO NOTHING RETURNING post_id`;
+    const rows = await sql`INSERT INTO post_bookmarks (user_id, post_id) SELECT ${session.id}::uuid, p.id FROM posts p JOIN users u ON u.id = p.user_id AND u.moderation_status = 'active' WHERE p.id = ${input.data.postId}::uuid AND p.visibility = 'public' AND p.moderation_removed_at IS NULL ON CONFLICT DO NOTHING RETURNING post_id`;
     if (!rows.length) {
-      const exists = await sql`SELECT id FROM posts WHERE id = ${input.data.postId}::uuid AND visibility = 'public' LIMIT 1`;
+      const exists = await sql`SELECT p.id FROM posts p JOIN users u ON u.id = p.user_id AND u.moderation_status = 'active' WHERE p.id = ${input.data.postId}::uuid AND p.visibility = 'public' AND p.moderation_removed_at IS NULL LIMIT 1`;
       if (!exists.length) return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
     return NextResponse.json({ saved: true });
