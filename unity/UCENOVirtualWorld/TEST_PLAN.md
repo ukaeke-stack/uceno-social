@@ -14,7 +14,7 @@ This checklist is for the first offline movement prototype. Passing it does not 
 
 - [ ] Press Play and confirm ground, player capsule, directional light and third-person camera appear.
 - [ ] WASD and arrow keys move the player across the ground.
-- [ ] Mouse movement rotates the player/camera view without abrupt camera flips.
+- [ ] Mouse movement rotates the view horizontally and vertically without abrupt camera flips.
 - [ ] Releasing movement keys stops horizontal movement.
 - [ ] Player remains grounded and does not fall through the plane.
 - [ ] Camera follows smoothly while the player turns and moves.
@@ -23,7 +23,7 @@ This checklist is for the first offline movement prototype. Passing it does not 
 
 - [ ] Build and install a Development Build on a physical Android device.
 - [ ] Drag on the left half of the screen; player moves relative to facing direction.
-- [ ] Drag on the right half; view rotates without moving the player.
+- [ ] Drag on the right half horizontally and vertically; view rotates both ways without moving the player.
 - [ ] Use both touch zones simultaneously; movement and camera look both respond.
 - [ ] Releasing either finger stops only that input.
 - [ ] Check frame rate, heat and battery use during a 10-minute test.
