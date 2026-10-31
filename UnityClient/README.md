@@ -29,6 +29,16 @@ This folder is the source-controlled starting point for the separate Unity clien
 
 The controller supports keyboard movement and mouse look for desktop prototyping. The mobile touch-control UI is a separate next task; do not treat this first controller as a completed phone control scheme.
 
+## Mobile touch input setup
+
+1. Add a Canvas with an EventSystem to the prototype scene.
+2. Add two transparent UI Images that cover the left and right halves of the screen; keep Raycast Target enabled.
+3. Attach `MobileTouchZone` to each Image.
+4. Set the left Image zone mode to `Move` and the right Image zone mode to `Look`.
+5. Ensure the player has a CharacterController and the camera has FollowCamera.
+
+The touch input code is present, but the Canvas, images, and EventSystem still need to be assembled and tested in Unity Editor on a real Android device.
+
 ## Security boundary
 
 Never place Neon credentials, UCENO session secrets, world-token signing keys, payment keys, or permanent access tokens in Unity assets or builds. Unity must obtain a short-lived, server-issued world access token through the planned one-time handoff API. That API is not implemented yet.
