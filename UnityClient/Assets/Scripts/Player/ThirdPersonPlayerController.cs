@@ -29,8 +29,11 @@ public sealed class ThirdPersonPlayerController : MonoBehaviour
 
     private void MoveFromDesktopInput()
     {
-        float horizontal = Input.GetAxisRaw("Horizontal");
-        float vertical = Input.GetAxisRaw("Vertical");
+        Vector2 input = Application.isMobilePlatform
+            ? MobileTouchZone.MoveInput
+            : new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+        float horizontal = input.x;
+        float vertical = input.y;
 
         Vector3 forward = cameraTransform != null ? cameraTransform.forward : transform.forward;
         Vector3 right = cameraTransform != null ? cameraTransform.right : transform.right;
