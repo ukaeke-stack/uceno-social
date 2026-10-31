@@ -18,12 +18,15 @@ const enforcementSchema = z.object({
 
 async function moderatorSession() {
   const session = await readSession();
+  if (!session) return null;
+  const sql = getDb();
   const allowed = (process.env.UCENO_MODERATOR_IDS || "").split(",").map(value => value.trim()).filter(Boolean);
-  if (!session || !allowed.includes(session.id)) return null;
-  return session;
+  const grants = await sql`SELECT revoked_at AS "revokedAt" FROM moderator_access WHERE user_id = ${session.id}::uuid LIMIT 1`;
+  const active = grants.length ? !grants[0].revokedAt : allowed.includes(session.id);
+  return active ? session : null;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await moderatorSession();
   if (!session) return NextResponse.json({ error: "Moderator access required" }, { status: 403 });
   try {
@@ -50,9 +53,9 @@ export async function GET() {
       LEFT JOIN users post_owner ON post_owner.id = p.user_id
       LEFT JOIN comments c ON r.target_type = 'comment' AND c.id = r.target_id
       LEFT JOIN users comment_owner ON comment_owner.id = c.user_id
-      WHERE r.status <> 'dismissed'
-      ORDER BY CASE r.status WHEN 'pending' THEN 0 WHEN 'reviewing' THEN 1 ELSE 2 END, r.created_at ASC
-      LIMIT 200
+      WHERE (${new URL(request.url).searchParams.get("all") === "1"} OR r.status <> 'dismissed')
+      ORDER BY CASE r.status WHEN 'pending' THEN 0 WHEN 'reviewing' THEN 1 WHEN 'actioned' THEN 2 ELSE 3 END, r.created_at DESC
+      LIMIT 500
     `;
     return NextResponse.json({ reports });
   } catch (error) {
