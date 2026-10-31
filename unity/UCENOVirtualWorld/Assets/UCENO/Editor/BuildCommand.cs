@@ -18,6 +18,18 @@ namespace UCENO.VirtualWorld.Editor
                 BuildTarget.Android
             );
 
+            PlayerSettings.companyName = "UCENO";
+            PlayerSettings.productName = "UCENO Virtual World";
+            PlayerSettings.SetApplicationIdentifier(
+                NamedBuildTarget.Android,
+                "com.uceno.virtualworld.dev"
+            );
+            PlayerSettings.SetScriptingBackend(
+                NamedBuildTarget.Android,
+                ScriptingImplementation.IL2CPP
+            );
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+
             string outputDirectory = Path.Combine("Builds", "Android");
             Directory.CreateDirectory(outputDirectory);
 
