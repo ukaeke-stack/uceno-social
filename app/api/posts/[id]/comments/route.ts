@@ -17,7 +17,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const rows = await sql`
       SELECT c.id, c.body, c.parent_comment_id AS "parentCommentId", c.created_at AS "createdAt", u.display_name AS "displayName", u.handle,
         (SELECT COUNT(*)::int FROM comment_likes cl WHERE cl.comment_id = c.id) AS likes
-      FROM comments c JOIN users u ON u.id = c.user_id
+      FROM comments c JOIN users u ON u.id = c.user_id AND u.moderation_status = 'active'
       WHERE c.post_id = ${id}::uuid AND c.moderation_removed_at IS NULL
         AND (${session?.id ?? null}::uuid IS NULL OR NOT EXISTS (
           SELECT 1 FROM user_blocks b WHERE (b.blocker_id = ${session?.id ?? null}::uuid AND b.blocked_id = c.user_id) OR (b.blocker_id = c.user_id AND b.blocked_id = ${session?.id ?? null}::uuid)
