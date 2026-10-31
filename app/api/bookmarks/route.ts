@@ -36,9 +36,9 @@ export async function POST(request: Request) {
   if (!input.success) return NextResponse.json({ error: "Provide a valid post ID" }, { status: 400 });
   try {
     const sql = getDb();
-    const rows = await sql`INSERT INTO post_bookmarks (user_id, post_id) SELECT ${session.id}::uuid, id FROM posts WHERE id = ${input.data.postId}::uuid AND visibility = 'public' ON CONFLICT DO NOTHING RETURNING post_id`;
+    const rows = await sql`INSERT INTO post_bookmarks (user_id, post_id) SELECT ${session.id}::uuid, p.id FROM posts p JOIN users u ON u.id = p.user_id AND u.moderation_status = 'active' WHERE p.id = ${input.data.postId}::uuid AND p.visibility = 'public' AND p.moderation_removed_at IS NULL ON CONFLICT DO NOTHING RETURNING post_id`;
     if (!rows.length) {
-      const exists = await sql`SELECT id FROM posts WHERE id = ${input.data.postId}::uuid AND visibility = 'public' LIMIT 1`;
+      const exists = await sql`SELECT p.id FROM posts p JOIN users u ON u.id = p.user_id AND u.moderation_status = 'active' WHERE p.id = ${input.data.postId}::uuid AND p.visibility = 'public' AND p.moderation_removed_at IS NULL LIMIT 1`;
       if (!exists.length) return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
     return NextResponse.json({ saved: true });
