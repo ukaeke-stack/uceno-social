@@ -1,0 +1,51 @@
+name: UCENO Unity Android Development Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/uceno-unity-foundation
+    paths:
+      - 'unity/UCENOVirtualWorld/**'
+      - '.github/workflows/uceno-unity-android.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uceno-unity-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    if: ${{ vars.UCENO_UNITY_CI_ENABLED == 'true' }}
+    name: Build Android development APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Build with Unity
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: unity/UCENOVirtualWorld
+          unityVersion: 6000.3.27f1
+          targetPlatform: Android
+          buildMethod: UCENO.VirtualWorld.Editor.BuildCommand.BuildAndroidDevelopment
+          buildsPath: Builds
+
+      - name: Upload development APK
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: uceno-virtual-world-android-development
+          path: unity/UCENOVirtualWorld/Builds/Android/UCENO-Virtual-World-dev.apk
+          if-no-files-found: warn
+          retention-days: 14
