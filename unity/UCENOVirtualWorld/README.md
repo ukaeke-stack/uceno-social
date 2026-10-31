@@ -6,7 +6,7 @@ This is the first client-side prototype scaffold. It is not yet a multiplayer ga
 
 - Unity **6.3 LTS — 6000.3.27f1**
 - Project root: `unity/UCENOVirtualWorld`
-- Android target: ARM64 development APK through the Unity Editor build pipeline
+- Android target: ARM64 development APK
 - The initial prototype uses Unity's legacy `Input` API for keyboard, mouse and touch.
 
 Unity 6.3 LTS is pinned for reproducible builds. Do not upgrade the editor version until the project has been opened and tested with the new version.
@@ -26,32 +26,48 @@ Unity 6.3 LTS is pinned for reproducible builds. Do not upgrade the editor versi
 - Desktop: WASD/arrow keys to move; mouse movement to rotate the view.
 - A VR headset is not required for this prototype.
 
-## Android cloud build
+## Cloud build option A — Unity Build Automation
 
-The repository includes a GitHub Actions/GameCI workflow at `.github/workflows/uceno-unity-android.yml`. It can build from this feature branch without merging the prototype into production.
+This is the preferred route if you only have an Android phone and cannot run the Unity Editor locally. Unity's hosted Build Automation can build from the GitHub repository through the Unity Dashboard; it supports Android and Git-based source control. Check the dashboard's usage estimate before starting a build because cloud build minutes and storage can be billable after included allowances.
 
-Before enabling the build, activate a Unity Personal license through Unity Hub on a computer. Add these GitHub Actions repository secrets under **Settings → Secrets and variables → Actions**:
+1. Create/sign in to a Unity ID and open the [Unity Dashboard](https://dashboard.unity.com/).
+2. Open **DevOps → Build Automation** and connect the GitHub repository `ukaeke-stack/uceno-social`.
+3. Create an Android build configuration with:
+   - Branch: `feature/uceno-unity-foundation`
+   - Project subfolder: `unity/UCENOVirtualWorld`
+   - Unity version: `6000.3.27f1`
+   - Target platform: Android
+   - Output: APK (development/test build)
+4. In **Advanced Settings → Script Hooks → Pre-Export Method**, enter:
+   `UCENO.VirtualWorld.Editor.BuildCommand.PrepareAndroidBuild`
+   This method creates/registers the starter scene and applies the development package ID, IL2CPP and ARM64 settings before the hosted builder exports the player.
+5. Use an automatically generated debug keystore for development testing. Do not upload a production signing key for this prototype.
+6. Save the configuration and trigger one build. Download the artifact only after the dashboard reports success.
 
-- `UNITY_LICENSE`: the contents of your Unity Personal license file (`.ulf`).
-- `UNITY_EMAIL`: the email address for the Unity account that owns that license.
-- `UNITY_PASSWORD`: the Unity account password.
+## Cloud build option B — GitHub Actions
 
-Then add this repository Actions variable:
+The repository also includes `.github/workflows/uceno-unity-android.yml` using GameCI. This alternative needs a Unity Personal license file and GitHub secrets; it is less convenient if you have no computer available to activate/export the license.
+
+Add these GitHub Actions repository secrets:
+
+- `UNITY_LICENSE`: contents of the Unity Personal `.ulf` license file.
+- `UNITY_EMAIL`: Unity account email.
+- `UNITY_PASSWORD`: Unity account password.
+
+Also add this repository Actions variable:
 
 - `UCENO_UNITY_CI_ENABLED` = `true`
 
-The variable is a safety switch. Until it is set to `true`, pushes to this feature branch skip the Unity build job. Once the secrets and variable are saved, a new commit to `feature/uceno-unity-foundation` starts the build. The manual workflow-dispatch option becomes available after the workflow is merged into the repository's default branch.
+Until the variable is set to `true`, pushes to this feature branch skip the Unity build job. Once the secrets and variable are saved, a new commit to `feature/uceno-unity-foundation` starts the build. The manual workflow-dispatch option becomes available after the workflow is merged into the repository's default branch.
 
 Never paste license files, account passwords, keystores or other secrets into source files, issues, pull requests or ChatGPT messages.
-
-A successful run uploads `UCENO-Virtual-World-dev.apk` as a 14-day workflow artifact. This is a development build, not a store-ready release. The workflow has not been run until the required secrets and variable are configured.
 
 ## Current scope and limitations
 
 - Offline single-player movement prototype only.
 - Runtime-generated placeholder environment and player.
 - No login, world-entry token exchange, networking, multiplayer, moderation checks, avatar customization, persistent world state, inventory, credits, purchases or advertising.
-- No Android APK or Web build is included in the source commits.
+- No Android APK or Web build has been generated yet.
 - Source review is not proof of Unity compilation. The cloud build and physical-device checklist must pass before treating the prototype as working.
 
 Do not put Neon credentials, UCENO session secrets, service API keys or production signing keys in this Unity project.

@@ -10,14 +10,11 @@ namespace UCENO.VirtualWorld.Editor
 {
     public static class BuildCommand
     {
-        public static void BuildAndroidDevelopment()
+        // Configure the project before Unity Build Automation performs its
+        // normal player build. Set this method as the target's Pre-Export Method.
+        public static void PrepareAndroidBuild()
         {
             StarterSceneBuilder.CreateStarterScene();
-
-            EditorUserBuildSettings.SwitchActiveBuildTarget(
-                BuildTargetGroup.Android,
-                BuildTarget.Android
-            );
 
             PlayerSettings.companyName = "UCENO";
             PlayerSettings.productName = "UCENO Virtual World";
@@ -30,6 +27,17 @@ namespace UCENO.VirtualWorld.Editor
                 ScriptingImplementation.IL2CPP
             );
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+        }
+
+        // Used by the repository's optional GitHub Actions/GameCI pipeline.
+        public static void BuildAndroidDevelopment()
+        {
+            PrepareAndroidBuild();
+
+            EditorUserBuildSettings.SwitchActiveBuildTarget(
+                BuildTargetGroup.Android,
+                BuildTarget.Android
+            );
 
             string outputDirectory = Path.Combine("Builds", "Android");
             Directory.CreateDirectory(outputDirectory);
