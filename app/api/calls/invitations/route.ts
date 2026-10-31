@@ -48,10 +48,7 @@ export async function GET() {
       WHERE (callee_id = ${session.id} AND status = 'pending')
          OR (caller_id = ${session.id} AND status IN ('accepted','rejected','cancelled'))
       ORDER BY created_at DESC LIMIT 10`;
-    const missedCalls = await sql`SELECT id, caller_handle AS "callerHandle", mode, created_at AS "createdAt"
-      FROM call_invitations WHERE callee_id = ${session.id} AND status = 'missed'
-      ORDER BY created_at DESC LIMIT 20`;
-    return NextResponse.json({ invitations, missedCalls });
+    return NextResponse.json({ invitations });
   } catch {
     return NextResponse.json({ error: "Call invitations are unavailable" }, { status: 503 });
   }

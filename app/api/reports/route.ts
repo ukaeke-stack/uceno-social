@@ -28,6 +28,8 @@ export async function POST(request: Request) {
         ? await sql`SELECT 1 FROM posts WHERE id = ${input.targetId}::uuid LIMIT 1`
         : await sql`SELECT 1 FROM comments WHERE id = ${input.targetId}::uuid LIMIT 1`;
     if (!exists.length) return NextResponse.json({ error: "The reported item was not found" }, { status: 404 });
+    const duplicate = await sql`SELECT id FROM user_reports WHERE reporter_id = ${session.id}::uuid AND target_type = ${input.targetType} AND target_id = ${input.targetId}::uuid AND status IN ('pending','reviewing') LIMIT 1`;
+    if (duplicate.length) return NextResponse.json({ submitted: true, duplicate: true });
     const rows = await sql`
       INSERT INTO user_reports (reporter_id, target_type, target_id, reason, details)
       VALUES (${session.id}::uuid, ${input.targetType}, ${input.targetId}::uuid, ${input.reason}, ${input.details})
