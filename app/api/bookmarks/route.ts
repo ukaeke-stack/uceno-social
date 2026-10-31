@@ -17,8 +17,8 @@ export async function GET() {
         (SELECT COUNT(*)::int FROM post_likes l WHERE l.post_id = p.id) AS likes,
         (SELECT COUNT(*)::int FROM comments c WHERE c.post_id = p.id) AS comments,
         b.created_at AS "savedAt"
-      FROM post_bookmarks b JOIN posts p ON p.id = b.post_id JOIN users u ON u.id = p.user_id
-      WHERE b.user_id = ${session.id}::uuid AND p.visibility = 'public'
+      FROM post_bookmarks b JOIN posts p ON p.id = b.post_id JOIN users u ON u.id = p.user_id AND u.moderation_status = 'active'
+      WHERE b.user_id = ${session.id}::uuid AND p.visibility = 'public' AND p.moderation_removed_at IS NULL
         AND NOT EXISTS (SELECT 1 FROM user_blocks x WHERE (x.blocker_id = ${session.id}::uuid AND x.blocked_id = p.user_id) OR (x.blocker_id = p.user_id AND x.blocked_id = ${session.id}::uuid))
       ORDER BY b.created_at DESC LIMIT 100
     `;
