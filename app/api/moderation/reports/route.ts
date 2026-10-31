@@ -18,16 +18,20 @@ const enforcementSchema = z.object({
 
 async function moderatorSession() {
   const session = await readSession();
+  if (!session) return null;
+  const sql = getDb();
   const allowed = (process.env.UCENO_MODERATOR_IDS || "").split(",").map(value => value.trim()).filter(Boolean);
-  if (!session || !allowed.includes(session.id)) return null;
-  return session;
+  const grants = await sql`SELECT revoked_at AS "revokedAt" FROM moderator_access WHERE user_id = ${session.id}::uuid LIMIT 1`;
+  const active = grants.length ? !grants[0].revokedAt : allowed.includes(session.id);
+  return active ? session : null;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await moderatorSession();
   if (!session) return NextResponse.json({ error: "Moderator access required" }, { status: 403 });
   try {
     const sql = getDb();
+    const includeDismissed = new URL(request.url).searchParams.get("all") === "1";
     const reports = await sql`
       SELECT r.id, r.target_type AS "targetType", r.target_id AS "targetId", r.reason, r.details,
         r.status, r.created_at AS "createdAt", r.reviewed_at AS "reviewedAt",
@@ -50,14 +54,14 @@ export async function GET() {
       LEFT JOIN users post_owner ON post_owner.id = p.user_id
       LEFT JOIN comments c ON r.target_type = 'comment' AND c.id = r.target_id
       LEFT JOIN users comment_owner ON comment_owner.id = c.user_id
-      WHERE r.status <> 'dismissed'
-      ORDER BY CASE r.status WHEN 'pending' THEN 0 WHEN 'reviewing' THEN 1 ELSE 2 END, r.created_at ASC
-      LIMIT 200
+      WHERE (${includeDismissed} OR r.status <> 'dismissed')
+      ORDER BY CASE r.status WHEN 'pending' THEN 0 WHEN 'reviewing' THEN 1 WHEN 'actioned' THEN 2 ELSE 3 END, r.created_at DESC
+      LIMIT 500
     `;
     return NextResponse.json({ reports });
   } catch (error) {
     console.error("UCENO moderation queue error", error);
-    return NextResponse.json({ error: "Moderation queue unavailable. Apply migrations 011 and 013." }, { status: 503 });
+    return NextResponse.json({ error: "Moderation queue unavailable. Apply migrations 011, 013 and 014." }, { status: 503 });
   }
 }
 
