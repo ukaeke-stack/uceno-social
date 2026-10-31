@@ -27,7 +27,7 @@ public sealed class FollowCamera : MonoBehaviour
 
 #if UNITY_EDITOR || UNITY_STANDALONE
         if (Input.GetMouseButton(1))
-            look += new Vector2(Input.GetAxis("Mouse X"), -Input.GetAxis("Mouse Y")) * mouseSensitivity;
+            look += new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y")) * mouseSensitivity;
 #endif
         yaw += look.x;
         pitch = Mathf.Clamp(pitch - look.y, minPitch, maxPitch);
