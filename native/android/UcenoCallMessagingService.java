@@ -20,7 +20,7 @@ public class UcenoCallMessagingService extends FirebaseMessagingService {
         String id = data.get("invitationId");
         String caller = data.getOrDefault("callerHandle", "Someone");
         String mode = data.getOrDefault("mode", "audio");
-        String channelId = "uceno_incoming_calls_v2";
+        String channelId = "uceno_incoming_calls_v3";
         NotificationManager manager = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
         if (manager == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager.getNotificationChannel(channelId) == null) {
