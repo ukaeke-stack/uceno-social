@@ -21,14 +21,16 @@ public sealed class FollowCamera : MonoBehaviour
     {
         if (target == null) return;
 
+        Vector2 look = Application.isMobilePlatform
+            ? MobileTouchZone.ConsumeLookDelta()
+            : Vector2.zero;
+
 #if UNITY_EDITOR || UNITY_STANDALONE
         if (Input.GetMouseButton(1))
-        {
-            yaw += Input.GetAxis("Mouse X") * mouseSensitivity;
-            pitch -= Input.GetAxis("Mouse Y") * mouseSensitivity;
-            pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
-        }
+            look += new Vector2(Input.GetAxis("Mouse X"), -Input.GetAxis("Mouse Y")) * mouseSensitivity;
 #endif
+        yaw += look.x;
+        pitch = Mathf.Clamp(pitch - look.y, minPitch, maxPitch);
 
         Quaternion orbit = Quaternion.Euler(pitch, yaw, 0f);
         Vector3 focus = target.position + Vector3.up * height;
