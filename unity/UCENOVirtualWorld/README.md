@@ -7,10 +7,12 @@ This is the first client-side prototype scaffold. It is not yet a multiplayer ga
 1. Install Unity Hub on a computer (or use a trusted remote Unity build workstation). A phone alone cannot run the full Unity Editor.
 2. Install a supported Unity 6 LTS Editor with Android Build Support (Android SDK/NDK and OpenJDK modules) and Web platform build support.
 3. Create a **3D Core** project named `UCENOVirtualWorld`.
-4. Copy the contents of this folder into the project root, preserving the `Assets` directory.
-5. Open the project and allow Unity to import scripts.
-6. In the Unity menu, choose **UCENO Virtual World → Create Starter Scene**.
-7. Press Play. The prototype creates a simple ground plane, a capsule player, lighting and a third-person camera.
+4. In **Edit → Project Settings → Player → Other Settings → Configuration**, set **Active Input Handling** to **Both** (or **Input Manager (Old)**). The current prototype uses Unity's legacy `Input` API for keyboard, mouse and touch input.
+5. Restart the Editor if Unity asks you to.
+6. Copy the contents of this folder into the project root, preserving the `Assets` directory.
+7. Open the project and allow Unity to import scripts.
+8. In the Unity menu, choose **UCENO Virtual World → Create Starter Scene**.
+9. Press Play. The prototype creates a simple ground plane, a capsule player, lighting and a third-person camera.
 
 ## Prototype controls
 
