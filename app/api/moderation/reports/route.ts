@@ -61,7 +61,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ reports });
   } catch (error) {
     console.error("UCENO moderation queue error", error);
-    return NextResponse.json({ error: "Moderation queue unavailable. Apply migrations 011 and 013." }, { status: 503 });
+    return NextResponse.json({ error: "Moderation queue unavailable. Apply migrations 011, 013 and 014." }, { status: 503 });
   }
 }
 
