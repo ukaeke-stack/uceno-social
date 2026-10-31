@@ -2,37 +2,50 @@
 
 This is the first client-side prototype scaffold. It is not yet a multiplayer game and does not connect to UCENO accounts or production services.
 
-## Create the Unity project
+## Pinned Unity version
 
-1. Install Unity Hub on a computer (or use a trusted remote Unity build workstation). A phone alone cannot run the full Unity Editor.
-2. Install a supported Unity 6 LTS Editor with Android Build Support (Android SDK/NDK and OpenJDK modules) and Web platform build support.
-3. Create a **3D Core** project named `UCENOVirtualWorld`.
-4. In **Edit → Project Settings → Player → Other Settings → Configuration**, set **Active Input Handling** to **Both** (or **Input Manager (Old)**). The current prototype uses Unity's legacy `Input` API for keyboard, mouse and touch input.
-5. Restart the Editor if Unity asks you to.
-6. Copy the contents of this folder into the project root, preserving the `Assets` directory.
-7. Open the project and allow Unity to import scripts.
-8. In the Unity menu, choose **UCENO Virtual World → Create Starter Scene**.
-9. Press Play. The prototype creates a simple ground plane, a capsule player, lighting and a third-person camera.
+- Unity **6.3 LTS — 6000.3.27f1**
+- Project root: `unity/UCENOVirtualWorld`
+- Android target: ARM64 development APK through the Unity Editor build pipeline
+- The initial prototype uses Unity's legacy `Input` API for keyboard, mouse and touch.
 
-## Prototype controls
+Unity 6.3 LTS is pinned for reproducible builds. Do not upgrade the editor version until the project has been opened and tested with the new version.
 
-- Android touch: drag on the left half of the screen to move; drag on the right half to rotate the view.
+## Open locally
+
+1. Install Unity Hub on a computer or use a trusted remote Unity build workstation. A phone alone cannot run the full Unity Editor.
+2. Install Unity 6000.3.27f1 with Android Build Support, including Android SDK & NDK Tools and OpenJDK. Install Web Build Support when the Web client stage begins.
+3. Open this folder as an existing Unity project.
+4. Set **Edit → Project Settings → Player → Other Settings → Configuration → Active Input Handling** to **Both** or **Input Manager (Old)**. Restart the Editor if requested.
+5. In the Unity menu, choose **UCENO Virtual World → Create Starter Scene**.
+6. Press Play and follow the control instructions below.
+
+## Controls
+
+- Android: drag on the left half of the screen to move; drag on the right half to rotate the camera horizontally and vertically. Two fingers can control movement and camera simultaneously.
 - Desktop: WASD/arrow keys to move; mouse movement to rotate the view.
-- A physical VR headset is not required.
+- A VR headset is not required for this prototype.
 
-## Current technical scope
+## Android cloud build
 
-- Offline single-player movement proof of concept.
+The repository includes a manually triggered GitHub Actions workflow at `.github/workflows/uceno-unity-android.yml`.
+
+Before running it, add these GitHub Actions repository secrets under **Settings → Secrets and variables → Actions**:
+
+- `UNITY_LICENSE`: the contents of your Unity Personal license file (`.ulf`).
+- `UNITY_EMAIL`: the email address for the Unity account that owns that license.
+- `UNITY_PASSWORD`: the Unity account password.
+
+Create and activate a Unity Personal license through Unity Hub on a computer first. Never paste license files, account passwords, keystores or other secrets into source files, issues, pull requests or ChatGPT messages.
+
+Then open **Actions → UCENO Unity Android Development Build → Run workflow**, select this feature branch and run it. A successful run uploads `UCENO-Virtual-World-dev.apk` as a 14-day workflow artifact. This is a development build, not a store-ready release. The workflow has not been run until the required secrets are configured.
+
+## Current scope and limitations
+
+- Offline single-player movement prototype only.
 - Runtime-generated placeholder environment and player.
-- No accounts, networking, multiplayer, avatar customization, persistent world data, purchases, advertising, UCENO Credits or moderation integration.
-- No Android APK or WebGL build is included in this commit.
+- No login, world-entry token exchange, networking, multiplayer, moderation checks, avatar customization, persistent world state, inventory, credits, purchases or advertising.
+- No Android APK or Web build is included in the source commits.
+- Source review is not proof of Unity compilation. The cloud build and physical-device checklist must pass before treating the prototype as working.
 
-## Build targets to configure in Unity
-
-- Android: switch platform in Build Settings and use IL2CPP/ARM64 for release validation.
-- Desktop browser: install the Web Build Support module and build for Web.
-- Test touch controls on a real Android device; Editor simulation is not sufficient for release approval.
-
-## Important limitations
-
-The source scaffold is not a substitute for an installed Unity Editor. This repository change does not prove that Unity compiles on a remote runner or that an APK can be produced. Unity licensing and build-runner availability must be configured before adding automated Unity builds. Do not put Neon credentials, session secrets, signing keys or service API secrets in this Unity project.
+Do not put Neon credentials, UCENO session secrets, service API keys or production signing keys in this Unity project.
