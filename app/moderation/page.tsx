@@ -1,102 +1,46 @@
 'use client';
-
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, ShieldCheck, Flag } from 'lucide-react';
-
-type Report = {
-  id:string; targetType:'user'|'post'|'comment'; targetId:string; reason:string; details:string;
-  status:'pending'|'reviewing'|'actioned'|'dismissed'; createdAt:string; reporterHandle:string;
-  targetHandle?:string|null; targetExcerpt?:string|null; targetModerationStatus?:'active'|'suspended'|'disabled'|null;
-  suspendedUntil?:string|null; contentRemovedAt?:string|null;
-};
-
+import { useCallback,useEffect,useMemo,useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft,ShieldCheck,Flag,Users,History,LayoutDashboard,RefreshCw,UserPlus,UserMinus,AlertTriangle } from "lucide-react";
+type Report={id:string;targetType:"user"|"post"|"comment";targetId:string;reason:string;details:string;status:"pending"|"reviewing"|"actioned"|"dismissed";createdAt:string;reporterHandle:string;targetHandle?:string|null;targetExcerpt?:string|null;targetModerationStatus?:"active"|"suspended"|"disabled"|null;suspendedUntil?:string|null;contentRemovedAt?:string|null};
+type Moderator={id:string;handle:string;displayName:string;grantedAt:string};
+type Audit={id:string;action:string;reason:string;targetType:string;targetHandle?:string|null;moderatorHandle:string;createdAt:string};
+const tabs=[{id:"overview",label:"Overview",icon:LayoutDashboard},{id:"reports",label:"Reports",icon:Flag},{id:"moderators",label:"Moderators",icon:Users},{id:"audit",label:"Audit history",icon:History}] as const;
 export default function ModerationPage(){
-  const router=useRouter();
-  const [reports,setReports]=useState<Report[]>([]);
-  const [reasons,setReasons]=useState<Record<string,string>>({});
-  const [error,setError]=useState('');
-  const [loading,setLoading]=useState(true);
-  const [busy,setBusy]=useState<string|null>(null);
-
-  async function load(){
-    try{
-      const r=await fetch('/api/moderation/reports',{cache:'no-store'});
-      const d=await r.json();
-      if(!r.ok) throw new Error(d.error||'Could not load moderation queue');
-      setReports(Array.isArray(d.reports)?d.reports:[]);
-      setError('');
-    }catch(e){setError(e instanceof Error?e.message:'Could not load moderation queue')}
-    finally{setLoading(false)}
-  }
-  useEffect(()=>{void load()},[]);
-
-  async function update(reportId:string,status:'reviewing'|'dismissed'|'actioned'){
-    setBusy(reportId);
-    try{
-      const r=await fetch('/api/moderation/reports',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({reportId,status})});
-      const d=await r.json();
-      if(!r.ok) throw new Error(d.error||'Could not update report');
-      if(status==='dismissed') setReports(old=>old.filter(item=>item.id!==reportId));
-      else setReports(old=>old.map(item=>item.id===reportId?{...item,status}:item));
-      setError('');
-    }catch(e){setError(e instanceof Error?e.message:'Could not update report')}
-    finally{setBusy(null)}
-  }
-
-  async function enforce(report:Report,action:'warn'|'suspend'|'disable'|'remove_content'|'restore_account'|'restore_content'){
-    setBusy(report.id);
-    try{
-      const r=await fetch('/api/moderation/reports',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({
-        reportId:report.id,action,reason:reasons[report.id]||'Moderation decision based on the submitted report.',
-        ...(action==='suspend'?{durationDays:7}:{})
-      })});
-      const d=await r.json();
-      if(!r.ok) throw new Error(d.error||'Could not apply enforcement action');
-      if(action==='remove_content') setReports(old=>old.map(item=>item.id===report.id?{...item,status:'actioned',contentRemovedAt:new Date().toISOString()}:item));
-      else if(action==='restore_content') setReports(old=>old.map(item=>item.id===report.id?{...item,status:'actioned',contentRemovedAt:null}:item));
-      else if(action==='suspend') setReports(old=>old.map(item=>item.id===report.id?{...item,status:'actioned',targetModerationStatus:'suspended'}:item));
-      else if(action==='disable') setReports(old=>old.map(item=>item.id===report.id?{...item,status:'actioned',targetModerationStatus:'disabled'}:item));
-      else if(action==='restore_account') setReports(old=>old.map(item=>item.id===report.id?{...item,status:'actioned',targetModerationStatus:'active',suspendedUntil:null}:item));
-      else setReports(old=>old.map(item=>item.id===report.id?{...item,status:'actioned'}:item));
-      setError('');
-    }catch(e){setError(e instanceof Error?e.message:'Could not apply enforcement action')}
-    finally{setBusy(null)}
-  }
-
-  return <main className="user-page">
-    <header className="user-page-top">
-      <button className="user-back" onClick={()=>router.back()}><ArrowLeft size={17}/> Back</button>
-      <strong><ShieldCheck size={18}/> Moderation queue</strong>
-    </header>
-    <section className="user-posts-section">
-      {error&&<p role="alert">{error}</p>}
-      {loading?<p>Loading reports…</p>:reports.length?reports.map(report=><article className="user-post-card" key={report.id}>
-        <div className="user-post-meta">
-          <strong><Flag size={15}/> {report.targetType} report · {report.reason}</strong>
-          <span>{report.status} · {new Date(report.createdAt).toLocaleString()}</span>
-        </div>
-        <p>Reported by @{report.reporterHandle}{report.targetHandle?' · Target: @'+report.targetHandle:''}</p>
-        {report.targetExcerpt&&<blockquote>{report.targetExcerpt}</blockquote>}
-        {report.details&&<p>{report.details}</p>}
-        {report.targetType==='user'&&<p>Account status: {report.targetModerationStatus||'active'}{report.suspendedUntil?' · Suspended until '+new Date(report.suspendedUntil).toLocaleString():''}</p>}
-        {report.targetType!=='user'&&<p>Content status: {report.contentRemovedAt?'Removed':'Visible'}</p>}
-        <label className="user-field-label" htmlFor={'moderation-reason-'+report.id}>Moderator reason</label>
-        <input id={'moderation-reason-'+report.id} value={reasons[report.id]||''} onChange={event=>setReasons(old=>({...old,[report.id]:event.target.value}))} placeholder="Reason shown in the audit record" maxLength={1000}/>
-        <div className="user-action-row">
-          <button disabled={busy===report.id} onClick={()=>void update(report.id,'reviewing')}>Mark reviewing</button>
-          <button disabled={busy===report.id} onClick={()=>void update(report.id,'dismissed')}>Dismiss</button>
-          {report.targetType==='user'?<>
-            <button disabled={busy===report.id} onClick={()=>void enforce(report,'warn')}>Send warning</button>
-            <button disabled={busy===report.id} onClick={()=>void enforce(report,'suspend')}>Suspend 7 days</button>
-            <button disabled={busy===report.id} onClick={()=>void enforce(report,'disable')}>Disable account</button>
-            {report.targetModerationStatus!=='active'&&<button disabled={busy===report.id} onClick={()=>void enforce(report,'restore_account')}>Restore account</button>}
-          </>:<>
-            {!report.contentRemovedAt?<button disabled={busy===report.id} onClick={()=>void enforce(report,'remove_content')}>Remove content</button>
-              :<button disabled={busy===report.id} onClick={()=>void enforce(report,'restore_content')}>Restore content</button>}
-          </>}
-        </div>
-      </article>):<div className="user-empty"><ShieldCheck size={25}/><strong>No reports in queue</strong></div>}
-    </section>
-  </main>;
+ const router=useRouter(),[tab,setTab]=useState<(typeof tabs)[number]["id"]>("overview"),[reports,setReports]=useState<Report[]>([]),[moderators,setModerators]=useState<Moderator[]>([]),[audit,setAudit]=useState<Audit[]>([]),[isAdmin,setIsAdmin]=useState(false),[status,setStatus]=useState("active"),[handle,setHandle]=useState(""),[reasons,setReasons]=useState<Record<string,string>>({}),[error,setError]=useState(""),[notice,setNotice]=useState(""),[loading,setLoading]=useState(true),[busy,setBusy]=useState<string|null>(null);
+ const request=useCallback(async(url:string,init?:RequestInit)=>{const r=await fetch(url,{cache:"no-store",...init}),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Request failed");return d},[]);
+ const load=useCallback(async()=>{setLoading(true);try{const [d,me]=await Promise.all([request("/api/moderation/reports?all=1"),request("/api/auth/me")]);setReports(Array.isArray(d.reports)?d.reports:[]);setIsAdmin(Boolean(me.user?.isModeratorAdmin));setError("")}catch(e){setError(e instanceof Error?e.message:"Could not load dashboard")}finally{setLoading(false)}},[request]);
+ const loadMods=useCallback(async()=>{try{const d=await request("/api/moderation/moderators");setModerators(d.moderators||[]);setIsAdmin(Boolean(d.admin))}catch(e){setError(e instanceof Error?e.message:"Could not load moderators")}},[request]);
+ const loadAudit=useCallback(async()=>{try{const d=await request("/api/moderation/actions");setAudit(d.actions||[])}catch(e){setError(e instanceof Error?e.message:"Could not load audit history")}},[request]);
+ useEffect(()=>{void load()},[load]);useEffect(()=>{if(tab==="moderators")void loadMods();if(tab==="audit")void loadAudit()},[tab,loadMods,loadAudit]);
+ const counts=useMemo(()=>({pending:reports.filter(r=>r.status==="pending").length,reviewing:reports.filter(r=>r.status==="reviewing").length,actioned:reports.filter(r=>r.status==="actioned").length,dismissed:reports.filter(r=>r.status==="dismissed").length}),[reports]);
+ const visible=useMemo(()=>reports.filter(r=>status==="active"?["pending","reviewing"].includes(r.status):status==="all"?true:r.status===status),[reports,status]);
+ async function update(id:string,next:"reviewing"|"dismissed"){setBusy(id);try{await request("/api/moderation/reports",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({reportId:id,status:next})});await load();setNotice("Report updated")}catch(e){setError(e instanceof Error?e.message:"Could not update report")}finally{setBusy(null)}}
+ async function enforce(report:Report,action:"warn"|"suspend"|"disable"|"remove_content"|"restore_account"|"restore_content"){setBusy(report.id);try{await request("/api/moderation/reports",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({reportId:report.id,action,reason:reasons[report.id]||"Moderation decision based on the submitted report.",...(action==="suspend"?{durationDays:7}:{})})});await load();setNotice("Moderation action applied")}catch(e){setError(e instanceof Error?e.message:"Could not apply action")}finally{setBusy(null)}}
+ async function addModerator(){setBusy("add");try{await request("/api/moderation/moderators",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({handle:handle.trim().replace(/^@/,"")})});setHandle("");await loadMods();setNotice("Moderator access granted")}catch(e){setError(e instanceof Error?e.message:"Could not add moderator")}finally{setBusy(null)}}
+ async function removeModerator(id:string){if(!window.confirm("Remove this account's moderator access?"))return;setBusy(id);try{await request("/api/moderation/moderators",{method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({userId:id})});await loadMods();setNotice("Moderator access removed")}catch(e){setError(e instanceof Error?e.message:"Could not remove moderator")}finally{setBusy(null)}}
+ return <main className="user-page moderation-page">
+  <header className="user-page-top moderation-top"><button className="user-back" onClick={()=>router.back()}><ArrowLeft size={17}/> Back</button><strong><ShieldCheck size={19}/> Moderation Centre</strong><button className="moderation-refresh" onClick={()=>{void load();if(tab==="moderators")void loadMods();if(tab==="audit")void loadAudit()}}><RefreshCw size={16}/></button></header>
+  <nav className="moderation-tabs">{tabs.map(t=>{const Icon=t.icon;return <button key={t.id} className={tab===t.id?"selected":""} onClick={()=>setTab(t.id)}><Icon size={17}/>{t.label}</button>})}</nav>
+  <section className="user-posts-section moderation-content">
+   {error&&<p className="moderation-error" role="alert"><AlertTriangle size={16}/>{error}</p>}{notice&&<p className="moderation-notice" role="status">{notice}<button onClick={()=>setNotice("")}>Dismiss</button></p>}
+   {tab==="overview"&&<><div className="moderation-welcome"><div><small>UCENO TRUST & SAFETY</small><h1>Moderation overview</h1><p>Review reports, manage moderator access and track enforcement decisions.</p></div><ShieldCheck size={34}/></div><div className="moderation-stat-grid">
+    <button onClick={()=>{setTab("reports");setStatus("active")}}><span>Open reports</span><strong>{counts.pending+counts.reviewing}</strong><small>{counts.pending} pending · {counts.reviewing} reviewing</small></button>
+    <button onClick={()=>{setTab("reports");setStatus("actioned")}}><span>Actioned reports</span><strong>{counts.actioned}</strong><small>Completed moderation decisions</small></button>
+    <button onClick={()=>{setTab("reports");setStatus("dismissed")}}><span>Dismissed reports</span><strong>{counts.dismissed}</strong><small>Closed reports</small></button>
+    <button onClick={()=>setTab("audit")}><span>Audit entries loaded</span><strong>{audit.length||"—"}</strong><small>Recorded enforcement actions</small></button>
+   </div><div className="moderation-shortcuts"><button onClick={()=>{setTab("reports");setStatus("active")}}><Flag size={16}/> Review reports</button>{isAdmin&&<button onClick={()=>setTab("moderators")}><UserPlus size={16}/> Manage moderators</button>}<button onClick={()=>setTab("audit")}><History size={16}/> Audit history</button></div></>}
+   {tab==="reports"&&<><div className="moderation-section-head"><h1>Report centre</h1><p>All submitted reports grouped by status.</p></div><div className="moderation-filters">{[["active","Open"],["pending","Pending"],["reviewing","Reviewing"],["actioned","Actioned"],["dismissed","Dismissed"],["all","All"]].map(([id,label])=><button key={id} className={status===id?"selected":""} onClick={()=>setStatus(id)}>{label}</button>)}</div>
+    {loading?<p>Loading reports…</p>:visible.length?visible.map(r=><article className="user-post-card moderation-report" key={r.id}><div className="user-post-meta"><strong><Flag size={15}/> {r.targetType} report · {r.reason}</strong><span>{r.status} · {new Date(r.createdAt).toLocaleString()}</span></div><p>Reported by @{r.reporterHandle}{r.targetHandle?" · Target: @"+r.targetHandle:""}</p>{r.targetExcerpt&&<blockquote>{r.targetExcerpt}</blockquote>}{r.details&&<p>{r.details}</p>}
+     {r.targetType==="user"&&<p>Account: {r.targetModerationStatus||"active"}{r.suspendedUntil?" · Until "+new Date(r.suspendedUntil).toLocaleString():""}</p>}{r.targetType!=="user"&&<p>Content: {r.contentRemovedAt?"Removed":"Visible"}</p>}
+     {["pending","reviewing"].includes(r.status)&&<><label className="user-field-label" htmlFor={"reason-"+r.id}>Moderator reason</label><input id={"reason-"+r.id} value={reasons[r.id]||""} onChange={e=>setReasons(old=>({...old,[r.id]:e.target.value}))} placeholder="Reason recorded in audit history" maxLength={1000}/></>}
+     <div className="user-action-row">{r.status==="pending"&&<button disabled={busy===r.id} onClick={()=>void update(r.id,"reviewing")}>Mark reviewing</button>}{["pending","reviewing"].includes(r.status)&&<button disabled={busy===r.id} onClick={()=>void update(r.id,"dismissed")}>Dismiss</button>}
+      {r.targetType==="user"&&["pending","reviewing"].includes(r.status)&&<><button disabled={busy===r.id} onClick={()=>void enforce(r,"warn")}>Send warning</button><button disabled={busy===r.id} onClick={()=>void enforce(r,"suspend")}>Suspend 7 days</button><button disabled={busy===r.id} onClick={()=>void enforce(r,"disable")}>Disable account</button>{r.targetModerationStatus!=="active"&&<button disabled={busy===r.id} onClick={()=>void enforce(r,"restore_account")}>Restore account</button>}</>}
+      {r.targetType!=="user"&&["pending","reviewing"].includes(r.status)&&(!r.contentRemovedAt?<button disabled={busy===r.id} onClick={()=>void enforce(r,"remove_content")}>Remove content</button>:<button disabled={busy===r.id} onClick={()=>void enforce(r,"restore_content")}>Restore content</button>)}
+     </div></article>):<div className="user-empty"><ShieldCheck size={25}/><strong>No reports in this group</strong></div>}
+   </>}
+   {tab==="moderators"&&<><div className="moderation-section-head"><h1>Moderator accounts</h1><p>Only ukaeke, the primary moderator, can grant or revoke moderator access.</p></div>{isAdmin?<><div className="moderator-add"><label htmlFor="new-moderator">Add moderator by UCENO username</label><div><input id="new-moderator" value={handle} onChange={e=>setHandle(e.target.value)} placeholder="Enter username" maxLength={24}/><button disabled={!handle.trim()||busy==="add"} onClick={()=>void addModerator()}><UserPlus size={16}/> Add moderator</button></div></div>{moderators.map(m=><article className="moderator-row" key={m.id}><div><strong>@{m.handle}</strong><span>{m.displayName} · Added {new Date(m.grantedAt).toLocaleDateString()}</span></div>{m.handle.toLowerCase()!=="ukaeke"&&<button disabled={busy===m.id} onClick={()=>void removeModerator(m.id)}><UserMinus size={16}/> Remove</button>}</article>)}{!moderators.length&&<p>No moderators found.</p>}</>:<p>Moderator administrator access required.</p>}</>}
+   {tab==="audit"&&<><div className="moderation-section-head"><h1>Audit history</h1><p>Enforcement decisions and the moderator responsible.</p></div>{audit.length?audit.map(a=><article className="moderator-row" key={a.id}><div><strong>{a.action.replaceAll("_"," ")} · {a.targetType}{a.targetHandle?" @"+a.targetHandle:""}</strong><span>By @{a.moderatorHandle} · {new Date(a.createdAt).toLocaleString()}</span><small>{a.reason}</small></div></article>):<div className="user-empty"><History size={25}/><strong>No audit actions recorded</strong></div>}</>}
+  </section>
+ </main>;
 }
