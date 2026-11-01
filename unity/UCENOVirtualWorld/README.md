@@ -120,6 +120,9 @@ A seat has one server-controlled occupant; another player is rejected while it
 is occupied. The seated state is applied to the local avatar only after the
 gateway confirms the seat request and is replicated through player snapshots.
 Seat occupancy is released when the occupying player's socket disconnects.
+The gateway derives seated movement state from its own seat-occupancy map rather
+than trusting the client's seated flag. The Unity client clears the local seated
+pose on transport loss so reconnect does not leave the avatar stuck sitting.
 The current seating pose uses the existing generic seated animation state; it
 does not yet align the avatar to a chair-specific sit point or provide IK.
 
