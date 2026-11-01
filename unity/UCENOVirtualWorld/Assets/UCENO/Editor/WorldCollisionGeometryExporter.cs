@@ -75,7 +75,9 @@ namespace UCENO.VirtualWorld.Editor
                 {
                     if (item == null || !item.gameObject.activeInHierarchy) continue;
                     string id = item.ObjectId;
-                    if (string.IsNullOrWhiteSpace(id) || id.Length > 80 || !ids.Add(id))
+                    if (string.IsNullOrWhiteSpace(id) || id.Length > 80 ||
+                        !id.All(character => char.IsLetterOrDigit(character) || "._:-".IndexOf(character) >= 0) ||
+                        !ids.Add(id))
                         throw new InvalidOperationException("World interactable IDs must be unique, non-empty and at most 80 characters: " + id);
                     Vector3 position = item.transform.position;
                     interactables.Add(new Interactable
