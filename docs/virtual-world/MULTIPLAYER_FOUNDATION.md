@@ -1,32 +1,45 @@
 # UCENO Virtual World — multiplayer and persistent-world foundation
 
-## Added in this stage
+## Implemented
 
-- Additive database schema for worlds, memberships, runtime instances, one-time entry codes, durable player state, private homes and permissions, scheduled events and attendance.
-- Distinct earned and purchased UCENO Credit balances with an append-only idempotency ledger.
-- Marketplace listing records priced only in Purchased Credits.
-- Advertising campaign records limited to real money or Purchased Credits.
-- UCENO Social world-entry API: authenticated issue, 90-second single-use code, per-account request cap, hashed code storage, client binding and five-minute JWT.
+- Additive database schema for worlds, memberships, runtime instances, one-time entry codes, durable player state, homes, permissions, events and attendance.
+- Separate earned and purchased UCENO Credit balances with an append-only ledger schema.
+- Marketplace listing schema with prices denominated only in Purchased Credits.
+- Advertising campaign schema limited to real money or Purchased Credits.
+- Authenticated world-entry code issue/redeem APIs. Codes are hashed, single-use, short-lived and client-bound; redemption returns a five-minute JWT.
 - Unity `WorldSessionClient` redeems a code over HTTPS and keeps the bearer token in memory only.
-- Authenticated `GET/PUT /api/worlds/:worldId/state` endpoints load and save bounded player checkpoints (position, rotation, spawn and compact state). These are explicit durable checkpoints, not per-frame networking.\n- `GET/POST /api/world-events` lists scheduled events and lets a world owner or active world admin host an event.\n- `POST /api/world-events/:eventId/attendance` records going/interested/cancelled RSVPs; a database trigger serializes capacity checks to prevent concurrent overbooking.
+- Authenticated bounded player checkpoint GET/PUT endpoints. These are durable checkpoints, not per-frame multiplayer synchronization.
+- Event listing/hosting and RSVP APIs. A database trigger serializes event-capacity checks.
+- Home listing/creation, owner invitations/revocation and bounded layout updates.
+- Read-only authenticated wallet endpoint: `GET /api/credits` returns separate earned/purchased balances and the latest 50 ledger entries.
+- Marketplace browse and seller endpoints:
+  - `GET /api/marketplace` lists active listings; `?mine=true` lists the signed-in seller's listings.
+  - `POST /api/marketplace` creates a draft listing.
+  - `PATCH /api/marketplace/:listingId` lets its seller update fields and status.
+  - Listing prices are validated as non-negative integer Purchased Credits; stock and metadata are bounded.
+
+## Important transaction boundary
+
+No credit top-up, transfer, marketplace purchase, seller settlement or advertiser debit endpoint has been implemented. The wallet API is read-only. Marketplace listing management does not move credits or transfer ownership of digital assets. Earned Credits are never treated as Purchased Credits. Marketplace purchases and credit-funded advertising must use Purchased Credits only, with server-authoritative atomic ledger operations and idempotency. Real-money funding must be verified server-side through the payment provider. Seller settlement rules remain intentionally undefined until the product payout policy is established; no payout behavior is assumed.
 
 ## Setup
 
 1. Review and apply `db/migrations/015_virtual_world_foundation.sql` through the normal migration process. No API route runs DDL.
 2. Configure server-only `WORLD_TOKEN_SECRET` with at least 32 random characters. Never commit it or put it in the Unity project.
-3. Signed-in Social client calls `POST /api/worlds/entry` with `{ "worldId": "...", "clientType": "unity-android" }`.
+3. A signed-in Social client calls `POST /api/worlds/entry` with a world ID and client type.
 4. Pass the returned code to Unity `WorldSessionClient.RedeemEntryCode`; it redeems with `PUT /api/worlds/entry`.
 5. Configure the Unity component's API base URL to the actual UCENO Social origin before use.
 
-## Security boundaries
+## Security boundaries and known gaps
 
 - The world gateway must verify JWT signature, issuer `uceno-social`, audience `uceno-world-gateway`, expiry, subject, world and client claims.
 - Re-check moderation, world membership and bans at admission and reconnect; do not treat the token as permanent authorization.
-- Neon is for durable records and occasional checkpoints, not per-frame movement snapshots. The checkpoint endpoint bounds coordinates, validates normalized rotations, limits state JSON to 16 KB and checks world access.
-- Event hosting is limited to world owners and active world admins. RSVP capacity is enforced by a database trigger; apply the updated migration before enabling the event endpoints.\n- Home creation is available to signed-in users with access to a published world. Friends-only visibility and Unity home-building UI are not implemented yet.\n- This does not yet provide a live multiplayer server, authoritative movement, instance allocator, reconnect protocol or spatial voice.
-- Credit balances must only change through future transactional server-side ledger operations. These tables do not grant balances or process purchases.
-- Voice needs a separate authenticated audio plane (evaluate LiveKit), server-controlled room membership and proximity/zone rules, plus mute/block/report controls.
+- Neon is for durable records and occasional checkpoints, not per-frame movement snapshots.
+- Home friends-only visibility and Unity home-building UI are not implemented.
+- This does not yet provide a live multiplayer server, authoritative movement, instance allocator, reconnect protocol or spatial voice.
+- Wallet balances are read-only through the new API. No client-supplied balance writes are accepted.
+- Voice needs a separate authenticated audio plane, server-controlled room membership and proximity/zone rules, plus mute/block/report controls.
 
 ## Validation still required
 
-Apply the complete migration on a disposable database; test event listing/creation permissions, RSVP capacity under concurrent requests, event closure, code expiry, replay, wrong-client, blocked account and banned membership; run TypeScript/Unity compilation; verify gateway JWT validation; then test Android handoff on a physical device. This source change is not evidence of a successful Unity build or deployed service.
+Migration 015 is not confirmed applied. Test all routes against a disposable database after migration; add integration tests for listing ownership, invalid payloads, wallet isolation, event capacity under concurrent requests, entry-code expiry/replay/wrong-client, blocks and banned memberships. Run TypeScript/build checks, configure and verify the gateway JWT validation, then compile Unity and test Android handoff on a physical device. No such validation is claimed by these source commits.
