@@ -394,7 +394,13 @@ namespace UCENO.VirtualWorld
             {
                 yield return request.SendWebRequest();
                 if (!Succeeded(request)) SetFailure(request, "Home save");
-                else status = "Home layout saved.";
+                else
+                {
+                    status = "Home layout saved.";
+                    if (selectedPermission == "owner" && selectedVisibility == "invite")
+                        StartCoroutine(LoadMembersRoutine());
+                    else members.Clear();
+                }
             }
             busy = false;
         }
