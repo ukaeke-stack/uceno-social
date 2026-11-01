@@ -8,6 +8,14 @@ using UnityEngine.Networking;
 
 namespace UCENO.VirtualWorld
 {
+    [Serializable] public sealed class WorldEventLocation
+    {
+        public float x;
+        public float y;
+        public float z;
+        public float yaw;
+    }
+
     [Serializable] public sealed class WorldEventSummary
     {
         public string id;
@@ -19,6 +27,9 @@ namespace UCENO.VirtualWorld
         public string status;
         public int goingCount;
         public string myAttendance;
+        public string activityType;
+        public string locationLabel;
+        public WorldEventLocation location;
     }
 
     [Serializable] internal sealed class WorldEventListResponse { public WorldEventSummary[] events; public bool canHost; }
@@ -30,6 +41,9 @@ namespace UCENO.VirtualWorld
         public string startsAt;
         public string endsAt;
         public int capacity;
+        public string activityType;
+        public string locationLabel;
+        public WorldEventLocation location;
     }
     [Serializable] internal sealed class WorldEventAttendanceRequest { public string attendanceStatus; }
 
@@ -41,6 +55,7 @@ namespace UCENO.VirtualWorld
     public sealed class WorldEventsClient : MonoBehaviour
     {
         [SerializeField] private WorldSessionClient session;
+        [SerializeField] private WorldGatewayClient gateway;
         private readonly List<WorldEventSummary> events = new List<WorldEventSummary>();
         private bool visible;
         private bool busy;
@@ -49,14 +64,52 @@ namespace UCENO.VirtualWorld
         private string newEventDescription = "";
         private string startsAtUtc = "";
         private string endsAtUtc = "";
+        private string newActivityType = "social";
+        private string newLocationLabel = "Main Plaza";
+        private string locationX = "0";
+        private string locationY = "1.15";
+        private string locationZ = "0";
+        private string activeEventId = "";
         private string status = "Press N to view world events.";
         private Vector2 scroll;
 
         private void Awake()
         {
             if (session == null) session = FindObjectOfType<WorldSessionClient>();
+            if (gateway == null) gateway = FindObjectOfType<WorldGatewayClient>();
+            if (gateway != null)
+            {
+                gateway.SpatialLocationEntered += HandleSpatialLocationEntered;
+                gateway.SpatialLocationExited += HandleSpatialLocationExited;
+            }
             startsAtUtc = DateTime.UtcNow.AddHours(1).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
             endsAtUtc = DateTime.UtcNow.AddHours(2).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+        }
+
+        private void OnDestroy()
+        {
+            if (gateway != null)
+            {
+                gateway.SpatialLocationEntered -= HandleSpatialLocationEntered;
+                gateway.SpatialLocationExited -= HandleSpatialLocationExited;
+            }
+        }
+
+        private void HandleSpatialLocationEntered(string contextType, string contextId, Vector3 position, float yaw)
+        {
+            if (contextType != "event") return;
+            activeEventId = contextId;
+            WorldEventSummary joined = events.Find(item => item.id == contextId);
+            status = "Joined " + (joined != null ? joined.title : "event") +
+                " at " + (joined != null ? joined.locationLabel : "the event venue") +
+                ". The world server authorized your arrival.";
+        }
+
+        private void HandleSpatialLocationExited()
+        {
+            if (string.IsNullOrEmpty(activeEventId)) return;
+            activeEventId = "";
+            status = "You have left the event venue.";
         }
 
         private void Update()
@@ -86,7 +139,16 @@ namespace UCENO.VirtualWorld
                 status = "Enter valid UTC start/end times. Start must be in the future; event duration is limited to 24 hours.";
                 return;
             }
-            StartCoroutine(CreateEventRoutine(start, end));
+            if (!float.TryParse(locationX, NumberStyles.Float, CultureInfo.InvariantCulture, out float x) ||
+                !float.TryParse(locationY, NumberStyles.Float, CultureInfo.InvariantCulture, out float y) ||
+                !float.TryParse(locationZ, NumberStyles.Float, CultureInfo.InvariantCulture, out float z) ||
+                float.IsNaN(x) || float.IsNaN(y) || float.IsNaN(z) ||
+                Mathf.Abs(x) > 5000f || y < 1.15f || y > 5000f || Mathf.Abs(z) > 5000f)
+            {
+                status = "Enter a valid world venue position (X/Z within 5000 metres; Y at least 1.15).";
+                return;
+            }
+            StartCoroutine(CreateEventRoutine(start, end, x, y, z));
         }
 
         public void SetAttendance(string eventId, string attendanceStatus)
@@ -129,7 +191,7 @@ namespace UCENO.VirtualWorld
             busy = false;
         }
 
-        private IEnumerator CreateEventRoutine(DateTime start, DateTime end)
+        private IEnumerator CreateEventRoutine(DateTime start, DateTime end, float x, float y, float z)
         {
             busy = true;
             WorldEventCreateRequest payload = new WorldEventCreateRequest
@@ -139,7 +201,10 @@ namespace UCENO.VirtualWorld
                 description = newEventDescription.Trim(),
                 startsAt = start.ToString("o", CultureInfo.InvariantCulture),
                 endsAt = end.ToString("o", CultureInfo.InvariantCulture),
-                capacity = 100
+                capacity = 100,
+                activityType = newActivityType,
+                locationLabel = newLocationLabel,
+                location = new WorldEventLocation { x = x, y = y, z = z, yaw = 0f }
             };
             using (UnityWebRequest request = CreateRequest(
                 session.ApiBaseUrl.TrimEnd('/') + "/api/world-events", "POST", JsonUtility.ToJson(payload)))
@@ -240,6 +305,9 @@ namespace UCENO.VirtualWorld
                 return;
             }
             GUILayout.EndHorizontal();
+            if (!string.IsNullOrEmpty(activeEventId) && gateway != null &&
+                GUILayout.Button("EXIT EVENT VENUE", GUILayout.Height(34f * scale)))
+                gateway.RequestEventExit();
 
             scroll = GUILayout.BeginScrollView(scroll, GUILayout.Height(height * 0.78f));
             if (canHost)
@@ -252,15 +320,30 @@ namespace UCENO.VirtualWorld
                 startsAtUtc = GUILayout.TextField(startsAtUtc);
                 GUILayout.Label("End UTC (YYYY-MM-DDTHH:MM:SSZ)");
                 endsAtUtc = GUILayout.TextField(endsAtUtc);
-                if (GUILayout.Button("CREATE EVENT (100 CAPACITY)", GUILayout.Height(34f * scale)))
+                string[] activityTypes = { "social", "dance", "sports", "racing", "adventure", "concert", "education", "cinema", "workshop", "community" };
+                if (GUILayout.Button("ACTIVITY: " + newActivityType.ToUpperInvariant(), GUILayout.Height(30f * scale)))
+                {
+                    int current = Array.IndexOf(activityTypes, newActivityType);
+                    newActivityType = activityTypes[(current + 1) % activityTypes.Length];
+                }
+                GUILayout.Label("Venue name");
+                newLocationLabel = GUILayout.TextField(newLocationLabel);
+                GUILayout.Label("Venue world position (X / Y / Z)");
+                GUILayout.BeginHorizontal();
+                locationX = GUILayout.TextField(locationX);
+                locationY = GUILayout.TextField(locationY);
+                locationZ = GUILayout.TextField(locationZ);
+                GUILayout.EndHorizontal();
+                if (GUILayout.Button("CREATE SPATIAL EVENT (100 CAPACITY)", GUILayout.Height(34f * scale)))
                     CreateEvent();
                 GUILayout.EndVertical();
             }
             foreach (WorldEventSummary item in events)
             {
                 GUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label(item.title);
+                GUILayout.Label(item.title + "  [" + (item.activityType ?? "social").ToUpperInvariant() + "]");
                 GUILayout.Label(item.startsAt + " — " + item.endsAt);
+                GUILayout.Label("Venue: " + (string.IsNullOrWhiteSpace(item.locationLabel) ? "Main Plaza" : item.locationLabel));
                 if (!string.IsNullOrWhiteSpace(item.description)) GUILayout.Label(item.description);
                 string capacity = item.capacity > 0 ? item.goingCount + "/" + item.capacity + " going" :
                     item.goingCount + " going";
@@ -274,6 +357,17 @@ namespace UCENO.VirtualWorld
                 if (GUILayout.Button("CANCEL", GUILayout.Height(32f * scale)))
                     SetAttendance(item.id, "cancelled");
                 GUILayout.EndHorizontal();
+                if (item.myAttendance == "going" && gateway != null)
+                {
+                    if (GUILayout.Button(activeEventId == item.id ? "CURRENTLY AT VENUE" : "JOIN EVENT VENUE",
+                        GUILayout.Height(34f * scale)) && activeEventId != item.id)
+                    {
+                        if (gateway.RequestEventJoin(item.id))
+                            status = "Join request sent. The server checks your RSVP, event time, venue and world access.";
+                        else
+                            status = "The authoritative world gateway is not connected.";
+                    }
+                }
                 GUILayout.EndVertical();
             }
             GUILayout.EndScrollView();
