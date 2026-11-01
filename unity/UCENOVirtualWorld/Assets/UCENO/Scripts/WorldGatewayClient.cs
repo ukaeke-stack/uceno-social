@@ -57,6 +57,41 @@ namespace UCENO.VirtualWorld
         public string id;
     }
 
+    [Serializable] internal sealed class GatewayActivityRequest
+    {
+        public string type;
+        public string id;
+        public string kind;
+        public string raceId;
+        public int maxParticipants;
+    }
+
+    [Serializable] public sealed class GatewayActivityParticipantState
+    {
+        public string userId;
+        public string status;
+        public double joinedAt;
+        public int checkpointIndex;
+        public double finishTime;
+    }
+
+    [Serializable] public sealed class GatewayActivitySessionState
+    {
+        public string id;
+        public string hostUserId;
+        public string worldId;
+        public string instanceId;
+        public string kind;
+        public string phase;
+        public double createdAt;
+        public double startedAt;
+        public double completedAt;
+        public int version;
+        public int maxParticipants;
+        public int checkpointCount;
+        public GatewayActivityParticipantState[] participants;
+    }
+
     [Serializable] internal sealed class GatewayPacket
     {
         public string type;
@@ -74,6 +109,7 @@ namespace UCENO.VirtualWorld
         public string occupantId;
         public GatewayVectorState state;
         public GatewaySnapshotPlayer[] players;
+        public GatewayActivitySessionState session;
     }
 
     /// <summary>
@@ -122,6 +158,10 @@ namespace UCENO.VirtualWorld
         public event Action<string, string, Vector3, float> SpatialLocationEntered;
         public event Action SpatialLocationExited;
         public event Action<string> SpatialLocationRejected;
+        public event Action<GatewayActivitySessionState> ActivityStateChanged;
+        public event Action<string> ActivityRejected;
+        private readonly List<GatewayActivitySessionState> activitySessions = new List<GatewayActivitySessionState>();
+        public IReadOnlyList<GatewayActivitySessionState> ActivitySessions => activitySessions;
 
         public void Configure(WorldSessionClient worldSession, PlayerMotor player, GameObject avatarPrefab)
         {
@@ -180,6 +220,46 @@ namespace UCENO.VirtualWorld
             catch (Exception error)
             {
                 Debug.LogWarning("UCENO spatial context request failed: " + error.Message);
+            }
+        }
+
+        public bool RequestActivityCreate(string kind, string raceId = "", int maxParticipants = 16)
+        {
+            if (kind != "checkpoint_race" && kind != "dance" && kind != "sports" && kind != "adventure")
+                return false;
+            if (kind == "checkpoint_race" && string.IsNullOrWhiteSpace(raceId)) return false;
+            if (maxParticipants < 2 || maxParticipants > 64) return false;
+            return SendActivityRequest(new GatewayActivityRequest
+            {
+                type = "activity_create", kind = kind, raceId = raceId, maxParticipants = maxParticipants
+            });
+        }
+
+        public bool RequestActivityJoin(string activityId) =>
+            SendActivityRequest(new GatewayActivityRequest { type = "activity_join", id = activityId });
+
+        public bool RequestActivityStart(string activityId) =>
+            SendActivityRequest(new GatewayActivityRequest { type = "activity_start", id = activityId });
+
+        public bool RequestActivityLeave(string activityId) =>
+            SendActivityRequest(new GatewayActivityRequest { type = "activity_leave", id = activityId });
+
+        public bool RequestActivityCancel(string activityId) =>
+            SendActivityRequest(new GatewayActivityRequest { type = "activity_cancel", id = activityId });
+
+        private bool SendActivityRequest(GatewayActivityRequest request)
+        {
+            if (!connected || socket == null) return false;
+            _ = SendActivityRequestAsync(request);
+            return true;
+        }
+
+        private async Task SendActivityRequestAsync(GatewayActivityRequest request)
+        {
+            try { await socket.SendText(JsonUtility.ToJson(request)); }
+            catch (Exception error)
+            {
+                Debug.LogWarning("UCENO activity request failed: " + error.Message);
             }
         }
 
@@ -353,6 +433,22 @@ namespace UCENO.VirtualWorld
             {
                 Debug.LogWarning("UCENO spatial location request rejected: " + packet.code);
                 SpatialLocationRejected?.Invoke(packet.code ?? "request_rejected");
+                return;
+            }
+
+            if (packet.type == "activity_state" && packet.session != null)
+            {
+                int existingIndex = activitySessions.FindIndex(item => item.id == packet.session.id);
+                if (existingIndex >= 0) activitySessions[existingIndex] = packet.session;
+                else activitySessions.Insert(0, packet.session);
+                if (activitySessions.Count > 64) activitySessions.RemoveRange(64, activitySessions.Count - 64);
+                ActivityStateChanged?.Invoke(packet.session);
+                return;
+            }
+
+            if (packet.type == "activity_rejected")
+            {
+                ActivityRejected?.Invoke(packet.code ?? "activity_rejected");
                 return;
             }
 
