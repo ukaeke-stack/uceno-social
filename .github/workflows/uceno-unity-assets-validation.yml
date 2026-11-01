@@ -1,0 +1,37 @@
+name: UCENO Unity Asset Source Validation
+
+on:
+  push:
+    branches:
+      - feature/uceno-unity-foundation
+    paths:
+      - 'unity/UCENOVirtualWorld/**'
+      - 'scripts/validate_uceno_unity_assets.py'
+      - 'scripts/download_polyhaven_assets.py'
+      - '.github/workflows/uceno-unity-assets-validation.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uceno-unity-assets-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-source-assets:
+    name: Validate imported free assets and scene wiring
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate CC0 asset manifests, file sizes and Unity source wiring
+        run: python scripts/validate_uceno_unity_assets.py
+
+      - name: Check asset downloader syntax
+        run: python -m py_compile scripts/download_polyhaven_assets.py
