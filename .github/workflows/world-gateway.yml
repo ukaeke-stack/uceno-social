@@ -61,6 +61,8 @@ jobs:
             throw new Error('Server movement is not checked against configured collision boxes');
           for (const marker of ['loadInteractables', 'type === "interact"', 'distance > 4.25', 'object_state', 'target.kind === "seat"', 'seat_occupied', 'releaseSeats', 'item.occupantId === player.id'])
             if (!gateway.includes(marker)) throw new Error('Missing authoritative interaction validation: ' + marker);
+          for (const marker of ['for (const target of INTERACTABLES.values())', 'actorId: target.actorId', 'occupantId: target.occupantId'])
+            if (!gateway.includes(marker)) throw new Error('Missing initial interactable-state synchronization for joining clients: ' + marker);
           const objectScript = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldInteractable.cs', 'utf8');
           const interactor = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldObjectInteractor.cs', 'utf8');
           const client = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs', 'utf8');
