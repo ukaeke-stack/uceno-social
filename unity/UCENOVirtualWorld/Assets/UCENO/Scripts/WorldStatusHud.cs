@@ -14,6 +14,7 @@ namespace UCENO.VirtualWorld
         private GUIStyle panelStyle;
         private GUIStyle labelStyle;
         private GUIStyle sprintStyle;
+        private bool sprintToggle;
 
         private void Awake()
         {
@@ -56,11 +57,17 @@ namespace UCENO.VirtualWorld
 
             if (Application.isMobilePlatform && showSprintControl)
             {
-                bool held = GUI.RepeatButton(GetSprintControlRect(), "RUN", sprintStyle);
-                player.SetSprinting(held);
+                // Toggle sprint on tap instead of requiring a continuous press.
+                // This is more reliable on touch screens and allows the player
+                // to keep steering with the other thumb.
+                string sprintLabel = sprintToggle ? "RUN: ON" : "RUN";
+                if (GUI.Button(GetSprintControlRect(), sprintLabel, sprintStyle))
+                    sprintToggle = !sprintToggle;
+                player.SetSprinting(sprintToggle);
             }
             else
             {
+                sprintToggle = false;
                 player.SetSprinting(false);
             }
         }
@@ -84,6 +91,7 @@ namespace UCENO.VirtualWorld
 
         private void OnDisable()
         {
+            sprintToggle = false;
             if (player != null)
                 player.SetSprinting(false);
         }
