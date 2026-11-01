@@ -613,6 +613,8 @@ namespace UCENO.VirtualWorld.Editor
             eventsData.FindProperty("session").objectReferenceValue = worldSession;
             eventsData.ApplyModifiedPropertiesWithoutUndo();
 
+            player.AddComponent<WorldActivityHud>();
+
             WorldStatusHud hud = player.AddComponent<WorldStatusHud>();
             SerializedObject hudData = new SerializedObject(hud);
             hudData.FindProperty("player").objectReferenceValue = motor;
