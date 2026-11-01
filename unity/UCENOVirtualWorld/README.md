@@ -4,7 +4,7 @@ This is the first offline single-player city-world client. It is not yet a multi
 
 ## Pinned Unity version
 
-- Unity **6.3 LTS — 6000.3.27f1**
+- Unity **6.3 LTS — 6000.3.27f1**. If Build Automation does not list that exact patch, choose **6000.3 stable**, not **6000.3 beta**.
 - Project root: `unity/UCENOVirtualWorld`
 - Android target: ARM64 development APK
 - The initial prototype uses Unity's legacy `Input` API for keyboard, mouse and touch.
@@ -14,7 +14,7 @@ Unity 6.3 LTS is pinned for reproducible builds. Do not upgrade the editor versi
 ## Open locally
 
 1. Install Unity Hub on a computer or use a trusted remote Unity build workstation. A phone alone cannot run the full Unity Editor.
-2. Install Unity 6000.3.27f1 with Android Build Support, including Android SDK & NDK Tools and OpenJDK. Install Web Build Support when the Web client stage begins.
+2. Install Unity 6000.3.27f1 with Android Build Support, including Android SDK & NDK Tools and OpenJDK. If only version channels are listed, use 6000.3 stable, not beta. Install Web Build Support when the Web client stage begins.
 3. Open this folder as an existing Unity project.
 4. Set **Edit → Project Settings → Player → Other Settings → Configuration → Active Input Handling** to **Both** or **Input Manager (Old)**. Restart the Editor if requested.
 5. In the Unity menu, choose **UCENO Virtual World → Build Realistic City Scene**. This imports the bundled free models, creates reusable prefabs and builds the playable city scene.
@@ -35,14 +35,14 @@ This is the preferred route if you only have an Android phone and cannot run the
 3. Create an Android build configuration with:
    - Branch: `feature/uceno-unity-foundation`
    - Project subfolder: `unity/UCENOVirtualWorld`
-   - Unity version: `6000.3.27f1`
+   - Unity version: `6000.3.27f1` or `6000.3` stable if the exact patch is not listed; do not choose beta.
    - Target platform: Android
    - Output: APK (development/test build)
 4. In **Advanced Settings → Script Hooks → Pre-Export Method**, enter:
    `UCENO.VirtualWorld.Editor.BuildCommand.PrepareAndroidBuild`
    This method creates/registers the starter scene and applies the development package ID, IL2CPP and ARM64 settings before the hosted builder exports the player.
 5. Use an automatically generated debug keystore for development testing. Do not upload a production signing key for this prototype.
-6. Save the configuration and trigger one build. Download the artifact only after the dashboard reports success.
+6. Save the configuration, but do not trigger a build yet. The Unity Editor import/compile and visual checks must be completed first. An APK build will be requested only after those checks pass and the user authorizes it.
 
 ## Cloud build option B — GitHub Actions
 
