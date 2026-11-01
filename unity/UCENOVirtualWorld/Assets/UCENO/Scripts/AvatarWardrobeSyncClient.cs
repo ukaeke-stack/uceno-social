@@ -54,6 +54,9 @@ namespace UCENO.VirtualWorld
             if (!loaded && !loading && session != null && session.IsAuthenticated &&
                 !string.IsNullOrEmpty(session.WorldId) && Time.unscaledTime >= retryAt)
                 StartCoroutine(LoadRoutine());
+            if (loaded && !saving && pendingEquipment.Count > 0 &&
+                session != null && session.IsAuthenticated && Time.unscaledTime >= retryAt)
+                StartCoroutine(SavePendingRoutine());
         }
 
         public bool Equip(string itemId, out string error)
