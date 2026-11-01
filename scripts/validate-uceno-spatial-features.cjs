@@ -49,6 +49,15 @@ requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldEventsClient.c
   "USE MY CURRENT LOCATION", "RequestEventJoin(item.id)",
   "RequestEventExit()", "locationLabel", "activityType", "gateway.TriggerDance()", '"DANCE"'
 ]);
+requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarAppearanceProfile.cs", [
+  "public struct Palette", "public void Apply(Palette next)",
+  "MaterialPropertyBlock", "TryResolveColor", "sharedMaterials"
+]);
+requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs", [
+  "BuildDistrictFeatures(", "Civic Garden Square", "Pedestrian Crossing Stripe",
+  "East Parking Bay", "model.AddComponent<AvatarAppearanceProfile>()"
+]);
+
 requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs", [
   "TriggerDance()", 'nextGesture == "dance"', "activeGesture == 3"
 ]);
