@@ -15,15 +15,24 @@ namespace UCENO.VirtualWorld
         private GUIStyle labelStyle;
         private GUIStyle sprintStyle;
         private GUIStyle actionStyle;
+        private AvatarLocomotionDriver avatar;
         private bool sprintToggle;
 
         private void Awake()
         {
             if (player == null)
                 player = GetComponentInParent<PlayerMotor>();
+            avatar = GetComponentInChildren<AvatarLocomotionDriver>();
 
             if (Application.isMobilePlatform)
                 Application.targetFrameRate = 60;
+        }
+
+        private void Update()
+        {
+            if (avatar == null) return;
+            if (Input.GetKeyDown(KeyCode.H)) avatar.TriggerWave();
+            if (Input.GetKeyDown(KeyCode.G)) avatar.TriggerCheer();
         }
 
         private void OnGUI()
@@ -58,6 +67,16 @@ namespace UCENO.VirtualWorld
 
             if (Application.isMobilePlatform && showSprintControl)
             {
+                if (avatar != null)
+                {
+                    float actionWidth = 92f * scale;
+                    float actionHeight = 46f * scale;
+                    float actionY = Screen.height - 2f * actionHeight - 145f * scale;
+                    if (GUI.Button(new Rect(Screen.width - actionWidth - 18f, actionY, actionWidth, actionHeight), "WAVE", actionStyle))
+                        avatar.TriggerWave();
+                    if (GUI.Button(new Rect(Screen.width - actionWidth - 18f, actionY - actionHeight - 8f, actionWidth, actionHeight), "CHEER", actionStyle))
+                        avatar.TriggerCheer();
+                }
                 Rect jumpRect = GetJumpControlRect();
                 if (GUI.Button(jumpRect, "JUMP", actionStyle))
                     player.RequestJump();
