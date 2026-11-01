@@ -99,6 +99,7 @@ namespace UCENO.VirtualWorld
         private IEnumerator SetAttendanceRoutine(string eventId, string attendanceStatus)
         {
             busy = true;
+            bool refreshAfterRsvp = false;
             WorldEventAttendanceRequest payload = new WorldEventAttendanceRequest
             {
                 attendanceStatus = attendanceStatus
@@ -114,10 +115,11 @@ namespace UCENO.VirtualWorld
                     status = attendanceStatus == "going" ? "You are going." :
                         attendanceStatus == "interested" ? "Marked as interested." : "RSVP cancelled.";
                     // Reload server counts and this account's current attendance.
-                    StartCoroutine(LoadEventsRoutine());
+                    refreshAfterRsvp = true;
                 }
             }
             busy = false;
+            if (refreshAfterRsvp) StartCoroutine(LoadEventsRoutine());
         }
 
         private UnityWebRequest CreateRequest(string url, string method, string body)
