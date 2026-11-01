@@ -19,6 +19,9 @@ namespace UCENO.VirtualWorld
         {
             if (player == null)
                 player = GetComponentInParent<PlayerMotor>();
+
+            if (Application.isMobilePlatform)
+                Application.targetFrameRate = 60;
         }
 
         private void OnGUI()
