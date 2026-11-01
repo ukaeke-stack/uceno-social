@@ -35,7 +35,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
              OR (b.blocker_id = w.owner_user_id AND b.blocked_id = ${session.id}::uuid)) AS blocked,
         EXISTS (SELECT 1 FROM virtual_world_presence p
           WHERE p.world_id = w.id AND p.user_id = ${session.id}::uuid
-            AND p.last_seen > NOW() - INTERVAL '30 seconds') AS present
+            AND p.instance_id = ${session.instanceId}::uuid
+            AND p.last_seen > NOW() - INTERVAL '30 seconds') AS present,
+        EXISTS (SELECT 1 FROM virtual_world_instance_sessions s
+          JOIN virtual_world_instances i ON i.id = s.instance_id
+          WHERE s.world_id = w.id AND s.user_id = ${session.id}::uuid
+            AND s.instance_id = ${session.instanceId}::uuid
+            AND s.lease_expires_at > NOW()
+            AND i.status = 'ready' AND i.heartbeat_at > NOW() - INTERVAL '30 seconds'
+            AND i.endpoint IS NOT NULL) AS instanceHealthy
       FROM virtual_worlds w
       JOIN users u ON u.id = ${session.id}::uuid
       LEFT JOIN virtual_world_memberships m
@@ -46,14 +54,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const moderationAllowed = !!world && world.moderationStatus !== "disabled" &&
       !(world.moderationStatus === "suspended" &&
         (!world.suspendedUntil || new Date(world.suspendedUntil).getTime() > Date.now()));
-    if (!world || !moderationAllowed || world.status !== "published" || world.blocked || !world.present ||
+    if (!world || !moderationAllowed || world.status !== "published" || world.blocked || !world.present || !world.instanceHealthy ||
         world.membershipStatus === "banned" || world.membershipStatus === "suspended" ||
         (world.visibility === "private" && world.membershipStatus !== "active" && world.ownerUserId !== session.id)) {
       return NextResponse.json({ error: "World access expired; request a new entry code" }, { status: 403 });
     }
 
     const now = Math.floor(Date.now() / 1000);
-    const token = await new SignJWT({ world_id: worldId, client_type: session.clientType })
+    const token = await new SignJWT({ world_id: worldId, client_type: session.clientType, instance_id: session.instanceId })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("uceno-social")
       .setAudience("uceno-world-gateway")
