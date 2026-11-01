@@ -12,7 +12,7 @@ This checklist covers the first offline movement prototype only. Passing it does
 
 ## Desktop checks
 
-- [ ] Press Play and confirm ground, player capsule, directional light and third-person camera appear.
+- [ ] Confirm green terrain, central walkway, two buildings, trees, player body/head, directional light and third-person camera appear.\n- [ ] Confirm the ground and player render with solid colors (no pink/magenta shader-error surfaces).\n- [ ] Confirm the on-screen player coordinates and MOVING/STOPPED indicator are visible.
 - [ ] WASD and arrow keys move the player across the ground.
 - [ ] Mouse movement rotates the view horizontally and vertically without abrupt camera flips.
 - [ ] Releasing movement keys stops horizontal movement.
@@ -22,7 +22,7 @@ This checklist covers the first offline movement prototype only. Passing it does
 ## Android device checks
 
 - [ ] Build and install a Development Build on a physical Android device.
-- [ ] Drag on the left half of the screen; player moves relative to facing direction.
+- [ ] Drag on the left half of the screen; player moves relative to facing direction and the coordinate display changes.\n- [ ] Confirm the movement indicator changes from STOPPED to MOVING while dragging, then returns to STOPPED after release.
 - [ ] Drag on the right half horizontally and vertically; view rotates both ways.
 - [ ] Start one finger in each half and move both simultaneously; movement and camera look both respond.
 - [ ] Release the movement finger while continuing to move the look finger; only movement stops.
