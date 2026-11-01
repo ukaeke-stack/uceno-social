@@ -3,6 +3,10 @@ ALTER TABLE virtual_ad_campaigns
   ADD COLUMN IF NOT EXISTS budget_unit TEXT NOT NULL DEFAULT 'minor_currency_unit'
     CHECK (budget_unit IN ('minor_currency_unit','purchased_credit'));
 
+UPDATE virtual_ad_campaigns
+SET budget_unit = CASE WHEN payment_source = 'purchased_credits'
+  THEN 'purchased_credit' ELSE 'minor_currency_unit' END;
+
 ALTER TABLE virtual_ad_campaigns
   ADD CONSTRAINT virtual_ad_campaign_budget_unit_matches_source
   CHECK (
