@@ -24,6 +24,15 @@ namespace UCENO.VirtualWorld.Editor
             public int version = 1;
             public string coordinateSystem = "Unity world coordinates; player position is feet/root";
             public Box[] boxes;
+            public Interactable[] interactables;
+        }
+
+        [Serializable]
+        private sealed class Interactable
+        {
+            public string id;
+            public string kind;
+            public float x, y, z;
         }
 
         [Serializable]
@@ -58,6 +67,25 @@ namespace UCENO.VirtualWorld.Editor
                 }
             }
 
+            List<Interactable> interactables = new List<Interactable>();
+            HashSet<string> ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (GameObject root in scene.GetRootGameObjects())
+            {
+                foreach (WorldInteractable item in root.GetComponentsInChildren<WorldInteractable>(true))
+                {
+                    if (item == null || !item.gameObject.activeInHierarchy) continue;
+                    string id = item.ObjectId;
+                    if (string.IsNullOrWhiteSpace(id) || id.Length > 80 || !ids.Add(id))
+                        throw new InvalidOperationException("World interactable IDs must be unique, non-empty and at most 80 characters: " + id);
+                    Vector3 position = item.transform.position;
+                    interactables.Add(new Interactable
+                    {
+                        id = id, kind = item.Kind,
+                        x = Round(position.x), y = Round(position.y), z = Round(position.z)
+                    });
+                }
+            }
+
             if (boxes.Count == 0)
                 throw new InvalidOperationException("No active, non-trigger world colliders were found.");
             if (boxes.Count > 500)
@@ -69,7 +97,11 @@ namespace UCENO.VirtualWorld.Editor
             string outputPath = Path.Combine(repositoryRoot,
                 "runtime", "world-gateway", "data", "uceno-city-collision-boxes.json");
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
-            CollisionMap map = new CollisionMap { boxes = boxes.ToArray() };
+            CollisionMap map = new CollisionMap
+            {
+                boxes = boxes.ToArray(),
+                interactables = interactables.ToArray()
+            };
             File.WriteAllText(outputPath, JsonUtility.ToJson(map, true), new UTF8Encoding(false));
             AssetDatabase.Refresh();
             Debug.Log("Exported " + boxes.Count + " actual Unity world colliders to " + outputPath);
