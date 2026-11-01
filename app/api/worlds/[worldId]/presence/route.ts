@@ -170,6 +170,14 @@ export async function DELETE(_request: NextRequest, { params }: Context) {
       DELETE FROM virtual_world_presence
       WHERE world_id = ${worldId}::uuid AND user_id = ${session.id}::uuid
     `;
+    if (session.instanceId) {
+      await sql`
+        DELETE FROM virtual_world_instance_sessions
+        WHERE world_id = ${worldId}::uuid
+          AND user_id = ${session.id}::uuid
+          AND instance_id = ${session.instanceId}::uuid
+      `;
+    }
     return NextResponse.json({ removed: true }, {
       headers: { "Cache-Control": "no-store, private" }
     });
