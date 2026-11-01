@@ -61,6 +61,8 @@ export async function POST(request: NextRequest, { params }: Context) {
       SELECT h.id, h.owner_user_id AS "ownerUserId", h.world_id AS "worldId",
              h.visibility AS "homeVisibility",
              w.status AS "worldStatus", w.visibility AS "worldVisibility",
+             w.owner_user_id AS "worldOwnerId",
+             COALESCE(owner_m.status, 'none') AS "ownerMembership",
              EXISTS (SELECT 1 FROM user_blocks b
                WHERE (b.blocker_id = h.owner_user_id AND b.blocked_id = ${body.userId}::uuid)
                   OR (b.blocker_id = ${body.userId}::uuid AND b.blocked_id = h.owner_user_id)) AS blocked,
@@ -69,6 +71,8 @@ export async function POST(request: NextRequest, { params }: Context) {
       JOIN virtual_worlds w ON w.id = h.world_id
       LEFT JOIN virtual_world_memberships m
         ON m.world_id = h.world_id AND m.user_id = ${body.userId}::uuid
+      LEFT JOIN virtual_world_memberships owner_m
+        ON owner_m.world_id = h.world_id AND owner_m.user_id = h.owner_user_id
       WHERE h.id = ${homeId}::uuid LIMIT 1
     `;
     const home = rows[0];
@@ -76,6 +80,10 @@ export async function POST(request: NextRequest, { params }: Context) {
       return NextResponse.json({ error: "Home is unavailable" }, { status: 404 });
     if (home.ownerUserId !== session.id)
       return NextResponse.json({ error: "Only the home owner can manage invitations" }, { status: 403 });
+    if (home.ownerMembership === "banned" || home.ownerMembership === "suspended" ||
+        (home.worldVisibility === "private" && home.ownerMembership !== "active" &&
+          home.worldOwnerId !== session.id))
+      return NextResponse.json({ error: "The home owner no longer has access to this world" }, { status: 403 });
     if (home.homeVisibility !== "invite")
       return NextResponse.json({ error: "Change the home visibility to invite before sharing it" }, { status: 409 });
     if (home.blocked || home.targetMembership === "banned" || home.targetMembership === "suspended" ||
