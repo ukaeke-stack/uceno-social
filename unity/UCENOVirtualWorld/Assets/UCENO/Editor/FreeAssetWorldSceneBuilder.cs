@@ -250,6 +250,8 @@ namespace UCENO.VirtualWorld.Editor
             GameObject source = AssetDatabase.LoadAssetAtPath<GameObject>(AvatarPath);
             GameObject instance = UnityEngine.Object.Instantiate(source);
             instance.name = "UCENO Default Humanoid";
+            Bounds avatarBounds = CalculateLocalBounds(instance);
+            instance.transform.position = new Vector3(0f, -avatarBounds.min.y, 0f);
             Animator animator = instance.GetComponent<Animator>();
             if (animator == null)
                 animator = instance.AddComponent<Animator>();
