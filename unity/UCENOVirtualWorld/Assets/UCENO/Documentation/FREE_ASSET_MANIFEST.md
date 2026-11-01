@@ -36,7 +36,17 @@ https://polyhaven.com/, using the official public API:
 | Covered Car | Parked street vehicle |
 | Modular Chainlink Fence | Perimeter and service areas |
 
-All Poly Haven models are CC0 1.0 and may be used in commercial projects.
+The same import job also downloads these CC0 surface and sky assets at mobile-
+appropriate resolutions:
+
+| Asset | Planned use |
+| --- | --- |
+| Asphalt 01 | Road surface PBR maps |
+| Concrete Floor 01 | Pavements and walkways |
+| Sparse Grass | Natural ground surface |
+| Modern Buildings (HDRI) | City sky and ambient lighting |
+
+All Poly Haven models, textures and HDRIs are CC0 1.0 and may be used in commercial projects.
 Poly Haven's API terms ask products built using its live API to make the source
 clear to users. UCENO will include a Poly Haven credit in its in-app credits.
 The API is used only in the development-time import workflow; the shipped game
@@ -49,7 +59,9 @@ The downloader prefers FBX for Unity's native importer and falls back to glTF.
 ## Unity import layout
 
 - Assets/UCENO/Characters/Imported/ — imported character FBX files.
-- Assets/UCENO/Environment/Imported/ — source environment models and textures.
+- Assets/UCENO/Environment/Imported/Models/ — source environment models.
+- Assets/UCENO/Environment/Imported/Textures/ — road, pavement and grass PBR maps.
+- Assets/UCENO/Environment/Imported/HDRI/ — city sky environment.
 - Assets/UCENO/Prefabs/Characters/ — Unity prefabs and controllers created from
   imported rigged characters.
 - Assets/UCENO/Prefabs/Environment/ — reusable environment prefabs.
