@@ -24,6 +24,18 @@ namespace UCENO.VirtualWorld.Editor
                 importer.animationType = ModelImporterAnimationType.Human;
                 importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
                 importer.importAnimation = true;
+                ModelImporterClipAnimation[] clips = importer.defaultClipAnimations;
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    string clipName = clips[i].name.ToLowerInvariant();
+                    if (clipName.Contains("idle") || clipName.Contains("walk") ||
+                        clipName.Contains("run") || clipName.Contains("strafe"))
+                    {
+                        clips[i].loopTime = true;
+                        clips[i].loopPose = true;
+                    }
+                }
+                importer.clipAnimations = clips;
                 importer.importBlendShapes = true;
                 importer.optimizeMesh = true;
                 importer.meshCompression = ModelImporterMeshCompression.Medium;
