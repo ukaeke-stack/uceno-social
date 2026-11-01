@@ -427,26 +427,19 @@ namespace UCENO.VirtualWorld.Editor
             Place(apartment, parent, new Vector3(-13.4f, 0f, 0f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.70f);
             Place(factory, parent, new Vector3(13.4f, 0f, 0f), Quaternion.Euler(0f, -90f, 0f), Vector3.one * 0.58f);
 
-            foreach (float z in new[] { -34f, -10f, 14f, 36f })
+            foreach (float z in new[] { -24f, 24f })
             {
                 Place(lamp, parent, new Vector3(-6.9f, 0f, z), Quaternion.identity, Vector3.one);
                 Place(lamp, parent, new Vector3(6.9f, 0f, z), Quaternion.identity, Vector3.one);
             }
 
-            Place(pachira, parent, new Vector3(-8.5f, 0f, -24f), Quaternion.Euler(0f, 25f, 0f), Vector3.one * 0.42f);
-            Place(pachira, parent, new Vector3(8.5f, 0f, 26f), Quaternion.Euler(0f, 195f, 0f), Vector3.one * 0.42f);
-            Place(shrub02, parent, new Vector3(-8.5f, 0f, 2f), Quaternion.Euler(0f, 60f, 0f), Vector3.one * 0.36f);
+            Place(pachira, parent, new Vector3(-8.5f, 0f, 25f), Quaternion.Euler(0f, 25f, 0f), Vector3.one * 0.42f);
             Place(shrub02, parent, new Vector3(8.5f, 0f, -12f), Quaternion.Euler(0f, 130f, 0f), Vector3.one * 0.36f);
-            Place(shrub03, parent, new Vector3(-8.5f, 0f, 18f), Quaternion.identity, Vector3.one);
-            Place(shrub03, parent, new Vector3(8.5f, 0f, 5f), Quaternion.Euler(0f, 110f, 0f), Vector3.one);
+            Place(shrub03, parent, new Vector3(-8.5f, 0f, -5f), Quaternion.identity, Vector3.one);
+            Place(shrub03, parent, new Vector3(8.5f, 0f, 18f), Quaternion.Euler(0f, 110f, 0f), Vector3.one);
 
             Place(car, parent, new Vector3(9.2f, 0f, -28f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.9f);
-
-            for (int i = 0; i < 7; i++)
-            {
-                float z = -27f + i * 9f;
-                Place(fence, parent, new Vector3(20.5f, 0f, z), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.75f);
-            }
+            Place(fence, parent, new Vector3(20.5f, 0f, 0f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.75f);
         }
 
         private static GameObject Place(
@@ -491,7 +484,7 @@ namespace UCENO.VirtualWorld.Editor
             QualitySettings.antiAliasing = 2;
             QualitySettings.pixelLightCount = 1;
             QualitySettings.vSyncCount = 0;
-            QualitySettings.lodBias = 1.4f;
+            QualitySettings.lodBias = 0.9f;
             QualitySettings.streamingMipmapsActive = true;
         }
 
