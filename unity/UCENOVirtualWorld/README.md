@@ -62,10 +62,29 @@ Until the variable is set to `true`, pushes to this feature branch skip the Unit
 
 Never paste license files, account passwords, keystores or other secrets into source files, issues, pull requests or ChatGPT messages.
 
+## Free asset import pipeline
+
+The free-asset pipeline is separate from the Android build and does not create an
+APK. It generates a rigged Unity Humanoid character using Ara 3D Gen and downloads
+selected CC0 city, street and nature models from Poly Haven. The downloaded files
+are placed under:
+
+- `Assets/UCENO/Characters/Imported/`
+- `Assets/UCENO/Environment/Imported/`
+
+The exact sources, licences and replacement rules are recorded in
+`Assets/UCENO/Documentation/FREE_ASSET_MANIFEST.md`. The Poly Haven source is
+credited in the application; the shipped client does not call the Poly Haven API.
+
+Imported models are not yet a finished scene. They must be assembled into
+reusable prefabs with appropriate materials, collision, lighting, LODs and
+animation wiring before the world can be considered visually complete. The
+asset-import workflow does not run a Unity build and does not generate an APK.
+
 ## Current scope and limitations
 
 - Offline single-player movement prototype only.
-- Runtime-generated placeholder environment and player.
+- The current scene still uses the original placeholder environment and avatar until the imported free models are assembled into the new scene.
 - No login, world-entry token exchange, networking, multiplayer, moderation checks, avatar customization, persistent world state, inventory, credits, purchases or advertising.
 - No Android APK or Web build has been generated yet.
 - Source review is not proof of Unity compilation. The cloud build and physical-device checklist must pass before treating the prototype as working.
