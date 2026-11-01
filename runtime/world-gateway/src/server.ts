@@ -90,7 +90,7 @@ async function authenticate(token: string) {
 
 async function loadPlayer(userId: string, worldId: string, token: string, socket: WebSocket): Promise<Player> {
   const rows = await sql`
-    SELECT position FROM virtual_world_player_state
+    SELECT position, rotation FROM virtual_world_player_state
     WHERE world_id = ${worldId}::uuid AND user_id = ${userId}::uuid
     LIMIT 1
   `;
@@ -98,8 +98,11 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
   const x = finiteNumber(p.x, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.x : 0;
   const y = finiteNumber(p.y, GROUND_Y, WORLD_BOUNDS) ? p.y : GROUND_Y;
   const z = finiteNumber(p.z, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.z : 0;
+  const rotation = rows[0]?.rotation || { y: 0, w: 1 };
+  const yaw = finiteNumber(rotation.y, -1.01, 1.01) && finiteNumber(rotation.w, -1.01, 1.01)
+    ? 2 * Math.atan2(rotation.y, rotation.w) : 0;
   return {
-    id: userId, worldId, token, socket, x, y, z, vx: 0, vy: 0, vz: 0, yaw: 0, grounded: y <= GROUND_Y + 0.01,
+    id: userId, worldId, token, socket, x, y, z, vx: 0, vy: 0, vz: 0, yaw, grounded: y <= GROUND_Y + 0.01,
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false
