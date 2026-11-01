@@ -158,3 +158,52 @@ CREATE TABLE IF NOT EXISTS virtual_ad_campaigns (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CHECK (ends_at IS NULL OR starts_at IS NULL OR ends_at > starts_at)
 );
+
+-- Enforce event capacity in the database so concurrent RSVP requests cannot overbook.
+CREATE OR REPLACE FUNCTION enforce_virtual_event_capacity()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  event_capacity INTEGER;
+  event_status TEXT;
+  going_count INTEGER;
+BEGIN
+  IF NEW.attendance_status <> 'going' THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT capacity, status
+    INTO event_capacity, event_status
+    FROM virtual_world_events
+    WHERE id = NEW.event_id
+    FOR UPDATE;
+
+  IF NOT FOUND OR event_status <> 'scheduled' THEN
+    RAISE EXCEPTION 'event_not_open' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF event_capacity IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT COUNT(*)::INTEGER INTO going_count
+    FROM virtual_world_event_attendees
+    WHERE event_id = NEW.event_id
+      AND attendance_status = 'going'
+      AND user_id <> NEW.user_id;
+
+  IF going_count >= event_capacity THEN
+    RAISE EXCEPTION 'event_full' USING ERRCODE = 'P0001';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS virtual_event_capacity_guard ON virtual_world_event_attendees;
+CREATE TRIGGER virtual_event_capacity_guard
+BEFORE INSERT OR UPDATE OF attendance_status
+ON virtual_world_event_attendees
+FOR EACH ROW
+EXECUTE FUNCTION enforce_virtual_event_capacity();
