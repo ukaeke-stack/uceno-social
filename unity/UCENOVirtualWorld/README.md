@@ -123,6 +123,16 @@ Seat occupancy is released when the occupying player's socket disconnects.
 The current seating pose uses the existing generic seated animation state; it
 does not yet align the avatar to a chair-specific sit point or provide IK.
 
+In the Unity Editor, select the actual imported prop and use
+**GameObject → UCENO → Mark Selected as Door / Seat / Usable Object**.
+These commands add a marker and unique ID; they do not create fake geometry or
+mark every object automatically. For a door, select a correctly positioned
+hinge/pivot transform (not the whole building root). For a chair, mark the
+chair root or a dedicated seat-point transform. Then run
+**UCENO → World → Export Current Scene Collision Map** or rebuild the starter
+scene. The exported map must be copied/deployed to the gateway host and loaded
+through `WORLD_COLLISION_BOXES_FILE`.
+
 No door mesh, chair or furniture item is marked as interactable in the generated
 city yet. This is a reusable interaction system, not a claim that the current
 scene props are already usable. Object state and seat occupancy currently live
