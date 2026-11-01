@@ -114,6 +114,7 @@ const server = createServer((req, res) => {
   res.writeHead(404); res.end();
 });
 const wss = new WebSocketServer({ noServer: true, maxPayload: 4096, perMessageDeflate: false });
+const upgradeIdentity = new WeakMap<WebSocket, { userId: string; worldId: string }>();
 
 server.on("upgrade", async (req, socket, head) => {
   try {
@@ -122,7 +123,8 @@ server.on("upgrade", async (req, socket, head) => {
     const identity = await authenticate(req.headers.authorization.slice(7));
     if (players.size >= MAX_CLIENTS && !players.has(identity.userId)) throw new Error("instance_full");
     wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit("connection", ws, identity);
+      upgradeIdentity.set(ws, identity);
+      wss.emit("connection", ws, req);
     });
   } catch {
     socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
@@ -130,7 +132,9 @@ server.on("upgrade", async (req, socket, head) => {
   }
 });
 
-wss.on("connection", async (socket: WebSocket, identity: { userId: string; worldId: string }) => {
+wss.on("connection", async (socket: WebSocket) => {
+  const identity = upgradeIdentity.get(socket);
+  if (!identity) { fail(socket, "missing_identity"); return; }
   try {
     const old = players.get(identity.userId);
     if (old) { old.socket.close(4001, "replaced_by_reconnect"); players.delete(identity.userId); }
