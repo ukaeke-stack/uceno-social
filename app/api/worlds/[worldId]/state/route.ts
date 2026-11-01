@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { readSession } from "@/lib/session";
+import { readWorldClientSession } from "@/lib/world-client-session";
 
 export const runtime = "nodejs";
 
@@ -48,9 +48,9 @@ async function canAccessWorld(worldId: string, userId: string) {
 
 // GET /api/worlds/:worldId/state — load the last durable checkpoint, not live movement.
 export async function GET(_request: NextRequest, { params }: Context) {
-  const session = await readSession();
-  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const { worldId } = await params;
+  const session = await readWorldClientSession(_request, worldId);
+  if (!session) return NextResponse.json({ error: "Sign in or reconnect to this world" }, { status: 401 });
   if (!/^[0-9a-f-]{36}$/i.test(worldId))
     return NextResponse.json({ error: "Invalid world ID" }, { status: 400 });
 
@@ -74,9 +74,9 @@ export async function GET(_request: NextRequest, { params }: Context) {
 
 // PUT /api/worlds/:worldId/state — save a bounded checkpoint on explicit safe points.
 export async function PUT(request: NextRequest, { params }: Context) {
-  const session = await readSession();
-  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const { worldId } = await params;
+  const session = await readWorldClientSession(request, worldId);
+  if (!session) return NextResponse.json({ error: "Sign in or reconnect to this world" }, { status: 401 });
   if (!/^[0-9a-f-]{36}$/i.test(worldId))
     return NextResponse.json({ error: "Invalid world ID" }, { status: 400 });
 
