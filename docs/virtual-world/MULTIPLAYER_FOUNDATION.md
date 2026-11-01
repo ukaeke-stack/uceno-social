@@ -87,8 +87,10 @@ player and references the imported humanoid prefab for remote players. The
 client uses the configured UCENO Social API origin, reads the world scope from
 the short-lived signed entry token, posts position/rotation at approximately
 one-second intervals, polls fresh peers, and interpolates remote humanoid
-transforms. Peers that disappear from fresh presence results are removed after
-a timeout. The Unity status HUD includes a field for pasting a one-time entry
+transforms. Peers beyond the 110 m visibility radius are discarded, and the
+client caps rendered remote avatars at 12 to limit mobile rendering and memory
+cost. Peers that disappear from fresh presence results are removed after a
+timeout. The Unity status HUD includes a field for pasting a one-time entry
 code issued by the signed-in UCENO Social web session. Once connected, it also
 shows the multiplayer connection state and the number of currently tracked
 nearby peers.
@@ -100,8 +102,8 @@ This is an initial polling implementation only:
   follow position and rotation only.
 - The Unity client now renews its bearer token approximately 45 seconds
   before expiry and replaces the in-memory token after a successful refresh.
-  Renewal still depends on a recent presence record and valid membership; if
-  renewal fails, the client clears the session and requires a fresh entry code.
+  Temporary network/server failures are retried after a short delay; rejected
+  credentials clear the session and require a fresh entry code.
 - Presence cleanup is best-effort; stale records expire from peer queries after
   the server-side freshness window.
 - No Unity Editor compile, Android build, database migration execution or
