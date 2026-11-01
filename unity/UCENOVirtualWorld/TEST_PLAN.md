@@ -65,6 +65,8 @@ store readiness or release performance.
 - [ ] With two clients, first player sits and receives the seated pose only after server confirmation; second player sees the chair occupied and cannot claim it.
 - [ ] First player stands; verify the seat becomes available and another player can sit.
 - [ ] Disconnect a seated player; verify the gateway releases the seat and broadcasts availability.
+- [ ] Send a movement input with a forged `seated=true` flag while not owning a seat; verify the gateway does not freeze the player as seated.
+- [ ] Drop the seated player's WebSocket and reconnect; verify the client clears the old seated pose and can move normally.
 - [ ] Verify chair-specific avatar alignment/IK is not assumed: the current implementation only synchronizes the generic seated animation state.
 
 ## Android device checks
