@@ -168,6 +168,7 @@ wss.on("connection", async (socket: WebSocket) => {
         player.gestureSequence = msg.gestureSequence;
         player.gesture = msg.gesture;
       }
+      if (player.seated) player.jumpQueued = false;
       if (msg.jump && player.grounded && !player.seated) player.jumpQueued = true;
     });
     socket.on("close", () => {
@@ -204,7 +205,7 @@ setInterval(async () => {
   const now = Date.now();
   const dt = Math.min(0.05, Math.max(0.001, (now - lastTick) / 1000));
   lastTick = now;
-  const snapshots: Array<{ userId: string; x: number; y: number; z: number; yaw: number; grounded: boolean }> = [];
+  const snapshots: Array<{ userId: string; x: number; y: number; z: number; yaw: number; grounded: boolean; seated: boolean; sprint: boolean; gesture: string; gestureSequence: number }> = [];
   for (const p of players.values()) {
     if (p.socket.readyState !== WebSocket.OPEN) continue;
     if (now - p.lastInputAt > 1500) { p.moveX = 0; p.moveZ = 0; p.sprint = false; }
