@@ -47,6 +47,11 @@ namespace UCENO.VirtualWorld
         private Quaternion rightLowerArmBase;
         private Vector3 hipsPositionBase;
         private float cycle;
+        private float gestureUntil;
+        private int activeGesture;
+
+        public void TriggerWave() { activeGesture = 1; gestureUntil = Time.time + 1.8f; }
+        public void TriggerCheer() { activeGesture = 2; gestureUntil = Time.time + 1.6f; }
 
         private bool UsesImportedController =>
             animator != null && animator.runtimeAnimatorController != null;
@@ -144,6 +149,24 @@ namespace UCENO.VirtualWorld
                     Quaternion.Euler(armSwing, 0f, relaxedArmDrop);
             SetRotation(leftLowerArm, leftLowerArmBase, new Vector3(-8f + Mathf.Abs(armSwing) * 0.12f, 0f, 0f));
             SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(-8f + Mathf.Abs(armSwing) * 0.12f, 0f, 0f));
+
+            if (Time.time < gestureUntil)
+            {
+                float pulse = Mathf.Sin(Mathf.Clamp01((gestureUntil - Time.time) / 1.8f) * Mathf.PI);
+                if (activeGesture == 1 && rightUpperArm != null)
+                {
+                    float wave = Mathf.Sin(Time.time * 13f) * 22f;
+                    rightUpperArm.localRotation = rightUpperArmBase * Quaternion.Euler(-75f, wave, 15f);
+                    SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(-95f + wave * 0.25f, 0f, 0f));
+                }
+                else if (activeGesture == 2)
+                {
+                    if (leftUpperArm != null) leftUpperArm.localRotation = leftUpperArmBase * Quaternion.Euler(-105f, 0f, -18f);
+                    if (rightUpperArm != null) rightUpperArm.localRotation = rightUpperArmBase * Quaternion.Euler(-105f, 0f, 18f);
+                    SetRotation(chest, chestBase, new Vector3(-5f * pulse, 0f, 0f));
+                }
+            }
+            else activeGesture = 0;
 
             if (hips != null)
                 hips.localPosition = hipsPositionBase;
