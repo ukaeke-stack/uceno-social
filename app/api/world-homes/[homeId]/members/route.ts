@@ -6,6 +6,40 @@ export const runtime = "nodejs";
 type Context = { params: Promise<{ homeId: string }> };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+
+// GET /api/world-homes/:homeId/members — owner-only roster for invitation management.
+export async function GET(_request: NextRequest, { params }: Context) {
+  const session = await readSession();
+  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  const { homeId } = await params;
+  if (!UUID.test(homeId)) return NextResponse.json({ error: "Invalid home ID" }, { status: 400 });
+
+  try {
+    const sql = getDb();
+    const home = await sql`
+      SELECT owner_user_id AS "ownerUserId", visibility
+      FROM virtual_homes WHERE id = ${homeId}::uuid LIMIT 1
+    `;
+    if (!home[0]) return NextResponse.json({ error: "Home not found" }, { status: 404 });
+    if (home[0].ownerUserId !== session.id)
+      return NextResponse.json({ error: "Only the home owner can view the invitation roster" }, { status: 403 });
+
+    const members = await sql`
+      SELECT user_id AS "userId", permission, created_at AS "createdAt"
+      FROM virtual_home_members
+      WHERE home_id = ${homeId}::uuid
+      ORDER BY created_at ASC
+      LIMIT 200
+    `;
+    return NextResponse.json({ members }, {
+      headers: { "Cache-Control": "no-store, private" }
+    });
+  } catch (error) {
+    console.error("Home member list failed", error);
+    return NextResponse.json({ error: "Home members are unavailable" }, { status: 503 });
+  }
+}
+
 export async function POST(request: NextRequest, { params }: Context) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
