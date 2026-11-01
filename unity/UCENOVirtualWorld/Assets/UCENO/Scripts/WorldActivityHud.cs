@@ -123,8 +123,11 @@ namespace UCENO.VirtualWorld
                             participantCount + "/" + activity.maxParticipants);
                         GUILayout.Label("Session: " + activity.id);
                         if (activity.kind == "checkpoint_race")
+                        {
+                            GUILayout.Label("Race: " + activity.raceId);
                             GUILayout.Label("Checkpoints: " + (mine != null ? mine.checkpointIndex : 0) +
                                 "/" + activity.checkpointCount);
+                        }
 
                         GUILayout.BeginHorizontal();
                         if (activity.phase == "lobby" && mine == null &&
