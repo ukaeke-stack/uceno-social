@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
 import { WebSocketServer, WebSocket } from "ws";
@@ -26,14 +27,27 @@ type CollisionBox = {
 };
 
 function loadCollisionBoxes(): CollisionBox[] {
-  const raw = process.env.WORLD_COLLISION_BOXES;
+  const filePath = process.env.WORLD_COLLISION_BOXES_FILE;
+  let raw = process.env.WORLD_COLLISION_BOXES;
+  if (!raw && filePath) {
+    try { raw = readFileSync(filePath, "utf8"); }
+    catch (error) {
+      throw new Error("Could not read WORLD_COLLISION_BOXES_FILE: " +
+        (error instanceof Error ? error.message : "unknown file error"));
+    }
+  }
   if (!raw) return [];
   let parsed: unknown;
   try { parsed = JSON.parse(raw); }
-  catch { throw new Error("WORLD_COLLISION_BOXES must be valid JSON"); }
-  if (!Array.isArray(parsed) || parsed.length > 500)
-    throw new Error("WORLD_COLLISION_BOXES must be an array with at most 500 boxes");
-  return parsed.map((value, index) => {
+  catch { throw new Error("Collision geometry must be valid JSON"); }
+  const values = Array.isArray(parsed)
+    ? parsed
+    : parsed && typeof parsed === "object" && Array.isArray((parsed as { boxes?: unknown }).boxes)
+      ? (parsed as { boxes: unknown[] }).boxes
+      : null;
+  if (!values || values.length > 500)
+    throw new Error("Collision geometry must contain a boxes array with at most 500 entries");
+  return values.map((value, index) => {
     if (!value || typeof value !== "object") throw new Error(`Collision box ${index} is invalid`);
     const box = value as Record<string, unknown>;
     const keys = ["minX", "maxX", "minY", "maxY", "minZ", "maxZ"] as const;
@@ -44,8 +58,8 @@ function loadCollisionBoxes(): CollisionBox[] {
     const b = box as unknown as CollisionBox;
     if (b.minX >= b.maxX || b.minY >= b.maxY || b.minZ >= b.maxZ ||
         Math.abs(b.minX) > WORLD_BOUNDS || Math.abs(b.maxX) > WORLD_BOUNDS ||
-        Math.abs(b.minZ) > WORLD_BOUNDS || Math.abs(b.maxZ) > WORLD_BOUNDS ||
-        b.minY < 0 || b.maxY > WORLD_BOUNDS)
+        Math.abs(b.minY) > WORLD_BOUNDS || Math.abs(b.maxY) > WORLD_BOUNDS ||
+        Math.abs(b.minZ) > WORLD_BOUNDS || Math.abs(b.maxZ) > WORLD_BOUNDS)
       throw new Error(`Collision box ${index} has invalid bounds`);
     return b;
   });
