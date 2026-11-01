@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   if (!isRecord(transform) || !Array.isArray(furnishing) ||
       !boundedJson(transform, 4000) || !boundedJson(furnishing, 12000) ||
       furnishing.length > 100 || (body.visibility !== undefined &&
-      body.visibility !== "private" && body.visibility !== "invite" && body.visibility !== "friends")) {
+      body.visibility !== "private" && body.visibility !== "invite")) {
     return NextResponse.json({ error: "Invalid home layout, furnishing or visibility settings" }, { status: 400 });
   }
 
