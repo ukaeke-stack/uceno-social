@@ -142,6 +142,7 @@ namespace UCENO.VirtualWorld
                 json.Append("}}");
                 byte[] body = Encoding.UTF8.GetBytes(json.ToString());
                 bool saved = false;
+                long responseCode = 0;
                 using (UnityWebRequest request = new UnityWebRequest(BuildUrl(), "PUT"))
                 {
                     request.uploadHandler = new UploadHandlerRaw(body);
@@ -151,20 +152,28 @@ namespace UCENO.VirtualWorld
                     request.timeout = 15;
                     yield return request.SendWebRequest();
                     saved = request.result == UnityWebRequest.Result.Success;
-                    if (!saved)
-                        Debug.LogWarning("UCENO wardrobe save failed: " + request.responseCode);
+                    responseCode = request.responseCode;
+                    if (!saved) Debug.LogWarning("UCENO wardrobe save failed: " + responseCode);
                 }
                 if (saved)
                 {
                     WorldGatewayClient gateway = FindObjectOfType<WorldGatewayClient>();
                     if (gateway != null) gateway.RequestWardrobeRefresh();
                 }
-                else
+                else if (responseCode == 0 || responseCode >= 500)
                 {
                     foreach (KeyValuePair<string, string> item in batch)
                         if (!pendingEquipment.ContainsKey(item.Key))
                             pendingEquipment[item.Key] = item.Value;
                     retryAt = Time.unscaledTime + 10f;
+                    break;
+                }
+                else
+                {
+                    // A permanent validation/auth failure must not retry forever.
+                    // Reload the server selection to roll back the local preview.
+                    loaded = false;
+                    retryAt = Time.unscaledTime + 1f;
                     break;
                 }
             }
