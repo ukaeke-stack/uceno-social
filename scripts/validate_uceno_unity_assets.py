@@ -164,6 +164,12 @@ def main():
 
     if "RequestJump" not in motor or "KeyCode.Space" not in motor or "jumpHeight" not in motor:
         fail("Player jump action is missing keyboard/mobile input or grounded jump physics.")
+    if "ToggleSeated" not in motor or "IsSeated" not in motor or "KeyCode.C" not in motor:
+        fail("Player seated/rest state or desktop toggle is missing.")
+    if "motor.IsSeated" not in avatar or "92f" not in avatar:
+        fail("Humanoid seated/rest pose is missing.")
+    if '"SIT"' not in hud or '"STAND"' not in hud or "GetSeatControlRect" not in hud:
+        fail("Mobile sit/stand control is missing.")
 
     manifests, listed_files = check_manifests()
     total_required = sum(path.stat().st_size for path in REQUIRED_FILES + REQUIRED_TEXTURES)
