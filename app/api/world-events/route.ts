@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Event must start at least one minute ahead and last no more than 24 hours" }, { status: 400 });
   }
   const capacity = body.capacity === undefined || body.capacity === null ? null : body.capacity;
-  if (capacity !== null && (!Number.isInteger(capacity) || (capacity as number) < 1 || (capacity as number) > 5000))
+  if (capacity !== null && (typeof capacity !== "number" || !Number.isInteger(capacity) || capacity < 1 || capacity > 5000))
     return NextResponse.json({ error: "Capacity must be between 1 and 5000" }, { status: 400 });
 
   try {
