@@ -29,7 +29,7 @@ namespace UCENO.VirtualWorld
     /// </summary>
     public sealed class WorldSessionClient : MonoBehaviour
     {
-        [SerializeField] private string apiBaseUrl = "";
+        [SerializeField] private string apiBaseUrl = "https://uceno-social.onrender.com";
         [SerializeField] private bool androidClient = true;
 
         public string AccessToken { get; private set; }
