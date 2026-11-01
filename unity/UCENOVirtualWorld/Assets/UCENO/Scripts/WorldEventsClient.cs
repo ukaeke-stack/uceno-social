@@ -56,6 +56,7 @@ namespace UCENO.VirtualWorld
     {
         [SerializeField] private WorldSessionClient session;
         [SerializeField] private WorldGatewayClient gateway;
+        [SerializeField] private PlayerMotor player;
         private readonly List<WorldEventSummary> events = new List<WorldEventSummary>();
         private bool visible;
         private bool busy;
@@ -69,6 +70,7 @@ namespace UCENO.VirtualWorld
         private string locationX = "0";
         private string locationY = "1.15";
         private string locationZ = "0";
+        private float locationYaw;
         private string activeEventId = "";
         private string status = "Press N to view world events.";
         private Vector2 scroll;
@@ -77,6 +79,7 @@ namespace UCENO.VirtualWorld
         {
             if (session == null) session = FindObjectOfType<WorldSessionClient>();
             if (gateway == null) gateway = FindObjectOfType<WorldGatewayClient>();
+            if (player == null) player = FindObjectOfType<PlayerMotor>();
             if (gateway != null)
             {
                 gateway.SpatialLocationEntered += HandleSpatialLocationEntered;
@@ -125,6 +128,17 @@ namespace UCENO.VirtualWorld
         {
             if (!CanRequest()) return;
             StartCoroutine(LoadEventsRoutine());
+        }
+
+        private void UseCurrentLocation()
+        {
+            if (player == null) return;
+            Vector3 position = player.transform.position;
+            locationX = position.x.ToString("0.###", CultureInfo.InvariantCulture);
+            locationY = Mathf.Max(1.15f, position.y).ToString("0.###", CultureInfo.InvariantCulture);
+            locationZ = position.z.ToString("0.###", CultureInfo.InvariantCulture);
+            locationYaw = player.transform.eulerAngles.y;
+            newLocationLabel = "Event at my current location";
         }
 
         public void CreateEvent()
@@ -204,7 +218,7 @@ namespace UCENO.VirtualWorld
                 capacity = 100,
                 activityType = newActivityType,
                 locationLabel = newLocationLabel,
-                location = new WorldEventLocation { x = x, y = y, z = z, yaw = 0f }
+                location = new WorldEventLocation { x = x, y = y, z = z, yaw = locationYaw }
             };
             using (UnityWebRequest request = CreateRequest(
                 session.ApiBaseUrl.TrimEnd('/') + "/api/world-events", "POST", JsonUtility.ToJson(payload)))
@@ -329,6 +343,8 @@ namespace UCENO.VirtualWorld
                 GUILayout.Label("Venue name");
                 newLocationLabel = GUILayout.TextField(newLocationLabel);
                 GUILayout.Label("Venue world position (X / Y / Z)");
+                if (GUILayout.Button("USE MY CURRENT LOCATION", GUILayout.Height(30f * scale)))
+                    UseCurrentLocation();
                 GUILayout.BeginHorizontal();
                 locationX = GUILayout.TextField(locationX);
                 locationY = GUILayout.TextField(locationY);
