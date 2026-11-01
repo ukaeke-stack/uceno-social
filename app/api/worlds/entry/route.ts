@@ -85,13 +85,30 @@ export async function PUT(request: NextRequest) {
 
   try {
     const sql = getDb();
+    // Re-check world visibility, membership, moderation and owner blocks at
+    // redemption time. A code issued earlier must not bypass a later ban,
+    // suspension, world shutdown or block.
     const redeemed = await sql`
-      UPDATE virtual_world_entry_codes
+      UPDATE virtual_world_entry_codes AS ec
       SET consumed_at = NOW()
-      WHERE code_hash = ${digest(body.code)}
-        AND client_type = ${body.clientType}
-        AND consumed_at IS NULL AND expires_at > NOW()
-      RETURNING user_id AS "userId", world_id AS "worldId"
+      FROM virtual_worlds AS w, users AS u
+      LEFT JOIN virtual_world_memberships AS m
+        ON m.world_id = w.id AND m.user_id = u.id
+      WHERE ec.code_hash = ${digest(body.code)}
+        AND ec.client_type = ${body.clientType}
+        AND ec.consumed_at IS NULL AND ec.expires_at > NOW()
+        AND w.id = ec.world_id AND u.id = ec.user_id
+        AND w.status = 'published'
+        AND COALESCE(m.status, 'none') NOT IN ('banned', 'suspended')
+        AND (w.visibility <> 'private' OR m.status = 'active' OR w.owner_user_id = u.id)
+        AND u.moderation_status <> 'disabled'
+        AND (u.moderation_status <> 'suspended' OR u.suspended_until <= NOW())
+        AND NOT EXISTS (
+          SELECT 1 FROM user_blocks b
+          WHERE (b.blocker_id = u.id AND b.blocked_id = w.owner_user_id)
+             OR (b.blocker_id = w.owner_user_id AND b.blocked_id = u.id)
+        )
+      RETURNING ec.user_id AS "userId", ec.world_id AS "worldId"
     `;
     if (!redeemed.length)
       return NextResponse.json({ error: "Entry code is invalid, expired or already used" }, { status: 401 });
@@ -106,7 +123,7 @@ export async function PUT(request: NextRequest) {
       .setExpirationTime("5m")
       .sign(worldTokenKey());
 
-    return NextResponse.json({ accessToken: token, tokenType: "Bearer", expiresInSeconds: WORLD_TOKEN_TTL_SECONDS }, {
+    return NextResponse.json({ accessToken: token, tokenType: "Bearer", expiresInSeconds: WORLD_TOKEN_TTL_SECONDS, worldId: identity.worldId }, {
       headers: { "Cache-Control": "no-store, private" }
     });
   } catch (error) {
