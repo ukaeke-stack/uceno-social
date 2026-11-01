@@ -49,6 +49,10 @@ namespace UCENO.VirtualWorld
                 error = "Wardrobe item is not in the local catalog.";
                 return false;
             }
+            if (equippedIds.TryGetValue(item.slot, out string alreadyEquipped) &&
+                alreadyEquipped == item.itemId &&
+                equippedObjects.TryGetValue(item.slot, out GameObject existingObject) && existingObject != null)
+                return true;
             if (string.IsNullOrWhiteSpace(item.prefabResourcePath))
             {
                 error = "Wardrobe item has no prefab resource path.";
@@ -117,12 +121,6 @@ namespace UCENO.VirtualWorld
                 renderer.updateWhenOffscreen = false;
             }
 
-            if (equippedIds.TryGetValue(item.slot, out string currentId) && currentId == item.itemId &&
-                equippedObjects.TryGetValue(item.slot, out GameObject currentObject) && currentObject != null)
-            {
-                Destroy(instance);
-                return true;
-            }
             if (equippedObjects.TryGetValue(item.slot, out GameObject previous) && previous != null)
                 Destroy(previous);
             equippedObjects[item.slot] = instance;
