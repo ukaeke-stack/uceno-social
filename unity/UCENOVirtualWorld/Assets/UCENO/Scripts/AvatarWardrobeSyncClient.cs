@@ -68,7 +68,7 @@ namespace UCENO.VirtualWorld
                 error = "This account does not own that wardrobe item.";
                 return false;
             }
-            if (!controller.TryEquip(itemId, out error)) return false;
+            if (!controller.TryEquip(itemId, owned.prefabKey, out error)) return false;
             QueueSaveSlot(owned.slot, itemId);
             return true;
         }
