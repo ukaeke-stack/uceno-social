@@ -7,6 +7,7 @@ namespace UCENO.VirtualWorld
     {
         [Header("Movement")]
         [SerializeField] private float moveSpeed = 4.5f;
+        [SerializeField] private float sprintMultiplier = 1.65f;
         [SerializeField] private float gravity = -20f;
         [SerializeField] private float maximumFallSpeed = 30f;
         [SerializeField] private float fallRecoveryHeight = -3f;
@@ -24,10 +25,19 @@ namespace UCENO.VirtualWorld
         private Vector2 moveTouchStart;
         private int moveFingerId = -1;
         private int lookFingerId = -1;
+        private bool sprintRequested;
 
         public float Yaw => yaw;
         public float Pitch => pitch;
         public Vector2 MovementInput { get; private set; }
+        public bool IsSprinting { get; private set; }
+        public float AnimationSpeed { get; private set; }
+
+        /// <summary>Allows a mobile sprint control to request sprint without changing movement input.</summary>
+        public void SetSprinting(bool value)
+        {
+            sprintRequested = value;
+        }
 
         private void Awake()
         {
@@ -56,6 +66,11 @@ namespace UCENO.VirtualWorld
             Vector2 move = ReadMoveInput();
             Vector2 look = ReadLookInput();
             MovementInput = move;
+            IsSprinting = move.sqrMagnitude > 0.01f &&
+                (sprintRequested || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
+            AnimationSpeed = move.sqrMagnitude <= 0.01f
+                ? 0f
+                : (IsSprinting ? 1f : Mathf.Clamp01(move.magnitude) * 0.5f);
             yaw += look.x * lookSensitivity;
             pitch = Mathf.Clamp(pitch - look.y * lookSensitivity, minimumPitch, maximumPitch);
             transform.rotation = Quaternion.Euler(0f, yaw, 0f);
@@ -67,7 +82,7 @@ namespace UCENO.VirtualWorld
                 verticalVelocity = -2f;
 
             verticalVelocity = Mathf.Max(verticalVelocity + gravity * Time.deltaTime, -maximumFallSpeed);
-            Vector3 velocity = direction * moveSpeed;
+            Vector3 velocity = direction * (moveSpeed * (IsSprinting ? sprintMultiplier : 1f));
             velocity.y = verticalVelocity;
             controller.Move(velocity * Time.deltaTime);
         }
