@@ -85,6 +85,24 @@ a rigged Humanoid avatar and an idle/walk/run blend tree. The player movement
 and camera remain separate from the model hierarchy, so later professional
 assets can replace the free models without rewriting those systems.
 
+### Authoritative collision geometry handoff
+
+After the scene is generated, the Editor builder scans the actual enabled,
+non-trigger Unity colliders (excluding the player) and exports their world-space
+bounds to `runtime/world-gateway/data/uceno-city-collision-boxes.json`.
+The gateway accepts this generated map through the server-only
+`WORLD_COLLISION_BOXES_FILE` environment variable. Point that variable at the
+exported JSON file in the gateway deployment and restart the instance. The
+existing `WORLD_COLLISION_BOXES` JSON environment variable remains available
+for small/manual test maps.
+
+The export uses axis-aligned world bounds, so rotated/irregular meshes are
+conservative approximations. This is a first collision bridge, not a full
+triangle-mesh or navmesh simulation. The gateway refuses malformed boxes and
+caps the map at 500 colliders. Re-export after changing the Unity scene; the
+gateway does not automatically read files from the Unity project or synchronize
+scene edits while running.
+
 This scene has not yet been opened and compiled in the Unity Editor after the
 asset import. Unity compilation, rendering review and physical Android testing
 are still required. Asset-import workflows do not run a Unity build and do not
