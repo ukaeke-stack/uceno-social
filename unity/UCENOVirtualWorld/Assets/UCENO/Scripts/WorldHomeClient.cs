@@ -364,13 +364,15 @@ namespace UCENO.VirtualWorld
 
         private IEnumerator LoadMembersRoutine()
         {
-            if (string.IsNullOrEmpty(selectedHomeId)) yield break;
+            string homeId = selectedHomeId;
+            if (string.IsNullOrEmpty(homeId)) yield break;
             using (UnityWebRequest request = CreateRequest(
                 session.ApiBaseUrl.TrimEnd('/') + "/api/world-homes/" +
-                UnityWebRequest.EscapeURL(selectedHomeId) + "/members", "GET", null))
+                UnityWebRequest.EscapeURL(homeId) + "/members", "GET", null))
             {
                 yield return request.SendWebRequest();
                 if (!Succeeded(request)) { SetFailure(request, "Invitation roster"); yield break; }
+                if (selectedHomeId != homeId) yield break;
                 WorldHomeMembersResponse response = JsonUtility.FromJson<WorldHomeMembersResponse>(request.downloadHandler.text);
                 members.Clear();
                 if (response != null && response.members != null) members.AddRange(response.members);
