@@ -102,7 +102,8 @@ namespace UCENO.VirtualWorld.Editor
                 carPrefab, fencePrefab);
             ConfigureLighting(skybox);
 
-            GameObject player = BuildPlayer(worldRoot, avatarPrefab);
+            WorldSessionClient worldSession = world.AddComponent<WorldSessionClient>();
+            GameObject player = BuildPlayer(worldRoot, avatarPrefab, worldSession);
             BuildCamera(player.transform);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -539,7 +540,7 @@ namespace UCENO.VirtualWorld.Editor
             QualitySettings.streamingMipmapsActive = true;
         }
 
-        private static GameObject BuildPlayer(Transform parent, GameObject avatarPrefab)
+        private static GameObject BuildPlayer(Transform parent, GameObject avatarPrefab, WorldSessionClient worldSession)
         {
             GameObject player = new GameObject("UCENO Local Player");
             player.transform.SetParent(parent, false);
@@ -565,6 +566,13 @@ namespace UCENO.VirtualWorld.Editor
             avatar.transform.localPosition = Vector3.zero;
             avatar.transform.localRotation = Quaternion.identity;
             avatar.transform.localScale = Vector3.one;
+
+            WorldPresenceClient presence = player.AddComponent<WorldPresenceClient>();
+            SerializedObject presenceData = new SerializedObject(presence);
+            presenceData.FindProperty("session").objectReferenceValue = worldSession;
+            presenceData.FindProperty("localPlayer").objectReferenceValue = motor;
+            presenceData.FindProperty("remoteAvatarPrefab").objectReferenceValue = avatarPrefab;
+            presenceData.ApplyModifiedPropertiesWithoutUndo();
 
             WorldStatusHud hud = player.AddComponent<WorldStatusHud>();
             SerializedObject hudData = new SerializedObject(hud);
