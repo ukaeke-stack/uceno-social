@@ -54,6 +54,10 @@ namespace UCENO.VirtualWorld
             public Vector3 targetPosition;
             public Quaternion targetRotation;
             public float lastReceived;
+            public Vector3 lastSamplePosition;
+            public float lastSampleTime;
+            public Animator animator;
+            public bool hasMovementSample;
         }
 
         private readonly Dictionary<string, RemotePlayer> remotePlayers = new Dictionary<string, RemotePlayer>();
@@ -230,12 +234,31 @@ namespace UCENO.VirtualWorld
                         avatar.name = "Remote Player " + peer.userId;
                         foreach (AvatarLocomotionDriver driver in avatar.GetComponentsInChildren<AvatarLocomotionDriver>())
                             driver.enabled = false;
-                        remote = new RemotePlayer { root = avatar.transform };
+                        Animator remoteAnimator = avatar.GetComponentInChildren<Animator>();
+                        remote = new RemotePlayer { root = avatar.transform, animator = remoteAnimator };
                         remotePlayers.Add(peer.userId, remote);
                     }
+                    float sampleTime = Time.time;
+                    float replicatedSpeed = 0f;
+                    if (remote.hasMovementSample)
+                    {
+                        float elapsed = Mathf.Max(0.05f, sampleTime - remote.lastSampleTime);
+                        replicatedSpeed = Vector3.Distance(peerPosition, remote.lastSamplePosition) / elapsed;
+                    }
+                    remote.lastSamplePosition = peerPosition;
+                    remote.lastSampleTime = sampleTime;
+                    remote.hasMovementSample = true;
                     remote.targetPosition = peerPosition;
                     remote.targetRotation = new Quaternion(peer.rotation.x, peer.rotation.y, peer.rotation.z, peer.rotation.w);
-                    remote.lastReceived = Time.time;
+                    remote.lastReceived = sampleTime;
+
+                    // Derive locomotion from authoritative server-observed position
+                    // samples. This keeps the wire format backward-compatible.
+                    if (remote.animator != null && remote.animator.runtimeAnimatorController != null)
+                    {
+                        float normalizedSpeed = Mathf.Clamp01(replicatedSpeed / 6.5f);
+                        remote.animator.SetFloat(Animator.StringToHash("MoveSpeed"), normalizedSpeed, 0.15f, Time.deltaTime);
+                    }
                 }
             }
         }
