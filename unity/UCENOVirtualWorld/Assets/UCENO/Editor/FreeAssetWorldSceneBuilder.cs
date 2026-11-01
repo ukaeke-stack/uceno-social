@@ -426,6 +426,7 @@ namespace UCENO.VirtualWorld.Editor
         {
             GameObject lineObject = new GameObject("Road Marking");
             lineObject.transform.SetParent(parent, false);
+            lineObject.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
             LineRenderer line = lineObject.AddComponent<LineRenderer>();
             line.useWorldSpace = true;
             line.positionCount = 2;
@@ -434,7 +435,7 @@ namespace UCENO.VirtualWorld.Editor
             line.startWidth = width;
             line.endWidth = width;
             line.sharedMaterial = material;
-            line.alignment = LineAlignment.View;
+            line.alignment = LineAlignment.TransformZ;
             line.numCapVertices = 2;
             SetStaticRecursive(lineObject);
         }
