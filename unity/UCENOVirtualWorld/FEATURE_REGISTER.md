@@ -88,3 +88,12 @@ gateway file; seat occupancy remains transient and is released on disconnect.
 - **Asset/content blocker:** no interchangeable garment/hair/accessory prefab catalogue has been imported or registered yet. The database catalogue is intentionally empty and disabled by default. A prefab must contain correctly weighted SkinnedMeshRenderers using matching Humanoid bone names and be placed under Resources with a matching catalog entry. Therefore actual wardrobe swapping is not yet end-to-end usable or verified.
 - **Multiplayer wardrobe replication source added:** the gateway loads equipped item IDs from account-owned inventory, includes them in authoritative player snapshots, and re-reads the database after a successful client wardrobe save. Unity remote avatars compare snapshot wardrobe state and attempt to apply changed slots through the same local Humanoid wardrobe controller. This is source implementation only; no real wardrobe prefabs exist yet, so actual remote clothing rendering is not demonstrated or verified.
 - Migration 027 is not applied or integration-tested. Unity Editor compilation, rig compatibility, visual review and two-device tests remain outstanding.
+
+
+## 2026-11-01 proximity voice signaling foundation
+
+- Added authenticated WebSocket voice join/leave and targeted WebRTC signaling relay for offer, answer and ICE candidate messages.
+- The gateway relays signaling only between users in the same world and same spatial context (public world, the same home, or the same event), within 24 metres, with both users opted in to voice. It checks mutual block state before relaying and rate-limits signaling.
+- Voice sessions are ended when a player changes spatial context or disconnects. Signaling payload sizes and types are bounded; WebSocket message maximum was raised to 16 KB to accommodate SDP.
+- Unity gateway client now exposes voice join/leave, signal-send methods and presence/signal/rejection events for a future media transport integration.
+- **Not full spatial voice:** no WebRTC peer connection/media capture/playback, microphone permission flow, audio track routing, STUN/TURN configuration, spatial attenuation, mute controls or device tests have been implemented. The new code is the signaling/control plane only; do not claim users can hear one another yet.
