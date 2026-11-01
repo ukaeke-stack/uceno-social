@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
 
@@ -61,7 +60,7 @@ export async function POST(request: NextRequest) {
     const users = await sql`SELECT email FROM users WHERE id = ${session.id}::uuid LIMIT 1`;
     const email = users[0]?.email;
     if (typeof email !== "string" || !email.includes("@")) {
-      return NextResponse.json({ error: "A verified email address is required for Paystack checkout" }, { status: 422 });
+      return NextResponse.json({ error: "An email address is required for Paystack checkout" }, { status: 422 });
     }
 
     const existing = await sql`
