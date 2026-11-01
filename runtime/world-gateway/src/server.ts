@@ -109,10 +109,41 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
   };
 }
 
-const server = createServer((req, res) => {
+const server = createServer(async (req, res) => {
+  const headers = { "content-type": "application/json", "cache-control": "no-store" };
   if (req.url === "/health") {
-    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    // Liveness only: the process can answer even while PostgreSQL is unavailable.
+    res.writeHead(200, headers);
     res.end(JSON.stringify({ service: "uceno-world-gateway", status: "online", instanceId: INSTANCE_ID, players: players.size, capacity: MAX_CLIENTS }));
+    return;
+  }
+  if (req.url === "/ready") {
+    // Readiness is stricter than liveness. Do not route new players to a
+    // gateway whose database lease/instance registration is missing or stale.
+    try {
+      const rows = await sql`
+        SELECT status, endpoint, heartbeat_at
+        FROM virtual_world_instances
+        WHERE id = ${INSTANCE_ID}::uuid
+        LIMIT 1
+      `;
+      const instance = rows[0];
+      const ready = !!instance && instance.status === "ready" &&
+        typeof instance.endpoint === "string" && instance.endpoint.length > 0 &&
+        instance.heartbeat_at != null &&
+        Date.now() - new Date(instance.heartbeat_at).getTime() < 30000;
+      res.writeHead(ready ? 200 : 503, headers);
+      res.end(JSON.stringify({
+        service: "uceno-world-gateway",
+        status: ready ? "ready" : "not_ready",
+        instanceId: INSTANCE_ID,
+        players: players.size,
+        capacity: MAX_CLIENTS
+      }));
+    } catch {
+      res.writeHead(503, headers);
+      res.end(JSON.stringify({ service: "uceno-world-gateway", status: "database_unavailable" }));
+    }
     return;
   }
   res.writeHead(404); res.end();
