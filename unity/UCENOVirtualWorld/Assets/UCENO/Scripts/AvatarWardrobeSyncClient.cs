@@ -36,6 +36,8 @@ namespace UCENO.VirtualWorld
         private bool loading;
         private bool loaded;
         private float retryAt;
+        private bool saving;
+        private readonly Dictionary<string, string> pendingEquipment = new Dictionary<string, string>();
 
         public IReadOnlyList<WardrobeInventoryItem> Inventory => inventory;
         private WardrobeInventoryItem[] inventory = Array.Empty<WardrobeInventoryItem>();
@@ -64,7 +66,7 @@ namespace UCENO.VirtualWorld
                 return false;
             }
             if (!controller.TryEquip(itemId, out error)) return false;
-            StartCoroutine(SaveSlotRoutine(owned.slot, itemId));
+            QueueSaveSlot(owned.slot, itemId);
             return true;
         }
 
@@ -73,7 +75,7 @@ namespace UCENO.VirtualWorld
             if (!loaded || !IsValidSlot(slot)) return;
             if (Enum.TryParse(slot, true, out AvatarWardrobeSlot parsed))
                 controller.Unequip(parsed);
-            StartCoroutine(SaveSlotRoutine(slot, null));
+            QueueSaveSlot(slot, null);
         }
 
         private IEnumerator LoadRoutine()
@@ -111,27 +113,59 @@ namespace UCENO.VirtualWorld
             loading = false;
         }
 
-        private IEnumerator SaveSlotRoutine(string slot, string itemId)
+        private void QueueSaveSlot(string slot, string itemId)
         {
-            string value = itemId == null ? "null" : "\"" + itemId + "\"";
-            string json = "{\"equipped\":{\"" + slot + "\":" + value + "}}";
-            byte[] body = Encoding.UTF8.GetBytes(json);
-            using (UnityWebRequest request = new UnityWebRequest(BuildUrl(), "PUT"))
+            pendingEquipment[slot] = itemId;
+            if (!saving) StartCoroutine(SavePendingRoutine());
+        }
+
+        private IEnumerator SavePendingRoutine()
+        {
+            saving = true;
+            while (pendingEquipment.Count > 0)
             {
-                request.uploadHandler = new UploadHandlerRaw(body);
-                request.downloadHandler = new DownloadHandlerBuffer();
-                request.SetRequestHeader("Authorization", "Bearer " + session.AccessToken);
-                request.SetRequestHeader("Content-Type", "application/json");
-                request.timeout = 15;
-                yield return request.SendWebRequest();
-                if (request.result != UnityWebRequest.Result.Success)
-                    Debug.LogWarning("UCENO wardrobe save failed: " + request.responseCode);
-                else
+                Dictionary<string, string> batch = new Dictionary<string, string>(pendingEquipment);
+                pendingEquipment.Clear();
+                StringBuilder json = new StringBuilder("{\\"equipped\\":{");
+                bool first = true;
+                foreach (KeyValuePair<string, string> item in batch)
+                {
+                    if (!first) json.Append(",");
+                    first = false;
+                    json.Append("\\"").Append(item.Key).Append("\\":");
+                    if (item.Value == null) json.Append("null");
+                    else json.Append("\\"").Append(item.Value).Append("\\"");
+                }
+                json.Append("}}");
+                byte[] body = Encoding.UTF8.GetBytes(json.ToString());
+                bool saved = false;
+                using (UnityWebRequest request = new UnityWebRequest(BuildUrl(), "PUT"))
+                {
+                    request.uploadHandler = new UploadHandlerRaw(body);
+                    request.downloadHandler = new DownloadHandlerBuffer();
+                    request.SetRequestHeader("Authorization", "Bearer " + session.AccessToken);
+                    request.SetRequestHeader("Content-Type", "application/json");
+                    request.timeout = 15;
+                    yield return request.SendWebRequest();
+                    saved = request.result == UnityWebRequest.Result.Success;
+                    if (!saved)
+                        Debug.LogWarning("UCENO wardrobe save failed: " + request.responseCode);
+                }
+                if (saved)
                 {
                     WorldGatewayClient gateway = FindObjectOfType<WorldGatewayClient>();
                     if (gateway != null) gateway.RequestWardrobeRefresh();
                 }
+                else
+                {
+                    foreach (KeyValuePair<string, string> item in batch)
+                        if (!pendingEquipment.ContainsKey(item.Key))
+                            pendingEquipment[item.Key] = item.Value;
+                    retryAt = Time.unscaledTime + 10f;
+                    break;
+                }
             }
+            saving = false;
         }
 
         private string BuildUrl() => session.ApiBaseUrl.TrimEnd('/') + "/api/worlds/" +
