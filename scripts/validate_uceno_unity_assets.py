@@ -153,8 +153,11 @@ def main():
         fail("FollowCamera is missing city-geometry collision handling.")
 
     hud = read_text(ASSETS / "Scripts/WorldStatusHud.cs")
-    if "GUI.RepeatButton" not in hud or "Position:" not in hud:
-        fail("World status HUD or mobile sprint control is missing.")
+    if "GUI.Button" not in hud or "Position:" not in hud or '"JUMP"' not in hud or '"RUN"' not in hud:
+        fail("World status HUD, mobile jump control, or sprint control is missing.")
+
+    if "RequestJump" not in motor or "KeyCode.Space" not in motor or "jumpHeight" not in motor:
+        fail("Player jump action is missing keyboard/mobile input or grounded jump physics.")
 
     manifests, listed_files = check_manifests()
     total_required = sum(path.stat().st_size for path in REQUIRED_FILES + REQUIRED_TEXTURES)
