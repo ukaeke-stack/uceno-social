@@ -16,6 +16,9 @@ namespace UCENO.VirtualWorld
         public float yaw;
         public bool sprint;
         public bool jump;
+        public bool seated;
+        public string gesture = "none";
+        public int gestureSequence;
     }
 
     [Serializable] internal sealed class GatewayVectorState
@@ -35,6 +38,10 @@ namespace UCENO.VirtualWorld
         public float z;
         public float yaw;
         public bool grounded;
+        public bool seated;
+        public bool sprint;
+        public string gesture;
+        public int gestureSequence;
     }
 
     [Serializable] internal sealed class GatewayPacket
@@ -82,6 +89,7 @@ namespace UCENO.VirtualWorld
         private int sequence;
         private float nextInputAt;
         private string localUserId;
+        private AvatarLocomotionDriver localAvatar;
 
         public string ConnectionStatus { get; private set; } = "WAITING";
         public int PeerCount => remotePlayers.Count;
@@ -97,6 +105,7 @@ namespace UCENO.VirtualWorld
         {
             if (session == null) session = FindObjectOfType<WorldSessionClient>();
             if (localPlayer == null) localPlayer = FindObjectOfType<PlayerMotor>();
+            localAvatar = FindObjectOfType<AvatarLocomotionDriver>();
             if (remoteAvatarPrefab == null || session == null || localPlayer == null)
             {
                 ConnectionStatus = "NOT CONFIGURED";
@@ -259,7 +268,8 @@ namespace UCENO.VirtualWorld
                 remote.targetRotation = Quaternion.Euler(0f, state.yaw * Mathf.Rad2Deg, 0f);
                 remote.lastReceived = now;
                 if (remote.locomotion != null)
-                    remote.locomotion.ApplyRemoteState(Mathf.Clamp01(speed / 8f), false, speed > 6f, "none", 0);
+                    remote.locomotion.ApplyRemoteState(Mathf.Clamp01(speed / 8f), state.seated,
+                        state.sprint || speed > 6f, state.gesture ?? "none", state.gestureSequence);
             }
         }
 
@@ -299,7 +309,10 @@ namespace UCENO.VirtualWorld
                 moveZ = localPlayer.MovementInput.y,
                 yaw = localPlayer.Yaw * Mathf.Deg2Rad,
                 sprint = localPlayer.IsSprinting,
-                jump = localPlayer.ConsumeJumpRequest()
+                jump = localPlayer.ConsumeJumpRequest(),
+                seated = localPlayer.IsSeated,
+                gesture = localAvatar != null ? localAvatar.GestureName : "none",
+                gestureSequence = localAvatar != null ? localAvatar.GestureSequence : 0
             };
             try { await socket.SendText(JsonUtility.ToJson(input)); }
             catch (Exception error) { Debug.LogWarning("UCENO gateway input send failed: " + error.Message); }
