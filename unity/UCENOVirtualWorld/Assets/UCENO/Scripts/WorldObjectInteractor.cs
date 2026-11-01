@@ -44,9 +44,13 @@ namespace UCENO.VirtualWorld
         private void Interact()
         {
             if (gateway == null || currentTarget == null) return;
-            string action = currentTarget.Kind == "door" ? "toggle" : "use";
+            string action = currentTarget.Kind == "door" ? "toggle" :
+                currentTarget.Kind == "seat" ? (currentTarget.OccupantId == "" || currentTarget.OccupantId == GetLocalUserId() ?
+                    (currentTarget.OccupantId == "" ? "sit" : "stand") : "sit") : "use";
             gateway.RequestInteraction(currentTarget.ObjectId, action);
         }
+
+        private string GetLocalUserId() => gateway != null ? gateway.LocalUserId : "";
 
         private void OnGUI()
         {
@@ -62,7 +66,9 @@ namespace UCENO.VirtualWorld
 
             string action = currentTarget.Kind == "door"
                 ? (currentTarget.CurrentState == "open" ? "CLOSE" : "OPEN")
-                : "INTERACT";
+                : currentTarget.Kind == "seat"
+                    ? (currentTarget.OccupantId == "" ? "SIT" : currentTarget.OccupantId == GetLocalUserId() ? "STAND" : "OCCUPIED")
+                    : "INTERACT";
             float width = Mathf.Clamp(Screen.width * 0.30f, 130f, 220f);
             float height = 52f;
             Rect rect = new Rect((Screen.width - width) * 0.5f,
