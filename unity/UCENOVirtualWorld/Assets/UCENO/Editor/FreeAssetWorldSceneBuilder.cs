@@ -248,24 +248,27 @@ namespace UCENO.VirtualWorld.Editor
 
             AnimatorController controller = CreateLocomotionController(idle, walk, run);
             GameObject source = AssetDatabase.LoadAssetAtPath<GameObject>(AvatarPath);
-            GameObject instance = UnityEngine.Object.Instantiate(source);
-            instance.name = "UCENO Default Humanoid";
-            Bounds avatarBounds = CalculateLocalBounds(instance);
-            instance.transform.position = new Vector3(0f, -avatarBounds.min.y, 0f);
-            Animator animator = instance.GetComponent<Animator>();
+            GameObject wrapper = new GameObject("UCENO Default Humanoid");
+            GameObject model = UnityEngine.Object.Instantiate(source);
+            model.name = "Humanoid Model";
+            model.transform.SetParent(wrapper.transform, false);
+            Bounds avatarBounds = CalculateLocalBounds(model);
+            model.transform.localPosition = new Vector3(0f, -avatarBounds.min.y, 0f);
+
+            Animator animator = model.GetComponent<Animator>();
             if (animator == null)
-                animator = instance.AddComponent<Animator>();
+                animator = model.AddComponent<Animator>();
             animator.avatar = avatar;
             animator.runtimeAnimatorController = controller;
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
 
-            if (instance.GetComponent<AvatarLocomotionDriver>() == null)
-                instance.AddComponent<AvatarLocomotionDriver>();
+            if (model.GetComponent<AvatarLocomotionDriver>() == null)
+                model.AddComponent<AvatarLocomotionDriver>();
 
             string prefabPath = PrefabRoot + "/Characters/UCENO_Default_Avatar.prefab";
-            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(instance, prefabPath);
-            UnityEngine.Object.DestroyImmediate(instance);
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(wrapper, prefabPath);
+            UnityEngine.Object.DestroyImmediate(wrapper);
             return prefab;
         }
 
