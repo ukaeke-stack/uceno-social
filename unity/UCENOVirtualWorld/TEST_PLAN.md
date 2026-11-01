@@ -1,8 +1,6 @@
 # UCENO Virtual World — realistic city scene test plan
 
-This checklist validates the first imported-asset city scene and offline player
-controller. Passing it does not validate multiplayer, production integration,
-store readiness or release performance.
+This checklist covers the Unity city client, world gateway interactions and the connected home APIs. Passing source checks does not validate Unity compilation, production integration, two-device behavior, store readiness or release performance.
 
 ## Editor import and scene generation
 
@@ -54,11 +52,14 @@ store readiness or release performance.
 - [ ] Add `WorldInteractable` to a real usable object and assign a stable unique ID.
 - [ ] Rebuild the city and confirm both objects appear in the exported `interactables` array with correct world positions.
 - [ ] Configure the gateway to read the exported geometry map and restart it.
-- [ ] Aim at the door and press E (or tap INTERACT); confirm the server accepts the in-range request and all connected clients receive the same open/closed state.\n- [ ] After changing a door or usable-object state, connect a third/late client; confirm its first authoritative object-state packets immediately render the current state without requiring another interaction.\n- [ ] Disconnect and reconnect a client while a door remains open; confirm it receives the persisted/current state on reconnect.\n- [ ] Connect a late client while a seat is occupied; confirm the seat displays the current occupant and rejects a second claim.
+- [ ] Aim at the door and press E (or tap INTERACT); confirm the server accepts the in-range request and all connected clients receive the same open/closed state.
+- [ ] After changing a door or usable-object state, connect a third/late client; confirm its first authoritative object-state packets immediately render the current state without requiring another interaction.
+- [ ] Disconnect and reconnect a client while a door remains open; confirm it receives the persisted/current state on reconnect.
+- [ ] Connect a late client while a seat is occupied; confirm the seat displays the current occupant and rejects a second claim.
 - [ ] Move beyond 4.25 world units and confirm the gateway rejects the interaction.
 - [ ] Confirm unknown object IDs and mismatched action types are rejected.
 - [ ] Confirm the dedicated door hinge moves while the building root and surrounding geometry remain fixed.
-- [ ] Confirm the generic object state is synchronized to all clients; restart behavior is currently non-persistent and must not be treated as durable.
+- [ ] Confirm the generic object state is synchronized to all clients; restart persistence works only when `WORLD_OBJECT_STATE_FILE` points to writable durable storage.
 - [ ] Use the Unity Editor authoring menu to mark an actual imported door hinge, chair/seat point and usable prop; confirm unique IDs and correct kinds are exported.
 - [ ] Export the active scene from the UCENO World menu and confirm the gateway deployment receives the exact generated JSON.
 - [ ] Mark an actual imported chair as a `seat` interactable with a unique ID and a seat position; confirm it appears in the exported JSON.
@@ -70,6 +71,20 @@ store readiness or release performance.
 - [ ] Send a movement input with a forged `seated=true` flag while not owning a seat; verify the gateway does not freeze the player as seated.
 - [ ] Drop the seated player's WebSocket and reconnect; verify the client clears the old seated pose and can move normally.
 - [ ] Verify the root/facing anchor aligns the avatar with the chair; full foot/hand IK is not implemented.
+
+
+## Home sharing API checks
+
+- [ ] Unauthenticated requests to home and home-member APIs return 401.
+- [ ] Home listing only returns homes owned by the signed-in user or explicitly shared with that user.
+- [ ] Home creation rejects invalid world IDs, templates, oversized transforms, oversized furnishing arrays and more than 100 furnishing entries.
+- [ ] Home layout updates are accepted only from the owner, a co-owner or a decorator; visitors cannot modify the layout.
+- [ ] Only the home owner can grant, list or revoke home members.
+- [ ] The owner-only member roster returns only user IDs, permission and invitation timestamp; it does not expose account email, phone or profile details.
+- [ ] A user blocked by the home owner or blocking the owner cannot be invited or access the shared home.
+- [ ] A banned or suspended world member cannot be invited into a home.
+- [ ] Revoking a home member removes their shared-home access on the next request.
+- [ ] Verify these checks against a test database after required migrations are deployed; static source checks are not database integration tests.
 
 ## Android device checks
 
