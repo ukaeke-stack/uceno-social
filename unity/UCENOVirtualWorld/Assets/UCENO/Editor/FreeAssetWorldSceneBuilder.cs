@@ -561,6 +561,7 @@ namespace UCENO.VirtualWorld.Editor
             characterController.minMoveDistance = 0f;
 
             PlayerMotor motor = player.AddComponent<PlayerMotor>();
+            player.AddComponent<WorldObjectInteractor>();
             SerializedObject motorData = new SerializedObject(motor);
             motorData.FindProperty("spawnPosition").vector3Value = new Vector3(0f, 0.05f, -35f);
             motorData.ApplyModifiedPropertiesWithoutUndo();
