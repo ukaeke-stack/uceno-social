@@ -90,7 +90,7 @@ namespace UCENO.VirtualWorld.Editor
                 "Models/modular_chainlink_fence/modular_chainlink_fence.fbx",
                 "UCENO_Chainlink_Fence", true);
 
-            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.Empty, NewSceneMode.Single);
+            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             GameObject world = new GameObject("UCENO Realistic City Block");
             Transform worldRoot = world.transform;
 
