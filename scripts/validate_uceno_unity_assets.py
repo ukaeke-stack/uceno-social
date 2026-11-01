@@ -189,8 +189,9 @@ def main():
             fail("Generated home furniture catalogue is missing " + asset_id)
 
     events_client = read_text(ASSETS / "Scripts/WorldEventsClient.cs")
-    for required in ("LoadEventsRoutine", "SetAttendanceRoutine", "/api/world-events?worldId=",
-                     "/attendance", "EVENTS", "INTERESTED"):
+    for required in ("LoadEventsRoutine", "CreateEventRoutine", "SetAttendanceRoutine",
+                     "/api/world-events?worldId=", "/api/world-events", "/attendance",
+                     "canHost", "EVENTS", "INTERESTED"):
         if required not in events_client:
             fail("WorldEventsClient is missing event discovery/RSVP behavior: " + required)
     if "WorldEventsClient eventsClient = player.AddComponent<WorldEventsClient>()" not in builder:
