@@ -6,6 +6,7 @@ namespace UCENO.VirtualWorld
     public enum WorldInteractableKind
     {
         Door,
+        Seat,
         Object
     }
 
@@ -26,8 +27,9 @@ namespace UCENO.VirtualWorld
         private Quaternion targetRotation;
         private bool initialized;
         public string ObjectId => objectId;
-        public string Kind => kind == WorldInteractableKind.Door ? "door" : "object";
+        public string Kind => kind == WorldInteractableKind.Door ? "door" : kind == WorldInteractableKind.Seat ? "seat" : "object";
         public string CurrentState { get; private set; } = "closed";
+        public string OccupantId { get; private set; } = "";
 
         private void Awake()
         {
@@ -43,10 +45,11 @@ namespace UCENO.VirtualWorld
                 doorPivot.localRotation, targetRotation, animationSpeed * Time.deltaTime);
         }
 
-        public void ApplyServerState(string state)
+        public void ApplyServerState(string state, string occupantId = "")
         {
             if (string.IsNullOrWhiteSpace(state)) return;
             CurrentState = state;
+            OccupantId = occupantId ?? "";
             if (kind != WorldInteractableKind.Door || doorPivot == null) return;
             if (!initialized) Awake();
             targetRotation = state == "open"
