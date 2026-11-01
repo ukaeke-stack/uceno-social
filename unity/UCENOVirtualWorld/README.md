@@ -126,6 +126,20 @@ pose on transport loss so reconnect does not leave the avatar stuck sitting.
 The current seating pose uses the existing generic seated animation state; it
 does not yet align the avatar to a chair-specific sit point or provide IK.
 
+### Persistent doors and usable-object state
+
+Door open/closed state and generic usable-object active/idle state can be
+persisted by configuring the gateway's server-only `WORLD_OBJECT_STATE_FILE`
+to a writable file on a durable mounted volume. The gateway restores only
+state entries whose IDs and kinds still exist in the current scene allowlist;
+seat occupancy is deliberately never restored because a disconnected player
+must not leave a chair permanently occupied. Writes use a temporary file and
+atomic rename. If the configured file cannot be read or written, startup fails
+or the interaction is rejected rather than silently claiming persistence.
+Without this variable, object state remains in gateway memory and resets on
+restart. The volume, backup policy and path permissions must be configured by
+the gateway operator; this code does not provision storage.
+
 In the Unity Editor, select the actual imported prop and use
 **GameObject → UCENO → Mark Selected as Door / Seat / Usable Object**.
 These commands add a marker and unique ID; they do not create fake geometry or
