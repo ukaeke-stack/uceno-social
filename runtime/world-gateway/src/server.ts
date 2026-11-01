@@ -389,7 +389,7 @@ wss.on("connection", async (socket: WebSocket) => {
       });
     }
 
-    socket.on("message", (raw) => {
+    socket.on("message", async (raw) => {
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
       if (msg && msg.type === "home_enter") {
