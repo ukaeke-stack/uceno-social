@@ -49,6 +49,7 @@ namespace UCENO.VirtualWorld
         public string gesture;
         public int gestureSequence;
         public GatewayWardrobeItemState[] wardrobe;
+        public bool voiceActive;
     }
 
     [Serializable] internal sealed class GatewayInteractionPacket
@@ -61,6 +62,22 @@ namespace UCENO.VirtualWorld
     [Serializable] internal sealed class GatewayWardrobeRefreshRequest
     {
         public string type = "wardrobe_refresh";
+    }
+
+    [Serializable] internal sealed class GatewayVoiceControlRequest
+    {
+        public string type;
+    }
+
+    [Serializable] internal sealed class GatewayVoiceSignalRequest
+    {
+        public string type = "voice_signal";
+        public string targetUserId;
+        public string signalType;
+        public string sdp;
+        public string candidate;
+        public string sdpMid;
+        public int sdpMLineIndex;
     }
 
     [Serializable] internal sealed class GatewayContextRequest
@@ -152,6 +169,8 @@ namespace UCENO.VirtualWorld
             public bool hasSample;
             public AvatarWardrobeController wardrobe;
             public string wardrobeSignature;
+            public bool voiceActive;
+            public bool voiceNearby;
         }
 
         private readonly Dictionary<string, RemotePlayer> remotePlayers = new Dictionary<string, RemotePlayer>();
@@ -175,6 +194,9 @@ namespace UCENO.VirtualWorld
         public event Action<string> SpatialLocationRejected;
         public event Action<GatewayActivitySessionState> ActivityStateChanged;
         public event Action<string> ActivityRejected;
+        public event Action<string, bool> VoicePeerPresenceChanged;
+        public event Action<string, string, string, string, string, int> VoiceSignalReceived;
+        public event Action<string> VoiceSignalRejected;
         private readonly List<GatewayActivitySessionState> activitySessions = new List<GatewayActivitySessionState>();
         public IReadOnlyList<GatewayActivitySessionState> ActivitySessions => activitySessions;
 
@@ -276,6 +298,40 @@ namespace UCENO.VirtualWorld
             {
                 Debug.LogWarning("UCENO activity request failed: " + error.Message);
             }
+        }
+
+        public bool RequestVoiceJoin() => SendVoiceControl("voice_join");
+        public bool RequestVoiceLeave() => SendVoiceControl("voice_leave");
+
+        private bool SendVoiceControl(string type)
+        {
+            if (!connected || socket == null) return false;
+            _ = SendVoiceControlAsync(type);
+            return true;
+        }
+
+        private async Task SendVoiceControlAsync(string type)
+        {
+            try { await socket.SendText(JsonUtility.ToJson(new GatewayVoiceControlRequest { type = type })); }
+            catch (Exception error) { Debug.LogWarning("UCENO voice control send failed: " + error.Message); }
+        }
+
+        public bool SendVoiceSignal(string targetUserId, string signalType, string sdp,
+            string candidate, string sdpMid, int sdpMLineIndex)
+        {
+            if (!connected || socket == null || string.IsNullOrWhiteSpace(targetUserId) ||
+                (signalType != "offer" && signalType != "answer" && signalType != "candidate")) return false;
+            _ = SendVoiceSignalAsync(new GatewayVoiceSignalRequest {
+                targetUserId = targetUserId, signalType = signalType, sdp = sdp,
+                candidate = candidate, sdpMid = sdpMid, sdpMLineIndex = sdpMLineIndex
+            });
+            return true;
+        }
+
+        private async Task SendVoiceSignalAsync(GatewayVoiceSignalRequest request)
+        {
+            try { await socket.SendText(JsonUtility.ToJson(request)); }
+            catch (Exception error) { Debug.LogWarning("UCENO voice signaling send failed: " + error.Message); }
         }
 
         public bool RequestWardrobeRefresh()
@@ -483,6 +539,25 @@ namespace UCENO.VirtualWorld
                 return;
             }
 
+            if (packet.type == "voice_presence")
+            {
+                VoicePeerPresenceChanged?.Invoke(packet.userId, packet.voiceActive);
+                return;
+            }
+
+            if (packet.type == "voice_signal")
+            {
+                VoiceSignalReceived?.Invoke(packet.userId, packet.signalType, packet.sdp,
+                    packet.candidate, packet.sdpMid, packet.sdpMLineIndex);
+                return;
+            }
+
+            if (packet.type == "voice_signal_rejected")
+            {
+                VoiceSignalRejected?.Invoke(packet.code ?? "voice_signal_rejected");
+                return;
+            }
+
             if (packet.type == "object_state")
             {
                 foreach (WorldInteractable item in FindObjectsOfType<WorldInteractable>())
@@ -555,6 +630,7 @@ namespace UCENO.VirtualWorld
                 remote.targetPosition = position;
                 remote.targetRotation = Quaternion.Euler(0f, state.yaw * Mathf.Rad2Deg, 0f);
                 remote.lastReceived = now;
+                remote.voiceActive = state.voiceActive;
                 if (remote.locomotion != null)
                     remote.locomotion.ApplyRemoteState(Mathf.Clamp01(speed / 8f), state.seated,
                         state.sprint || speed > 6f, state.gesture ?? "none", state.gestureSequence);
@@ -606,6 +682,13 @@ namespace UCENO.VirtualWorld
                     1f - Mathf.Exp(-interpolation * Time.deltaTime));
                 remote.root.rotation = Quaternion.Slerp(remote.root.rotation, remote.targetRotation,
                     1f - Mathf.Exp(-interpolation * Time.deltaTime));
+                bool nearbyVoice = remote.voiceActive && localPlayer != null &&
+                    Vector3.Distance(localPlayer.transform.position, remote.root.position) <= 24f;
+                if (nearbyVoice != remote.voiceNearby)
+                {
+                    remote.voiceNearby = nearbyVoice;
+                    VoicePeerPresenceChanged?.Invoke(remote.root.name.Replace("Remote Player ", ""), nearbyVoice);
+                }
             }
 
             List<string> expired = new List<string>();
@@ -645,6 +728,7 @@ namespace UCENO.VirtualWorld
         private void RemoveRemote(string id)
         {
             if (!remotePlayers.TryGetValue(id, out RemotePlayer remote)) return;
+            if (remote.voiceNearby) VoicePeerPresenceChanged?.Invoke(id, false);
             if (remote.root != null) Destroy(remote.root.gameObject);
             remotePlayers.Remove(id);
         }
