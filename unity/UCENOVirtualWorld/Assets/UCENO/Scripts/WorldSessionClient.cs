@@ -28,7 +28,7 @@ namespace UCENO.VirtualWorld
     /// </summary>
     public sealed class WorldSessionClient : MonoBehaviour
     {
-        [SerializeField] private string apiBaseUrl = "https://uceno.com";
+        [SerializeField] private string apiBaseUrl = "";
         [SerializeField] private bool androidClient = true;
 
         public string AccessToken { get; private set; }
@@ -60,9 +60,14 @@ namespace UCENO.VirtualWorld
                 clientType = clientType
             });
             byte[] body = Encoding.UTF8.GetBytes(payload);
+            if (string.IsNullOrWhiteSpace(apiBaseUrl))
+            {
+                completed?.Invoke(false, "Configure the UCENO Social API address before connecting.");
+                yield break;
+            }
             string url = apiBaseUrl.TrimEnd('/') + "/api/worlds/entry";
 
-            using (UnityWebRequest request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPUT))
+            using (UnityWebRequest request = new UnityWebRequest(url, "PUT"))
             {
                 request.uploadHandler = new UploadHandlerRaw(body);
                 request.downloadHandler = new DownloadHandlerBuffer();
