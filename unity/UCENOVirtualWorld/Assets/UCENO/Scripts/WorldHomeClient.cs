@@ -169,6 +169,11 @@ namespace UCENO.VirtualWorld
             Vector3 worldPosition = player.transform.position + player.transform.forward * placementDistance;
             worldPosition.y = Mathf.Max(worldPosition.y, player.transform.position.y);
             Vector3 localPosition = Quaternion.Inverse(homeRotation) * (worldPosition - HomePosition());
+            if (!WithinHomeBounds(localPosition))
+            {
+                status = "Move closer to this home's plot before placing furniture. The furnishing area is 50 by 50 metres.";
+                return false;
+            }
             GameObject instance = Instantiate(entry.prefab, worldPosition, homeRotation);
             instance.name = "Home Furniture " + assetId;
             spawnedFurniture.Add(instance);
@@ -217,8 +222,14 @@ namespace UCENO.VirtualWorld
                 direction == 3 ? right * furnitureMoveStep : Vector3.zero;
             WorldHomeFurnishing item = furnishing[selectedFurnitureIndex];
             Vector3 localDelta = Quaternion.Inverse(HomeRotation()) * delta;
-            item.x += localDelta.x;
-            item.z += localDelta.z;
+            Vector3 candidate = new Vector3(item.x + localDelta.x, item.y, item.z + localDelta.z);
+            if (!WithinHomeBounds(candidate))
+            {
+                status = "Furniture cannot be moved outside this home's furnishing area.";
+                return;
+            }
+            item.x = candidate.x;
+            item.z = candidate.z;
             if (selectedFurnitureIndex < spawnedFurniture.Count && spawnedFurniture[selectedFurnitureIndex] != null)
                 spawnedFurniture[selectedFurnitureIndex].transform.position += delta;
             status = "Selected furniture moved. Save the home to persist the change.";
@@ -449,6 +460,13 @@ namespace UCENO.VirtualWorld
         private Quaternion HomeRotation()
         {
             return Quaternion.Euler(0f, selectedHomeTransform.yaw, 0f);
+        }
+
+        private static bool WithinHomeBounds(Vector3 localPosition)
+        {
+            return localPosition.x >= -25f && localPosition.x <= 25f &&
+                localPosition.z >= -25f && localPosition.z <= 25f &&
+                localPosition.y >= -2f && localPosition.y <= 10f;
         }
 
         private void RebuildFurniture()
