@@ -45,6 +45,8 @@ namespace UCENO.VirtualWorld
         [SerializeField] private float pollInterval = 1.5f;
         [SerializeField] private float interpolation = 12f;
         [SerializeField] private float peerTimeout = 35f;
+        [SerializeField] private float maxVisiblePeerDistance = 110f;
+        [SerializeField] private int maxRemoteAvatars = 12;
 
         private sealed class RemotePlayer
         {
@@ -207,8 +209,24 @@ namespace UCENO.VirtualWorld
                 {
                     if (peer == null || string.IsNullOrEmpty(peer.userId) || peer.position == null || peer.rotation == null)
                         continue;
+
+                    Vector3 peerPosition = new Vector3(peer.position.x, peer.position.y, peer.position.z);
+                    bool inRange = Vector3.Distance(localPlayer.transform.position, peerPosition) <= maxVisiblePeerDistance;
+                    if (!inRange)
+                    {
+                        if (remotePlayers.TryGetValue(peer.userId, out RemotePlayer distant))
+                        {
+                            distant.targetPosition = peerPosition;
+                            distant.lastReceived = Time.time;
+                            if (distant.root != null) distant.root.gameObject.SetActive(false);
+                        }
+                        continue;
+                    }
+
                     if (!remotePlayers.TryGetValue(peer.userId, out RemotePlayer remote))
                     {
+                        if (remotePlayers.Count >= Mathf.Max(1, maxRemoteAvatars))
+                            continue;
                         GameObject avatar = Instantiate(remoteAvatarPrefab);
                         avatar.name = "Remote Player " + peer.userId;
                         foreach (AvatarLocomotionDriver driver in avatar.GetComponentsInChildren<AvatarLocomotionDriver>())
@@ -216,7 +234,8 @@ namespace UCENO.VirtualWorld
                         remote = new RemotePlayer { root = avatar.transform };
                         remotePlayers.Add(peer.userId, remote);
                     }
-                    remote.targetPosition = new Vector3(peer.position.x, peer.position.y, peer.position.z);
+                    if (remote.root != null && !remote.root.gameObject.activeSelf) remote.root.gameObject.SetActive(true);
+                    remote.targetPosition = peerPosition;
                     remote.targetRotation = new Quaternion(peer.rotation.x, peer.rotation.y, peer.rotation.z, peer.rotation.w);
                     remote.lastReceived = Time.time;
                 }
