@@ -25,6 +25,43 @@ type CollisionBox = {
   minX: number; maxX: number; minY: number; maxY: number;
   minZ: number; maxZ: number;
 };
+type Interactable = { id: string; kind: "door" | "object"; x: number; y: number; z: number; state: string; actorId: string | null };
+
+function loadInteractables(): Map<string, Interactable> {
+  const filePath = process.env.WORLD_INTERACTABLES_FILE || process.env.WORLD_COLLISION_BOXES_FILE;
+  let raw = process.env.WORLD_INTERACTABLES;
+  if (!raw && filePath) {
+    try { raw = readFileSync(filePath, "utf8"); }
+    catch (error) {
+      throw new Error("Could not read world interactables: " +
+        (error instanceof Error ? error.message : "unknown file error"));
+    }
+  }
+  if (!raw) return new Map();
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); }
+  catch { throw new Error("World interactables must be valid JSON"); }
+  const values = parsed && typeof parsed === "object" &&
+    Array.isArray((parsed as { interactables?: unknown }).interactables)
+      ? (parsed as { interactables: unknown[] }).interactables : [];
+  if (values.length > 500) throw new Error("World interactables cannot exceed 500 entries");
+  const result = new Map<string, Interactable>();
+  for (const [index, value] of values.entries()) {
+    if (!value || typeof value !== "object") throw new Error(`Interactable ${index} is invalid`);
+    const item = value as Record<string, unknown>;
+    if (typeof item.id !== "string" || !/^[a-zA-Z0-9._:-]{1,80}$/.test(item.id) ||
+        (item.kind !== "door" && item.kind !== "object") ||
+        !finiteNumber(item.x, -WORLD_BOUNDS, WORLD_BOUNDS) ||
+        !finiteNumber(item.y, -WORLD_BOUNDS, WORLD_BOUNDS) ||
+        !finiteNumber(item.z, -WORLD_BOUNDS, WORLD_BOUNDS) || result.has(item.id))
+      throw new Error(`Interactable ${index} has invalid or duplicate fields`);
+    result.set(item.id, {
+      id: item.id, kind: item.kind, x: item.x, y: item.y, z: item.z,
+      state: item.kind === "door" ? "closed" : "idle", actorId: null
+    });
+  }
+  return result;
+}
 
 function loadCollisionBoxes(): CollisionBox[] {
   const filePath = process.env.WORLD_COLLISION_BOXES_FILE;
@@ -66,6 +103,7 @@ function loadCollisionBoxes(): CollisionBox[] {
 }
 
 const COLLISION_BOXES = loadCollisionBoxes();
+const INTERACTABLES = loadInteractables();
 
 function overlapsBox(x: number, y: number, z: number, box: CollisionBox): boolean {
   const horizontal = x + PLAYER_RADIUS > box.minX && x - PLAYER_RADIUS < box.maxX &&
@@ -95,6 +133,7 @@ type Player = {
   moveX: number; moveZ: number; sprint: boolean; seated: boolean; gesture: string; gestureSequence: number; jumpQueued: boolean;
   lastInputAt: number; inputCount: number; inputWindowAt: number;
   lastSequence: number; lastCheckpointAt: number; lastAuthorizationCheck: number; authorizationCheckInProgress: boolean;
+  lastInteractionAt: number;
 };
 const players = new Map<string, Player>();
 
@@ -171,7 +210,8 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
     id: userId, worldId, token, socket, x, y, z, vx: 0, vy: 0, vz: 0, yaw, grounded: y <= GROUND_Y + 0.01,
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
-    lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false
+    lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
+    lastInteractionAt: 0
   };
 }
 
@@ -248,6 +288,31 @@ wss.on("connection", async (socket: WebSocket) => {
     socket.on("message", (raw) => {
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
+      if (msg && msg.type === "interact") {
+        if (typeof msg.objectId !== "string" ||
+            !/^[a-zA-Z0-9._:-]{1,80}$/.test(msg.objectId) ||
+            !["toggle", "use"].includes(msg.action)) {
+          fail(socket, "invalid_interaction"); return;
+        }
+        const target = INTERACTABLES.get(msg.objectId);
+        if (!target || (target.kind === "door" && msg.action !== "toggle") ||
+            (target.kind === "object" && msg.action !== "use")) {
+          send(socket, { type: "interaction_rejected", code: "unknown_or_invalid_object" }); return;
+        }
+        const distance = Math.hypot(player.x - target.x, player.y - target.y, player.z - target.z);
+        const now = Date.now();
+        if (distance > 4.25 || now - player.lastInteractionAt < 250) {
+          send(socket, { type: "interaction_rejected", code: "out_of_range_or_rate_limited" }); return;
+        }
+        player.lastInteractionAt = now;
+        target.state = target.kind === "door"
+          ? (target.state === "open" ? "closed" : "open")
+          : (target.state === "active" ? "idle" : "active");
+        target.actorId = player.id;
+        const packet = { type: "object_state", objectId: target.id, state: target.state, actorId: player.id };
+        for (const peer of players.values()) send(peer.socket, packet);
+        return;
+      }
       if (!msg || msg.type !== "input" || !Number.isSafeInteger(msg.sequence) ||
           msg.sequence <= player.lastSequence || !finiteNumber(msg.moveX, -1, 1) ||
           !finiteNumber(msg.moveZ, -1, 1) || !finiteNumber(msg.yaw, -Math.PI * 4, Math.PI * 4) ||
