@@ -94,6 +94,9 @@ jobs:
           const homeMembers = fs.readFileSync('./app/api/world-homes/[homeId]/members/route.ts', 'utf8');
           for (const marker of ['export async function GET', 'Only the home owner can view the invitation roster', 'FROM virtual_home_members', 'Cache-Control'])
             if (!homeMembers.includes(marker)) throw new Error('Missing private owner-only home invitation roster behavior: ' + marker);
+          const homeMembersApi = fs.readFileSync('./app/api/world-homes/[homeId]/members/route.ts', 'utf8');
+          for (const marker of ["owner_m.status", "home.ownerMembership === \"banned\"", "home.ownerMembership === \"suspended\""])
+            if (!homeMembersApi.includes(marker)) throw new Error('Home invite API does not revalidate owner world membership: ' + marker);
           const homeRoute = fs.readFileSync('./app/api/world-homes/[homeId]/route.ts', 'utf8');
           for (const marker of ['export async function GET', 'Home is unavailable', 'worldStatus', 'worldMembership', 'home.visibility !== "invite"', 'COALESCE(wm.status, \'none\') NOT IN', "w.status = 'published'", "h.visibility = 'invite'", 'Cache-Control'])
             if (!homeRoute.includes(marker)) throw new Error('Missing access-controlled home retrieval behavior: ' + marker);
