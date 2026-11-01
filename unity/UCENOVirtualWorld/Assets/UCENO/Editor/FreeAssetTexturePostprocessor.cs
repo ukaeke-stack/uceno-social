@@ -37,7 +37,10 @@ namespace UCENO.VirtualWorld.Editor
                 importer.textureType = TextureImporterType.NormalMap;
                 importer.sRGBTexture = false;
             }
-            else if (lowerPath.Contains("_rough") || lowerPath.Contains("_ao") || lowerPath.Contains("_metal"))
+            else if (lowerPath.Contains("_rough") || lowerPath.Contains("_ao") ||
+                     lowerPath.Contains("_arm") || lowerPath.Contains("_metal") ||
+                     lowerPath.Contains("_mask") || lowerPath.Contains("_alpha") ||
+                     lowerPath.Contains("_opacity") || lowerPath.Contains("_disp"))
             {
                 importer.textureType = TextureImporterType.Default;
                 importer.sRGBTexture = false;
