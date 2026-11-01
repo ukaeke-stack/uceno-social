@@ -59,6 +59,7 @@ namespace UCENO.VirtualWorld
         public string objectId;
         public string objectState;
         public string actorId;
+        public string occupantId;
         public GatewayVectorState state;
         public GatewaySnapshotPlayer[] players;
     }
@@ -105,6 +106,7 @@ namespace UCENO.VirtualWorld
 
         public string ConnectionStatus { get; private set; } = "WAITING";
         public int PeerCount => remotePlayers.Count;
+        public string LocalUserId => localUserId;
 
         public void Configure(WorldSessionClient worldSession, PlayerMotor player, GameObject avatarPrefab)
         {
@@ -130,7 +132,7 @@ namespace UCENO.VirtualWorld
         public bool RequestInteraction(string objectId, string action)
         {
             if (!connected || socket == null || string.IsNullOrWhiteSpace(objectId) ||
-                (action != "toggle" && action != "use"))
+                (action != "toggle" && action != "use" && action != "sit" && action != "stand"))
                 return false;
             _ = SendInteractionAsync(objectId, action);
             return true;
@@ -261,7 +263,9 @@ namespace UCENO.VirtualWorld
             {
                 foreach (WorldInteractable item in FindObjectsOfType<WorldInteractable>())
                     if (item != null && item.ObjectId == packet.objectId)
-                        item.ApplyServerState(packet.objectState);
+                        item.ApplyServerState(packet.objectState, packet.occupantId);
+                if (packet.actorId == localUserId && localPlayer != null && itemKindIsSeat(packet.objectId))
+                    localPlayer.SetSeated(packet.objectState == "occupied");
                 return;
             }
 
@@ -329,6 +333,13 @@ namespace UCENO.VirtualWorld
                     remote.locomotion.ApplyRemoteState(Mathf.Clamp01(speed / 8f), state.seated,
                         state.sprint || speed > 6f, state.gesture ?? "none", state.gestureSequence);
             }
+        }
+
+        private bool itemKindIsSeat(string objectId)
+        {
+            foreach (WorldInteractable item in FindObjectsOfType<WorldInteractable>())
+                if (item != null && item.ObjectId == objectId) return item.Kind == "seat";
+            return false;
         }
 
         private void Update()
