@@ -15,6 +15,7 @@ const MOVE_SPEED = 5.5;
 const RUN_SPEED = 8.0;
 const JUMP_SPEED = 6.5;
 const GRAVITY = 18;
+const GROUND_Y = 1.15;
 const MAX_INPUTS_PER_SECOND = 30;
 
 if (!/^[0-9a-f-]{36}$/i.test(INSTANCE_ID) || !DATABASE_URL || TOKEN_SECRET.length < 32)
@@ -93,12 +94,12 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
     WHERE world_id = ${worldId}::uuid AND user_id = ${userId}::uuid
     LIMIT 1
   `;
-  const p = rows[0]?.position || { x: 0, y: 0, z: 0 };
+  const p = rows[0]?.position || { x: 0, y: GROUND_Y, z: 0 };
   const x = finiteNumber(p.x, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.x : 0;
-  const y = finiteNumber(p.y, -1000, WORLD_BOUNDS) ? p.y : 0;
+  const y = finiteNumber(p.y, GROUND_Y, WORLD_BOUNDS) ? p.y : GROUND_Y;
   const z = finiteNumber(p.z, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.z : 0;
   return {
-    id: userId, worldId, token, socket, x, y, z, vx: 0, vy: 0, vz: 0, yaw: 0, grounded: y <= 0.01,
+    id: userId, worldId, token, socket, x, y, z, vx: 0, vy: 0, vz: 0, yaw: 0, grounded: y <= GROUND_Y + 0.01,
     moveX: 0, moveZ: 0, sprint: false, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false
@@ -194,7 +195,7 @@ setInterval(async () => {
     p.x = Math.max(-WORLD_BOUNDS, Math.min(WORLD_BOUNDS, p.x + p.vx * dt));
     p.z = Math.max(-WORLD_BOUNDS, Math.min(WORLD_BOUNDS, p.z + p.vz * dt));
     p.y += p.vy * dt;
-    if (p.y <= 0) { p.y = 0; p.vy = 0; p.grounded = true; }
+    if (p.y <= GROUND_Y) { p.y = GROUND_Y; p.vy = 0; p.grounded = true; }
     snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded });
     if (now - p.lastCheckpointAt >= 5000) {
       p.lastCheckpointAt = now;
@@ -217,20 +218,17 @@ setInterval(async () => {
   }
 }, TICK_MS);
 
-const heartbeatSecret = process.env.WORLD_INSTANCE_HEARTBEAT_SECRET || "";
-if (heartbeatSecret.length >= 32) {
-  const heartbeat = async () => {
-    try {
-      await sql`
-        UPDATE virtual_world_instances SET heartbeat_at = NOW(),
-          current_players = ${players.size}
-        WHERE id = ${INSTANCE_ID}::uuid AND status IN ('ready', 'draining')
-      `;
-    } catch (error) { console.error("instance_heartbeat_failed", error); }
-  };
-  void heartbeat();
-  setInterval(heartbeat, 10000);
-}
+const heartbeat = async () => {
+  try {
+    await sql`
+      UPDATE virtual_world_instances SET heartbeat_at = NOW(),
+        current_players = ${players.size}
+      WHERE id = ${INSTANCE_ID}::uuid AND status IN ('ready', 'draining')
+    `;
+  } catch (error) { console.error("instance_heartbeat_failed", error); }
+};
+void heartbeat();
+setInterval(heartbeat, 10000);
 
 server.listen(PORT, () => console.log(`UCENO world gateway listening on ${PORT} for instance ${INSTANCE_ID}`));
 process.on("SIGTERM", async () => {
