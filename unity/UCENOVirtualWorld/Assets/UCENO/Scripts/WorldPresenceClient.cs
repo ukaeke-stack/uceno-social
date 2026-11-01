@@ -7,6 +7,7 @@ using UnityEngine.Networking;
 
 namespace UCENO.VirtualWorld
 {
+    [Serializable] internal sealed class WorldTokenWorldScope { public string world_id; }
     [Serializable] public sealed class WorldPresenceVector { public float x; public float y; public float z; }
     [Serializable] public sealed class WorldPresenceRotation { public float x; public float y; public float z; public float w = 1f; }
     [Serializable] public sealed class WorldPresencePeer
@@ -61,6 +62,8 @@ namespace UCENO.VirtualWorld
         {
             if (session == null) session = FindObjectOfType<WorldSessionClient>();
             if (localPlayer == null) localPlayer = FindObjectOfType<PlayerMotor>();
+            if (session != null && string.IsNullOrWhiteSpace(apiBaseUrl)) apiBaseUrl = session.ApiBaseUrl;
+            if (session != null && string.IsNullOrWhiteSpace(worldId)) worldId = ReadWorldId(session.AccessToken);
             if (session == null || localPlayer == null || remoteAvatarPrefab == null ||
                 string.IsNullOrWhiteSpace(apiBaseUrl) || string.IsNullOrWhiteSpace(worldId))
             {
@@ -201,6 +204,22 @@ namespace UCENO.VirtualWorld
                 if (remotePlayers[id].root != null) Destroy(remotePlayers[id].root.gameObject);
                 remotePlayers.Remove(id);
             }
+        }
+
+
+        private static string ReadWorldId(string token)
+        {
+            try
+            {
+                string[] parts = token.Split('.');
+                if (parts.Length != 3) return null;
+                string payload = parts[1].Replace('-', '+').Replace('_', '/');
+                payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+                byte[] bytes = Convert.FromBase64String(payload);
+                WorldTokenWorldScope scope = JsonUtility.FromJson<WorldTokenWorldScope>(Encoding.UTF8.GetString(bytes));
+                return scope != null ? scope.world_id : null;
+            }
+            catch { return null; }
         }
 
         private string Endpoint(string suffix) =>
