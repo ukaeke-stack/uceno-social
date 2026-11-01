@@ -42,6 +42,10 @@ DECLARE
   v_instance virtual_world_instances%ROWTYPE;
   v_lease TIMESTAMPTZ := NOW() + INTERVAL '45 seconds';
 BEGIN
+  -- Serialize claims for this world. A row lock alone does not guarantee
+  -- that a concurrent capacity COUNT sees leases inserted by a waiting claim.
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_world_id::text, 0));
+
   -- Prefer a still-healthy instance already assigned to this player.
   SELECT i.* INTO v_instance
   FROM virtual_world_instance_sessions s
