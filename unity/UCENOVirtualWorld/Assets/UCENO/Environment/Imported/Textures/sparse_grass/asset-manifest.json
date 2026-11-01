@@ -10,7 +10,8 @@
     "1k"
   ],
   "maps": [
-    "sparse_grass_nor_gl.png"
+    "sparse_grass_nor_gl.png",
+    "sparse_grass_arm.jpg"
   ],
   "runtime_api_dependency": false
 }
