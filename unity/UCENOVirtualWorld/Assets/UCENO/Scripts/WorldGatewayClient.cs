@@ -126,7 +126,14 @@ namespace UCENO.VirtualWorld
     {
         public string type;
         public string userId;
+        public string fromUserId;
         public string code;
+        public bool active;
+        public string signalType;
+        public string sdp;
+        public string candidate;
+        public string sdpMid;
+        public int sdpMLineIndex;
         public string contextType;
         public string contextId;
         public string activityType;
@@ -541,13 +548,13 @@ namespace UCENO.VirtualWorld
 
             if (packet.type == "voice_presence")
             {
-                VoicePeerPresenceChanged?.Invoke(packet.userId, packet.voiceActive);
+                VoicePeerPresenceChanged?.Invoke(packet.userId, packet.active);
                 return;
             }
 
             if (packet.type == "voice_signal")
             {
-                VoiceSignalReceived?.Invoke(packet.userId, packet.signalType, packet.sdp,
+                VoiceSignalReceived?.Invoke(packet.fromUserId, packet.signalType, packet.sdp,
                     packet.candidate, packet.sdpMid, packet.sdpMLineIndex);
                 return;
             }
