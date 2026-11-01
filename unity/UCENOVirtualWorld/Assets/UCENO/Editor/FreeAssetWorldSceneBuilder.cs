@@ -163,11 +163,11 @@ namespace UCENO.VirtualWorld.Editor
             Material material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
             if (material == null)
             {
-                material = new Material(Shader.Find("Standard"));
+                material = new Material(RequireShader("Standard"));
                 AssetDatabase.CreateAsset(material, materialPath);
             }
 
-            material.shader = Shader.Find("Standard");
+            material.shader = RequireShader("Standard");
             material.color = baseColor;
             material.SetTexture("_MainTex", diffuse);
             material.SetTextureScale("_MainTex", tiling);
@@ -212,13 +212,11 @@ namespace UCENO.VirtualWorld.Editor
             Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (material == null)
             {
-                Shader shader = Shader.Find("Skybox/Panoramic");
-                if (shader == null)
-                    throw new BuildFailedException("Unity's Skybox/Panoramic shader is unavailable.");
+                Shader shader = RequireShader("Skybox/Panoramic");
                 material = new Material(shader);
                 AssetDatabase.CreateAsset(material, path);
             }
-            material.shader = Shader.Find("Skybox/Panoramic");
+            material.shader = RequireShader("Skybox/Panoramic");
             material.SetTexture("_MainTex", hdri);
             material.SetFloat("_Exposure", 1f);
             material.SetFloat("_Rotation", 0f);
@@ -272,6 +270,8 @@ namespace UCENO.VirtualWorld.Editor
             string prefabPath = PrefabRoot + "/Characters/UCENO_Default_Avatar.prefab";
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(wrapper, prefabPath);
             UnityEngine.Object.DestroyImmediate(wrapper);
+            if (prefab == null)
+                throw new BuildFailedException("Could not save avatar prefab: " + prefabPath);
             return prefab;
         }
 
@@ -338,6 +338,8 @@ namespace UCENO.VirtualWorld.Editor
             string prefabPath = PrefabRoot + "/Environment/" + prefabName + ".prefab";
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(wrapper, prefabPath);
             UnityEngine.Object.DestroyImmediate(wrapper);
+            if (prefab == null)
+                throw new BuildFailedException("Could not save environment prefab: " + prefabPath);
             return prefab;
         }
 
@@ -586,6 +588,14 @@ namespace UCENO.VirtualWorld.Editor
             EditorBuildSettings.scenes = scenes
                 .Concat(new[] { new EditorBuildSettingsScene(scenePath, true) })
                 .ToArray();
+        }
+
+        private static Shader RequireShader(string shaderName)
+        {
+            Shader shader = Shader.Find(shaderName);
+            if (shader == null)
+                throw new BuildFailedException("Required Unity shader is unavailable: " + shaderName);
+            return shader;
         }
 
         private static void EnsureFolder(string path)
