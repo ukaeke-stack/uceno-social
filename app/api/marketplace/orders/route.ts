@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
              l.title AS "listingTitle", o.quantity,
              o.unit_price_purchased_credits AS "unitPricePurchasedCredits",
              o.total_purchased_credits AS "totalPurchasedCredits",
-             o.status, o.created_at AS "createdAt", o.updated_at AS "updatedAt",
+             o.status, o.fulfillment_status AS "fulfillmentStatus",\n             o.seller_delivered_at AS "sellerDeliveredAt",\n             o.buyer_confirmed_at AS "buyerConfirmedAt",\n             o.disputed_at AS "disputedAt", o.dispute_reason AS "disputeReason",\n             o.created_at AS "createdAt", o.updated_at AS "updatedAt",
              CASE WHEN o.buyer_user_id = ${session.id}::uuid THEN 'buyer' ELSE 'seller' END AS "myRole"
       FROM virtual_marketplace_orders o
       LEFT JOIN virtual_marketplace_listings l ON l.id = o.listing_id
