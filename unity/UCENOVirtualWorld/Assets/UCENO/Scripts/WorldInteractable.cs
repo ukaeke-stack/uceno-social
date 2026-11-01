@@ -30,25 +30,23 @@ namespace UCENO.VirtualWorld
 
         private void Awake()
         {
-            Transform pivot = doorPivot != null ? doorPivot : transform;
-            closedRotation = pivot.localRotation;
+            closedRotation = doorPivot != null ? doorPivot.localRotation : Quaternion.identity;
             targetRotation = closedRotation;
             initialized = true;
         }
 
         private void Update()
         {
-            if (!initialized || kind != WorldInteractableKind.Door) return;
-            Transform pivot = doorPivot != null ? doorPivot : transform;
-            pivot.localRotation = Quaternion.RotateTowards(
-                pivot.localRotation, targetRotation, animationSpeed * Time.deltaTime);
+            if (!initialized || kind != WorldInteractableKind.Door || doorPivot == null) return;
+            doorPivot.localRotation = Quaternion.RotateTowards(
+                doorPivot.localRotation, targetRotation, animationSpeed * Time.deltaTime);
         }
 
         public void ApplyServerState(string state)
         {
             if (string.IsNullOrWhiteSpace(state)) return;
             CurrentState = state;
-            if (kind != WorldInteractableKind.Door) return;
+            if (kind != WorldInteractableKind.Door || doorPivot == null) return;
             if (!initialized) Awake();
             targetRotation = state == "open"
                 ? closedRotation * Quaternion.Euler(0f, openAngle, 0f)
