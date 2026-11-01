@@ -26,7 +26,7 @@ const secret = new TextEncoder().encode(TOKEN_SECRET);
 type Player = {
   id: string; worldId: string; token: string; socket: WebSocket; x: number; y: number; z: number;
   vx: number; vy: number; vz: number; yaw: number; grounded: boolean;
-  moveX: number; moveZ: number; sprint: boolean; jumpQueued: boolean;
+  moveX: number; moveZ: number; sprint: boolean; seated: boolean; gesture: string; gestureSequence: number; jumpQueued: boolean;
   lastInputAt: number; inputCount: number; inputWindowAt: number;
   lastSequence: number; lastCheckpointAt: number; lastAuthorizationCheck: number; authorizationCheckInProgress: boolean;
 };
@@ -100,7 +100,7 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
   const z = finiteNumber(p.z, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.z : 0;
   return {
     id: userId, worldId, token, socket, x, y, z, vx: 0, vy: 0, vz: 0, yaw: 0, grounded: y <= GROUND_Y + 0.01,
-    moveX: 0, moveZ: 0, sprint: false, jumpQueued: false,
+    moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false
   };
@@ -151,7 +151,9 @@ wss.on("connection", async (socket: WebSocket) => {
       if (!msg || msg.type !== "input" || !Number.isSafeInteger(msg.sequence) ||
           msg.sequence <= player.lastSequence || !finiteNumber(msg.moveX, -1, 1) ||
           !finiteNumber(msg.moveZ, -1, 1) || !finiteNumber(msg.yaw, -Math.PI * 4, Math.PI * 4) ||
-          typeof msg.sprint !== "boolean" || typeof msg.jump !== "boolean") {
+          typeof msg.sprint !== "boolean" || typeof msg.jump !== "boolean" ||
+          typeof msg.seated !== "boolean" || !["none", "wave", "cheer"].includes(msg.gesture) ||
+          !Number.isSafeInteger(msg.gestureSequence) || msg.gestureSequence < 0) {
         fail(socket, "invalid_input"); return;
       }
       const now = Date.now();
@@ -160,8 +162,13 @@ wss.on("connection", async (socket: WebSocket) => {
       player.lastSequence = msg.sequence;
       player.lastInputAt = now;
       player.moveX = msg.moveX; player.moveZ = msg.moveZ;
-      player.yaw = msg.yaw; player.sprint = msg.sprint;
-      if (msg.jump && player.grounded) player.jumpQueued = true;
+      player.yaw = msg.yaw; player.sprint = msg.sprint && !msg.seated;
+      player.seated = msg.seated;
+      if (msg.gestureSequence >= player.gestureSequence) {
+        player.gestureSequence = msg.gestureSequence;
+        player.gesture = msg.gesture;
+      }
+      if (msg.jump && player.grounded && !player.seated) player.jumpQueued = true;
     });
     socket.on("close", () => {
       if (players.get(identity.userId)?.socket === socket) players.delete(identity.userId);
@@ -206,8 +213,8 @@ setInterval(async () => {
     const speed = p.sprint ? RUN_SPEED : MOVE_SPEED;
     const sin = Math.sin(p.yaw), cos = Math.cos(p.yaw);
     const localX = p.moveX * scale, localZ = p.moveZ * scale;
-    p.vx = (localX * cos + localZ * sin) * speed;
-    p.vz = (-localX * sin + localZ * cos) * speed;
+    p.vx = p.seated ? 0 : (localX * cos + localZ * sin) * speed;
+    p.vz = p.seated ? 0 : (-localX * sin + localZ * cos) * speed;
     if (p.jumpQueued && p.grounded) { p.vy = JUMP_SPEED; p.grounded = false; }
     p.jumpQueued = false;
     p.vy -= GRAVITY * dt;
@@ -215,7 +222,8 @@ setInterval(async () => {
     p.z = Math.max(-WORLD_BOUNDS, Math.min(WORLD_BOUNDS, p.z + p.vz * dt));
     p.y += p.vy * dt;
     if (p.y <= GROUND_Y) { p.y = GROUND_Y; p.vy = 0; p.grounded = true; }
-    snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded });
+    snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
+      seated: p.seated, sprint: p.sprint, gesture: p.gesture, gestureSequence: p.gestureSequence });
     if (now - p.lastCheckpointAt >= 5000) {
       p.lastCheckpointAt = now;
       void sql`
