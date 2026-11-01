@@ -91,6 +91,7 @@ namespace UCENO.VirtualWorld
     {
         [SerializeField] private WorldSessionClient session;
         [SerializeField] private PlayerMotor player;
+        [SerializeField] private WorldGatewayClient gateway;
         [SerializeField] private WorldHomeFurnitureCatalogEntry[] furnitureCatalog =
             new WorldHomeFurnitureCatalogEntry[0];
         [SerializeField] private float placementDistance = 2.2f;
@@ -114,6 +115,8 @@ namespace UCENO.VirtualWorld
         private bool busy;
         private Vector2 scroll;
         private Vector2 furnitureScroll;
+        private GameObject activeInterior;
+        private string activeHomeId;
 
         public IReadOnlyList<WorldHomeSummary> Homes => homes;
         public string SelectedHomeId => selectedHomeId;
@@ -124,6 +127,23 @@ namespace UCENO.VirtualWorld
         {
             if (session == null) session = FindObjectOfType<WorldSessionClient>();
             if (player == null) player = FindObjectOfType<PlayerMotor>();
+            if (gateway == null) gateway = FindObjectOfType<WorldGatewayClient>();
+            if (gateway != null)
+            {
+                gateway.SpatialLocationEntered += HandleSpatialLocationEntered;
+                gateway.SpatialLocationExited += HandleSpatialLocationExited;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (gateway != null)
+            {
+                gateway.SpatialLocationEntered -= HandleSpatialLocationEntered;
+                gateway.SpatialLocationExited -= HandleSpatialLocationExited;
+            }
+            if (activeInterior != null) Destroy(activeInterior);
+            ClearSpawnedFurniture();
         }
 
         private void Update()
@@ -297,7 +317,7 @@ namespace UCENO.VirtualWorld
                 templateId = "starter.home",
                 visibility = "private",
                 transform = CurrentTransform(),
-                furnishing = new WorldHomeFurnishing[0]
+                furnishing = CreateStarterFurnishing()
             };
             using (UnityWebRequest request = CreateRequest(
                 session.ApiBaseUrl.TrimEnd('/') + "/api/world-homes", "POST", JsonUtility.ToJson(payload)))
@@ -354,8 +374,10 @@ namespace UCENO.VirtualWorld
                         if (selectedPermission == "owner" && selectedVisibility == "invite")
                             StartCoroutine(LoadMembersRoutine());
                         if (response.home.furnishing != null) furnishing.AddRange(response.home.furnishing);
-                        RebuildFurniture();
-                        status = "Loaded " + selectedHomeName + " (" + selectedPermission + ").";
+                        if (gateway == null || !gateway.RequestHomeEntry(homeId))
+                            status = "Home access loaded, but the authoritative world gateway is not connected. Reconnect and open this home again.";
+                        else
+                            status = "Home access verified. Waiting for the world server to admit you.";
                     }
                 }
             }
@@ -445,6 +467,38 @@ namespace UCENO.VirtualWorld
                 }
             }
             busy = false;
+        }
+
+        private static WorldHomeFurnishing[] CreateStarterFurnishing()
+        {
+            return new[]
+            {
+                new WorldHomeFurnishing { id = "starter-sofa", assetId = "sofa_01", x = -2.1f, y = 0f, z = 1.9f, yaw = 0f, scale = 0.9f },
+                new WorldHomeFurnishing { id = "starter-chair", assetId = "arm_chair_01", x = 2.2f, y = 0f, z = 1.8f, yaw = 180f, scale = 0.9f },
+                new WorldHomeFurnishing { id = "starter-table", assetId = "round_wooden_table_01", x = 0f, y = 0f, z = 0.2f, yaw = 0f, scale = 0.85f },
+                new WorldHomeFurnishing { id = "starter-bed", assetId = "gothic_bed_01", x = -2.3f, y = 0f, z = -2.7f, yaw = 90f, scale = 0.8f },
+                new WorldHomeFurnishing { id = "starter-cabinet", assetId = "gothic_cabinet_01", x = 2.5f, y = 0f, z = -2.9f, yaw = 0f, scale = 0.85f }
+            };
+        }
+
+        private void HandleSpatialLocationEntered(string contextType, string contextId, Vector3 spawnPosition, float yaw)
+        {
+            if (contextType != "home" || contextId != selectedHomeId) return;
+            if (activeInterior != null) Destroy(activeInterior);
+            ClearSpawnedFurniture();
+            activeInterior = WorldHomeInteriorBuilder.Create(contextId, HomePosition(), HomeRotation());
+            activeHomeId = contextId;
+            RebuildFurniture();
+            status = "Inside " + selectedHomeName + ". Home entry was authorized by the world server.";
+        }
+
+        private void HandleSpatialLocationExited()
+        {
+            if (activeInterior != null) Destroy(activeInterior);
+            activeInterior = null;
+            activeHomeId = null;
+            ClearSpawnedFurniture();
+            status = "You have left the residential interior.";
         }
 
         private WorldHomeTransform CurrentTransform()
@@ -578,6 +632,9 @@ namespace UCENO.VirtualWorld
             if (!string.IsNullOrEmpty(selectedHomeId))
             {
                 GUILayout.Label("Selected: " + selectedHomeName + " (" + selectedPermission + ")");
+                if (activeHomeId == selectedHomeId && gateway != null &&
+                    GUILayout.Button("EXIT HOME", GUILayout.Height(34f * scale)))
+                    gateway.RequestHomeExit();
                 if (selectedPermission == "owner")
                 {
                     if (GUILayout.Button(selectedVisibility == "invite" ? "SHARING: ON (TAP TO MAKE PRIVATE)" : "SHARING: OFF (TAP TO INVITE)", GUILayout.Height(32f * scale)))
