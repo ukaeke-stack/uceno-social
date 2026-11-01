@@ -30,6 +30,12 @@ namespace UCENO.VirtualWorld
         public bool grounded;
     }
 
+    [Serializable] internal sealed class GatewayWardrobeItemState
+    {
+        public string slot;
+        public string itemId;
+    }
+
     [Serializable] internal sealed class GatewaySnapshotPlayer
     {
         public string userId;
@@ -42,6 +48,7 @@ namespace UCENO.VirtualWorld
         public bool sprint;
         public string gesture;
         public int gestureSequence;
+        public GatewayWardrobeItemState[] wardrobe;
     }
 
     [Serializable] internal sealed class GatewayInteractionPacket
@@ -49,6 +56,11 @@ namespace UCENO.VirtualWorld
         public string type = "interact";
         public string objectId;
         public string action;
+    }
+
+    [Serializable] internal sealed class GatewayWardrobeRefreshRequest
+    {
+        public string type = "wardrobe_refresh";
     }
 
     [Serializable] internal sealed class GatewayContextRequest
@@ -138,6 +150,8 @@ namespace UCENO.VirtualWorld
             public float lastSampleTime;
             public AvatarLocomotionDriver locomotion;
             public bool hasSample;
+            public AvatarWardrobeController wardrobe;
+            public string wardrobeSignature;
         }
 
         private readonly Dictionary<string, RemotePlayer> remotePlayers = new Dictionary<string, RemotePlayer>();
@@ -261,6 +275,22 @@ namespace UCENO.VirtualWorld
             catch (Exception error)
             {
                 Debug.LogWarning("UCENO activity request failed: " + error.Message);
+            }
+        }
+
+        public bool RequestWardrobeRefresh()
+        {
+            if (!connected || socket == null) return false;
+            _ = SendWardrobeRefreshAsync();
+            return true;
+        }
+
+        private async Task SendWardrobeRefreshAsync()
+        {
+            try { await socket.SendText(JsonUtility.ToJson(new GatewayWardrobeRefreshRequest())); }
+            catch (Exception error)
+            {
+                Debug.LogWarning("UCENO wardrobe refresh request failed: " + error.Message);
             }
         }
 
@@ -505,8 +535,10 @@ namespace UCENO.VirtualWorld
                     remote = new RemotePlayer
                     {
                         root = avatar.transform,
-                        locomotion = avatar.GetComponentInChildren<AvatarLocomotionDriver>()
+                        locomotion = avatar.GetComponentInChildren<AvatarLocomotionDriver>(),
+                        wardrobe = avatar.GetComponentInChildren<AvatarWardrobeController>()
                     };
+                    if (remote.wardrobe == null) remote.wardrobe = avatar.AddComponent<AvatarWardrobeController>();
                     if (remote.locomotion != null) remote.locomotion.enabled = true;
                     remotePlayers.Add(state.userId, remote);
                 }
@@ -526,6 +558,23 @@ namespace UCENO.VirtualWorld
                 if (remote.locomotion != null)
                     remote.locomotion.ApplyRemoteState(Mathf.Clamp01(speed / 8f), state.seated,
                         state.sprint || speed > 6f, state.gesture ?? "none", state.gestureSequence);
+                if (remote.wardrobe != null && state.wardrobe != null)
+                {
+                    string signature = "";
+                    List<KeyValuePair<AvatarWardrobeSlot, string>> selections =
+                        new List<KeyValuePair<AvatarWardrobeSlot, string>>();
+                    foreach (GatewayWardrobeItemState item in state.wardrobe)
+                    {
+                        if (item == null || !Enum.TryParse(item.slot, true, out AvatarWardrobeSlot slot)) continue;
+                        signature += item.slot + ":" + item.itemId + ";";
+                        selections.Add(new KeyValuePair<AvatarWardrobeSlot, string>(slot, item.itemId));
+                    }
+                    if (signature != remote.wardrobeSignature)
+                    {
+                        remote.wardrobe.ApplyEquipped(selections);
+                        remote.wardrobeSignature = signature;
+                    }
+                }
             }
         }
 
