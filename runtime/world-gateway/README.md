@@ -9,7 +9,7 @@ Standalone WebSocket runtime for an already-provisioned UCENO world instance.
 - Re-checks account moderation, world publication/visibility, membership,
   owner-block state and the live instance lease against PostgreSQL at connect.
 - Accepts authenticated WebSocket connections at `/world`.
-- Accepts sequenced movement input (move axes, yaw, sprint and jump), rejects
+- Accepts sequenced movement input (move axes, yaw, sprint, jump, seated state and wave/cheer gesture state), rejects
   malformed or excessive input, and simulates horizontal movement, gravity,
   jump and ground contact at 20 ticks/second on the server.
 - Broadcasts server-generated world snapshots to connected players.
