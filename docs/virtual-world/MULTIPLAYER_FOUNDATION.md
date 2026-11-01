@@ -78,3 +78,34 @@ token was previously issued but the world APIs only read the browser cookie.
 It does not yet make the Unity client a complete multiplayer client. Movement
 polling, remote-avatar interpolation, reconnect UX, voice proximity
 attenuation, mute/deafen, block/report and on-device tests remain outstanding.
+
+
+## Unity presence client implementation
+
+The generated starter city now attaches a Unity presence component to the local
+player and references the imported humanoid prefab for remote players. The
+client uses the configured UCENO Social API origin, reads the world scope from
+the short-lived signed entry token, posts position/rotation at approximately
+one-second intervals, polls fresh peers, and interpolates remote humanoid
+transforms. Peers that disappear from fresh presence results are removed after
+a timeout. The Unity status HUD includes a field for pasting a one-time entry
+code issued by the signed-in UCENO Social web session.
+
+This is an initial polling implementation only:
+- It is not authoritative movement simulation, anti-cheat, prediction or
+  server-side collision validation.
+- Remote player animation state is not yet replicated; remote avatars currently
+  follow position and rotation only.
+- The Unity client does not yet replace its bearer token after a successful
+  refresh response. A five-minute session can therefore expire during a long
+  play session; re-enter using a new one-time code until client-side renewal is
+  completed.
+- Presence cleanup is best-effort; stale records expire from peer queries after
+  the server-side freshness window.
+- No Unity Editor compile, Android build, database migration execution or
+  physical-device multiplayer test has been completed for this change.
+
+The world session component defaults to `https://uceno-social.onrender.com`.
+The website must issue an entry code for the selected published world; the
+player pastes that short-lived code into the Unity HUD. Do not paste account
+passwords, browser cookies or API secrets into the Unity client.
