@@ -55,14 +55,14 @@ jobs:
             if (!gateway.includes(marker)) throw new Error('Missing server collision behavior: ' + marker);
           if (!gateway.includes('COLLISION_BOXES.some'))
             throw new Error('Server movement is not checked against configured collision boxes');
-          for (const marker of ['loadInteractables', 'type === "interact"', 'distance > 4.25', 'object_state'])
+          for (const marker of ['loadInteractables', 'type === "interact"', 'distance > 4.25', 'object_state', 'target.kind === "seat"', 'seat_occupied', 'releaseSeats'])
             if (!gateway.includes(marker)) throw new Error('Missing authoritative interaction validation: ' + marker);
           const objectScript = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldInteractable.cs', 'utf8');
           const interactor = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldObjectInteractor.cs', 'utf8');
           const client = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs', 'utf8');
-          for (const marker of ['ApplyServerState', 'doorPivot']) if (!objectScript.includes(marker)) throw new Error('Missing interactable state behavior: ' + marker);
-          for (const marker of ['Physics.Raycast', 'KeyCode.E', 'RequestInteraction']) if (!interactor.includes(marker)) throw new Error('Missing interaction targeting: ' + marker);
-          for (const marker of ['RequestInteraction', 'object_state', 'objectState']) if (!client.includes(marker)) throw new Error('Missing client interaction transport: ' + marker);
+          for (const marker of ['ApplyServerState', 'doorPivot', 'OccupantId']) if (!objectScript.includes(marker)) throw new Error('Missing interactable state behavior: ' + marker);
+          for (const marker of ['Physics.Raycast', 'KeyCode.E', 'RequestInteraction', '"SIT"', '"STAND"']) if (!interactor.includes(marker)) throw new Error('Missing interaction targeting: ' + marker);
+          for (const marker of ['RequestInteraction', 'object_state', 'objectState', 'occupantId', 'SetSeated']) if (!client.includes(marker)) throw new Error('Missing client interaction transport: ' + marker);
           if (!gateway.includes('Array.isArray((parsed as { boxes?: unknown }).boxes)'))
             throw new Error('Gateway does not accept the Unity-exported collision map format');
           const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
