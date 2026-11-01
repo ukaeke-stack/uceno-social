@@ -183,6 +183,13 @@ namespace UCENO.VirtualWorld
             }
         }
 
+        public bool TriggerDance()
+        {
+            if (!connected || localAvatar == null) return false;
+            localAvatar.TriggerDance();
+            return true;
+        }
+
         public bool RequestInteraction(string objectId, string action)
         {
             if (!connected || socket == null || string.IsNullOrWhiteSpace(objectId) ||
