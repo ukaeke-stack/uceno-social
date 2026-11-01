@@ -52,9 +52,19 @@ jobs:
         working-directory: ${{ runner.temp }}/ara3dgen
         run: npm ci
 
-      - name: Download CC0 MakeHuman source assets and build generator library
+      - name: Prepare CC0 MakeHuman assets without redundant mocap downloads
         working-directory: ${{ runner.temp }}/ara3dgen
-        run: npm run setup-assets
+        run: |
+          mkdir -p vendor/dl vendor/sys
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/makehumancommunity/makehuman.git vendor/mh
+          git -C vendor/mh sparse-checkout set makehuman/data
+          curl --fail --location --retry 3 --retry-all-errors --connect-timeout 30 --max-time 1200 \
+            https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip \
+            --output vendor/dl/sys.zip
+          unzip -q vendor/dl/sys.zip -d vendor/sys
+          test -d vendor/mh/makehuman/data
+          test -d vendor/sys/skins
+          npm run build-assets
 
       - name: Generate rigged UCENO humanoid with animations
         working-directory: ${{ runner.temp }}/ara3dgen
