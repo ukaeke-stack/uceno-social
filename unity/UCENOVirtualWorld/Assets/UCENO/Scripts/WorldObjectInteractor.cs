@@ -73,7 +73,12 @@ namespace UCENO.VirtualWorld
             float height = 52f;
             Rect rect = new Rect((Screen.width - width) * 0.5f,
                 Screen.height - height - 34f, width, height);
+            bool seatHeldByOther = currentTarget.Kind == "seat" &&
+                !string.IsNullOrEmpty(currentTarget.OccupantId) &&
+                currentTarget.OccupantId != GetLocalUserId();
+            GUI.enabled = !seatHeldByOther;
             if (GUI.Button(rect, action, buttonStyle)) Interact();
+            GUI.enabled = true;
         }
     }
 }
