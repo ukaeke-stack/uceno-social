@@ -10,6 +10,7 @@
 - Unity `WorldSessionClient` redeems a code over HTTPS and keeps the bearer token in memory only.
 - Authenticated bounded player checkpoint GET/PUT endpoints. These are durable checkpoints, not per-frame multiplayer synchronization.
 - Short-lived multiplayer presence API at `GET/POST/DELETE /api/worlds/:worldId/presence`: authenticated clients publish bounded transforms, receive up to 64 fresh peers from the same accessible world, and remove their own presence on exit. Stale presence is filtered after 30 seconds. This is a polling foundation, not authoritative movement replication or a production realtime transport.
+- Gated LiveKit world voice token endpoint at `POST /api/worlds/:worldId/voice-token`. It issues a 10-minute, world-and-zone-scoped room token only to a signed-in user with fresh world presence and valid world access. Tokens are microphone-only for publishing and permit subscription. It remains disabled unless `WORLD_SPATIAL_VOICE_ENABLED=true`; proximity attenuation, moderation controls and physical-device audio QA are not yet complete.
 - Event listing/hosting and RSVP APIs. A database trigger serializes event-capacity checks.
 - Home listing/creation, owner invitations/revocation and bounded layout updates.
 - Read-only authenticated wallet endpoint: `GET /api/credits` returns separate earned/purchased balances and the latest 50 ledger entries.
@@ -45,8 +46,8 @@ No credit top-up execution endpoint, transfer, seller settlement, refund, final 
 - Home friends-only visibility and Unity home-building UI are not implemented.
 - This does not yet provide a live multiplayer server, authoritative movement, instance allocator, reconnect protocol or spatial voice.
 - Wallet balances are read-only through the new API. No client-supplied balance writes are accepted.
-- Voice needs a separate authenticated audio plane, server-controlled room membership and proximity/zone rules, plus mute/block/report controls.
+- The LiveKit token endpoint is only the authenticated audio-plane admission step. Unity must still implement distance-based attenuation, zone transitions, local mute/deafen, participant block/report controls and reconnect handling. Do not enable the feature flag until these client controls and QA are complete.
 
 ## Validation still required
 
-Migration 022 (`virtual_world_presence.sql`) is not confirmed applied.  Test all routes against a disposable database after migration; add integration tests for listing ownership, invalid payloads, wallet isolation, event capacity under concurrent requests, entry-code expiry/replay/wrong-client, blocks and banned memberships. Run TypeScript/build checks, configure and verify the gateway JWT validation, then compile Unity and test Android handoff on a physical device. No such validation is claimed by these source commits.
+Migration 022 (`virtual_world_presence.sql`) is not confirmed applied. Set `WORLD_SPATIAL_VOICE_ENABLED=true` only after Unity voice controls and moderation are ready; keep it unset for now.  Test all routes against a disposable database after migration; add integration tests for listing ownership, invalid payloads, wallet isolation, event capacity under concurrent requests, entry-code expiry/replay/wrong-client, blocks and banned memberships. Run TypeScript/build checks, configure and verify the gateway JWT validation, then compile Unity and test Android handoff on a physical device. No such validation is claimed by these source commits.
