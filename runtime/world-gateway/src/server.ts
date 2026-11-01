@@ -25,7 +25,7 @@ type CollisionBox = {
   minX: number; maxX: number; minY: number; maxY: number;
   minZ: number; maxZ: number;
 };
-type Interactable = { id: string; kind: "door" | "seat" | "object"; x: number; y: number; z: number; state: string; actorId: string | null; occupantId: string | null };
+type Interactable = { id: string; kind: "door" | "seat" | "object"; x: number; y: number; z: number; yaw: number; state: string; actorId: string | null; occupantId: string | null };
 
 function loadInteractables(): Map<string, Interactable> {
   const filePath = process.env.WORLD_INTERACTABLES_FILE || process.env.WORLD_COLLISION_BOXES_FILE;
@@ -53,10 +53,12 @@ function loadInteractables(): Map<string, Interactable> {
         (item.kind !== "door" && item.kind !== "seat" && item.kind !== "object") ||
         !finiteNumber(item.x, -WORLD_BOUNDS, WORLD_BOUNDS) ||
         !finiteNumber(item.y, -WORLD_BOUNDS, WORLD_BOUNDS) ||
-        !finiteNumber(item.z, -WORLD_BOUNDS, WORLD_BOUNDS) || result.has(item.id))
+        !finiteNumber(item.z, -WORLD_BOUNDS, WORLD_BOUNDS) ||
+        (item.yaw !== undefined && !finiteNumber(item.yaw, -Math.PI * 4, Math.PI * 4)) || result.has(item.id))
       throw new Error(`Interactable ${index} has invalid or duplicate fields`);
     result.set(item.id, {
       id: item.id, kind: item.kind, x: item.x, y: item.y, z: item.z,
+      yaw: typeof item.yaw === "number" ? item.yaw : 0,
       state: item.kind === "door" ? "closed" : item.kind === "seat" ? "available" : "idle", actorId: null, occupantId: null
     });
   }
@@ -361,6 +363,11 @@ wss.on("connection", async (socket: WebSocket) => {
           if (msg.action === "sit") {
             target.occupantId = player.id;
             target.state = "occupied";
+            // Seat markers are authored at the avatar's feet/root anchor.
+            player.x = target.x; player.y = target.y; player.z = target.z;
+            player.yaw = target.yaw;
+            player.vx = 0; player.vy = 0; player.vz = 0;
+            player.grounded = true; player.jumpQueued = false;
             player.seated = true;
           } else {
             target.occupantId = null;
