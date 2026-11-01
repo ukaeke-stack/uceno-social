@@ -6,6 +6,7 @@ on:
       - "runtime/world-gateway/**"
       - "db/migrations/024_virtual_world_instance_leases.sql"
       - "app/api/worlds/**"
+      - "app/api/world-homes/**"
       - "lib/world-client-session.ts"
       - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/**"
       - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/**"
@@ -77,6 +78,10 @@ jobs:
           const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
           for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes.json'])
             if (!exporter.includes(marker)) throw new Error('Missing Unity geometry export behavior: ' + marker);
+          const homeMembers = fs.readFileSync('./app/api/world-homes/[homeId]/members/route.ts', 'utf8');
+          for (const marker of ['export async function GET', 'Only the home owner can view the invitation roster', 'FROM virtual_home_members', 'Cache-Control'])
+            if (!homeMembers.includes(marker)) throw new Error('Missing private owner-only home invitation roster behavior: ' + marker);
+          console.log('Home invitation roster authorization source checks passed.');
           console.log('Static collision configuration and movement-resolution source checks passed.');
           NODE
       - name: Verify authoritative client wiring
