@@ -115,13 +115,19 @@ raycast; desktop uses **E**, and touch devices receive an on-screen action
 button. The server checks the object allowlist, interaction type, 4.25-unit
 range and request rate, then broadcasts the accepted state to connected players.
 
-Only doors and generic usable objects are currently supported by this first
-protocol. No door mesh or furniture item is marked as interactable in the
-generated city yet, so this is a reusable interaction system rather than a
-claim that doors/chairs are already usable. Object state currently lives in
-gateway memory and resets when that process restarts; durable object state,
-seat occupancy, furniture placement and chair-specific avatar animation are
-later work.
+The interaction protocol now also supports explicitly marked seats.
+A seat has one server-controlled occupant; another player is rejected while it
+is occupied. The seated state is applied to the local avatar only after the
+gateway confirms the seat request and is replicated through player snapshots.
+Seat occupancy is released when the occupying player's socket disconnects.
+The current seating pose uses the existing generic seated animation state; it
+does not yet align the avatar to a chair-specific sit point or provide IK.
+
+No door mesh, chair or furniture item is marked as interactable in the generated
+city yet. This is a reusable interaction system, not a claim that the current
+scene props are already usable. Object state and seat occupancy currently live
+in gateway memory and reset when that process restarts; durable object state,
+furniture placement and chair-specific avatar alignment remain later work.
 
 This scene has not yet been opened and compiled in the Unity Editor after the
 asset import. Unity compilation, rendering review and physical Android testing
