@@ -22,7 +22,9 @@ MODEL_NAMES = (
     "Modular Urban Apartments Facade",
     "Modular Factory Facade",
     "Street Lamp 01",
-    "Jacaranda Tree",
+    "Pachira Aquatica 01",
+    "Shrub 02",
+    "Shrub 03",
     "Covered Car",
     "Modular Chainlink Fence",
 )
