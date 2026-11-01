@@ -43,7 +43,8 @@ This register is the scope ledger for the connected UCENO social platform and vi
 - Position/movement HUD and static source validation.
 - Editor export of actual scene collider bounds and explicitly marked interactables for the world gateway.
 - Unity Editor menu commands to mark selected real props as doors, seats or usable objects and export the current scene collision map.
-- Server-validated, range-limited door/object interactions and synchronized seat occupancy. Object/seat state is currently in gateway memory only.
+- Server-validated, range-limited door/object interactions and synchronized seat occupancy. Door and generic object state can be persisted through a configured durable
+gateway file; seat occupancy remains transient and is released on disconnect.
 
 ## Implementation sequence
 
