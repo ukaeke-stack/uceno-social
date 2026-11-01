@@ -49,6 +49,9 @@ namespace UCENO.VirtualWorld
         {
             moveFingerId = -1;
             lookFingerId = -1;
+            sprintRequested = false;
+            IsSprinting = false;
+            AnimationSpeed = 0f;
         }
 
         private void Update()
