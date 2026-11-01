@@ -49,13 +49,14 @@ export async function GET(_request: NextRequest, { params }: Context) {
     if (!home || home.worldStatus !== "published" || home.blocked ||
         home.worldMembership === "banned" || home.worldMembership === "suspended" ||
         (home.worldVisibility === "private" &&
-          home.worldMembership !== "active" && home.ownerUserId !== session.id) ||
+          home.worldMembership !== "active" && home.worldOwnerId !== session.id) ||
         (home.ownerUserId !== session.id &&
           (home.visibility !== "invite" || !home.permission))) {
       return NextResponse.json({ error: "Home is unavailable" }, { status: 404 });
     }
     const { ownerUserId: _ownerUserId, worldStatus: _worldStatus,
-      worldVisibility: _worldVisibility, worldMembership: _worldMembership,
+      worldVisibility: _worldVisibility, worldOwnerId: _worldOwnerId,
+      worldMembership: _worldMembership,
       blocked: _blocked, ...visibleHome } = home;
     return NextResponse.json({ home: visibleHome }, {
       headers: { "Cache-Control": "no-store, private" }
