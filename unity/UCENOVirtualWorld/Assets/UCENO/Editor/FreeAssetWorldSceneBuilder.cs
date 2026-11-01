@@ -113,7 +113,12 @@ namespace UCENO.VirtualWorld.Editor
             RegisterSceneInBuildSettings(ScenePath);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            Debug.Log("UCENO realistic city scene generated from imported free assets.");
+
+            // Export the exact world-space bounds of the colliders just built
+            // from imported scene geometry. The gateway consumes this generated
+            // map at deployment; no hand-entered placeholder collision boxes.
+            string collisionMapPath = WorldCollisionGeometryExporter.Export(scene);
+            Debug.Log("UCENO realistic city scene generated. Authoritative collision map: " + collisionMapPath);
         }
 
         private static void ValidateSourceAssets()
