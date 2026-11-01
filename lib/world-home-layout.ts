@@ -11,11 +11,10 @@ function finiteBounded(value: unknown, minimum: number, maximum: number): boolea
 
 export function isValidHomeTransform(value: unknown): boolean {
   if (!isRecord(value)) return false;
-  for (const key of ["x", "y", "z"]) {
-    if (key in value && !finiteBounded(value[key], -100000, 100000)) return false;
-  }
-  if ("yaw" in value && !finiteBounded(value.yaw, -360, 360)) return false;
-  return true;
+  return finiteBounded(value.x, -10000, 10000) &&
+    finiteBounded(value.y, 1.15, 10000) &&
+    finiteBounded(value.z, -10000, 10000) &&
+    (!("yaw" in value) || finiteBounded(value.yaw, -360, 360));
 }
 
 export function isValidHomeFurnishing(value: unknown): boolean {
