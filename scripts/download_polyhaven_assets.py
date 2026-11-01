@@ -124,15 +124,28 @@ def download_texture(asset_id: str, metadata: dict, output_root: Path):
     downloaded = []
     resolutions_used = []
 
-    # Poly Haven's API places each map name (diff, nor_gl, rough, ao) at the
-    # top level; each map then contains resolution -> file format -> file.
-    for map_name in ("diff", "nor_gl", "rough", "ao"):
-        try:
-            resolution, formats = choose_resolution(files.get(map_name) or {})
-        except RuntimeError:
+    # Poly Haven's API uses map names as top-level keys. Its naming varies
+    # between short and descriptive aliases, so support both.
+    map_aliases = (
+        ("diff", ("diff", "diffuse")),
+        ("nor_gl", ("nor_gl", "normal_gl")),
+        ("rough", ("rough", "roughness")),
+        ("ao", ("ao", "ambient_occlusion")),
+        ("arm", ("arm", "ao_rough_metal")),
+    )
+    for output_name, aliases in map_aliases:
+        formats = None
+        resolution = None
+        for alias in aliases:
+            try:
+                resolution, formats = choose_resolution(files.get(alias) or {})
+                break
+            except RuntimeError:
+                continue
+        if formats is None:
             continue
         resolutions_used.append(resolution)
-        preferred = ("jpg", "png", "exr") if map_name in ("diff", "rough", "ao") else ("png", "jpg", "exr")
+        preferred = ("jpg", "png", "exr") if output_name in ("diff", "rough", "ao", "arm") else ("png", "jpg", "exr")
         record = next(
             (
                 formats.get(ext)
@@ -144,7 +157,7 @@ def download_texture(asset_id: str, metadata: dict, output_root: Path):
         if record is None:
             continue
         ext = Path(urllib.parse.urlparse(record["url"]).path).suffix.lower() or ".jpg"
-        filename = f"{safe_name(metadata['name'])}_{map_name}{ext}"
+        filename = f"{safe_name(metadata['name'])}_{output_name}{ext}"
         download(record["url"], texture_dir / filename)
         downloaded.append(filename)
 
