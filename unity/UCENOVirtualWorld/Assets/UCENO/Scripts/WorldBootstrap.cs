@@ -34,6 +34,8 @@ namespace UCENO.VirtualWorld
             road.transform.position = new Vector3(0f, 0.035f, 9f);
             road.transform.localScale = new Vector3(5f, 0.07f, 34f);
             ApplyMaterial(road, new Color(0.34f, 0.34f, 0.36f));
+            Collider roadCollider = road.GetComponent<Collider>();
+            if (roadCollider != null) Destroy(roadCollider);
         }
 
         private void CreateLandmarks()
@@ -55,6 +57,8 @@ namespace UCENO.VirtualWorld
             marker.transform.position = new Vector3(0f, 0.12f, 0f);
             marker.transform.localScale = new Vector3(1.5f, 0.12f, 1.5f);
             ApplyMaterial(marker, new Color(0.95f, 0.72f, 0.12f));
+            Collider markerCollider = marker.GetComponent<Collider>();
+            if (markerCollider != null) Destroy(markerCollider);
         }
 
         private static void CreateBuilding(string name, Vector3 position, Vector3 scale, Color color)
