@@ -49,7 +49,6 @@ namespace UCENO.VirtualWorld
         public string gesture;
         public int gestureSequence;
         public GatewayWardrobeItemState[] wardrobe;
-        public bool voiceActive;
     }
 
     [Serializable] internal sealed class GatewayInteractionPacket
@@ -176,8 +175,6 @@ namespace UCENO.VirtualWorld
             public bool hasSample;
             public AvatarWardrobeController wardrobe;
             public string wardrobeSignature;
-            public bool voiceActive;
-            public bool voiceNearby;
         }
 
         private readonly Dictionary<string, RemotePlayer> remotePlayers = new Dictionary<string, RemotePlayer>();
@@ -637,7 +634,6 @@ namespace UCENO.VirtualWorld
                 remote.targetPosition = position;
                 remote.targetRotation = Quaternion.Euler(0f, state.yaw * Mathf.Rad2Deg, 0f);
                 remote.lastReceived = now;
-                remote.voiceActive = state.voiceActive;
                 if (remote.locomotion != null)
                     remote.locomotion.ApplyRemoteState(Mathf.Clamp01(speed / 8f), state.seated,
                         state.sprint || speed > 6f, state.gesture ?? "none", state.gestureSequence);
@@ -689,13 +685,7 @@ namespace UCENO.VirtualWorld
                     1f - Mathf.Exp(-interpolation * Time.deltaTime));
                 remote.root.rotation = Quaternion.Slerp(remote.root.rotation, remote.targetRotation,
                     1f - Mathf.Exp(-interpolation * Time.deltaTime));
-                bool nearbyVoice = remote.voiceActive && localPlayer != null &&
-                    Vector3.Distance(localPlayer.transform.position, remote.root.position) <= 24f;
-                if (nearbyVoice != remote.voiceNearby)
-                {
-                    remote.voiceNearby = nearbyVoice;
-                    VoicePeerPresenceChanged?.Invoke(remote.root.name.Replace("Remote Player ", ""), nearbyVoice);
-                }
+
             }
 
             List<string> expired = new List<string>();
@@ -735,7 +725,6 @@ namespace UCENO.VirtualWorld
         private void RemoveRemote(string id)
         {
             if (!remotePlayers.TryGetValue(id, out RemotePlayer remote)) return;
-            if (remote.voiceNearby) VoicePeerPresenceChanged?.Invoke(id, false);
             if (remote.root != null) Destroy(remote.root.gameObject);
             remotePlayers.Remove(id);
         }
