@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, type ActivitySession } from "./activity-session.js";
+import { sameSpatialVoiceRoom, isWithinVoiceRange, isValidVoiceSignal } from "./voice-policy.js";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
@@ -311,19 +312,11 @@ function findAccessibleActivity(sessionId: unknown, player: Player): ActivitySes
     session.instanceId === INSTANCE_ID ? session : null;
 }
 
-function sameVoiceSpace(a: Player, b: Player): boolean {
-  return a.worldId === b.worldId && a.homeId === b.homeId && a.eventId === b.eventId;
-}
-
-function withinVoiceRange(a: Player, b: Player): boolean {
-  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) <= 24;
-}
-
 function leaveVoiceRoom(player: Player): void {
   if (!player.voiceActive) return;
   player.voiceActive = false;
   for (const peer of players.values()) {
-    if (peer.id !== player.id && sameVoiceSpace(player, peer) && withinVoiceRange(player, peer))
+    if (peer.id !== player.id && sameSpatialVoiceRoom(player, peer) && isWithinVoiceRange(player, peer))
       send(peer.socket, { type: "voice_presence", userId: player.id, active: false });
   }
 }
@@ -845,8 +838,8 @@ wss.on("connection", async (socket: WebSocket) => {
         if (player.voiceActive) return;
         player.voiceActive = true;
         for (const peer of players.values()) {
-          if (peer.id === player.id || !peer.voiceActive || !sameVoiceSpace(player, peer) ||
-              !withinVoiceRange(player, peer) || peer.socket.readyState !== WebSocket.OPEN) continue;
+          if (peer.id === player.id || !peer.voiceActive || !sameSpatialVoiceRoom(player, peer) ||
+              !isWithinVoiceRange(player, peer) || peer.socket.readyState !== WebSocket.OPEN) continue;
           try {
             if (await isBlockedPair(player.id, peer.id)) continue;
             send(player.socket, { type: "voice_presence", userId: peer.id, active: true });
@@ -862,12 +855,9 @@ wss.on("connection", async (socket: WebSocket) => {
       if (msg && msg.type === "voice_signal") {
         const targetId = typeof msg.targetUserId === "string" ? msg.targetUserId : "";
         const target = players.get(targetId);
-        const kindValid = msg.signalType === "offer" || msg.signalType === "answer" || msg.signalType === "candidate";
-        const payloadValid = msg.signalType === "candidate"
-          ? typeof msg.candidate === "string" && msg.candidate.length > 0 && msg.candidate.length <= 2048
-          : typeof msg.sdp === "string" && msg.sdp.length > 0 && msg.sdp.length <= 12000;
+        const payloadValid = isValidVoiceSignal(msg.signalType, msg.sdp, msg.candidate);
         if (!player.voiceActive || !target || !target.voiceActive || !kindValid || !payloadValid ||
-            targetId === player.id || !sameVoiceSpace(player, target) || !withinVoiceRange(player, target)) {
+            targetId === player.id || !sameSpatialVoiceRoom(player, target) || !isWithinVoiceRange(player, target)) {
           send(socket, { type: "voice_signal_rejected", code: "peer_unavailable_or_invalid_signal" }); return;
         }
         const signalNow = Date.now();
