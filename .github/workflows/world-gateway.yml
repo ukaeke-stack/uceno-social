@@ -1,0 +1,27 @@
+name: UCENO World Gateway
+on:
+  pull_request:
+    paths:
+      - "runtime/world-gateway/**"
+      - "db/migrations/024_virtual_world_instance_leases.sql"
+  push:
+    branches:
+      - feature/uceno-unity-foundation
+    paths:
+      - "runtime/world-gateway/**"
+      - "db/migrations/024_virtual_world_instance_leases.sql"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: runtime/world-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: runtime/world-gateway/package-lock.json
+      - run: npm install
+      - run: npm run build
