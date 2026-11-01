@@ -115,7 +115,7 @@ namespace UCENO.VirtualWorld
                 verticalVelocity = 0f;
             }
 
-            if (Input.GetKeyDown(KeyCode.C))
+            if (!serverAuthoritative && Input.GetKeyDown(KeyCode.C))
                 ToggleSeated();
 
             if (Input.GetKeyDown(KeyCode.Space) && !IsSeated)
