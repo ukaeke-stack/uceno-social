@@ -44,6 +44,8 @@ namespace UCENO.VirtualWorld
         private void Interact()
         {
             if (gateway == null || currentTarget == null) return;
+            if (currentTarget.Kind == "seat" && !string.IsNullOrEmpty(currentTarget.OccupantId) &&
+                currentTarget.OccupantId != GetLocalUserId()) return;
             string action = currentTarget.Kind == "door" ? "toggle" :
                 currentTarget.Kind == "seat" ? (currentTarget.OccupantId == "" || currentTarget.OccupantId == GetLocalUserId() ?
                     (currentTarget.OccupantId == "" ? "sit" : "stand") : "sit") : "use";
