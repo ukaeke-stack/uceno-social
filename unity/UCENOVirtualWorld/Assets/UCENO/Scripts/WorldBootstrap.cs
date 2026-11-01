@@ -126,7 +126,17 @@ namespace UCENO.VirtualWorld
                 cameraObject.AddComponent<AudioListener>();
             }
 
+            // Use an explicit solid sky colour so a missing/incompatible skybox
+            // cannot leave the Android view magenta or visually empty.
+            camera.enabled = true;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.42f, 0.70f, 0.92f);
             camera.fieldOfView = 60f;
+            camera.nearClipPlane = 0.1f;
+            camera.farClipPlane = 500f;
+            camera.allowHDR = false;
+            camera.allowMSAA = true;
+
             FollowCamera follow = camera.GetComponent<FollowCamera>();
             if (follow == null) follow = camera.gameObject.AddComponent<FollowCamera>();
             follow.SetTarget(player.transform);
