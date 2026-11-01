@@ -23,11 +23,11 @@ if (!/^[0-9a-f-]{36}$/i.test(INSTANCE_ID) || !DATABASE_URL || TOKEN_SECRET.lengt
 const sql = postgres(DATABASE_URL, { max: 8, idle_timeout: 20, connect_timeout: 10 });
 const secret = new TextEncoder().encode(TOKEN_SECRET);
 type Player = {
-  id: string; socket: WebSocket; x: number; y: number; z: number;
+  id: string; worldId: string; token: string; socket: WebSocket; x: number; y: number; z: number;
   vx: number; vy: number; vz: number; yaw: number; grounded: boolean;
   moveX: number; moveZ: number; sprint: boolean; jumpQueued: boolean;
   lastInputAt: number; inputCount: number; inputWindowAt: number;
-  lastSequence: number; lastCheckpointAt: number;
+  lastSequence: number; lastCheckpointAt: number; lastAuthorizationCheck: number; authorizationCheckInProgress: boolean;
 };
 const players = new Map<string, Player>();
 
@@ -87,7 +87,7 @@ async function authenticate(token: string) {
   return { userId: row.id as string, worldId: payload.world_id as string };
 }
 
-async function loadPlayer(userId: string, worldId: string, socket: WebSocket): Promise<Player> {
+async function loadPlayer(userId: string, worldId: string, token: string, socket: WebSocket): Promise<Player> {
   const rows = await sql`
     SELECT position FROM virtual_world_player_state
     WHERE world_id = ${worldId}::uuid AND user_id = ${userId}::uuid
@@ -98,10 +98,10 @@ async function loadPlayer(userId: string, worldId: string, socket: WebSocket): P
   const y = finiteNumber(p.y, -1000, WORLD_BOUNDS) ? p.y : 0;
   const z = finiteNumber(p.z, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.z : 0;
   return {
-    id: userId, socket, x, y, z, vx: 0, vy: 0, vz: 0, yaw: 0, grounded: y <= 0.01,
+    id: userId, worldId, token, socket, x, y, z, vx: 0, vy: 0, vz: 0, yaw: 0, grounded: y <= 0.01,
     moveX: 0, moveZ: 0, sprint: false, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
-    lastSequence: 0, lastCheckpointAt: Date.now()
+    lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false
   };
 }
 
@@ -114,16 +114,16 @@ const server = createServer((req, res) => {
   res.writeHead(404); res.end();
 });
 const wss = new WebSocketServer({ noServer: true, maxPayload: 4096, perMessageDeflate: false });
-const upgradeIdentity = new WeakMap<WebSocket, { userId: string; worldId: string }>();
+const upgradeIdentity = new WeakMap<WebSocket, { userId: string; worldId: string; token: string }>();
 
 server.on("upgrade", async (req, socket, head) => {
   try {
     if (req.url !== "/world" || !req.headers.authorization?.startsWith("Bearer "))
       throw new Error("unauthorized");
-    const identity = await authenticate(req.headers.authorization.slice(7));
+    const token = req.headers.authorization.slice(7);\n    const identity = await authenticate(token);
     if (players.size >= MAX_CLIENTS && !players.has(identity.userId)) throw new Error("instance_full");
     wss.handleUpgrade(req, socket, head, (ws) => {
-      upgradeIdentity.set(ws, identity);
+      upgradeIdentity.set(ws, { ...identity, token });
       wss.emit("connection", ws, req);
     });
   } catch {
@@ -138,7 +138,7 @@ wss.on("connection", async (socket: WebSocket) => {
   try {
     const old = players.get(identity.userId);
     if (old) { old.socket.close(4001, "replaced_by_reconnect"); players.delete(identity.userId); }
-    const player = await loadPlayer(identity.userId, identity.worldId, socket);
+    const player = await loadPlayer(identity.userId, identity.worldId, identity.token, socket);
     players.set(identity.userId, player);
     send(socket, { type: "welcome", userId: identity.userId, tickRate: TICK_RATE,
       state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
@@ -172,7 +172,7 @@ wss.on("connection", async (socket: WebSocket) => {
   }
 });
 
-let lastTick = Date.now();
+// Re-check the original signed session periodically so bans, suspensions, blocks,\n// world shutdowns and expired tokens revoke already-open sockets.\nsetInterval(() => {\n  const now = Date.now();\n  for (const player of players.values()) {\n    if (now - player.lastAuthorizationCheck < 15000 || player.authorizationCheckInProgress) continue;\n    player.lastAuthorizationCheck = now;\n    player.authorizationCheckInProgress = true;\n    void authenticate(player.token).catch(() => {\n      if (players.get(player.id)?.socket === player.socket) {\n        send(player.socket, { type: "error", code: "access_revoked" });\n        player.socket.close(4003, "access_revoked");\n        players.delete(player.id);\n      }\n    }).finally(() => { player.authorizationCheckInProgress = false; });\n  }\n}, 5000);\n\nlet lastTick = Date.now();
 setInterval(async () => {
   const now = Date.now();
   const dt = Math.min(0.05, Math.max(0.001, (now - lastTick) / 1000));
