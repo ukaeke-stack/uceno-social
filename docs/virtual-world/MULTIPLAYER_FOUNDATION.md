@@ -193,3 +193,18 @@ Keep real payment credentials out of source control. Payment configuration may
 be deferred while world systems continue; do not represent top-ups as live
 until server-side Paystack verification and idempotent credit issuance have
 been tested. Marketplace escrow remains disabled.
+
+
+## Active-session moderation enforcement (November 2026)
+
+The checkpoint read/write, live presence read/write, and Unity session-renewal
+routes now re-check the linked UCENO account's moderation status in addition
+to world publication, membership, and owner-block state. Disabled accounts
+are denied. Suspended accounts are denied until their suspension expiry; a
+suspension with no expiry is treated as indefinite. Session renewal also
+continues to require a recent presence record, so a stale token cannot be
+renewed after a player has left or stopped sending presence.
+
+This is admission and request authorization hardening, not a replacement for
+a continuously authoritative simulation server. Changes have not yet been
+validated against a deployed database or Unity runtime.
