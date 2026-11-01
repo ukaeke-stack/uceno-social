@@ -246,6 +246,7 @@ type Player = {
   lastInputAt: number; inputCount: number; inputWindowAt: number;
   lastSequence: number; lastCheckpointAt: number; lastAuthorizationCheck: number; authorizationCheckInProgress: boolean;
   lastInteractionAt: number;
+  lastWardrobeRefreshAt: number;
   homeId: string | null;
   homeAnchor: { x: number; y: number; z: number; yaw: number } | null;
   eventId: string | null;
@@ -419,7 +420,7 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
-    lastInteractionAt: 0, homeId: null, homeAnchor: null, eventId: null, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null
+    lastInteractionAt: 0, lastWardrobeRefreshAt: 0, homeId: null, homeAnchor: null, eventId: null, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null
   };
 }
 
@@ -807,6 +808,9 @@ wss.on("connection", async (socket: WebSocket) => {
         return;
       }
       if (msg && msg.type === "wardrobe_refresh") {
+        const refreshNow = Date.now();
+        if (refreshNow - player.lastWardrobeRefreshAt < 1000) return;
+        player.lastWardrobeRefreshAt = refreshNow;
         try {
           const wardrobeRows = await sql`
             SELECT e.slot, e.item_id AS "itemId"
