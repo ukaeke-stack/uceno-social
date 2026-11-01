@@ -178,7 +178,7 @@ def main():
 
     home_client = read_text(ASSETS / "Scripts/WorldHomeClient.cs")
     for required in ("RequestHomes", "CreateHomeRoutine", "LoadHomeRoutine",
-                     "SaveHomeRoutine", "PlaceFurniture", "CanEditSelectedHome",
+                     "SaveHomeRoutine", "PlaceFurniture", "MoveSelectedFurniture", "RotateSelectedFurniture", "RemoveSelectedFurniture", "CanEditSelectedHome",
                      "/api/world-homes?worldId=", "SAVE HOME LAYOUT"):
         if required not in home_client:
             fail("WorldHomeClient is missing home management integration: " + required)
