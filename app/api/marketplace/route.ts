@@ -12,7 +12,7 @@ function validListing(body: Record<string, unknown>) {
     (body.description === undefined || (typeof body.description === "string" && body.description.length <= 3000)) &&
     typeof body.itemType === "string" && TYPES.has(body.itemType) &&
     (body.assetKey === undefined || body.assetKey === null ||
-      (typeof body.assetKey === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,179}$/.test(body.assetKey))) &&
+      (typeof body.assetKey === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,179}$/.test(body.assetKey) && !body.assetKey.split("/").some((part: string) => part === "." || part === ".."))) &&
     typeof body.pricePurchasedCredits === "number" && Number.isSafeInteger(body.pricePurchasedCredits) &&
     body.pricePurchasedCredits >= 0 && body.pricePurchasedCredits <= 1_000_000_000 &&
     (body.stock === undefined || body.stock === null ||
@@ -34,8 +34,11 @@ export async function GET(request: NextRequest) {
              l.price_purchased_credits AS "pricePurchasedCredits", l.stock, l.status,
              l.created_at AS "createdAt", l.updated_at AS "updatedAt"
       FROM virtual_marketplace_listings l
+      LEFT JOIN virtual_worlds w ON w.id = l.world_id
       WHERE (${mine}::boolean AND l.seller_user_id = ${session.id}::uuid)
          OR (NOT ${mine}::boolean AND l.status = 'active'
+             AND (l.stock IS NULL OR l.stock > 0)
+             AND (l.world_id IS NULL OR (w.status = 'published' AND w.visibility = 'public'))
              AND (${worldId}::uuid IS NULL OR l.world_id = ${worldId}::uuid))
       ORDER BY l.created_at DESC
       LIMIT 100
