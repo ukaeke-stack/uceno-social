@@ -87,6 +87,32 @@ This checklist covers the Unity city client, world gateway interactions and the 
 - [ ] Verify blocked users cannot create events or RSVP, even when they call the APIs directly.
 - [ ] Do not treat RSVP as a spatial join; event location/teleport and activity scene integration are not implemented yet.
 
+## Residential interior and server-authoritative home travel checks
+
+- [ ] Apply migration 025 only after the previously reviewed migrations are applied and the UCENO database is confirmed to be the separate UCENO Neon project.
+- [ ] Create a new home and confirm its saved layout includes the five imported starter furniture assets.
+- [ ] Open the home as owner; confirm the runtime room shell, imported furniture, windows, entry door and lighting are visible.
+- [ ] Open the same invite-only home as a visitor; confirm the same room and furniture render while layout controls remain unavailable.
+- [ ] Attempt home entry with a forged home ID, a home in another world, a revoked invitation, a blocked owner relationship, banned/suspended membership and a private world without active membership; confirm the gateway rejects every request.
+- [ ] Confirm the gateway, not the client, changes the player's position after admission.
+- [ ] Walk and jump around the interior; confirm the server clamps movement to the room bounds and prevents walking through walls or ceiling.
+- [ ] Exit the home; confirm the server returns the player to the exact saved pre-entry position and facing.
+- [ ] Disconnect while inside a home; confirm the gateway checkpoints the return position rather than leaving the next session stranded inside an unloaded room.
+- [ ] Reconnect the client and verify that a revoked invite no longer permits entry.
+- [ ] Verify these cases against a deployed test database and live gateway; source checks do not prove SQL or runtime behavior.
+
+## Spatial event and venue checks
+
+- [ ] Apply migration 025 and confirm activity_type, location_label and location exist with their constraints.
+- [ ] As a world owner/admin, create an event at the current player location and verify its venue coordinates and label persist.
+- [ ] Verify invalid activity types, oversized coordinates, invalid Y positions and oversized venue labels are rejected.
+- [ ] RSVP GOING and attempt to join more than 30 minutes before the event; confirm the gateway rejects early admission.
+- [ ] Within the 30-minute admission window, join as a GOING attendee; confirm the gateway moves the player to the persisted venue coordinates.
+- [ ] Attempt direct event joining without a GOING RSVP, after cancellation, after event end, in an unpublished world, with blocked access, or from a different world; confirm rejection.
+- [ ] Exit the event and confirm the server restores the previous world position and facing.
+- [ ] Confirm event location is the same for every client and that venue entry does not falsely mark an activity as playable.
+- [ ] Test two clients at the same event venue. Spatial admission alone does not complete sports, racing, adventure, dance, cinema or concert gameplay.
+
 ## Home sharing API checks
 
 - [ ] Unauthenticated requests to home and home-member APIs return 401.
