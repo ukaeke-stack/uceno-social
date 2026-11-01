@@ -13,10 +13,12 @@ namespace UCENO.VirtualWorld
         private static readonly int MoveSpeedHash = Animator.StringToHash("MoveSpeed");
 
         [SerializeField] private float dampTime = 0.12f;
-        [SerializeField] private float walkCycleSpeed = 7.2f;
-        [SerializeField] private float runCycleSpeed = 10.5f;
-        [SerializeField] private float walkLegSwing = 25f;
-        [SerializeField] private float runLegSwing = 42f;
+        [SerializeField] private float walkCycleSpeed = 6.4f;
+        [SerializeField] private float runCycleSpeed = 9.2f;
+        [SerializeField] private float walkLegSwing = 19f;
+        [SerializeField] private float runLegSwing = 34f;
+        [SerializeField] private float relaxedArmDrop = 58f;
+        [SerializeField] private float armSwingFactor = 0.42f;
 
         private Animator animator;
         private PlayerMotor motor;
@@ -83,7 +85,20 @@ namespace UCENO.VirtualWorld
             rightUpperArmBase = BaseRotation(rightUpperArm);
             leftLowerArmBase = BaseRotation(leftLowerArm);
             rightLowerArmBase = BaseRotation(rightLowerArm);
+
+            // Imported avatar is authored in a T-pose. Bring both arms down
+            // into a relaxed stance before applying the walking swing.
+            if (leftUpperArm != null)
+                leftUpperArm.localRotation = leftUpperArmBase * Quaternion.Euler(0f, 0f, -relaxedArmDrop);
+            if (rightUpperArm != null)
+                rightUpperArm.localRotation = rightUpperArmBase * Quaternion.Euler(0f, 0f, relaxedArmDrop);
+            if (leftLowerArm != null)
+                leftLowerArm.localRotation = leftLowerArmBase * Quaternion.Euler(-8f, 0f, 0f);
+            if (rightLowerArm != null)
+                rightLowerArm.localRotation = rightLowerArmBase * Quaternion.Euler(-8f, 0f, 0f);
+
             if (hips != null) hipsPositionBase = hips.localPosition;
+            ApplyNaturalAvatarColors();
         }
 
         private void Update()
@@ -110,8 +125,8 @@ namespace UCENO.VirtualWorld
             float opposite = -swing;
             float kneeLeft = Mathf.Max(0f, -Mathf.Sin(cycle)) * amplitude * 0.65f;
             float kneeRight = Mathf.Max(0f, Mathf.Sin(cycle)) * amplitude * 0.65f;
-            float armSwing = swing * 0.58f;
-            float bob = Mathf.Abs(Mathf.Sin(cycle * 2f)) * 0.025f * speed;
+            float armSwing = swing * armSwingFactor;
+            float bob = Mathf.Abs(Mathf.Sin(cycle * 2f)) * 0.012f * speed;
             float idleBreath = Mathf.Sin(Time.time * 1.35f) * 1.1f * (1f - speed);
 
             SetRotation(hips, hipsBase, new Vector3(0f, 0f, idleBreath));
@@ -121,13 +136,65 @@ namespace UCENO.VirtualWorld
             SetRotation(rightUpperLeg, rightUpperLegBase, new Vector3(opposite, 0f, 0f));
             SetRotation(leftLowerLeg, leftLowerLegBase, new Vector3(kneeLeft, 0f, 0f));
             SetRotation(rightLowerLeg, rightLowerLegBase, new Vector3(kneeRight, 0f, 0f));
-            SetRotation(leftUpperArm, leftUpperArmBase, new Vector3(-armSwing, 0f, 0f));
-            SetRotation(rightUpperArm, rightUpperArmBase, new Vector3(armSwing, 0f, 0f));
-            SetRotation(leftLowerArm, leftLowerArmBase, new Vector3(8f + Mathf.Abs(armSwing) * 0.18f, 0f, 0f));
-            SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(8f + Mathf.Abs(armSwing) * 0.18f, 0f, 0f));
+            if (leftUpperArm != null)
+                leftUpperArm.localRotation = leftUpperArmBase *
+                    Quaternion.Euler(-armSwing, 0f, -relaxedArmDrop);
+            if (rightUpperArm != null)
+                rightUpperArm.localRotation = rightUpperArmBase *
+                    Quaternion.Euler(armSwing, 0f, relaxedArmDrop);
+            SetRotation(leftLowerArm, leftLowerArmBase, new Vector3(-8f + Mathf.Abs(armSwing) * 0.12f, 0f, 0f));
+            SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(-8f + Mathf.Abs(armSwing) * 0.12f, 0f, 0f));
 
             if (hips != null)
                 hips.localPosition = hipsPositionBase + Vector3.up * bob;
+        }
+
+
+        private void ApplyNaturalAvatarColors()
+        {
+            if (animator == null) return;
+
+            // Use property blocks so imported shared materials are not mutated.
+            // Tint only clearly identified skin/body materials; clothing remains
+            // controlled by its imported material when one is available.
+            Color skin = new Color(0.58f, 0.34f, 0.21f, 1f);
+            Color hair = new Color(0.09f, 0.055f, 0.035f, 1f);
+            foreach (Renderer renderer in animator.GetComponentsInChildren<Renderer>(true))
+            {
+                Material[] materials = renderer.sharedMaterials;
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    Material material = materials[i];
+                    if (material == null) continue;
+                    string materialName = material.name.ToLowerInvariant();
+                    Color tint;
+                    bool apply = false;
+                    if (materialName.Contains("skin") || materialName.Contains("body") ||
+                        materialName.Contains("face") || materialName.Contains("head"))
+                    {
+                        tint = skin;
+                        apply = true;
+                    }
+                    else if (materialName.Contains("hair") || materialName.Contains("brow"))
+                    {
+                        tint = hair;
+                        apply = true;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
+                    if (apply)
+                    {
+                        MaterialPropertyBlock block = new MaterialPropertyBlock();
+                        renderer.GetPropertyBlock(block, i);
+                        block.SetColor("_Color", tint);
+                        block.SetColor("_BaseColor", tint);
+                        renderer.SetPropertyBlock(block, i);
+                    }
+                }
+            }
         }
 
         private Transform Bone(HumanBodyBones bone)
