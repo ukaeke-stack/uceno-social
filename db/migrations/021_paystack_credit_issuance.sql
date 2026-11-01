@@ -88,3 +88,8 @@ $$;
 
 COMMENT ON FUNCTION issue_verified_purchased_credits(UUID,TEXT,TEXT,BIGINT,TEXT,TEXT) IS
 'Call only after server-side Paystack transaction verification. Database-level idempotency prevents duplicate Purchased Credit issuance. Does not charge advertisers or enable marketplace escrow.';
+
+-- Do not expose the financial issuance function to anonymous/public SQL callers.
+-- The migration owner and trusted server database role retain access according to
+-- the database's ownership/role setup; verify the deployed DATABASE_URL role before rollout.
+REVOKE ALL ON FUNCTION issue_verified_purchased_credits(UUID,TEXT,TEXT,BIGINT,TEXT,TEXT) FROM PUBLIC;
