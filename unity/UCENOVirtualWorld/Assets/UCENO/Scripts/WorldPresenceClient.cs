@@ -58,6 +58,9 @@ namespace UCENO.VirtualWorld
         private float tokenExpiresAt;
         private bool stopping;
 
+        public int PeerCount => remotePlayers.Count;
+        public string ConnectionStatus { get; private set; } = "WAITING";
+
         private void Start()
         {
             if (session == null) session = FindObjectOfType<WorldSessionClient>();
@@ -80,6 +83,7 @@ namespace UCENO.VirtualWorld
             yield return new WaitUntil(() => session != null && session.IsAuthenticated);
             if (string.IsNullOrWhiteSpace(worldId)) worldId = ReadWorldId(session.AccessToken);
             tokenExpiresAt = Time.time + Mathf.Max(1, session.ExpiresInSeconds);
+            ConnectionStatus = "CONNECTING";
             if (string.IsNullOrWhiteSpace(worldId))
             {
                 Debug.LogError("UCENO world token is missing its world scope. Request a new entry code.");
@@ -149,10 +153,16 @@ namespace UCENO.VirtualWorld
                 if (request.responseCode == 401 || request.responseCode == 403)
                 {
                     Debug.LogWarning("UCENO presence rejected. World access may have expired.");
+                    ConnectionStatus = "SESSION EXPIRED";
                     session.ClearSession();
                 }
-                else if (request.result != UnityWebRequest.Result.Success && request.responseCode != 429)
+                else if (request.result == UnityWebRequest.Result.Success)
+                    ConnectionStatus = "ONLINE";
+                else if (request.responseCode != 429)
+                {
+                    ConnectionStatus = "RETRYING";
                     Debug.LogWarning("UCENO presence update failed: " + request.responseCode);
+                }
             }
         }
 
@@ -166,11 +176,17 @@ namespace UCENO.VirtualWorld
                 yield return request.SendWebRequest();
                 if (request.result != UnityWebRequest.Result.Success)
                 {
-                    if (request.responseCode == 401 || request.responseCode == 403) session.ClearSession();
+                    if (request.responseCode == 401 || request.responseCode == 403)
+                    {
+                        ConnectionStatus = "SESSION EXPIRED";
+                        session.ClearSession();
+                    }
+                    else ConnectionStatus = "RETRYING";
                     yield break;
                 }
                 WorldPresencePeerList response = JsonUtility.FromJson<WorldPresencePeerList>(request.downloadHandler.text);
                 if (response == null || response.peers == null) yield break;
+                ConnectionStatus = "ONLINE";
                 foreach (WorldPresencePeer peer in response.peers)
                 {
                     if (peer == null || string.IsNullOrEmpty(peer.userId) || peer.position == null || peer.rotation == null)
