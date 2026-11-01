@@ -69,8 +69,8 @@ export async function POST(request: NextRequest) {
     }
 
     const transaction = await verifyPaystackTransaction(reference);
-    const metadataIntentId = transaction.metadata?.uceno_topup_intent_id ??
-      event.data?.metadata?.uceno_topup_intent_id;
+    // Only metadata returned by Paystack’s server-to-server verification is trusted.
+    const metadataIntentId = transaction.metadata?.uceno_topup_intent_id;
 
     if (transaction.status !== "success" ||
         transaction.reference !== reference ||
