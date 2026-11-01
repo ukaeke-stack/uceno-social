@@ -80,6 +80,25 @@ UCENO should combine the strongest relevant capabilities while avoiding a featur
 - VR/WebXR after the mobile/computer world is stable.
 - Distributed capacity tests, security review, accessibility, observability and operational readiness.
 
+## Latest visual foundation implementation record
+
+The Unity Editor scene builder now composes the imported starter assets into a
+civic garden square, pedestrian crossing and marked parking bay. These features
+reuse the project's existing imported materials and environment prefabs.
+
+A runtime `AvatarAppearanceProfile` component now supports per-avatar skin,
+hair, top, trousers and shoe tint palettes using renderer material property
+blocks. This avoids creating material instances or recolouring other players'
+avatars. Unknown material slots are intentionally left unchanged.
+
+Status: **Implemented in source**. The scene must be regenerated in Unity for
+the district layout to appear. Appearance customization currently recolours
+recognised material slots; it does not yet provide mesh/wardrobe swaps, face
+morphs, hair selection, body-shape editing or a saved account-backed wardrobe.
+Unity Editor compilation, visual inspection and physical-device performance
+testing remain outstanding. The starter district is not yet a finished
+photorealistic city.
+
 ## Evidence-based status rules
 
 Every capability must be marked as one of:
