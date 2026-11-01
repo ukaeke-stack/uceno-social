@@ -51,3 +51,30 @@ No credit top-up execution endpoint, transfer, seller settlement, refund, final 
 ## Validation still required
 
 Migration 022 (`virtual_world_presence.sql`) is not confirmed applied. Set `WORLD_SPATIAL_VOICE_ENABLED=true` only after Unity voice controls and moderation are ready; keep it unset for now.  Test all routes against a disposable database after migration; add integration tests for listing ownership, invalid payloads, wallet isolation, event capacity under concurrent requests, entry-code expiry/replay/wrong-client, blocks and banned memberships. Run TypeScript/build checks, configure and verify the gateway JWT validation, then compile Unity and test Android handoff on a physical device. No such validation is claimed by these source commits.
+
+
+## Unity bearer-session integration (November 2026)
+
+The Unity entry exchange returns a five-minute JWT scoped to one world and one
+client type. World runtime APIs now accept that token through
+`Authorization: Bearer <token>`; the token is not accepted as a general UCENO
+web session. The shared server verifier checks issuer, audience, signature,
+expiry, world ID, client type and the user's current moderation status.
+
+Unity-compatible endpoints:
+- `GET/POST/DELETE /api/worlds/:worldId/presence`
+- `GET/PUT /api/worlds/:worldId/state`
+- `POST /api/worlds/:worldId/voice-token` (still feature-gated)
+- `POST /api/worlds/:worldId/session/refresh`
+
+The refresh endpoint accepts only a still-valid Unity world token, and renews
+it for five minutes only while the user has a fresh presence record and still
+passes world visibility, membership, moderation and owner-block checks. It is
+not a long-lived refresh credential. Clients must stop world requests if
+renewal fails and require a fresh authenticated entry handoff.
+
+This closes the earlier client/server authentication mismatch: Unity's bearer
+token was previously issued but the world APIs only read the browser cookie.
+It does not yet make the Unity client a complete multiplayer client. Movement
+polling, remote-avatar interpolation, reconnect UX, voice proximity
+attenuation, mute/deafen, block/report and on-device tests remain outstanding.
