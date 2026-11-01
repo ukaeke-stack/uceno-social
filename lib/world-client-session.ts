@@ -17,12 +17,12 @@ function worldTokenKey() {
  * accepted as general social-app sessions.
  */
 export async function readWorldClientSession(request: NextRequest, worldId: string): Promise<WorldClientSession | null> {
-  const webSession = await readSession();
-  if (webSession) return { ...webSession, worldId, clientType: "web" };
-
   const authorization = request.headers.get("authorization") || "";
   const match = /^Bearer ([A-Za-z0-9._~-]+)$/.exec(authorization);
-  if (!match) return null;
+  if (!match) {
+    const webSession = await readSession();
+    return webSession ? { ...webSession, worldId, clientType: "web" } : null;
+  }
 
   try {
     const { payload } = await jwtVerify(match[1], worldTokenKey(), {
