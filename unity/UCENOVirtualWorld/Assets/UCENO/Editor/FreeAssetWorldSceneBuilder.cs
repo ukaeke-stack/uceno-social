@@ -608,6 +608,11 @@ namespace UCENO.VirtualWorld.Editor
             }
             homeData.ApplyModifiedPropertiesWithoutUndo();
 
+            WorldEventsClient eventsClient = player.AddComponent<WorldEventsClient>();
+            SerializedObject eventsData = new SerializedObject(eventsClient);
+            eventsData.FindProperty("session").objectReferenceValue = worldSession;
+            eventsData.ApplyModifiedPropertiesWithoutUndo();
+
             WorldStatusHud hud = player.AddComponent<WorldStatusHud>();
             SerializedObject hudData = new SerializedObject(hud);
             hudData.FindProperty("player").objectReferenceValue = motor;
