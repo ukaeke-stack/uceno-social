@@ -177,6 +177,9 @@ type Player = {
   lastInputAt: number; inputCount: number; inputWindowAt: number;
   lastSequence: number; lastCheckpointAt: number; lastAuthorizationCheck: number; authorizationCheckInProgress: boolean;
   lastInteractionAt: number;
+  homeId: string | null;
+  eventId: string | null;
+  returnState: { x: number; y: number; z: number; yaw: number } | null;
 };
 const players = new Map<string, Player>();
 
@@ -189,6 +192,35 @@ function fail(socket: WebSocket, code: string) {
 }
 function finiteNumber(value: unknown, min: number, max: number): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function releasePlayerSeats(userId: string) {
+  for (const target of INTERACTABLES.values()) {
+    if (target.kind !== "seat" || target.occupantId !== userId) continue;
+    target.occupantId = null;
+    target.state = "available";
+    target.actorId = userId;
+    const packet = {
+      type: "object_state", objectId: target.id, objectState: target.state,
+      actorId: userId, occupantId: null
+    };
+    for (const peer of players.values()) send(peer.socket, packet);
+  }
+}
+
+function readSpatialTransform(value: unknown, zOffset = 0) {
+  if (!value || typeof value !== "object") return null;
+  const transform = value as Record<string, unknown>;
+  if (!finiteNumber(transform.x, -WORLD_BOUNDS, WORLD_BOUNDS) ||
+      !finiteNumber(transform.y, GROUND_Y, WORLD_BOUNDS) ||
+      !finiteNumber(transform.z, -WORLD_BOUNDS, WORLD_BOUNDS) ||
+      (transform.yaw !== undefined && !finiteNumber(transform.yaw, -360, 360))) return null;
+  return {
+    x: transform.x,
+    y: transform.y,
+    z: transform.z + zOffset,
+    yaw: ((typeof transform.yaw === "number" ? transform.yaw : 0) * Math.PI) / 180
+  };
 }
 
 async function authenticate(token: string) {
@@ -254,7 +286,7 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
-    lastInteractionAt: 0
+    lastInteractionAt: 0, homeId: null, eventId: null, returnState: null
   };
 }
 
@@ -344,6 +376,142 @@ wss.on("connection", async (socket: WebSocket) => {
     socket.on("message", (raw) => {
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
+      if (msg && msg.type === "home_enter") {
+        if (typeof msg.id !== "string" || !/^[0-9a-f-]{36}$/i.test(msg.id) ||
+            player.homeId || player.eventId || player.returnState) {
+          send(socket, { type: "spatial_location_rejected", code: "invalid_home_request_or_context_active" }); return;
+        }
+        try {
+          const rows = await sql`
+            SELECT h.id, h.world_id AS "worldId", h.owner_user_id AS "ownerUserId",
+              h.visibility, h.transform, w.status AS "worldStatus",
+              w.visibility AS "worldVisibility", w.owner_user_id AS "worldOwnerId",
+              COALESCE(wm.status, 'none') AS "membershipStatus",
+              hm.permission,
+              EXISTS (SELECT 1 FROM user_blocks b
+                WHERE (b.blocker_id = h.owner_user_id AND b.blocked_id = ${player.id}::uuid)
+                   OR (b.blocker_id = ${player.id}::uuid AND b.blocked_id = h.owner_user_id)) AS blocked
+            FROM virtual_homes h
+            JOIN virtual_worlds w ON w.id = h.world_id
+            LEFT JOIN virtual_world_memberships wm
+              ON wm.world_id = h.world_id AND wm.user_id = ${player.id}::uuid
+            LEFT JOIN virtual_home_members hm
+              ON hm.home_id = h.id AND hm.user_id = ${player.id}::uuid
+            WHERE h.id = ${msg.id}::uuid AND h.world_id = ${player.worldId}::uuid
+            LIMIT 1
+          `;
+          const home = rows[0];
+          const allowed = !!home && home.worldStatus === "published" && !home.blocked &&
+            home.membershipStatus !== "banned" && home.membershipStatus !== "suspended" &&
+            (home.worldVisibility !== "private" || home.membershipStatus === "active" ||
+              home.worldOwnerId === player.id) &&
+            (home.ownerUserId === player.id ||
+              (home.visibility === "invite" && !!home.permission));
+          const anchor = allowed ? readSpatialTransform(home.transform, -2.8) : null;
+          if (!allowed || !anchor) {
+            send(socket, { type: "spatial_location_rejected", code: "home_access_denied_or_invalid_anchor" }); return;
+          }
+          releasePlayerSeats(player.id);
+          player.returnState = { x: player.x, y: player.y, z: player.z, yaw: player.yaw };
+          player.homeId = home.id;
+          player.eventId = null;
+          player.x = anchor.x; player.y = anchor.y; player.z = anchor.z; player.yaw = anchor.yaw;
+          player.vx = 0; player.vy = 0; player.vz = 0;
+          player.moveX = 0; player.moveZ = 0; player.sprint = false;
+          player.grounded = true; player.seated = false; player.jumpQueued = false;
+          send(socket, { type: "spatial_location_entered", contextType: "home",
+            contextId: home.id, state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
+        } catch (error) {
+          console.error("home_entry_validation_failed", error);
+          send(socket, { type: "spatial_location_rejected", code: "home_entry_unavailable" });
+        }
+        return;
+      }
+      if (msg && msg.type === "home_exit") {
+        if (!player.homeId || !player.returnState) {
+          send(socket, { type: "spatial_location_rejected", code: "not_inside_home" }); return;
+        }
+        const destination = player.returnState;
+        player.homeId = null; player.returnState = null;
+        player.x = destination.x; player.y = destination.y; player.z = destination.z; player.yaw = destination.yaw;
+        player.vx = 0; player.vy = 0; player.vz = 0;
+        player.moveX = 0; player.moveZ = 0; player.sprint = false;
+        player.grounded = true; player.seated = false; player.jumpQueued = false;
+        send(socket, { type: "spatial_location_exited",
+          state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
+        return;
+      }
+      if (msg && msg.type === "event_join") {
+        if (typeof msg.id !== "string" || !/^[0-9a-f-]{36}$/i.test(msg.id) ||
+            player.homeId || player.eventId || player.returnState) {
+          send(socket, { type: "spatial_location_rejected", code: "invalid_event_request_or_context_active" }); return;
+        }
+        try {
+          const rows = await sql`
+            SELECT e.id, e.world_id AS "worldId", e.location, e.location_label AS "locationLabel",
+              e.activity_type AS "activityType", e.starts_at AS "startsAt", e.ends_at AS "endsAt",
+              e.status AS "eventStatus", w.status AS "worldStatus", w.visibility,
+              w.owner_user_id AS "worldOwnerId",
+              COALESCE(m.status, 'none') AS "membershipStatus",
+              EXISTS (SELECT 1 FROM user_blocks b
+                WHERE (b.blocker_id = w.owner_user_id AND b.blocked_id = ${player.id}::uuid)
+                   OR (b.blocker_id = ${player.id}::uuid AND b.blocked_id = w.owner_user_id)) AS blocked,
+              EXISTS (SELECT 1 FROM virtual_world_event_attendees a
+                WHERE a.event_id = e.id AND a.user_id = ${player.id}::uuid
+                  AND a.attendance_status = 'going') AS attending
+            FROM virtual_world_events e
+            JOIN virtual_worlds w ON w.id = e.world_id
+            LEFT JOIN virtual_world_memberships m
+              ON m.world_id = w.id AND m.user_id = ${player.id}::uuid
+            WHERE e.id = ${msg.id}::uuid AND e.world_id = ${player.worldId}::uuid
+            LIMIT 1
+          `;
+          const event = rows[0];
+          const now = Date.now();
+          const starts = event ? new Date(event.startsAt).getTime() : 0;
+          const ends = event ? new Date(event.endsAt).getTime() : 0;
+          const allowed = !!event && event.eventStatus === "scheduled" &&
+            event.worldStatus === "published" && !event.blocked && event.attending &&
+            event.membershipStatus !== "banned" && event.membershipStatus !== "suspended" &&
+            (event.visibility !== "private" || event.membershipStatus === "active" ||
+              event.worldOwnerId === player.id) &&
+            ends > now && starts <= now + 30 * 60 * 1000;
+          const destination = allowed ? readSpatialTransform(event.location) : null;
+          if (!allowed || !destination) {
+            send(socket, { type: "spatial_location_rejected", code: "event_join_denied_or_not_open" }); return;
+          }
+          releasePlayerSeats(player.id);
+          player.returnState = { x: player.x, y: player.y, z: player.z, yaw: player.yaw };
+          player.eventId = event.id;
+          player.homeId = null;
+          player.x = destination.x; player.y = destination.y; player.z = destination.z; player.yaw = destination.yaw;
+          player.vx = 0; player.vy = 0; player.vz = 0;
+          player.moveX = 0; player.moveZ = 0; player.sprint = false;
+          player.grounded = true; player.seated = false; player.jumpQueued = false;
+          send(socket, { type: "spatial_location_entered", contextType: "event",
+            contextId: event.id, activityType: event.activityType,
+            locationLabel: event.locationLabel,
+            state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
+        } catch (error) {
+          console.error("event_join_validation_failed", error);
+          send(socket, { type: "spatial_location_rejected", code: "event_join_unavailable" });
+        }
+        return;
+      }
+      if (msg && msg.type === "event_exit") {
+        if (!player.eventId || !player.returnState) {
+          send(socket, { type: "spatial_location_rejected", code: "not_inside_event" }); return;
+        }
+        const destination = player.returnState;
+        player.eventId = null; player.returnState = null;
+        player.x = destination.x; player.y = destination.y; player.z = destination.z; player.yaw = destination.yaw;
+        player.vx = 0; player.vy = 0; player.vz = 0;
+        player.moveX = 0; player.moveZ = 0; player.sprint = false;
+        player.grounded = true; player.seated = false; player.jumpQueued = false;
+        send(socket, { type: "spatial_location_exited",
+          state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
+        return;
+      }
       if (msg && msg.type === "interact") {
         if (typeof msg.objectId !== "string" ||
             !/^[a-zA-Z0-9._:-]{1,80}$/.test(msg.objectId) ||
