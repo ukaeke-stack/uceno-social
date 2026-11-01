@@ -64,7 +64,17 @@ namespace UCENO.VirtualWorld
         public string visibility;
     }
     [Serializable] internal sealed class WorldHomeCreateResponse { public WorldHomeDetail home; }
-    [Serializable] internal sealed class WorldHomeFurnishingList { public WorldHomeFurnishing[] items; }
+    [Serializable] public sealed class WorldHomeMember
+    {
+        public string userId;
+        public string permission;
+    }
+    [Serializable] internal sealed class WorldHomeMembersResponse { public WorldHomeMember[] members; }
+    [Serializable] internal sealed class WorldHomeGrantRequest
+    {
+        public string userId;
+        public string permission;
+    }
 
     [Serializable] public sealed class WorldHomeFurnitureCatalogEntry
     {
@@ -88,11 +98,14 @@ namespace UCENO.VirtualWorld
         private readonly List<WorldHomeSummary> homes = new List<WorldHomeSummary>();
         private readonly List<WorldHomeFurnishing> furnishing = new List<WorldHomeFurnishing>();
         private readonly List<GameObject> spawnedFurniture = new List<GameObject>();
+        private readonly List<WorldHomeMember> members = new List<WorldHomeMember>();
         private string selectedHomeId;
         private string selectedHomeName = "";
         private string selectedPermission = "";
         private string selectedVisibility = "private";
         private string newHomeName = "My Home";
+        private string inviteUserId = "";
+        private string invitePermission = "visitor";
         private string status = "Press M to manage homes.";
         private bool visible;
         private bool busy;
@@ -235,6 +248,7 @@ namespace UCENO.VirtualWorld
                         selectedHomeName = response.home.name;
                         selectedPermission = "owner";
                         selectedVisibility = "private";
+                        members.Clear();
                         furnishing.Clear();
                         ClearSpawnedFurniture();
                         status = "Home created. Change visibility to invite before sharing.";
@@ -267,11 +281,71 @@ namespace UCENO.VirtualWorld
                         selectedHomeName = response.home.name;
                         selectedPermission = response.home.permission;
                         selectedVisibility = response.home.visibility;
+                        members.Clear();
                         furnishing.Clear();
+                        if (selectedPermission == "owner" && selectedVisibility == "invite")
+                            StartCoroutine(LoadMembersRoutine());
                         if (response.home.furnishing != null) furnishing.AddRange(response.home.furnishing);
                         RebuildFurniture();
                         status = "Loaded " + selectedHomeName + " (" + selectedPermission + ").";
                     }
+                }
+            }
+            busy = false;
+        }
+
+        private IEnumerator LoadMembersRoutine()
+        {
+            if (string.IsNullOrEmpty(selectedHomeId)) yield break;
+            using (UnityWebRequest request = CreateRequest(
+                session.ApiBaseUrl.TrimEnd('/') + "/api/world-homes/" +
+                UnityWebRequest.EscapeURL(selectedHomeId) + "/members", "GET", null))
+            {
+                yield return request.SendWebRequest();
+                if (!Succeeded(request)) { SetFailure(request, "Invitation roster"); yield break; }
+                WorldHomeMembersResponse response = JsonUtility.FromJson<WorldHomeMembersResponse>(request.downloadHandler.text);
+                members.Clear();
+                if (response != null && response.members != null) members.AddRange(response.members);
+            }
+        }
+
+        private IEnumerator InviteMemberRoutine(string userId)
+        {
+            busy = true;
+            WorldHomeGrantRequest payload = new WorldHomeGrantRequest
+            {
+                userId = userId,
+                permission = invitePermission
+            };
+            using (UnityWebRequest request = CreateRequest(
+                session.ApiBaseUrl.TrimEnd('/') + "/api/world-homes/" +
+                UnityWebRequest.EscapeURL(selectedHomeId) + "/members", "POST", JsonUtility.ToJson(payload)))
+            {
+                yield return request.SendWebRequest();
+                if (!Succeeded(request)) SetFailure(request, "Home invitation");
+                else
+                {
+                    inviteUserId = "";
+                    status = "Home access granted.";
+                    StartCoroutine(LoadMembersRoutine());
+                }
+            }
+            busy = false;
+        }
+
+        private IEnumerator RevokeMemberRoutine(string userId)
+        {
+            busy = true;
+            string url = session.ApiBaseUrl.TrimEnd('/') + "/api/world-homes/" +
+                UnityWebRequest.EscapeURL(selectedHomeId) + "/members?userId=" + UnityWebRequest.EscapeURL(userId);
+            using (UnityWebRequest request = CreateRequest(url, "DELETE", null))
+            {
+                yield return request.SendWebRequest();
+                if (!Succeeded(request)) SetFailure(request, "Home access revocation");
+                else
+                {
+                    status = "Home access revoked.";
+                    StartCoroutine(LoadMembersRoutine());
                 }
             }
             busy = false;
@@ -388,6 +462,23 @@ namespace UCENO.VirtualWorld
                 {
                     if (GUILayout.Button(selectedVisibility == "invite" ? "SHARING: ON (TAP TO MAKE PRIVATE)" : "SHARING: OFF (TAP TO INVITE)", GUILayout.Height(32f * scale)))
                         selectedVisibility = selectedVisibility == "invite" ? "private" : "invite";
+                }
+                if (selectedPermission == "owner" && selectedVisibility == "invite")
+                {
+                    inviteUserId = GUILayout.TextField(inviteUserId, GUILayout.Height(30f * scale));
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button("ROLE: " + invitePermission.ToUpperInvariant(), GUILayout.Height(30f * scale)))
+                        invitePermission = invitePermission == "visitor" ? "decorator" :
+                            invitePermission == "decorator" ? "co_owner" : "visitor";
+                    if (GUILayout.Button("INVITE USER ID", GUILayout.Height(30f * scale))) InviteMember();
+                    GUILayout.EndHorizontal();
+                    foreach (WorldHomeMember member in members)
+                    {
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label(member.userId + " [" + member.permission + "]", GUILayout.MinWidth(100f));
+                        if (GUILayout.Button("REVOKE", GUILayout.Width(72f * scale))) RevokeMember(member.userId);
+                        GUILayout.EndHorizontal();
+                    }
                 }
                 if (CanEditSelectedHome)
                 {
