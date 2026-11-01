@@ -1,17 +1,25 @@
-name: UCENO World Gateway
+name: UCENO World Gateway and Unity Client
 on:
   pull_request:
     paths:
       - "runtime/world-gateway/**"
       - "db/migrations/024_virtual_world_instance_leases.sql"
+      - "app/api/worlds/**"
+      - "lib/world-client-session.ts"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/**"
+      - "unity/UCENOVirtualWorld/Packages/manifest.json"
   push:
     branches:
       - feature/uceno-unity-foundation
     paths:
       - "runtime/world-gateway/**"
       - "db/migrations/024_virtual_world_instance_leases.sql"
+      - "app/api/worlds/**"
+      - "lib/world-client-session.ts"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/**"
+      - "unity/UCENOVirtualWorld/Packages/manifest.json"
 jobs:
-  build:
+  gateway-build:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -23,3 +31,30 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run build
+
+  unity-source-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate Unity package manifest
+        run: |
+          node -e "const p=require('./unity/UCENOVirtualWorld/Packages/manifest.json'); if (!p.dependencies || !p.dependencies['com.endel.nativewebsocket']) process.exit(1);"
+      - name: Verify authoritative client wiring
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const root = './unity/UCENOVirtualWorld/Assets/UCENO/Scripts/';
+          const gateway = fs.readFileSync(root + 'WorldGatewayClient.cs', 'utf8');
+          const motor = fs.readFileSync(root + 'PlayerMotor.cs', 'utf8');
+          const presence = fs.readFileSync(root + 'WorldPresenceClient.cs', 'utf8');
+          for (const marker of ['OnMessage', 'SendText', 'DispatchMessageQueue', 'ApplyServerState', 'SetServerAuthority'])
+            if (!gateway.includes(marker)) throw new Error('Missing gateway behavior: ' + marker);
+          for (const marker of ['SetServerAuthority', 'ConsumeJumpRequest', 'ApplyServerState'])
+            if (!motor.includes(marker)) throw new Error('Missing motor behavior: ' + marker);
+          if (!presence.includes('AddComponent<WorldGatewayClient>()'))
+            throw new Error('WorldPresenceClient does not attach the gateway transport');
+          console.log('Unity package and gateway wiring checks passed. This is not a Unity Editor/Android build.');
+          NODE
