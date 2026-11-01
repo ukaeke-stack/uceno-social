@@ -25,7 +25,7 @@ type CollisionBox = {
   minX: number; maxX: number; minY: number; maxY: number;
   minZ: number; maxZ: number;
 };
-type Interactable = { id: string; kind: "door" | "object"; x: number; y: number; z: number; state: string; actorId: string | null };
+type Interactable = { id: string; kind: "door" | "seat" | "object"; x: number; y: number; z: number; state: string; actorId: string | null; occupantId: string | null };
 
 function loadInteractables(): Map<string, Interactable> {
   const filePath = process.env.WORLD_INTERACTABLES_FILE || process.env.WORLD_COLLISION_BOXES_FILE;
@@ -50,14 +50,14 @@ function loadInteractables(): Map<string, Interactable> {
     if (!value || typeof value !== "object") throw new Error(`Interactable ${index} is invalid`);
     const item = value as Record<string, unknown>;
     if (typeof item.id !== "string" || !/^[a-zA-Z0-9._:-]{1,80}$/.test(item.id) ||
-        (item.kind !== "door" && item.kind !== "object") ||
+        (item.kind !== "door" && item.kind !== "seat" && item.kind !== "object") ||
         !finiteNumber(item.x, -WORLD_BOUNDS, WORLD_BOUNDS) ||
         !finiteNumber(item.y, -WORLD_BOUNDS, WORLD_BOUNDS) ||
         !finiteNumber(item.z, -WORLD_BOUNDS, WORLD_BOUNDS) || result.has(item.id))
       throw new Error(`Interactable ${index} has invalid or duplicate fields`);
     result.set(item.id, {
       id: item.id, kind: item.kind, x: item.x, y: item.y, z: item.z,
-      state: item.kind === "door" ? "closed" : "idle", actorId: null
+      state: item.kind === "door" ? "closed" : item.kind === "seat" ? "available" : "idle", actorId: null, occupantId: null
     });
   }
   return result;
@@ -291,12 +291,16 @@ wss.on("connection", async (socket: WebSocket) => {
       if (msg && msg.type === "interact") {
         if (typeof msg.objectId !== "string" ||
             !/^[a-zA-Z0-9._:-]{1,80}$/.test(msg.objectId) ||
-            !["toggle", "use"].includes(msg.action)) {
+            !["toggle", "use", "sit", "stand"].includes(msg.action)) {
           fail(socket, "invalid_interaction"); return;
         }
         const target = INTERACTABLES.get(msg.objectId);
-        if (!target || (target.kind === "door" && msg.action !== "toggle") ||
-            (target.kind === "object" && msg.action !== "use")) {
+        const actionMatches = target && (
+          (target.kind === "door" && msg.action === "toggle") ||
+          (target.kind === "object" && msg.action === "use") ||
+          (target.kind === "seat" && (msg.action === "sit" || msg.action === "stand"))
+        );
+        if (!actionMatches) {
           send(socket, { type: "interaction_rejected", code: "unknown_or_invalid_object" }); return;
         }
         const distance = Math.hypot(player.x - target.x, player.y - target.y, player.z - target.z);
@@ -304,12 +308,33 @@ wss.on("connection", async (socket: WebSocket) => {
         if (distance > 4.25 || now - player.lastInteractionAt < 250) {
           send(socket, { type: "interaction_rejected", code: "out_of_range_or_rate_limited" }); return;
         }
+        if (target.kind === "seat") {
+          if (msg.action === "sit" && target.occupantId && target.occupantId !== player.id) {
+            send(socket, { type: "interaction_rejected", code: "seat_occupied" }); return;
+          }
+          if (msg.action === "stand" && target.occupantId !== player.id) {
+            send(socket, { type: "interaction_rejected", code: "seat_not_occupied_by_player" }); return;
+          }
+          if (msg.action === "sit") {
+            target.occupantId = player.id;
+            target.state = "occupied";
+            player.seated = true;
+          } else {
+            target.occupantId = null;
+            target.state = "available";
+            player.seated = false;
+          }
+        } else {
+          target.state = target.kind === "door"
+            ? (target.state === "open" ? "closed" : "open")
+            : (target.state === "active" ? "idle" : "active");
+        }
         player.lastInteractionAt = now;
-        target.state = target.kind === "door"
-          ? (target.state === "open" ? "closed" : "open")
-          : (target.state === "active" ? "idle" : "active");
         target.actorId = player.id;
-        const packet = { type: "object_state", objectId: target.id, objectState: target.state, actorId: player.id };
+        const packet = {
+          type: "object_state", objectId: target.id, objectState: target.state,
+          actorId: player.id, occupantId: target.occupantId
+        };
         for (const peer of players.values()) send(peer.socket, packet);
         return;
       }
@@ -336,12 +361,23 @@ wss.on("connection", async (socket: WebSocket) => {
       if (player.seated) player.jumpQueued = false;
       if (msg.jump && player.grounded && !player.seated) player.jumpQueued = true;
     });
-    socket.on("close", () => {
-      if (players.get(identity.userId)?.socket === socket) players.delete(identity.userId);
-    });
-    socket.on("error", () => {
-      if (players.get(identity.userId)?.socket === socket) players.delete(identity.userId);
-    });
+    const releaseSeats = () => {
+      if (players.get(identity.userId)?.socket !== socket) return;
+      players.delete(identity.userId);
+      for (const target of INTERACTABLES.values()) {
+        if (target.kind !== "seat" || target.occupantId !== identity.userId) continue;
+        target.occupantId = null;
+        target.state = "available";
+        target.actorId = identity.userId;
+        const packet = {
+          type: "object_state", objectId: target.id, objectState: target.state,
+          actorId: identity.userId, occupantId: null
+        };
+        for (const peer of players.values()) send(peer.socket, packet);
+      }
+    };
+    socket.on("close", releaseSeats);
+    socket.on("error", releaseSeats);
   } catch {
     fail(socket, "session_initialization_failed");
   }
