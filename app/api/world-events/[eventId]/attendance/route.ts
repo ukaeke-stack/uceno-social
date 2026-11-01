@@ -25,7 +25,10 @@ export async function POST(request: NextRequest, { params }: Context) {
       SELECT e.id, e.world_id AS "worldId", e.starts_at AS "startsAt",
              e.ends_at AS "endsAt", e.status AS "eventStatus",
              w.status AS "worldStatus", w.visibility, w.owner_user_id AS "ownerUserId",
-             COALESCE(m.status, 'none') AS "membershipStatus"
+             COALESCE(m.status, 'none') AS "membershipStatus",
+             EXISTS (SELECT 1 FROM user_blocks b
+               WHERE (b.blocker_id = w.owner_user_id AND b.blocked_id = ${session.id}::uuid)
+                  OR (b.blocker_id = ${session.id}::uuid AND b.blocked_id = w.owner_user_id)) AS blocked
       FROM virtual_world_events e
       JOIN virtual_worlds w ON w.id = e.world_id
       LEFT JOIN virtual_world_memberships m
@@ -36,7 +39,7 @@ export async function POST(request: NextRequest, { params }: Context) {
     if (!event || event.worldStatus !== "published" || event.eventStatus !== "scheduled" ||
         new Date(event.endsAt).getTime() <= Date.now())
       return NextResponse.json({ error: "Event is unavailable" }, { status: 404 });
-    if (event.membershipStatus === "banned" || event.membershipStatus === "suspended" ||
+    if (event.blocked || event.membershipStatus === "banned" || event.membershipStatus === "suspended" ||
         (event.visibility === "private" && event.membershipStatus !== "active" && event.ownerUserId !== session.id))
       return NextResponse.json({ error: "You cannot access this event" }, { status: 403 });
 
