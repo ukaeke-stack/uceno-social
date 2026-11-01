@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { readSession } from "@/lib/session";
+import { readWorldClientSession } from "@/lib/world-client-session";
 
 export const runtime = "nodejs";
 type Context = { params: Promise<{ worldId: string }> };
@@ -46,9 +46,9 @@ async function canAccessWorld(worldId: string, userId: string) {
 
 // GET returns fresh peers only. This is polling presence, not authoritative movement replication.
 export async function GET(_request: NextRequest, { params }: Context) {
-  const session = await readSession();
-  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const { worldId } = await params;
+  const session = await readWorldClientSession(_request, worldId);
+  if (!session) return NextResponse.json({ error: "Sign in or reconnect to this world" }, { status: 401 });
   if (!validUuid(worldId)) return NextResponse.json({ error: "Invalid world ID" }, { status: 400 });
   try {
     if (!await canAccessWorld(worldId, session.id))
@@ -77,9 +77,9 @@ export async function GET(_request: NextRequest, { params }: Context) {
 
 // POST refreshes the signed-in user's ephemeral presence. Clients should send at most once per second.
 export async function POST(request: NextRequest, { params }: Context) {
-  const session = await readSession();
-  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const { worldId } = await params;
+  const session = await readWorldClientSession(request, worldId);
+  if (!session) return NextResponse.json({ error: "Sign in or reconnect to this world" }, { status: 401 });
   if (!validUuid(worldId)) return NextResponse.json({ error: "Invalid world ID" }, { status: 400 });
   let body: unknown;
   try { body = await request.json(); }
