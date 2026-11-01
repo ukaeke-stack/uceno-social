@@ -426,7 +426,7 @@ namespace UCENO.VirtualWorld
             busy = true;
             WorldHomeSaveRequest payload = new WorldHomeSaveRequest
             {
-                transform = selectedHomeTransform,
+                transform = selectedPermission == "decorator" ? null : selectedHomeTransform,
                 furnishing = furnishing.ToArray(),
                 visibility = selectedPermission == "owner" ? selectedVisibility : ""
             };
