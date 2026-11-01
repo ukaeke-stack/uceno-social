@@ -1,4 +1,6 @@
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
+import { createActivitySession, joinActivity, startActivity, leaveActivity, cancelActivity, type ActivitySession } from "./activity-session.js";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
@@ -198,6 +200,50 @@ type Player = {
   returnState: { x: number; y: number; z: number; yaw: number } | null;
 };
 const players = new Map<string, Player>();
+// Activity sessions are scoped to this live gateway instance. They are deliberately
+// not advertised as persistent: process restarts currently clear sessions/results.
+const activitySessions = new Map<string, ActivitySession>();
+const activityHosts = new Map<string, string>();
+
+function activityPayload(session: ActivitySession) {
+  return {
+    type: "activity_state",
+    session: {
+      id: session.id,
+      worldId: session.worldId,
+      instanceId: session.instanceId,
+      kind: session.kind,
+      phase: session.phase,
+      createdAt: session.createdAt,
+      startedAt: session.startedAt,
+      completedAt: session.completedAt,
+      version: session.version,
+      maxParticipants: session.maxParticipants,
+      checkpointCount: session.checkpointCount,
+      participants: Array.from(session.participants.values()).map(participant => ({
+        userId: participant.userId,
+        status: participant.status,
+        joinedAt: participant.joinedAt,
+        checkpointIndex: participant.checkpointIndex,
+        finishTime: participant.finishTime
+      }))
+    }
+  };
+}
+
+function broadcastActivity(session: ActivitySession) {
+  const packet = activityPayload(session);
+  for (const peer of players.values()) {
+    if (peer.worldId === session.worldId) send(peer.socket, packet);
+  }
+}
+
+function findAccessibleActivity(sessionId: unknown, player: Player): ActivitySession | null {
+  if (typeof sessionId !== "string") return null;
+  const session = activitySessions.get(sessionId);
+  return session && session.worldId === player.worldId &&
+    session.instanceId === INSTANCE_ID ? session : null;
+}
 
 function send(socket: WebSocket, value: unknown) {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(value));
@@ -392,6 +438,80 @@ wss.on("connection", async (socket: WebSocket) => {
     socket.on("message", async (raw) => {
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
+      if (msg && msg.type === "activity_create") {
+        // Checkpoint races are intentionally withheld until the gateway validates
+        // checkpoint proximity against server-authored world geometry.
+        if (player.homeId || player.eventId || player.returnState ||
+            !["dance", "sports", "adventure"].includes(msg.kind) ||
+            (msg.maxParticipants !== undefined &&
+              (!Number.isInteger(msg.maxParticipants) || msg.maxParticipants < 2 || msg.maxParticipants > 64))) {
+          send(socket, { type: "activity_rejected", code: "invalid_activity_request_or_context_active" }); return;
+        }
+        const id = randomUUID();
+        const created = createActivitySession({
+          id, worldId: player.worldId, instanceId: INSTANCE_ID,
+          kind: msg.kind, maxParticipants: msg.maxParticipants ?? 16
+        });
+        if (!created.ok) {
+          send(socket, { type: "activity_rejected", code: created.code }); return;
+        }
+        const joined = joinActivity(created.session, player.id);
+        if (!joined.ok) {
+          send(socket, { type: "activity_rejected", code: joined.code }); return;
+        }
+        activitySessions.set(id, created.session);
+        activityHosts.set(id, player.id);
+        broadcastActivity(created.session);
+        return;
+      }
+      if (msg && msg.type === "activity_join") {
+        const session = findAccessibleActivity(msg.id, player);
+        if (!session || player.homeId || player.eventId || player.returnState) {
+          send(socket, { type: "activity_rejected", code: "activity_not_found_or_context_active" }); return;
+        }
+        const joined = joinActivity(session, player.id);
+        if (!joined.ok) {
+          send(socket, { type: "activity_rejected", code: joined.code }); return;
+        }
+        broadcastActivity(session);
+        return;
+      }
+      if (msg && msg.type === "activity_start") {
+        const session = findAccessibleActivity(msg.id, player);
+        if (!session) {
+          send(socket, { type: "activity_rejected", code: "activity_not_found" }); return;
+        }
+        const started = startActivity(session, activityHosts.get(session.id) === player.id);
+        if (!started.ok) {
+          send(socket, { type: "activity_rejected", code: started.code }); return;
+        }
+        broadcastActivity(session);
+        return;
+      }
+      if (msg && msg.type === "activity_leave") {
+        const session = findAccessibleActivity(msg.id, player);
+        if (!session) {
+          send(socket, { type: "activity_rejected", code: "activity_not_found" }); return;
+        }
+        const left = leaveActivity(session, player.id);
+        if (!left.ok) {
+          send(socket, { type: "activity_rejected", code: left.code }); return;
+        }
+        broadcastActivity(session);
+        return;
+      }
+      if (msg && msg.type === "activity_cancel") {
+        const session = findAccessibleActivity(msg.id, player);
+        if (!session) {
+          send(socket, { type: "activity_rejected", code: "activity_not_found" }); return;
+        }
+        const cancelled = cancelActivity(session, activityHosts.get(session.id) === player.id);
+        if (!cancelled.ok) {
+          send(socket, { type: "activity_rejected", code: cancelled.code }); return;
+        }
+        broadcastActivity(session);
+        return;
+      }
       if (msg && msg.type === "home_enter") {
         if (typeof msg.id !== "string" || !/^[0-9a-f-]{36}$/i.test(msg.id) ||
             player.homeId || player.eventId || player.returnState) {
@@ -640,6 +760,12 @@ wss.on("connection", async (socket: WebSocket) => {
         `.catch(error => console.error("spatial_return_checkpoint_failed", error));
       }
       if (current?.socket === socket) players.delete(identity.userId);
+      for (const session of activitySessions.values()) {
+        const participant = session.participants.get(identity.userId);
+        if (!participant || participant.status === "left" || participant.status === "dnf" || participant.status === "finished") continue;
+        const left = leaveActivity(session, identity.userId);
+        if (left.ok) broadcastActivity(session);
+      }
       for (const target of INTERACTABLES.values()) {
         if (target.kind !== "seat" || target.occupantId !== identity.userId) continue;
         target.occupantId = null;
