@@ -1,0 +1,97 @@
+name: Import UCENO free realistic 3D assets
+
+on:
+  push:
+    branches:
+      - feature/uceno-free-realistic-assets
+    paths:
+      - '.github/workflows/uceno-free-assets.yml'
+      - 'scripts/download_polyhaven_assets.py'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Characters/uceno_default_avatar.params.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: uceno-free-assets-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  import-free-assets:
+    name: Generate avatar and download CC0 environment models
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out UCENO source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Clone Ara 3D Gen
+        run: git clone --depth 1 https://github.com/olatunde85/3d-gen.git "$RUNNER_TEMP/ara3dgen"
+
+      - name: Install character generator dependencies
+        working-directory: ${{ runner.temp }}/ara3dgen
+        run: npm ci
+
+      - name: Download CC0 MakeHuman source assets and build generator library
+        working-directory: ${{ runner.temp }}/ara3dgen
+        run: npm run setup-assets
+
+      - name: Generate rigged UCENO humanoid with animations
+        working-directory: ${{ runner.temp }}/ara3dgen
+        run: |
+          npm run export -- \
+            --params "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Characters/uceno_default_avatar.params.json" \
+            --formats fbx \
+            --detail medium \
+            --out "$RUNNER_TEMP/uceno-avatar-export"
+          mkdir -p "$RUNNER_TEMP/uceno-avatar-extracted"
+          archive="$(find "$RUNNER_TEMP/uceno-avatar-export" -maxdepth 1 -type f -name '*.zip' -print -quit)"
+          test -n "$archive"
+          unzip -q "$archive" -d "$RUNNER_TEMP/uceno-avatar-extracted"
+          avatar="$(find "$RUNNER_TEMP/uceno-avatar-extracted" -type f -name 'UCENO_Default_Avatar.fbx' -print -quit)"
+          test -n "$avatar"
+          mkdir -p "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported"
+          cp "$avatar" "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported/UCENO_Default_Avatar.fbx"
+          license="$(find "$RUNNER_TEMP/uceno-avatar-extracted" -type f -name 'LICENSE.txt' -print -quit)"
+          if [ -n "$license" ]; then
+            mkdir -p "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Documentation/Ara3DGen"
+            cp "$license" "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Documentation/Ara3DGen/LICENSE.txt"
+          fi
+          echo "Generated avatar:"
+          ls -lh "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported/UCENO_Default_Avatar.fbx"
+
+      - name: Download selected Poly Haven CC0 city and nature models
+        run: |
+          python -m py_compile scripts/download_polyhaven_assets.py
+          python scripts/download_polyhaven_assets.py \
+            --output-dir unity/UCENOVirtualWorld/Assets/UCENO/Environment/Imported
+
+      - name: Commit imported free assets to the feature branch
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported
+          git add unity/UCENOVirtualWorld/Assets/UCENO/Environment/Imported
+          git add unity/UCENOVirtualWorld/Assets/UCENO/Documentation/Ara3DGen
+          if git diff --cached --quiet; then
+            echo "No new imported assets to commit."
+            exit 0
+          fi
+          git commit -m "Import free rigged avatar and CC0 environment assets"
+          git push origin "HEAD:${BRANCH_NAME}"
