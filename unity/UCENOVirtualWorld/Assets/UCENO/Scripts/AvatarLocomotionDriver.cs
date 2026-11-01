@@ -70,7 +70,9 @@ namespace UCENO.VirtualWorld
                 receivedGestureSequence = sequence;
                 if (UsesImportedController)
                 {
-                    string trigger = nextGesture == "wave" ? "Wave" : nextGesture == "cheer" ? "Cheer" : null;
+                    string trigger = nextGesture == "wave" ? "Wave" :
+                        nextGesture == "cheer" ? "Cheer" :
+                        nextGesture == "dance" ? "Dance" : null;
                     if (!string.IsNullOrEmpty(trigger))
                     {
                         foreach (AnimatorControllerParameter parameter in animator.parameters)
@@ -78,8 +80,10 @@ namespace UCENO.VirtualWorld
                                 animator.SetTrigger(trigger);
                     }
                 }
-                activeGesture = nextGesture == "wave" ? 1 : nextGesture == "cheer" ? 2 : 0;
-                gestureUntil = Time.time + (activeGesture == 1 ? 1.8f : 1.6f);
+                activeGesture = nextGesture == "wave" ? 1 :
+                    nextGesture == "cheer" ? 2 : nextGesture == "dance" ? 3 : 0;
+                gestureUntil = Time.time + (activeGesture == 1 ? 1.8f :
+                    activeGesture == 3 ? 5f : 1.6f);
             }
             GestureName = nextGesture;
             if (nextGesture == "none")
@@ -91,6 +95,7 @@ namespace UCENO.VirtualWorld
 
         public void TriggerWave() { activeGesture = 1; GestureName = "wave"; GestureSequence++; gestureUntil = Time.time + 1.8f; }
         public void TriggerCheer() { activeGesture = 2; GestureName = "cheer"; GestureSequence++; gestureUntil = Time.time + 1.6f; }
+        public void TriggerDance() { activeGesture = 3; GestureName = "dance"; GestureSequence++; gestureUntil = Time.time + 5f; }
 
         private bool UsesImportedController =>
             animator != null && animator.runtimeAnimatorController != null;
@@ -236,6 +241,22 @@ namespace UCENO.VirtualWorld
                     if (leftUpperArm != null) leftUpperArm.localRotation = leftUpperArmBase * Quaternion.Euler(-105f, 0f, -18f);
                     if (rightUpperArm != null) rightUpperArm.localRotation = rightUpperArmBase * Quaternion.Euler(-105f, 0f, 18f);
                     SetRotation(chest, chestBase, new Vector3(-5f * pulse, 0f, 0f));
+                }
+                else if (activeGesture == 3)
+                {
+                    float beat = Mathf.Sin(Time.time * 10f);
+                    float sway = Mathf.Sin(Time.time * 4.8f) * 22f;
+                    SetRotation(hips, hipsBase, new Vector3(beat * 7f, sway * 0.45f, sway * 0.25f));
+                    SetRotation(chest, chestBase, new Vector3(-beat * 5f, sway * 0.7f, -sway * 0.18f));
+                    SetRotation(head, headBase, new Vector3(beat * 3f, -sway * 0.15f, 0f));
+                    SetRotation(leftUpperLeg, leftUpperLegBase, new Vector3(beat * 10f, 0f, -sway * 0.16f));
+                    SetRotation(rightUpperLeg, rightUpperLegBase, new Vector3(-beat * 10f, 0f, sway * 0.16f));
+                    if (leftUpperArm != null)
+                        leftUpperArm.localRotation = leftUpperArmBase * Quaternion.Euler(-105f + beat * 12f, 0f, -35f + sway * 0.25f);
+                    if (rightUpperArm != null)
+                        rightUpperArm.localRotation = rightUpperArmBase * Quaternion.Euler(-105f - beat * 12f, 0f, 35f + sway * 0.25f);
+                    SetRotation(leftLowerArm, leftLowerArmBase, new Vector3(-38f + beat * 18f, 0f, -8f));
+                    SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(-38f - beat * 18f, 0f, 8f));
                 }
             }
             else { activeGesture = 0; GestureName = "none"; }
