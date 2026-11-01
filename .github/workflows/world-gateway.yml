@@ -8,6 +8,7 @@ on:
       - "app/api/worlds/**"
       - "lib/world-client-session.ts"
       - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/**"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/**"
       - "unity/UCENOVirtualWorld/Packages/manifest.json"
   push:
     branches:
@@ -49,10 +50,15 @@ jobs:
           node - <<'NODE'
           const fs = require('fs');
           const gateway = fs.readFileSync('./runtime/world-gateway/src/server.ts', 'utf8');
-          for (const marker of ['WORLD_COLLISION_BOXES', 'loadCollisionBoxes', 'PLAYER_RADIUS', 'PLAYER_HEIGHT', 'resolveHorizontalMovement', 'overlapsBox'])
+          for (const marker of ['WORLD_COLLISION_BOXES_FILE', 'readFileSync', 'loadCollisionBoxes', 'PLAYER_RADIUS', 'PLAYER_HEIGHT', 'resolveHorizontalMovement', 'overlapsBox'])
             if (!gateway.includes(marker)) throw new Error('Missing server collision behavior: ' + marker);
           if (!gateway.includes('COLLISION_BOXES.some'))
             throw new Error('Server movement is not checked against configured collision boxes');
+          if (!gateway.includes('Array.isArray((parsed as { boxes?: unknown }).boxes)'))
+            throw new Error('Gateway does not accept the Unity-exported collision map format');
+          const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
+          for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes.json'])
+            if (!exporter.includes(marker)) throw new Error('Missing Unity geometry export behavior: ' + marker);
           console.log('Static collision configuration and movement-resolution source checks passed.');
           NODE
       - name: Verify authoritative client wiring
