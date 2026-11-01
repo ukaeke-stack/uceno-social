@@ -102,6 +102,18 @@ export async function PUT(request: NextRequest, { params }: Context) {
               AND hm.permission IN ('decorator', 'co_owner')
           )
         )
+        AND EXISTS (
+          SELECT 1
+          FROM virtual_worlds w
+          LEFT JOIN virtual_world_memberships wm
+            ON wm.world_id = w.id AND wm.user_id = ${session.id}::uuid
+          WHERE w.id = h.world_id
+            AND w.status = 'published'
+            AND COALESCE(wm.status, 'none') NOT IN ('banned', 'suspended')
+            AND (w.visibility <> 'private' OR wm.status = 'active'
+              OR h.owner_user_id = ${session.id}::uuid)
+            AND (h.owner_user_id = ${session.id}::uuid OR h.visibility = 'invite')
+        )
         AND NOT EXISTS (
           SELECT 1 FROM user_blocks b
           WHERE (b.blocker_id = h.owner_user_id AND b.blocked_id = ${session.id}::uuid)
