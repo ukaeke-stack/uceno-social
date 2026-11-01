@@ -62,10 +62,32 @@ Until the variable is set to `true`, pushes to this feature branch skip the Unit
 
 Never paste license files, account passwords, keystores or other secrets into source files, issues, pull requests or ChatGPT messages.
 
+## Free asset import pipeline
+
+The free-asset pipeline generates a rigged Unity Humanoid character using Ara 3D
+Gen and downloads selected CC0 city, street and nature models from Poly Haven.
+Imported files are kept separate from gameplay code so professional replacements
+can be added later without rewriting player movement, camera control or
+interaction logic.
+
+- Character source: `Assets/UCENO/Characters/Imported/`
+- Environment models: `Assets/UCENO/Environment/Imported/Models/`
+- PBR road, pavement and grass maps: `Assets/UCENO/Environment/Imported/Textures/`
+- City HDRI: `Assets/UCENO/Environment/Imported/HDRI/`
+
+The exact sources, licences and replacement rules are recorded in
+`Assets/UCENO/Documentation/FREE_ASSET_MANIFEST.md`. The Poly Haven API is used
+only during development-time import; the shipped client does not call it.
+
+Imported models are not yet a finished scene. They must be assembled into
+reusable prefabs with collision, mobile-ready materials, lighting, LODs and
+animation wiring before the world can be considered visually complete. Asset
+import workflows do not run a Unity build and do not generate an APK.
+
 ## Current scope and limitations
 
 - Offline single-player movement prototype only.
-- Runtime-generated placeholder environment and player.
+- The current scene still uses the original placeholder environment and avatar until the imported free models are assembled into the new scene.
 - No login, world-entry token exchange, networking, multiplayer, moderation checks, avatar customization, persistent world state, inventory, credits, purchases or advertising.
 - No Android APK or Web build has been generated yet.
 - Source review is not proof of Unity compilation. The cloud build and physical-device checklist must pass before treating the prototype as working.
