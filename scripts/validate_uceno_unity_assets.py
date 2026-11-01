@@ -181,6 +181,10 @@ def main():
         fail("WorldPresenceClient is missing multiplayer connection status.")
     if "maxVisiblePeerDistance = 110f" not in presence or "maxRemoteAvatars = 12" not in presence:
         fail("WorldPresenceClient is missing mobile remote-avatar visibility limits.")
+    if "remote.animator.SetFloat(Animator.StringToHash(\"MoveSpeed\")" not in presence:
+        fail("WorldPresenceClient is missing remote humanoid locomotion animation updates.")
+    if "remote.lastSamplePosition" not in presence or "replicatedSpeed" not in presence:
+        fail("WorldPresenceClient is missing movement-sample speed estimation.")
     if "presence.PeerCount" not in hud or "presence.ConnectionStatus" not in hud:
         fail("World status HUD does not display multiplayer connection status.")
 
