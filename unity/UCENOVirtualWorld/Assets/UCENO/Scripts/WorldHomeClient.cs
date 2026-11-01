@@ -478,7 +478,11 @@ namespace UCENO.VirtualWorld
             foreach (WorldHomeFurnishing item in furnishing)
             {
                 WorldHomeFurnitureCatalogEntry entry = FindCatalogEntry(item.assetId);
-                if (entry == null || entry.prefab == null) continue;
+                if (entry == null || entry.prefab == null)
+                {
+                    spawnedFurniture.Add(null);
+                    continue;
+                }
                 Vector3 localPosition = new Vector3(item.x, item.y, item.z);
                 Vector3 worldPosition = homePosition + homeRotation * localPosition;
                 Quaternion worldRotation = homeRotation * Quaternion.Euler(0f, item.yaw, 0f);
