@@ -13,6 +13,9 @@ without rewriting player movement, camera control, or interaction logic.
   on its own. The generator includes the required acknowledgement in its export.
 - Export target: FBX, Unity Humanoid rig, medium mesh detail, baked idle/walk/run
   and other available clips.
+- Imported result: approximately 75,000 triangles and 182 cm tall; the Unity
+  import postprocessor applies Humanoid rigging, looping locomotion clips and
+  mobile texture/mesh compression.
 - UCENO profile: contemporary adult male appearance with African skin settings,
   modern casual clothing, and dark hair. This is an initial default model, not a
   limit on future player customisation.
@@ -27,15 +30,15 @@ MakeHuman and CMU notices.
 The asset-import workflow downloads these selected models from
 https://polyhaven.com/, using the official public API:
 
-| Asset | Planned use |
-| --- | --- |
-| Modular Urban Apartments Facade | Residential city frontage |
-| Modular Factory Facade | Industrial/commercial frontage |
-| Street Lamp 01 | Street lighting |
-| Pachira Aquatica 01 | Tropical street tree / planted areas |
-| Shrub 02 and Shrub 03 | Realistic street greenery and low planting |
-| Covered Car | Parked street vehicle |
-| Modular Chainlink Fence | Perimeter and service areas |
+| Asset | Planned use | Approx. source triangles |
+| --- | --- | ---: |
+| Modular Urban Apartments Facade | Residential city frontage | 118K |
+| Modular Factory Facade | Industrial/commercial frontage | 175K |
+| Street Lamp 01 | Street lighting | 30K |
+| Pachira Aquatica 01 | Tropical street tree / planted areas | 77K |
+| Shrub 02 and Shrub 03 | Realistic street greenery and low planting | 52K + 17K |
+| Covered Car | Parked street vehicle | 12K |
+| Modular Chainlink Fence | Perimeter and service areas | 89K |
 
 The same import job also downloads these CC0 surface and sky assets at mobile-
 appropriate resolutions:
@@ -68,9 +71,16 @@ The downloader prefers FBX for Unity's native importer and falls back to glTF.
 - Assets/UCENO/Prefabs/Environment/ — reusable environment prefabs.
 
 Character imports are configured as Unity Humanoid rigs. Environment assets use
-mesh optimisation and medium mesh compression. Before the first Android build,
-the actual scene must be assembled from these imported models, colliders and
-materials, then compiled and checked on a physical device.
+mesh optimisation, medium mesh compression and 1K PBR textures. The Editor scene
+builder creates replaceable prefabs, collision, a city street, PBR road and
+walkway surfaces, planted verges, HDRI sky, lighting, the humanoid player,
+locomotion blend tree and status HUD. It limits repeated high-poly props for
+Android performance.
+
+The scene builder has not yet been run in the Unity Editor. Unity asset import,
+C# compilation, visual inspection and physical Android performance testing
+remain mandatory. Do not generate an APK until those checks pass and the user
+authorises the build.
 
 ## Replacement policy
 
