@@ -56,7 +56,6 @@ namespace UCENO.VirtualWorld
         private bool networkSprinting;
         private int receivedGestureSequence;
         public int GestureSequence { get; private set; }
-        public int GestureSequence { get; private set; }
         public string GestureName { get; private set; } = "none";
 
         public void ApplyRemoteState(float speed, bool seated, bool sprinting, string gesture, int sequence)
