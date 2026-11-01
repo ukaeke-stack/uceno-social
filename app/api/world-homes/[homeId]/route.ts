@@ -79,10 +79,12 @@ export async function PUT(request: NextRequest, { params }: Context) {
 
   const hasTransform = Object.prototype.hasOwnProperty.call(body, "transform");
   const hasFurnishing = Object.prototype.hasOwnProperty.call(body, "furnishing");
-  if ((!hasTransform && !hasFurnishing) ||
+  const hasVisibility = body.visibility !== undefined && body.visibility !== "";
+  if ((!hasTransform && !hasFurnishing && !hasVisibility) ||
       (hasTransform && (!isRecord(body.transform) || !withinBytes(body.transform, 4000))) ||
       (hasFurnishing && (!Array.isArray(body.furnishing) || body.furnishing.length > 100 ||
-        !withinBytes(body.furnishing, 12000)))) {
+        !withinBytes(body.furnishing, 12000))) ||
+      (hasVisibility && body.visibility !== "private" && body.visibility !== "invite")) {
     return NextResponse.json({ error: "Provide a valid bounded transform or furnishing layout" }, { status: 400 });
   }
 
@@ -92,8 +94,10 @@ export async function PUT(request: NextRequest, { params }: Context) {
       UPDATE virtual_homes h
       SET transform = CASE WHEN ${hasTransform} THEN ${JSON.stringify(body.transform ?? {})}::jsonb ELSE h.transform END,
           furnishing = CASE WHEN ${hasFurnishing} THEN ${JSON.stringify(body.furnishing ?? [])}::jsonb ELSE h.furnishing END,
+          visibility = CASE WHEN ${hasVisibility} THEN ${body.visibility ?? "private"} ELSE h.visibility END,
           updated_at = NOW()
       WHERE h.id = ${homeId}::uuid
+        AND (NOT ${hasVisibility} OR h.owner_user_id = ${session.id}::uuid)
         AND (
           h.owner_user_id = ${session.id}::uuid
           OR EXISTS (
