@@ -72,6 +72,7 @@ namespace UCENO.VirtualWorld
         private string locationZ = "0";
         private float locationYaw;
         private string activeEventId = "";
+        private string activeEventActivityType = "";
         private string status = "Press N to view world events.";
         private Vector2 scroll;
 
@@ -105,6 +106,7 @@ namespace UCENO.VirtualWorld
             if (contextType != "event") return;
             activeEventId = contextId;
             WorldEventSummary joined = events.Find(item => item.id == contextId);
+            activeEventActivityType = joined != null ? joined.activityType : "social";
             status = "Joined " + (joined != null ? joined.title : "event") +
                 " at " + (joined != null ? joined.locationLabel : "the event venue") +
                 ". The world server authorized your arrival.";
@@ -120,6 +122,7 @@ namespace UCENO.VirtualWorld
         {
             if (string.IsNullOrEmpty(activeEventId)) return;
             activeEventId = "";
+            activeEventActivityType = "";
             status = "You have left the event venue.";
         }
 
@@ -327,9 +330,16 @@ namespace UCENO.VirtualWorld
                 return;
             }
             GUILayout.EndHorizontal();
-            if (!string.IsNullOrEmpty(activeEventId) && gateway != null &&
-                GUILayout.Button("EXIT EVENT VENUE", GUILayout.Height(34f * scale)))
-                gateway.RequestEventExit();
+            if (!string.IsNullOrEmpty(activeEventId) && gateway != null)
+            {
+                if (activeEventActivityType == "dance" &&
+                    GUILayout.Button("DANCE", GUILayout.Height(42f * scale)))
+                    status = gateway.TriggerDance()
+                        ? "Dance animation sent to the authoritative world. Nearby participants will see it replicated."
+                        : "Dance action is unavailable while the world gateway is disconnected.";
+                if (GUILayout.Button("EXIT EVENT VENUE", GUILayout.Height(34f * scale)))
+                    gateway.RequestEventExit();
+            }
 
             scroll = GUILayout.BeginScrollView(scroll, GUILayout.Height(height * 0.78f));
             if (canHost)
