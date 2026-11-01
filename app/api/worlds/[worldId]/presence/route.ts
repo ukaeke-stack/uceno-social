@@ -115,9 +115,9 @@ export async function POST(request: NextRequest, { params }: Context) {
 
 // DELETE removes this user's presence when they leave a world.
 export async function DELETE(_request: NextRequest, { params }: Context) {
-  const session = await readSession();
-  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const { worldId } = await params;
+  const session = await readWorldClientSession(_request, worldId);
+  if (!session) return NextResponse.json({ error: "Sign in or reconnect to this world" }, { status: 401 });
   if (!validUuid(worldId)) return NextResponse.json({ error: "Invalid world ID" }, { status: 400 });
   try {
     const sql = getDb();
