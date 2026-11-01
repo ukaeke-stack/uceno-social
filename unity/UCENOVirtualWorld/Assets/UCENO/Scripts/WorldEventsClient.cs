@@ -84,6 +84,7 @@ namespace UCENO.VirtualWorld
             {
                 gateway.SpatialLocationEntered += HandleSpatialLocationEntered;
                 gateway.SpatialLocationExited += HandleSpatialLocationExited;
+                gateway.SpatialLocationRejected += HandleSpatialLocationRejected;
             }
             startsAtUtc = DateTime.UtcNow.AddHours(1).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
             endsAtUtc = DateTime.UtcNow.AddHours(2).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
@@ -95,6 +96,7 @@ namespace UCENO.VirtualWorld
             {
                 gateway.SpatialLocationEntered -= HandleSpatialLocationEntered;
                 gateway.SpatialLocationExited -= HandleSpatialLocationExited;
+                gateway.SpatialLocationRejected -= HandleSpatialLocationRejected;
             }
         }
 
@@ -106,6 +108,12 @@ namespace UCENO.VirtualWorld
             status = "Joined " + (joined != null ? joined.title : "event") +
                 " at " + (joined != null ? joined.locationLabel : "the event venue") +
                 ". The world server authorized your arrival.";
+        }
+
+        private void HandleSpatialLocationRejected(string code)
+        {
+            status = "The world server rejected event joining: " + code +
+                ". Confirm your RSVP is GOING and the event starts within 30 minutes.";
         }
 
         private void HandleSpatialLocationExited()
