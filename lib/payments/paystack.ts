@@ -20,7 +20,7 @@ export type PaystackTransaction = {
 };
 
 export function verifyPaystackWebhookSignature(rawBody: string, signature: string | null): boolean {
-  if (!signature) return false;
+  if (!signature || !/^[a-fA-F0-9]{128}$/.test(signature)) return false;
   const expected = createHmac("sha512", secretKey()).update(rawBody).digest();
   let supplied: Buffer;
   try {
