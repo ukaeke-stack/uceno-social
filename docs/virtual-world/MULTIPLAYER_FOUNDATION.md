@@ -89,17 +89,19 @@ the short-lived signed entry token, posts position/rotation at approximately
 one-second intervals, polls fresh peers, and interpolates remote humanoid
 transforms. Peers that disappear from fresh presence results are removed after
 a timeout. The Unity status HUD includes a field for pasting a one-time entry
-code issued by the signed-in UCENO Social web session.
+code issued by the signed-in UCENO Social web session. Once connected, it also
+shows the multiplayer connection state and the number of currently tracked
+nearby peers.
 
 This is an initial polling implementation only:
 - It is not authoritative movement simulation, anti-cheat, prediction or
   server-side collision validation.
 - Remote player animation state is not yet replicated; remote avatars currently
   follow position and rotation only.
-- The Unity client does not yet replace its bearer token after a successful
-  refresh response. A five-minute session can therefore expire during a long
-  play session; re-enter using a new one-time code until client-side renewal is
-  completed.
+- The Unity client now renews its bearer token approximately 45 seconds
+  before expiry and replaces the in-memory token after a successful refresh.
+  Renewal still depends on a recent presence record and valid membership; if
+  renewal fails, the client clears the session and requires a fresh entry code.
 - Presence cleanup is best-effort; stale records expire from peer queries after
   the server-side freshness window.
 - No Unity Editor compile, Android build, database migration execution or
