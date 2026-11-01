@@ -12,6 +12,9 @@ namespace UCENO.VirtualWorld
         [SerializeField] private float collisionRadius = 0.20f;
         [SerializeField] private float collisionPadding = 0.12f;
         [SerializeField] private float minimumDistance = 0.85f;
+        [SerializeField] private float maximumDistance = 9f;
+        [SerializeField] private float zoomSensitivity = 0.012f;
+        private float previousPinchDistance;
 
         private PlayerMotor playerMotor;
 
@@ -19,6 +22,29 @@ namespace UCENO.VirtualWorld
         {
             target = value;
             playerMotor = value != null ? value.GetComponent<PlayerMotor>() : null;
+        }
+
+        private void Update()
+        {
+            float scroll = Input.mouseScrollDelta.y;
+            if (Mathf.Abs(scroll) > 0.01f)
+                distance = Mathf.Clamp(distance - scroll * 0.45f, 2.2f, maximumDistance);
+
+            if (Input.touchCount == 2)
+            {
+                Touch first = Input.GetTouch(0);
+                Touch second = Input.GetTouch(1);
+                float pinchDistance = Vector2.Distance(first.position, second.position);
+                if (first.phase == TouchPhase.Began || second.phase == TouchPhase.Began || previousPinchDistance <= 0f)
+                    previousPinchDistance = pinchDistance;
+                else
+                {
+                    float delta = pinchDistance - previousPinchDistance;
+                    distance = Mathf.Clamp(distance - delta * zoomSensitivity, 2.2f, maximumDistance);
+                    previousPinchDistance = pinchDistance;
+                }
+            }
+            else previousPinchDistance = 0f;
         }
 
         private void LateUpdate()
