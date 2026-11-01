@@ -68,3 +68,12 @@ gateway file; seat occupancy remains transient and is released on disconnect.
 - Automated source checks are not Unity compilation and do not prove visual or runtime behavior.
 - Do not create fake multiplayer avatars, inert feature buttons, or destination cards that imply a feature is playable when it is not.
 - Update this register whenever a feature is implemented, tested, blocked, or redesigned.
+
+
+## 2026-11-01 account appearance persistence stage
+
+- Added migration 026 defining one account-scoped avatar appearance row per user, shared across worlds/devices. It stores a bounded JSON palette and version/update metadata.
+- Added authenticated GET/PUT world appearance endpoints. Requests use the existing world-scoped bearer session or authenticated web session; appearance is keyed by authenticated account ID, never a client-supplied user ID. Palette input is restricted to five validated hex colors.
+- Added Unity account appearance sync client and connected it to the customization HUD. It waits for a valid world session, loads the account palette, applies it to the local avatar, and sends updates after customization. The bearer token remains in memory.
+- This is source implementation only. Migration 026 is not confirmed applied, endpoints have not been integration-tested, and Unity Editor compilation/device cross-account synchronization have not been verified.
+- **Wardrobe swapping remains not implemented.** Current controls recolour existing material slots only; they do not equip/unequip actual clothing meshes, hair models or accessories. The imported avatar has one generated outfit and no verified interchangeable garment catalogue. Do not describe palette tinting as wardrobe support.
