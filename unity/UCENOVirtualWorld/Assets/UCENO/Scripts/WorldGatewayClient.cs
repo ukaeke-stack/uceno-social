@@ -121,6 +121,7 @@ namespace UCENO.VirtualWorld
         public string LocalUserId => localUserId;
         public event Action<string, string, Vector3, float> SpatialLocationEntered;
         public event Action SpatialLocationExited;
+        public event Action<string> SpatialLocationRejected;
 
         public void Configure(WorldSessionClient worldSession, PlayerMotor player, GameObject avatarPrefab)
         {
@@ -344,6 +345,7 @@ namespace UCENO.VirtualWorld
             if (packet.type == "spatial_location_rejected")
             {
                 Debug.LogWarning("UCENO spatial location request rejected: " + packet.code);
+                SpatialLocationRejected?.Invoke(packet.code ?? "request_rejected");
                 return;
             }
 
