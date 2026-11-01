@@ -170,3 +170,17 @@ generate an APK.
 - Source review is not proof of Unity compilation. The cloud build and physical-device checklist must pass before treating the prototype as working.
 
 Do not put Neon credentials, UCENO session secrets, service API keys or production signing keys in this Unity project.
+
+
+## Modular avatar wardrobe authoring
+
+The wardrobe source now supports account-owned inventory and equipped slots, plus runtime replacement of skinned clothing prefabs on the imported Humanoid rig. It does not ship a ready-made clothing catalogue yet.
+
+To add a real garment:
+1. Import a properly licensed garment model and rig it to the exact Humanoid skeleton used by the UCENO avatar. Keep the garment's mesh skin weights and bone names intact.
+2. Create a prefab with one or more `SkinnedMeshRenderer` components. A plain static mesh or an unweighted mesh is rejected by the runtime equip controller.
+3. Place the prefab under `Assets/Resources/Wardrobe/` (or another Resources subfolder) and record its Resources-relative path in an `AvatarWardrobeCatalog` asset at `Assets/Resources/UCENO/AvatarWardrobeCatalog.asset`.
+4. Add a matching enabled `avatar_wardrobe_items` database row and grant the item to an account through a trusted server-side fulfilment/admin path. Never grant inventory based on a client request.
+5. Test bone remapping, garment clipping, animation deformation and mobile performance before enabling the catalogue row.
+
+The database catalogue starts empty and disabled. Palette tinting is not wardrobe swapping. Account equip persistence is not yet synchronized to remote multiplayer avatars; that requires a separate validated multiplayer snapshot update.
