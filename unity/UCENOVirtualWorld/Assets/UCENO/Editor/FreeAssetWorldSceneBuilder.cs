@@ -408,16 +408,17 @@ namespace UCENO.VirtualWorld.Editor
             Material edgeLine,
             Material centreLine)
         {
-            CreatePlane("Grass Terrain", parent, new Vector3(0f, -0.08f, 0f), 180f, 160f, grass);
-            CreatePlane("Main Asphalt Road", parent, new Vector3(0f, 0.005f, 0f), 10f, 90f, asphalt);
-            CreatePlane("Left Concrete Walkway", parent, new Vector3(-6.25f, 0.02f, 0f), 2.5f, 90f, concrete);
-            CreatePlane("Right Concrete Walkway", parent, new Vector3(6.25f, 0.02f, 0f), 2.5f, 90f, concrete);
-            CreatePlane("Left Grass Verge", parent, new Vector3(-8.5f, 0.01f, 0f), 2f, 90f, grassVerge);
-            CreatePlane("Right Grass Verge", parent, new Vector3(8.5f, 0.01f, 0f), 2f, 90f, grassVerge);
+            // A longer, wider walkable district built from the existing lightweight assets.
+            CreatePlane("Grass Terrain", parent, new Vector3(0f, -0.08f, 0f), 360f, 360f, grass);
+            CreatePlane("Main Asphalt Road", parent, new Vector3(0f, 0.005f, 0f), 10f, 240f, asphalt);
+            CreatePlane("Left Concrete Walkway", parent, new Vector3(-6.25f, 0.02f, 0f), 2.5f, 240f, concrete);
+            CreatePlane("Right Concrete Walkway", parent, new Vector3(6.25f, 0.02f, 0f), 2.5f, 240f, concrete);
+            CreatePlane("Left Grass Verge", parent, new Vector3(-8.5f, 0.01f, 0f), 2f, 240f, grassVerge);
+            CreatePlane("Right Grass Verge", parent, new Vector3(8.5f, 0.01f, 0f), 2f, 240f, grassVerge);
 
-            CreateRoadLine(parent, edgeLine, new Vector3(-4.7f, 0.035f, -45f), new Vector3(-4.7f, 0.035f, 45f), 0.055f);
-            CreateRoadLine(parent, edgeLine, new Vector3(4.7f, 0.035f, -45f), new Vector3(4.7f, 0.035f, 45f), 0.055f);
-            for (int z = -40; z <= 40; z += 7)
+            CreateRoadLine(parent, edgeLine, new Vector3(-4.7f, 0.035f, -120f), new Vector3(-4.7f, 0.035f, 120f), 0.055f);
+            CreateRoadLine(parent, edgeLine, new Vector3(4.7f, 0.035f, -120f), new Vector3(4.7f, 0.035f, 120f), 0.055f);
+            for (int z = -115; z <= 115; z += 7)
                 CreateRoadLine(parent, centreLine, new Vector3(0f, 0.04f, z), new Vector3(0f, 0.04f, z + 3.2f), 0.10f);
         }
 
@@ -461,22 +462,35 @@ namespace UCENO.VirtualWorld.Editor
             GameObject car,
             GameObject fence)
         {
-            Place(apartment, parent, new Vector3(-13.4f, 0f, 0f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.70f);
-            Place(factory, parent, new Vector3(13.4f, 0f, 0f), Quaternion.Euler(0f, -90f, 0f), Vector3.one * 0.58f);
-
-            foreach (float z in new[] { 0f })
+            // Repeat existing low-resolution licensed models to form a longer
+            // neighbourhood without adding a large new asset bundle.
+            for (int z = -95; z <= 95; z += 38)
             {
-                Place(lamp, parent, new Vector3(-6.9f, 0f, z), Quaternion.identity, Vector3.one);
-                Place(lamp, parent, new Vector3(6.9f, 0f, z), Quaternion.identity, Vector3.one);
+                Place(apartment, parent, new Vector3(-14.5f, 0f, z), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.70f);
+                Place(factory, parent, new Vector3(14.5f, 0f, z + 18f), Quaternion.Euler(0f, -90f, 0f), Vector3.one * 0.58f);
             }
 
-            Place(pachira, parent, new Vector3(-8.5f, 0f, 25f), Quaternion.Euler(0f, 25f, 0f), Vector3.one * 0.42f);
-            Place(shrub02, parent, new Vector3(8.5f, 0f, -12f), Quaternion.Euler(0f, 130f, 0f), Vector3.one * 0.36f);
-            Place(shrub03, parent, new Vector3(-8.5f, 0f, -5f), Quaternion.identity, Vector3.one);
-            Place(shrub03, parent, new Vector3(8.5f, 0f, 18f), Quaternion.Euler(0f, 110f, 0f), Vector3.one);
+            for (int z = -105; z <= 105; z += 30)
+            {
+                Place(lamp, parent, new Vector3(-6.9f, 0f, z), Quaternion.identity, Vector3.one);
+                Place(lamp, parent, new Vector3(6.9f, 0f, z + 12f), Quaternion.identity, Vector3.one);
+            }
 
-            Place(car, parent, new Vector3(9.2f, 0f, -28f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.9f);
-            Place(fence, parent, new Vector3(20.5f, 0f, 0f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.75f);
+            // Greenery along both pavements, with varied spacing and rotation.
+            for (int z = -100; z <= 100; z += 25)
+            {
+                Place(pachira, parent, new Vector3(-9.5f, 0f, z + 5f), Quaternion.Euler(0f, (z * 3) % 360, 0f), Vector3.one * 0.42f);
+                Place(shrub02, parent, new Vector3(9.5f, 0f, z - 7f), Quaternion.Euler(0f, (z * 5) % 360, 0f), Vector3.one * 0.36f);
+                Place(shrub03, parent, new Vector3(-9.2f, 0f, z + 15f), Quaternion.Euler(0f, (z * 7) % 360, 0f), Vector3.one * 0.92f);
+                Place(shrub03, parent, new Vector3(9.2f, 0f, z - 15f), Quaternion.Euler(0f, (z * 11) % 360, 0f), Vector3.one);
+            }
+
+            // A few parked cars and boundary fencing create street context.
+            Place(car, parent, new Vector3(9.8f, 0f, -72f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.9f);
+            Place(car, parent, new Vector3(-9.8f, 0f, -12f), Quaternion.Euler(0f, -90f, 0f), Vector3.one * 0.9f);
+            Place(car, parent, new Vector3(9.8f, 0f, 54f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.9f);
+            Place(fence, parent, new Vector3(21.5f, 0f, 0f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.75f);
+            Place(fence, parent, new Vector3(-21.5f, 0f, 48f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.75f);
         }
 
         private static GameObject Place(
