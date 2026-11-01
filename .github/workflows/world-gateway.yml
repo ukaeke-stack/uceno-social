@@ -112,7 +112,7 @@ jobs:
           const homeRoute = fs.readFileSync('./app/api/world-homes/[homeId]/route.ts', 'utf8');
           for (const marker of ['export async function GET', 'Home is unavailable', 'worldStatus', 'worldMembership', 'home.visibility !== "invite"', 'home.worldOwnerId !== session.id', 'w.owner_user_id = ${session.id}::uuid', 'COALESCE(wm.status, \'none\') NOT IN', "w.status = 'published'", "h.visibility = 'invite'", 'Cache-Control'])
             if (!homeRoute.includes(marker)) throw new Error('Missing access-controlled home retrieval behavior: ' + marker);
-          for (const marker of ['const hasVisibility = body.visibility !== undefined && body.visibility !== ""', 'NOT ${hasVisibility} OR h.owner_user_id'])
+          for (const marker of ['const hasVisibility = body.visibility !== undefined && body.visibility !== ""', 'const hasTransform = body.transform !== undefined && body.transform !== null', 'NOT ${hasVisibility} OR h.owner_user_id', 'NOT ${hasTransform} OR h.owner_user_id', "transform_editor.permission = 'co_owner'"])
             if (!homeRoute.includes(marker)) throw new Error('Home visibility changes are not owner-restricted: ' + marker);
           const homeClient = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldHomeClient.cs', 'utf8');
           for (const marker of ['RequestHomes', 'CreateHomeRoutine', 'LoadHomeRoutine', 'SaveHomeRoutine', 'PlaceFurniture', 'MoveSelectedFurniture', 'RotateSelectedFurniture', 'RemoveSelectedFurniture', 'InviteMemberRoutine', 'RevokeMemberRoutine', 'SHARING: ON', 'HOMES', 'Application.isMobilePlatform', 'CLOSE'])
