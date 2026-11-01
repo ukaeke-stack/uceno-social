@@ -17,6 +17,58 @@ const JUMP_SPEED = 6.5;
 const GRAVITY = 18;
 const GROUND_Y = 1.15;
 const MAX_INPUTS_PER_SECOND = 30;
+const PLAYER_RADIUS = 0.4;
+const PLAYER_HEIGHT = 1.8;
+
+type CollisionBox = {
+  minX: number; maxX: number; minY: number; maxY: number;
+  minZ: number; maxZ: number;
+};
+
+function loadCollisionBoxes(): CollisionBox[] {
+  const raw = process.env.WORLD_COLLISION_BOXES;
+  if (!raw) return [];
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); }
+  catch { throw new Error("WORLD_COLLISION_BOXES must be valid JSON"); }
+  if (!Array.isArray(parsed) || parsed.length > 500)
+    throw new Error("WORLD_COLLISION_BOXES must be an array with at most 500 boxes");
+  return parsed.map((value, index) => {
+    if (!value || typeof value !== "object") throw new Error(`Collision box ${index} is invalid`);
+    const box = value as Record<string, unknown>;
+    const keys = ["minX", "maxX", "minY", "maxY", "minZ", "maxZ"] as const;
+    for (const key of keys) {
+      if (typeof box[key] !== "number" || !Number.isFinite(box[key]))
+        throw new Error(`Collision box ${index} has invalid ${key}`);
+    }
+    const b = box as unknown as CollisionBox;
+    if (b.minX >= b.maxX || b.minY >= b.maxY || b.minZ >= b.maxZ ||
+        Math.abs(b.minX) > WORLD_BOUNDS || Math.abs(b.maxX) > WORLD_BOUNDS ||
+        Math.abs(b.minZ) > WORLD_BOUNDS || Math.abs(b.maxZ) > WORLD_BOUNDS ||
+        b.minY < 0 || b.maxY > WORLD_BOUNDS)
+      throw new Error(`Collision box ${index} has invalid bounds`);
+    return b;
+  });
+}
+
+const COLLISION_BOXES = loadCollisionBoxes();
+
+function overlapsBox(x: number, y: number, z: number, box: CollisionBox): boolean {
+  const horizontal = x + PLAYER_RADIUS > box.minX && x - PLAYER_RADIUS < box.maxX &&
+    z + PLAYER_RADIUS > box.minZ && z - PLAYER_RADIUS < box.maxZ;
+  const vertical = y + PLAYER_HEIGHT > box.minY && y < box.maxY;
+  return horizontal && vertical;
+}
+
+function resolveHorizontalMovement(player: Player, nextX: number, nextZ: number) {
+  const candidateX = Math.max(-WORLD_BOUNDS, Math.min(WORLD_BOUNDS, nextX));
+  const blockedX = COLLISION_BOXES.some(box => overlapsBox(candidateX, player.y, player.z, box));
+  if (!blockedX) player.x = candidateX;
+
+  const candidateZ = Math.max(-WORLD_BOUNDS, Math.min(WORLD_BOUNDS, nextZ));
+  const blockedZ = COLLISION_BOXES.some(box => overlapsBox(player.x, player.y, candidateZ, box));
+  if (!blockedZ) player.z = candidateZ;
+}
 
 if (!/^[0-9a-f-]{36}$/i.test(INSTANCE_ID) || !DATABASE_URL || TOKEN_SECRET.length < 32)
   throw new Error("WORLD_INSTANCE_ID, DATABASE_URL and a 32+ character WORLD_TOKEN_SECRET are required");
@@ -253,8 +305,7 @@ setInterval(async () => {
     if (p.jumpQueued && p.grounded) { p.vy = JUMP_SPEED; p.grounded = false; }
     p.jumpQueued = false;
     p.vy -= GRAVITY * dt;
-    p.x = Math.max(-WORLD_BOUNDS, Math.min(WORLD_BOUNDS, p.x + p.vx * dt));
-    p.z = Math.max(-WORLD_BOUNDS, Math.min(WORLD_BOUNDS, p.z + p.vz * dt));
+    resolveHorizontalMovement(p, p.x + p.vx * dt, p.z + p.vz * dt);
     p.y += p.vy * dt;
     if (p.y <= GROUND_Y) { p.y = GROUND_Y; p.vy = 0; p.grounded = true; }
     snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
