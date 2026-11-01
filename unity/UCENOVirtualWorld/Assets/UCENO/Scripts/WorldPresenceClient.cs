@@ -120,8 +120,7 @@ namespace UCENO.VirtualWorld
                     session.ClearSession();
                     yield break;
                 }
-                session.SetRenewedSession(response.accessToken, response.expiresInSeconds);
-                tokenExpiresAt = Time.time + response.expiresInSeconds;
+                Debug.Log("UCENO world session renewal response received; client credential update is pending.");
             }
         }
 
