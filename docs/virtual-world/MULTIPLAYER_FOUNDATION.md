@@ -17,10 +17,12 @@
   - `POST /api/marketplace` creates a draft listing.
   - `PATCH /api/marketplace/:listingId` lets its seller update fields and status.
   - Listing prices are validated as non-negative integer Purchased Credits; stock and metadata are bounded.
+- Migration 016 adds a concurrency-safe marketplace purchase function: it locks the listing, validates stock and buyer, debits only Purchased Credits, writes an idempotent ledger row and reserves stock in one database transaction. The resulting order remains in escrow; no seller payout or item delivery is performed.
+- `POST /api/marketplace/:listingId/purchase` is implemented but deliberately feature-gated. It returns 503 unless `MARKETPLACE_ESCROW_ENABLED=true`; do not enable it until seller settlement, refunds, dispute handling and digital-item delivery are implemented and tested.
 
 ## Important transaction boundary
 
-No credit top-up, transfer, marketplace purchase, seller settlement or advertiser debit endpoint has been implemented. The wallet API is read-only. Marketplace listing management does not move credits or transfer ownership of digital assets. Earned Credits are never treated as Purchased Credits. Marketplace purchases and credit-funded advertising must use Purchased Credits only, with server-authoritative atomic ledger operations and idempotency. Real-money funding must be verified server-side through the payment provider. Seller settlement rules remain intentionally undefined until the product payout policy is established; no payout behavior is assumed.
+No credit top-up, transfer, seller settlement, refund, dispute-resolution or advertiser debit endpoint has been implemented. The wallet API is read-only. Marketplace listing management does not transfer ownership of digital assets. A database purchase function and gated API exist, but checkout is disabled by default and must remain disabled until the escrow lifecycle is complete. Earned Credits are never treated as Purchased Credits. Marketplace purchases and credit-funded advertising must use Purchased Credits only, with server-authoritative atomic ledger operations and idempotency. Real-money funding must be verified server-side through the payment provider. Seller settlement rules remain intentionally undefined until the product payout policy is established; no payout behavior is assumed.
 
 ## Setup
 
