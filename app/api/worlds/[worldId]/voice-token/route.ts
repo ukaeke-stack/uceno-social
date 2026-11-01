@@ -33,7 +33,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const worlds = await sql`
       SELECT w.id, w.name, w.visibility, w.status, w.owner_user_id AS "ownerUserId",
         w.max_players AS "maxPlayers", u.handle,
-        COALESCE(m.status, 'none') AS "membershipStatus"
+        COALESCE(m.status, 'none') AS "membershipStatus",
+        EXISTS (SELECT 1 FROM user_blocks b
+          WHERE (b.blocker_id = ${session.id}::uuid AND b.blocked_id = w.owner_user_id)
+             OR (b.blocker_id = w.owner_user_id AND b.blocked_id = ${session.id}::uuid)) AS blocked
       FROM virtual_worlds w
       JOIN users u ON u.id = ${session.id}::uuid
       LEFT JOIN virtual_world_memberships m
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       WHERE w.id = ${worldId}::uuid LIMIT 1
     `;
     const world = worlds[0];
-    if (!world || world.status !== "published" ||
+    if (!world || world.status !== "published" || world.blocked ||
         world.membershipStatus === "banned" || world.membershipStatus === "suspended" ||
         (world.visibility === "private" && world.membershipStatus !== "active" && world.ownerUserId !== session.id)) {
       return NextResponse.json({ error: "World is unavailable" }, { status: 404 });
