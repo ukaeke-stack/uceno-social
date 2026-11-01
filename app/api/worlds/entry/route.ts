@@ -116,7 +116,23 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Entry code is invalid, expired or already used" }, { status: 401 });
 
     const identity = redeemed[0];
-    const token = await new SignJWT({ world_id: identity.worldId, client_type: body.clientType })
+    // Claim a capacity-limited, healthy runtime instance. The instance must
+    // already be provisioned and publishing a recent heartbeat.
+    const assignments = await sql`
+      SELECT instance_id AS "instanceId", endpoint, region,
+             lease_expires_at AS "leaseExpiresAt"
+      FROM claim_virtual_world_instance(${identity.worldId}::uuid, ${identity.userId}::uuid)
+    `;
+    const assignment = assignments[0];
+    if (!assignment) {
+      return NextResponse.json({ error: "No healthy world instance is currently available. Request a fresh entry code and retry." }, { status: 503 });
+    }
+
+    const token = await new SignJWT({
+      world_id: identity.worldId,
+      client_type: body.clientType,
+      instance_id: assignment.instanceId
+    })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("uceno-social")
       .setAudience("uceno-world-gateway")
@@ -125,7 +141,16 @@ export async function PUT(request: NextRequest) {
       .setExpirationTime("5m")
       .sign(worldTokenKey());
 
-    return NextResponse.json({ accessToken: token, tokenType: "Bearer", expiresInSeconds: WORLD_TOKEN_TTL_SECONDS, worldId: identity.worldId }, {
+    return NextResponse.json({
+      accessToken: token,
+      tokenType: "Bearer",
+      expiresInSeconds: WORLD_TOKEN_TTL_SECONDS,
+      worldId: identity.worldId,
+      instanceId: assignment.instanceId,
+      instanceEndpoint: assignment.endpoint,
+      region: assignment.region,
+      leaseExpiresAt: assignment.leaseExpiresAt
+    }, {
       headers: { "Cache-Control": "no-store, private" }
     });
   } catch (error) {
