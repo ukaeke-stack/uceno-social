@@ -102,6 +102,13 @@ blendshapes. Models without facial blendshapes still receive head motion; they
 do not gain a fabricated face rig. This is source-level functionality, not a
 claim of visually verified facial animation.
 
+An `AvatarCustomizationHud` now provides selectable skin, hair, top, trousers
+and shoe color palettes. The player can open it with the C key (keyboard) and
+save the selected palette in local device preferences. It is attached to the
+generated player scene. This is device-local customization only; it is not yet
+synced to the UCENO account or shared across devices, and it does not swap
+actual clothing meshes or hairstyles.
+
 Unity Editor compilation, visual inspection and physical-device performance
 testing remain outstanding. The starter district is not yet a finished
 photorealistic city.
