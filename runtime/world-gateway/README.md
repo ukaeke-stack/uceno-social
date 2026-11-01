@@ -116,3 +116,10 @@ presence remains as a low-frequency lease/session heartbeat; it is no longer
 used to render remote movement. End-to-end multiplayer is not yet verified:
 the gateway must be deployed, the database migrations applied, and two physical
 devices tested against the same ready instance.
+
+
+## Proximity voice signaling status
+
+The gateway now provides an authenticated, proximity- and spatial-context-scoped WebSocket signaling relay for WebRTC offers, answers and ICE candidates. Both users must opt in; the server enforces same-world/same-home-or-event scope, 24-metre range, block checks, bounded payloads and rate limits. Moving between spatial contexts or disconnecting ends the active voice session.
+
+This is only the signaling plane. A WebRTC media implementation, microphone permissions, STUN/TURN service configuration, audio playback, spatial attenuation and physical-device testing are still required before voice chat works end to end.
