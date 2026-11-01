@@ -115,7 +115,7 @@ namespace UCENO.VirtualWorld.Editor
                 pachiraPrefab, shrub02Prefab, shrub03Prefab,
                 carPrefab, fencePrefab);
             BuildDistrictFeatures(
-                worldRoot, asphalt, concrete, laneMarking, centreMarking,
+                worldRoot, asphalt, concrete, grass, laneMarking,
                 pachiraPrefab, shrub03Prefab, lampPrefab, carPrefab);
             ConfigureLighting(skybox);
 
@@ -536,8 +536,8 @@ namespace UCENO.VirtualWorld.Editor
             Transform parent,
             Material asphalt,
             Material concrete,
+            Material grass,
             Material laneMarking,
-            Material centreMarking,
             GameObject treePrefab,
             GameObject shrubPrefab,
             GameObject lampPrefab,
@@ -550,7 +550,7 @@ namespace UCENO.VirtualWorld.Editor
             square.localPosition = new Vector3(37f, 0f, 0f);
 
             CreatePlane("Garden Square Paving", square, new Vector3(0f, 0.025f, 0f), 27f, 34f, concrete);
-            CreatePlane("Garden Lawn", square, new Vector3(0f, 0.045f, 0f), 15f, 22f, grassMaterialFromParent(parent));
+            CreatePlane("Garden Lawn", square, new Vector3(0f, 0.045f, 0f), 15f, 22f, grass);
             CreatePlane("North Walk", square, new Vector3(0f, 0.065f, 12.4f), 25f, 2.1f, concrete);
             CreatePlane("South Walk", square, new Vector3(0f, 0.065f, -12.4f), 25f, 2.1f, concrete);
             CreatePlane("West Walk", square, new Vector3(-9.2f, 0.065f, 0f), 2.1f, 21f, concrete);
@@ -585,20 +585,6 @@ namespace UCENO.VirtualWorld.Editor
 
             Place(carPrefab, parent, new Vector3(10.2f, 0.04f, 88f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.78f);
             Place(carPrefab, parent, new Vector3(10.2f, 0.04f, 100f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.78f);
-        }
-
-        private static Material grassMaterialFromParent(Transform parent)
-        {
-            // Reuse the already-created grass material from the scene builder.
-            Renderer existing = parent.GetComponentInChildren<Renderer>();
-            if (existing != null && existing.sharedMaterial != null &&
-                existing.sharedMaterial.name == "UCENO_Grass")
-                return existing.sharedMaterial;
-
-            Material grass = AssetDatabase.LoadAssetAtPath<Material>(MaterialRoot + "/UCENO_Grass.mat");
-            if (grass == null)
-                throw new BuildFailedException("UCENO_Grass material was not created before district layout.");
-            return grass;
         }
 
         private static void ConfigureLighting(Material skybox)
