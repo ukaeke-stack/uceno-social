@@ -48,6 +48,18 @@ store readiness or release performance.
 - [ ] Tap STAND or press C again; normal movement resumes without a stuck sprint or jump request.
 - [ ] Confirm the seated pose is visually acceptable on the imported humanoid. This is a ground-rest pose, not chair-specific sitting or IK.
 
+## Authoritative world-object interaction checks
+
+- [ ] Add `WorldInteractable` to a real imported door mesh/pivot and assign a stable unique ID and the actual hinge transform.
+- [ ] Add `WorldInteractable` to a real usable object and assign a stable unique ID.
+- [ ] Rebuild the city and confirm both objects appear in the exported `interactables` array with correct world positions.
+- [ ] Configure the gateway to read the exported geometry map and restart it.
+- [ ] Aim at the door and press E (or tap INTERACT); confirm the server accepts the in-range request and all connected clients receive the same open/closed state.
+- [ ] Move beyond 4.25 world units and confirm the gateway rejects the interaction.
+- [ ] Confirm unknown object IDs and mismatched action types are rejected.
+- [ ] Confirm the dedicated door hinge moves while the building root and surrounding geometry remain fixed.
+- [ ] Confirm the generic object state is synchronized to all clients; restart behavior is currently non-persistent and must not be treated as durable.
+
 ## Android device checks
 
 Do not start an Android build until the Editor import and scene checks above pass.
