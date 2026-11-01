@@ -32,7 +32,7 @@ namespace UCENO.VirtualWorld.Editor
         {
             public string id;
             public string kind;
-            public float x, y, z;
+            public float x, y, z, yaw;
         }
 
         [Serializable]
@@ -83,7 +83,8 @@ namespace UCENO.VirtualWorld.Editor
                     interactables.Add(new Interactable
                     {
                         id = id, kind = item.Kind,
-                        x = Round(position.x), y = Round(position.y), z = Round(position.z)
+                        x = Round(position.x), y = Round(position.y), z = Round(position.z),
+                        yaw = Round(item.transform.eulerAngles.y * Mathf.Deg2Rad)
                     });
                 }
             }
