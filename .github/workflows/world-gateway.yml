@@ -121,7 +121,7 @@ jobs:
           if (!sceneBuilder.includes('WorldHomeClient homeClient = player.AddComponent<WorldHomeClient>()'))
             throw new Error('Generated Unity player is missing the home-management client.');
           const layoutValidation = fs.readFileSync('./lib/world-home-layout.ts', 'utf8');
-          for (const marker of ['Number.isFinite', '-100000', '100000', 'assetId', 'item.scale', 'value.length > 100'])
+          for (const marker of ['Number.isFinite', '-100000', '100000', 'finiteBounded(item.x, -25, 25)', 'finiteBounded(item.z, -25, 25)', 'assetId', 'item.scale', 'value.length > 100'])
             if (!layoutValidation.includes(marker)) throw new Error('Missing bounded home layout validation: ' + marker);
           for (const [file, marker] of [
             ['./app/api/world-homes/route.ts', 'isValidHomeFurnishing(furnishing)'],
