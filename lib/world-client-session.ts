@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
 
-export type WorldClientSession = { id: string; handle: string; worldId: string; clientType: string };
+export type WorldClientSession = { id: string; handle: string; worldId: string; clientType: string; instanceId: string | null };
 
 function worldTokenKey() {
   const secret = process.env.WORLD_TOKEN_SECRET;
@@ -21,7 +21,7 @@ export async function readWorldClientSession(request: NextRequest, worldId: stri
   const match = /^Bearer ([A-Za-z0-9._~-]+)$/.exec(authorization);
   if (!match) {
     const webSession = await readSession();
-    return webSession ? { ...webSession, worldId, clientType: "web" } : null;
+    return webSession ? { ...webSession, worldId, clientType: "web", instanceId: null } : null;
   }
 
   try {
@@ -31,6 +31,8 @@ export async function readWorldClientSession(request: NextRequest, worldId: stri
       audience: "uceno-world-gateway",
     });
     if (!payload.sub || payload.world_id !== worldId ||
+        typeof payload.instance_id !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.instance_id) ||
         (payload.client_type !== "unity-android" && payload.client_type !== "unity-desktop")) return null;
 
     const sql = getDb();
@@ -45,7 +47,7 @@ export async function readWorldClientSession(request: NextRequest, worldId: stri
         moderation_note = NULL, moderated_at = NOW()
         WHERE id = ${payload.sub}::uuid AND moderation_status = 'suspended'`;
     }
-    return { id: payload.sub, handle: account.handle, worldId, clientType: payload.client_type };
+    return { id: payload.sub, handle: account.handle, worldId, clientType: payload.client_type, instanceId: payload.instance_id };
   } catch {
     return null;
   }
