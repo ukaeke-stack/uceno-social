@@ -601,7 +601,7 @@ wss.on("connection", async (socket: WebSocket) => {
           msg.sequence <= player.lastSequence || !finiteNumber(msg.moveX, -1, 1) ||
           !finiteNumber(msg.moveZ, -1, 1) || !finiteNumber(msg.yaw, -Math.PI * 4, Math.PI * 4) ||
           typeof msg.sprint !== "boolean" || typeof msg.jump !== "boolean" ||
-          typeof msg.seated !== "boolean" || !["none", "wave", "cheer"].includes(msg.gesture) ||
+          typeof msg.seated !== "boolean" || !["none", "wave", "cheer", "dance"].includes(msg.gesture) ||
           !Number.isSafeInteger(msg.gestureSequence) || msg.gestureSequence < 0) {
         fail(socket, "invalid_input"); return;
       }
