@@ -44,7 +44,7 @@ No credit top-up execution endpoint, transfer, seller settlement, refund, final 
 - Re-check moderation, world membership and bans at admission and reconnect; do not treat the token as permanent authorization.
 - Neon is for durable records and occasional checkpoints, not per-frame movement snapshots.
 - Home friends-only visibility and Unity home-building UI are not implemented.
-- This does not yet provide a live multiplayer server, authoritative movement, instance allocator, reconnect protocol or spatial voice.
+- The standalone world gateway now provides an initial authoritative kinematic simulation, and the Unity client has a WebSocket transport. This is source implementation only until the gateway is deployed and two physical clients are tested. Spatial voice is still not end-to-end.
 - Wallet balances are read-only through the new API. No client-supplied balance writes are accepted.
 - The LiveKit token endpoint is only the authenticated audio-plane admission step. Unity must still implement distance-based attenuation, zone transitions, local mute/deafen, participant block/report controls and reconnect handling. Do not enable the feature flag until these client controls and QA are complete.
 
@@ -263,3 +263,40 @@ instance ready until its runtime is actually listening and has passed its own
 health check. If heartbeats stop, the allocator excludes the instance after
 30 seconds. Configure the heartbeat secret only in the server environment;
 never expose it to Unity clients.
+
+
+## Authoritative WebSocket runtime and Unity transport (November 2026)
+
+The standalone service in `runtime/world-gateway` accepts WSS connections at
+`/world`. It validates the short-lived Unity JWT (signature, issuer, audience,
+expiry, world and instance scope) and rechecks moderation, publication,
+membership, private-world access, owner blocks and the active instance lease
+both at connection and periodically while connected. It sends a heartbeat to
+the instance registry every ten seconds.
+
+The Unity project now includes the NativeWebSocket UPM package and a
+`WorldGatewayClient`. It connects only over encrypted WSS, sends sequenced
+movement, sprint, jump, seated and gesture input at 20 Hz, and consumes
+server-generated snapshots. The local PlayerMotor stops applying local physics
+while the server-authoritative connection is active; remote avatars interpolate
+the same server snapshots. Walk/run, seated, wave and cheer state are included
+in snapshots. Reconnect attempts use bounded exponential backoff.
+
+The HTTP presence route remains as a low-frequency session heartbeat. A valid
+45-second instance lease is extended by each accepted presence write; the
+Unity client sends that heartbeat every ten seconds and refreshes its short
+JWT before expiry. HTTP peer polling is no longer used by the Unity client for
+remote movement rendering.
+
+The simulation remains deliberately limited: no collision meshes, terrain
+queries, vehicles, client prediction/reconciliation, lag compensation,
+distributed state, cross-instance migration or comprehensive anti-cheat.
+The gateway's initial ground plane is at 1.15 Unity units to match the current
+player-root spawn convention. Validate this against the actual Unity scene.
+
+This is not yet a deployed or runtime-verified multiplayer release. The
+NativeWebSocket dependency must resolve in Unity 6.3; Unity Editor compilation,
+Android APK build/install, database migration execution, gateway deployment,
+instance provisioning and two-device multiplayer tests remain outstanding.
+The CI workflow performs a TypeScript gateway build and static Unity source
+wiring checks only; those checks do not replace a Unity build.
