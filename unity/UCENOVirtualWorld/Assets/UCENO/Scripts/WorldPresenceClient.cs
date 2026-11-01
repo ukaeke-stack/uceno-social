@@ -10,17 +10,28 @@ namespace UCENO.VirtualWorld
     [Serializable] internal sealed class WorldTokenWorldScope { public string world_id; }
     [Serializable] public sealed class WorldPresenceVector { public float x; public float y; public float z; }
     [Serializable] public sealed class WorldPresenceRotation { public float x; public float y; public float z; public float w = 1f; }
+    [Serializable] public sealed class WorldAnimationState
+    {
+        public string locomotion = "idle";
+        public bool seated;
+        public string gesture = "none";
+        public int gestureSequence;
+    }
     [Serializable] public sealed class WorldPresencePeer
     {
         public string userId;
         public WorldPresenceVector position;
         public WorldPresenceRotation rotation;
+        public WorldAnimationState animationState;
+        public long sequence;
     }
     [Serializable] internal sealed class WorldPresencePeerList { public WorldPresencePeer[] peers; }
     [Serializable] internal sealed class WorldPresenceWrite
     {
         public WorldPresenceVector position;
         public WorldPresenceRotation rotation;
+        public WorldAnimationState animationState;
+        public long sequence;
     }
     [Serializable] internal sealed class WorldSessionRefreshResponse
     {
@@ -58,12 +69,15 @@ namespace UCENO.VirtualWorld
             public float lastSampleTime;
             public Animator animator;
             public bool hasMovementSample;
+            public int lastGestureSequence;
         }
 
         private readonly Dictionary<string, RemotePlayer> remotePlayers = new Dictionary<string, RemotePlayer>();
         private float tokenExpiresAt;
         private float refreshRetryAt;
         private bool stopping;
+        private long presenceSequence;
+        private AvatarLocomotionDriver localAvatar;
 
         public int PeerCount => remotePlayers.Count;
         public string ConnectionStatus { get; private set; } = "WAITING";
@@ -72,6 +86,7 @@ namespace UCENO.VirtualWorld
         {
             if (session == null) session = FindObjectOfType<WorldSessionClient>();
             if (localPlayer == null) localPlayer = FindObjectOfType<PlayerMotor>();
+            localAvatar = FindObjectOfType<AvatarLocomotionDriver>();
             if (session != null && string.IsNullOrWhiteSpace(apiBaseUrl)) apiBaseUrl = session.ApiBaseUrl;
             if (session != null && string.IsNullOrWhiteSpace(worldId)) worldId = ReadWorldId(session.AccessToken);
             if (session == null || localPlayer == null || remoteAvatarPrefab == null ||
@@ -161,7 +176,15 @@ namespace UCENO.VirtualWorld
             WorldPresenceWrite payload = new WorldPresenceWrite
             {
                 position = new WorldPresenceVector { x = p.x, y = p.y, z = p.z },
-                rotation = new WorldPresenceRotation { x = q.x, y = q.y, z = q.z, w = q.w }
+                rotation = new WorldPresenceRotation { x = q.x, y = q.y, z = q.z, w = q.w },
+                sequence = ++presenceSequence,
+                animationState = new WorldAnimationState
+                {
+                    locomotion = localPlayer.IsSeated ? "idle" : localPlayer.IsSprinting ? "run" : localPlayer.AnimationSpeed > 0.01f ? "walk" : "idle",
+                    seated = localPlayer.IsSeated,
+                    gesture = localAvatar != null ? localAvatar.GestureName : "none",
+                    gestureSequence = localAvatar != null ? localAvatar.GestureSequence : 0
+                }
             };
             byte[] bytes = Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload));
             using (UnityWebRequest request = new UnityWebRequest(Endpoint("/presence"), "POST"))
@@ -258,6 +281,21 @@ namespace UCENO.VirtualWorld
                     {
                         float normalizedSpeed = Mathf.Clamp01(replicatedSpeed / 6.5f);
                         remote.animator.SetFloat(Animator.StringToHash("MoveSpeed"), normalizedSpeed, 0.15f, Time.deltaTime);
+                        if (peer.animationState != null)
+                        {
+                            remote.animator.SetBool(Animator.StringToHash("IsSeated"), peer.animationState.seated);
+                            if (peer.animationState.gestureSequence > remote.lastGestureSequence)
+                            {
+                                string trigger = peer.animationState.gesture == "wave" ? "Wave" : peer.animationState.gesture == "cheer" ? "Cheer" : null;
+                                if (!string.IsNullOrEmpty(trigger))
+                                {
+                                    foreach (AnimatorControllerParameter parameter in remote.animator.parameters)
+                                        if (parameter.type == AnimatorControllerParameterType.Trigger && parameter.name == trigger)
+                                            remote.animator.SetTrigger(trigger);
+                                }
+                                remote.lastGestureSequence = peer.animationState.gestureSequence;
+                            }
+                        }
                     }
                 }
             }
