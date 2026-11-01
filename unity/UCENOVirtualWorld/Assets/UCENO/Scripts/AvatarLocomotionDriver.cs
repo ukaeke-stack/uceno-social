@@ -126,7 +126,7 @@ namespace UCENO.VirtualWorld
             float kneeLeft = Mathf.Max(0f, -Mathf.Sin(cycle)) * amplitude * 0.65f;
             float kneeRight = Mathf.Max(0f, Mathf.Sin(cycle)) * amplitude * 0.65f;
             float armSwing = swing * armSwingFactor;
-            float bob = Mathf.Abs(Mathf.Sin(cycle * 2f)) * 0.012f * speed;
+            // Keep the root/hips stable; exaggerated vertical bob causes a floating look.
             float idleBreath = Mathf.Sin(Time.time * 1.35f) * 1.1f * (1f - speed);
 
             SetRotation(hips, hipsBase, new Vector3(0f, 0f, idleBreath));
@@ -146,7 +146,7 @@ namespace UCENO.VirtualWorld
             SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(-8f + Mathf.Abs(armSwing) * 0.12f, 0f, 0f));
 
             if (hips != null)
-                hips.localPosition = hipsPositionBase + Vector3.up * bob;
+                hips.localPosition = hipsPositionBase;
         }
 
 
@@ -154,45 +154,72 @@ namespace UCENO.VirtualWorld
         {
             if (animator == null) return;
 
-            // Use property blocks so imported shared materials are not mutated.
-            // Tint only clearly identified skin/body materials; clothing remains
-            // controlled by its imported material when one is available.
             Color skin = new Color(0.58f, 0.34f, 0.21f, 1f);
             Color hair = new Color(0.09f, 0.055f, 0.035f, 1f);
+            Color shirt = new Color(0.12f, 0.28f, 0.48f, 1f);
+            Color trousers = new Color(0.12f, 0.14f, 0.18f, 1f);
+            Color shoes = new Color(0.075f, 0.06f, 0.05f, 1f);
+
             foreach (Renderer renderer in animator.GetComponentsInChildren<Renderer>(true))
             {
                 Material[] materials = renderer.sharedMaterials;
+                if (materials == null || materials.Length == 0) continue;
+                bool hasSemanticNames = false;
+                foreach (Material candidate in materials)
+                {
+                    if (candidate == null) continue;
+                    string candidateName = candidate.name.ToLowerInvariant();
+                    if (candidateName.Contains("skin") || candidateName.Contains("body") ||
+                        candidateName.Contains("face") || candidateName.Contains("head") ||
+                        candidateName.Contains("hair") || candidateName.Contains("brow") ||
+                        candidateName.Contains("shirt") || candidateName.Contains("cloth") ||
+                        candidateName.Contains("pant") || candidateName.Contains("shoe"))
+                    {
+                        hasSemanticNames = true;
+                        break;
+                    }
+                }
+
                 for (int i = 0; i < materials.Length; i++)
                 {
                     Material material = materials[i];
                     if (material == null) continue;
                     string materialName = material.name.ToLowerInvariant();
                     Color tint;
-                    bool apply = false;
+
                     if (materialName.Contains("skin") || materialName.Contains("body") ||
                         materialName.Contains("face") || materialName.Contains("head"))
-                    {
                         tint = skin;
-                        apply = true;
-                    }
                     else if (materialName.Contains("hair") || materialName.Contains("brow"))
-                    {
                         tint = hair;
-                        apply = true;
-                    }
+                    else if (materialName.Contains("shirt") || materialName.Contains("top") ||
+                             materialName.Contains("cloth") || materialName.Contains("jacket"))
+                        tint = shirt;
+                    else if (materialName.Contains("pant") || materialName.Contains("trouser"))
+                        tint = trousers;
+                    else if (materialName.Contains("shoe"))
+                        tint = shoes;
+                    else if (hasSemanticNames)
+                        continue;
                     else
                     {
-                        continue;
+                        // Some generated FBX files use generic material names.
+                        // Give those slots a restrained human palette instead of
+                        // leaving the entire character pure white.
+                        switch (i)
+                        {
+                            case 0: tint = skin; break;
+                            case 1: tint = shirt; break;
+                            case 2: tint = trousers; break;
+                            default: tint = i % 2 == 0 ? shoes : hair; break;
+                        }
                     }
 
-                    if (apply)
-                    {
-                        MaterialPropertyBlock block = new MaterialPropertyBlock();
-                        renderer.GetPropertyBlock(block, i);
-                        block.SetColor("_Color", tint);
-                        block.SetColor("_BaseColor", tint);
-                        renderer.SetPropertyBlock(block, i);
-                    }
+                    MaterialPropertyBlock block = new MaterialPropertyBlock();
+                    renderer.GetPropertyBlock(block, i);
+                    block.SetColor("_Color", tint);
+                    block.SetColor("_BaseColor", tint);
+                    renderer.SetPropertyBlock(block, i);
                 }
             }
         }
