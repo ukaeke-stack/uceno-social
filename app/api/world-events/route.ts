@@ -11,10 +11,27 @@ type Body = {
   startsAt?: unknown;
   endsAt?: unknown;
   capacity?: unknown;
+  activityType?: unknown;
+  locationLabel?: unknown;
+  location?: unknown;
 };
 
 function validUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+const ACTIVITY_TYPES = new Set([
+  "social", "dance", "sports", "racing", "adventure",
+  "concert", "education", "cinema", "workshop", "community"
+]);
+
+function validSpatialLocation(value: unknown): value is { x: number; y: number; z: number; yaw: number } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const location = value as Record<string, unknown>;
+  return typeof location.x === "number" && Number.isFinite(location.x) && Math.abs(location.x) <= 5000 &&
+    typeof location.y === "number" && Number.isFinite(location.y) && location.y >= 1.15 && location.y <= 5000 &&
+    typeof location.z === "number" && Number.isFinite(location.z) && Math.abs(location.z) <= 5000 &&
+    typeof location.yaw === "number" && Number.isFinite(location.yaw) && location.yaw >= -360 && location.yaw <= 360;
 }
 
 async function canAccessWorld(worldId: string, userId: string) {
@@ -51,7 +68,8 @@ export async function GET(request: NextRequest) {
     const events = await sql`
       SELECT e.id, e.title, e.description, e.starts_at AS "startsAt",
              e.ends_at AS "endsAt", e.capacity, e.status,
-             e.host_user_id AS "hostUserId",
+             e.activity_type AS "activityType", e.location_label AS "locationLabel",
+             e.location, e.host_user_id AS "hostUserId",
              (SELECT COUNT(*)::int FROM virtual_world_event_attendees a
                WHERE a.event_id = e.id AND a.attendance_status = 'going') AS "goingCount",
              (SELECT a.attendance_status FROM virtual_world_event_attendees a
@@ -105,6 +123,15 @@ export async function POST(request: NextRequest) {
   const capacity = body.capacity === undefined || body.capacity === null ? null : body.capacity;
   if (capacity !== null && (typeof capacity !== "number" || !Number.isInteger(capacity) || capacity < 1 || capacity > 5000))
     return NextResponse.json({ error: "Capacity must be between 1 and 5000" }, { status: 400 });
+  const activityType = body.activityType === undefined ? "social" : body.activityType;
+  const locationLabel = body.locationLabel === undefined ? "Main Plaza" : body.locationLabel;
+  const location = body.location === undefined
+    ? { x: 0, y: 1.15, z: 0, yaw: 0 } : body.location;
+  if (typeof activityType !== "string" || !ACTIVITY_TYPES.has(activityType) ||
+      typeof locationLabel !== "string" || locationLabel.trim().length < 2 ||
+      locationLabel.trim().length > 120 || !validSpatialLocation(location)) {
+    return NextResponse.json({ error: "Provide a valid activity type, location label and bounded world location" }, { status: 400 });
+  }
 
   try {
     if (!await canAccessWorld(body.worldId, session.id))
@@ -126,13 +153,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only the world owner or an active world admin can host events" }, { status: 403 });
     const inserted = await sql`
       INSERT INTO virtual_world_events
-        (world_id, host_user_id, title, description, starts_at, ends_at, capacity)
+        (world_id, host_user_id, title, description, starts_at, ends_at, capacity,
+         activity_type, location_label, location)
       VALUES (${body.worldId}::uuid, ${session.id}::uuid, ${body.title.trim()},
         ${typeof body.description === "string" ? body.description.trim() : ""},
         ${startsAt.toISOString()}::timestamptz, ${endsAt.toISOString()}::timestamptz,
-        ${capacity})
+        ${capacity}, ${activityType}, ${locationLabel.trim()}, ${JSON.stringify(location)}::jsonb)
       RETURNING id, title, description, starts_at AS "startsAt",
-                ends_at AS "endsAt", capacity, status
+                ends_at AS "endsAt", capacity, status, activity_type AS "activityType",
+                location_label AS "locationLabel", location
     `;
     return NextResponse.json({ event: inserted[0] }, { status: 201, headers: { "Cache-Control": "no-store, private" } });
   } catch (error) {
