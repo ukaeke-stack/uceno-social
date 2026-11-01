@@ -41,9 +41,9 @@ namespace UCENO.VirtualWorld
     }
 
     /// <summary>
-    /// Sends low-frequency player presence and renders other players using the
-    /// imported humanoid prefab. This is best-effort polling, not authoritative
-    /// physics or anti-cheat movement replication.
+    /// Maintains the low-frequency HTTP presence/lease heartbeat and token
+    /// refresh. Authoritative movement and remote avatar snapshots are handled
+    /// by WorldGatewayClient; HTTP peer polling is retained only as legacy API code.
     /// </summary>
     public sealed class WorldPresenceClient : MonoBehaviour
     {
