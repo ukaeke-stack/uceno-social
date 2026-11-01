@@ -129,15 +129,15 @@ namespace UCENO.VirtualWorld
             {
                 Dictionary<string, string> batch = new Dictionary<string, string>(pendingEquipment);
                 pendingEquipment.Clear();
-                StringBuilder json = new StringBuilder("{\\"equipped\\":{");
+                StringBuilder json = new StringBuilder("{\"equipped\":{");
                 bool first = true;
                 foreach (KeyValuePair<string, string> item in batch)
                 {
                     if (!first) json.Append(",");
                     first = false;
-                    json.Append("\\"").Append(item.Key).Append("\\":");
+                    json.Append("\"").Append(item.Key).Append("\":");
                     if (item.Value == null) json.Append("null");
-                    else json.Append("\\"").Append(item.Value).Append("\\"");
+                    else json.Append("\"").Append(item.Value).Append("\"");
                 }
                 json.Append("}}");
                 byte[] body = Encoding.UTF8.GetBytes(json.ToString());
