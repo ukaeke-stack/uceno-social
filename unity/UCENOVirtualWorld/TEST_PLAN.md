@@ -90,6 +90,7 @@ This checklist covers the Unity city client, world gateway interactions and the 
 ## Unity home manager and layout checks
 
 - [ ] Enter a world and press M; the home manager opens and loads only homes accessible to the signed-in account.
+- [ ] On Android, tap the HOMES button; verify the home manager can be opened and closed without a hardware keyboard.
 - [ ] Create a home; confirm the server returns a home ID and it appears in the refreshed home list.
 - [ ] Open an owned home; confirm the permission label is owner and the saved furnishing layout loads.
 - [ ] Open an invited home as visitor; confirm furniture is visible but layout editing and save controls are unavailable.
