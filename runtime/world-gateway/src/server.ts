@@ -686,11 +686,12 @@ setInterval(async () => {
     p.vy -= GRAVITY * dt;
     resolveHorizontalMovement(p, p.x + p.vx * dt, p.z + p.vz * dt);
     p.y += p.vy * dt;
+    const groundY = p.homeAnchor ? p.homeAnchor.y : GROUND_Y;
     if (p.homeAnchor && p.y > p.homeAnchor.y + 3.05) {
       p.y = p.homeAnchor.y + 3.05;
       p.vy = 0;
     }
-    if (p.y <= GROUND_Y) { p.y = GROUND_Y; p.vy = 0; p.grounded = true; }
+    if (p.y <= groundY) { p.y = groundY; p.vy = 0; p.grounded = true; }
     snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
       seated: p.seated, sprint: p.sprint, gesture: p.gesture, gestureSequence: p.gestureSequence });
     if (now - p.lastCheckpointAt >= 5000) {
