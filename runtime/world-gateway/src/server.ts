@@ -262,6 +262,7 @@ function activityPayload(session: ActivitySession) {
     type: "activity_state",
     session: {
       id: session.id,
+      hostUserId: activityHosts.get(session.id) || "",
       worldId: session.worldId,
       instanceId: session.instanceId,
       kind: session.kind,
@@ -473,6 +474,10 @@ wss.on("connection", async (socket: WebSocket) => {
     players.set(identity.userId, player);
     send(socket, { type: "welcome", userId: identity.userId, tickRate: TICK_RATE,
       state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
+    for (const activity of activitySessions.values()) {
+      if (activity.worldId === player.worldId && activity.instanceId === INSTANCE_ID)
+        send(socket, activityPayload(activity));
+    }
 
     // A joining or reconnecting client must receive the current authoritative
     // state of every scene interactable. Broadcasting only future changes
