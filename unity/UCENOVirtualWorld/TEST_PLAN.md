@@ -62,12 +62,14 @@ store readiness or release performance.
 - [ ] Use the Unity Editor authoring menu to mark an actual imported door hinge, chair/seat point and usable prop; confirm unique IDs and correct kinds are exported.
 - [ ] Export the active scene from the UCENO World menu and confirm the gateway deployment receives the exact generated JSON.
 - [ ] Mark an actual imported chair as a `seat` interactable with a unique ID and a seat position; confirm it appears in the exported JSON.
+- [ ] Place the seat marker at the avatar root/feet position and rotate it toward the intended sitting direction.
+- [ ] Confirm the gateway moves and rotates the player to the exported seat anchor after a successful sit.
 - [ ] With two clients, first player sits and receives the seated pose only after server confirmation; second player sees the chair occupied and cannot claim it.
 - [ ] First player stands; verify the seat becomes available and another player can sit.
 - [ ] Disconnect a seated player; verify the gateway releases the seat and broadcasts availability.
 - [ ] Send a movement input with a forged `seated=true` flag while not owning a seat; verify the gateway does not freeze the player as seated.
 - [ ] Drop the seated player's WebSocket and reconnect; verify the client clears the old seated pose and can move normally.
-- [ ] Verify chair-specific avatar alignment/IK is not assumed: the current implementation only synchronizes the generic seated animation state.
+- [ ] Verify the root/facing anchor aligns the avatar with the chair; full foot/hand IK is not implemented.
 
 ## Android device checks
 
