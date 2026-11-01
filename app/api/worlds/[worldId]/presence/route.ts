@@ -6,6 +6,12 @@ export const runtime = "nodejs";
 type Context = { params: Promise<{ worldId: string }> };
 type Vector3 = { x: number; y: number; z: number };
 type Quaternion = { x: number; y: number; z: number; w: number };
+type AnimationState = {
+  locomotion: "idle" | "walk" | "run";
+  seated: boolean;
+  gesture: "none" | "wave" | "cheer";
+  gestureSequence: number;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -24,6 +30,14 @@ function validRotation(value: unknown): value is Quaternion {
     Math.abs(value[key] as number) <= 1.01)) return false;
   const n = Math.hypot(value.x as number, value.y as number, value.z as number, value.w as number);
   return n > 0.9 && n < 1.1;
+}
+function validAnimationState(value: unknown): value is AnimationState {
+  return isRecord(value) &&
+    ["idle", "walk", "run"].includes(String(value.locomotion)) &&
+    typeof value.seated === "boolean" &&
+    ["none", "wave", "cheer"].includes(String(value.gesture)) &&
+    Number.isSafeInteger(value.gestureSequence) &&
+    (value.gestureSequence as number) >= 0;
 }
 async function canAccessWorld(worldId: string, userId: string) {
   const sql = getDb();
@@ -45,9 +59,9 @@ async function canAccessWorld(worldId: string, userId: string) {
 }
 
 // GET returns fresh peers only. This is polling presence, not authoritative movement replication.
-export async function GET(_request: NextRequest, { params }: Context) {
+export async function GET(request: NextRequest, { params }: Context) {
   const { worldId } = await params;
-  const session = await readWorldClientSession(_request, worldId);
+  const session = await readWorldClientSession(request, worldId);
   if (!session) return NextResponse.json({ error: "Sign in or reconnect to this world" }, { status: 401 });
   if (!validUuid(worldId)) return NextResponse.json({ error: "Invalid world ID" }, { status: 400 });
   try {
@@ -55,7 +69,9 @@ export async function GET(_request: NextRequest, { params }: Context) {
       return NextResponse.json({ error: "World is unavailable" }, { status: 404 });
     const sql = getDb();
     const peers = await sql`
-      SELECT user_id AS "userId", position, rotation, last_seen AS "lastSeen"
+      SELECT user_id AS "userId", position, rotation,
+        animation_state AS "animationState", client_sequence AS "sequence",
+        last_seen AS "lastSeen"
       FROM virtual_world_presence
       WHERE world_id = ${worldId}::uuid AND user_id <> ${session.id}::uuid
         AND last_seen > NOW() - INTERVAL '30 seconds'
@@ -75,7 +91,7 @@ export async function GET(_request: NextRequest, { params }: Context) {
   }
 }
 
-// POST refreshes the signed-in user's ephemeral presence. Clients should send at most once per second.
+// POST refreshes ephemeral transform and animation metadata. Clients should send at most once per second.
 export async function POST(request: NextRequest, { params }: Context) {
   const { worldId } = await params;
   const session = await readWorldClientSession(request, worldId);
@@ -85,26 +101,39 @@ export async function POST(request: NextRequest, { params }: Context) {
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
   if (!isRecord(body) || !validVector(body.position) ||
-      (body.rotation !== undefined && !validRotation(body.rotation)))
-    return NextResponse.json({ error: "Invalid presence position or rotation" }, { status: 400 });
+      (body.rotation !== undefined && !validRotation(body.rotation)) ||
+      (body.animationState !== undefined && !validAnimationState(body.animationState)) ||
+      (body.sequence !== undefined && (!Number.isSafeInteger(body.sequence) || (body.sequence as number) < 1)))
+    return NextResponse.json({ error: "Invalid presence transform, sequence or animation state" }, { status: 400 });
   try {
     if (!await canAccessWorld(worldId, session.id))
       return NextResponse.json({ error: "World is unavailable" }, { status: 404 });
     const sql = getDb();
+    const animationState = body.animationState ?? {
+      locomotion: "idle", seated: false, gesture: "none", gestureSequence: 0
+    };
+    const sequence = body.sequence ?? null;
     const rows = await sql`
-      INSERT INTO virtual_world_presence (world_id, user_id, position, rotation, last_seen)
+      INSERT INTO virtual_world_presence
+        (world_id, user_id, position, rotation, animation_state, client_sequence, last_seen)
       VALUES (${worldId}::uuid, ${session.id}::uuid,
         ${JSON.stringify(body.position)}::jsonb,
-        ${JSON.stringify(body.rotation ?? { x: 0, y: 0, z: 0, w: 1 })}::jsonb, NOW())
+        ${JSON.stringify(body.rotation ?? { x: 0, y: 0, z: 0, w: 1 })}::jsonb,
+        ${JSON.stringify(animationState)}::jsonb, COALESCE(${sequence}::bigint, 1), NOW())
       ON CONFLICT (world_id, user_id) DO UPDATE SET
-        position = EXCLUDED.position, rotation = EXCLUDED.rotation, last_seen = NOW()
+        position = EXCLUDED.position, rotation = EXCLUDED.rotation,
+        animation_state = EXCLUDED.animation_state,
+        client_sequence = CASE WHEN EXCLUDED.client_sequence > virtual_world_presence.client_sequence
+          THEN EXCLUDED.client_sequence ELSE virtual_world_presence.client_sequence + 1 END,
+        last_seen = NOW()
       WHERE virtual_world_presence.last_seen <= NOW() - INTERVAL '1 second'
-      RETURNING last_seen AS "lastSeen"
+        AND (${sequence}::bigint IS NULL OR EXCLUDED.client_sequence > virtual_world_presence.client_sequence)
+      RETURNING last_seen AS "lastSeen", client_sequence AS "sequence"
     `;
-    if (!rows[0]) return NextResponse.json({ error: "Presence updates are limited to once per second" }, {
+    if (!rows[0]) return NextResponse.json({ error: "Presence update was rate-limited or sequence was stale" }, {
       status: 429, headers: { "Retry-After": "1", "Cache-Control": "no-store, private" }
     });
-    return NextResponse.json({ present: true, lastSeen: rows[0].lastSeen }, {
+    return NextResponse.json({ present: true, lastSeen: rows[0].lastSeen, sequence: rows[0].sequence }, {
       headers: { "Cache-Control": "no-store, private" }
     });
   } catch (error) {
