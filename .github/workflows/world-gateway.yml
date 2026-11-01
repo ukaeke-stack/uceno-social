@@ -13,6 +13,7 @@ on:
     branches:
       - feature/uceno-unity-foundation
     paths:
+      - ".github/workflows/world-gateway.yml"
       - "runtime/world-gateway/**"
       - "db/migrations/024_virtual_world_instance_leases.sql"
       - "app/api/worlds/**"
