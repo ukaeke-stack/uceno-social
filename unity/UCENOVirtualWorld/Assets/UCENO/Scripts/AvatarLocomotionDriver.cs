@@ -50,8 +50,29 @@ namespace UCENO.VirtualWorld
         private float gestureUntil;
         private int activeGesture;
         private bool wasSeated;
+        private bool networkDriven;
+        private float networkSpeed;
+        private bool networkSeated;
+        private bool networkSprinting;
+        private int receivedGestureSequence;
+        public int GestureSequence { get; private set; }
         public int GestureSequence { get; private set; }
         public string GestureName { get; private set; } = "none";
+
+        public void ApplyRemoteState(float speed, bool seated, bool sprinting, string gesture, int sequence)
+        {
+            networkDriven = true;
+            networkSpeed = Mathf.Clamp01(speed);
+            networkSeated = seated;
+            networkSprinting = sprinting;
+            if (sequence > receivedGestureSequence)
+            {
+                receivedGestureSequence = sequence;
+                GestureName = gesture ?? "none";
+                activeGesture = GestureName == "wave" ? 1 : GestureName == "cheer" ? 2 : 0;
+                gestureUntil = Time.time + (activeGesture == 1 ? 1.8f : 1.6f);
+            }
+        }
 
         public void TriggerWave() { activeGesture = 1; GestureName = "wave"; GestureSequence++; gestureUntil = Time.time + 1.8f; }
         public void TriggerCheer() { activeGesture = 2; GestureName = "cheer"; GestureSequence++; gestureUntil = Time.time + 1.6f; }
@@ -111,26 +132,31 @@ namespace UCENO.VirtualWorld
 
         private void Update()
         {
-            if (animator == null || motor == null)
+            if (animator == null)
                 return;
 
             if (UsesImportedController)
-                animator.SetFloat(MoveSpeedHash, motor.AnimationSpeed, dampTime, Time.deltaTime);
+            {
+                float speed = motor != null ? motor.AnimationSpeed : networkSpeed;
+                animator.SetFloat(MoveSpeedHash, speed, dampTime, Time.deltaTime);
+            }
         }
 
         private void LateUpdate()
         {
-            if (UsesImportedController || animator == null || motor == null)
+            if (UsesImportedController || animator == null || (motor == null && !networkDriven))
                 return;
 
-            if (motor.IsSeated != wasSeated)
+            bool seated = motor != null ? motor.IsSeated : networkSeated;
+            float speed = motor != null ? motor.AnimationSpeed : networkSpeed;
+            bool sprinting = motor != null ? motor.IsSprinting : networkSprinting;
+            if (seated != wasSeated)
             {
-                wasSeated = motor.IsSeated;
+                wasSeated = seated;
                 if (wasSeated) { activeGesture = 0; gestureUntil = 0f; }
             }
 
-            float speed = motor.AnimationSpeed;
-            float sprint = motor.IsSprinting ? 1f : 0f;
+            float sprint = sprinting ? 1f : 0f;
             float amplitude = Mathf.Lerp(walkLegSwing, runLegSwing, sprint) * speed;
             float frequency = Mathf.Lerp(walkCycleSpeed, runCycleSpeed, sprint);
             cycle += Time.deltaTime * frequency * Mathf.Lerp(0.15f, 1f, speed);
@@ -159,7 +185,7 @@ namespace UCENO.VirtualWorld
             SetRotation(leftLowerArm, leftLowerArmBase, new Vector3(-8f + Mathf.Abs(armSwing) * 0.12f, 0f, 0f));
             SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(-8f + Mathf.Abs(armSwing) * 0.12f, 0f, 0f));
 
-            if (motor.IsSeated)
+            if (seated)
             {
                 // Procedural seated/rest pose for the imported humanoid.
                 // This is a ground-rest pose; chair-specific IK is a later system.
@@ -175,7 +201,7 @@ namespace UCENO.VirtualWorld
                 SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(-35f, 0f, 0f));
             }
 
-            if (!motor.IsSeated && Time.time < gestureUntil)
+            if (!seated && Time.time < gestureUntil)
             {
                 float pulse = Mathf.Sin(Mathf.Clamp01((gestureUntil - Time.time) / 1.8f) * Mathf.PI);
                 if (activeGesture == 1 && rightUpperArm != null)
