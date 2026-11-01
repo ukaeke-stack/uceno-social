@@ -5,16 +5,7 @@ on:
     branches:
       - feature/uceno-unity-foundation
     paths:
-      - '.github/workflows/uceno-free-assets.yml'
-      - 'scripts/download_polyhaven_assets.py'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Characters/uceno_default_avatar.params.json'
-  pull_request:
-    branches:
-      - feature/uceno-unity-foundation
-    types: [opened, synchronize, reopened]
-    paths:
-      - '.github/workflows/uceno-free-assets.yml'
-      - 'unity/UCENOVirtualWorld/README.md'
   workflow_dispatch:
 
 permissions:
@@ -110,5 +101,7 @@ jobs:
             echo "No new imported assets to commit."
             exit 0
           fi
-          git commit -m "Import free rigged avatar and CC0 environment assets"
+          git commit -m "Regenerate free rigged UCENO humanoid avatar"
+          git fetch origin "${BRANCH_NAME}"
+          git rebase "origin/${BRANCH_NAME}"
           git push origin "HEAD:${BRANCH_NAME}"
