@@ -5,6 +5,7 @@ on:
       - ".github/workflows/world-gateway.yml"
       - "runtime/world-gateway/**"
       - "db/migrations/024_virtual_world_instance_leases.sql"
+      - "db/migrations/025_virtual_world_event_locations.sql"
       - "app/api/worlds/**"
       - "app/api/world-homes/**"
       - "app/api/world-events/**"
@@ -20,6 +21,7 @@ on:
       - ".github/workflows/world-gateway.yml"
       - "runtime/world-gateway/**"
       - "db/migrations/024_virtual_world_instance_leases.sql"
+      - "db/migrations/025_virtual_world_event_locations.sql"
       - "app/api/worlds/**"
       - "app/api/world-homes/**"
       - "lib/world-client-session.ts"
@@ -153,3 +155,5 @@ jobs:
             if (!animation.includes(marker)) throw new Error('Missing remote avatar animation support: ' + marker);
           console.log('Unity package and gateway wiring checks passed. This is not a Unity Editor/Android build.');
           NODE
+      - name: Validate residential and spatial event admission contracts
+        run: node scripts/validate-uceno-spatial-features.cjs
