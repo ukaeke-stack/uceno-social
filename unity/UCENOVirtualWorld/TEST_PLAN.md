@@ -116,6 +116,7 @@ This checklist covers the Unity city client, world gateway interactions and the 
 - [ ] Revoke an invitee; verify the roster updates and that account receives 404 on the next home load.
 - [ ] Confirm the imported sofa, armchair, round table, bed and cabinet appear in the Unity home furniture catalogue; place each, save, reload and verify scale/rotation/position.
 - [ ] Select placed furniture, move it in 0.25-metre steps, rotate it in 15-degree increments, remove it, save and reload to confirm all edits persist.
+- [ ] Confirm home transform remains stable after the player walks away and saves; furniture persists in local coordinates within the 50-by-50-metre home plot.
 - [ ] Confirm each residential furniture FBX has its CC0 Poly Haven asset manifest and local texture dependencies in the imported asset folder.
 - [ ] Add a real residential interior shell/prefab and configure its entrance/exit before claiming complete home visiting; the current apartment asset is an exterior facade, not a furnished interior.
 - [ ] Test placement on Android touch controls and confirm placed furniture cannot be moved outside the intended home boundary.
