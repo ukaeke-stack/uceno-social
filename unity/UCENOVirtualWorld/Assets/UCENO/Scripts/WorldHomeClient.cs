@@ -1,0 +1,398 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Text;
+using UnityEngine;
+using UnityEngine.Networking;
+
+namespace UCENO.VirtualWorld
+{
+    [Serializable] public sealed class WorldHomeSummary
+    {
+        public string id;
+        public string name;
+        public string templateId;
+        public string visibility;
+        public string permission;
+        public string updatedAt;
+    }
+
+    [Serializable] public sealed class WorldHomeTransform
+    {
+        public float x;
+        public float y;
+        public float z;
+        public float yaw;
+    }
+
+    [Serializable] public sealed class WorldHomeFurnishing
+    {
+        public string id;
+        public string assetId;
+        public float x;
+        public float y;
+        public float z;
+        public float yaw;
+        public float scale = 1f;
+    }
+
+    [Serializable] internal sealed class WorldHomeListResponse { public WorldHomeSummary[] homes; }
+    [Serializable] internal sealed class WorldHomeDetail
+    {
+        public string id;
+        public string name;
+        public string templateId;
+        public string visibility;
+        public string permission;
+        public WorldHomeTransform transform;
+        public WorldHomeFurnishing[] furnishing;
+    }
+    [Serializable] internal sealed class WorldHomeDetailResponse { public WorldHomeDetail home; }
+    [Serializable] internal sealed class WorldHomeCreateRequest
+    {
+        public string worldId;
+        public string name;
+        public string templateId;
+        public string visibility;
+        public WorldHomeTransform transform;
+        public WorldHomeFurnishing[] furnishing;
+    }
+    [Serializable] internal sealed class WorldHomeSaveRequest
+    {
+        public WorldHomeTransform transform;
+        public WorldHomeFurnishing[] furnishing;
+    }
+    [Serializable] internal sealed class WorldHomeCreateResponse { public WorldHomeDetail home; }
+    [Serializable] internal sealed class WorldHomeFurnishingList { public WorldHomeFurnishing[] items; }
+
+    [Serializable] public sealed class WorldHomeFurnitureCatalogEntry
+    {
+        public string assetId;
+        public GameObject prefab;
+    }
+
+    /// <summary>
+    /// Authenticated Unity client for home listing, creation, loading and
+    /// permission-aware layout persistence. Furniture prefabs are supplied
+    /// through an explicit scene catalog; no placeholder meshes are created.
+    /// </summary>
+    public sealed class WorldHomeClient : MonoBehaviour
+    {
+        [SerializeField] private WorldSessionClient session;
+        [SerializeField] private PlayerMotor player;
+        [SerializeField] private WorldHomeFurnitureCatalogEntry[] furnitureCatalog =
+            new WorldHomeFurnitureCatalogEntry[0];
+        [SerializeField] private float placementDistance = 2.2f;
+
+        private readonly List<WorldHomeSummary> homes = new List<WorldHomeSummary>();
+        private readonly List<WorldHomeFurnishing> furnishing = new List<WorldHomeFurnishing>();
+        private readonly List<GameObject> spawnedFurniture = new List<GameObject>();
+        private string selectedHomeId;
+        private string selectedHomeName = "";
+        private string selectedPermission = "";
+        private string newHomeName = "My Home";
+        private string status = "Press M to manage homes.";
+        private bool visible;
+        private bool busy;
+        private Vector2 scroll;
+
+        public IReadOnlyList<WorldHomeSummary> Homes => homes;
+        public string SelectedHomeId => selectedHomeId;
+        public bool CanEditSelectedHome => selectedPermission == "owner" ||
+            selectedPermission == "decorator" || selectedPermission == "co_owner";
+
+        private void Awake()
+        {
+            if (session == null) session = FindObjectOfType<WorldSessionClient>();
+            if (player == null) player = FindObjectOfType<PlayerMotor>();
+        }
+
+        private void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.M))
+            {
+                visible = !visible;
+                if (visible && session != null && session.IsAuthenticated) RefreshHomes();
+            }
+        }
+
+        public void RefreshHomes()
+        {
+            if (!CanRequest()) return;
+            StartCoroutine(RequestHomes());
+        }
+
+        public void CreateHome(string homeName)
+        {
+            if (!CanRequest() || string.IsNullOrWhiteSpace(homeName)) return;
+            StartCoroutine(CreateHomeRoutine(homeName.Trim()));
+        }
+
+        public void LoadHome(string homeId)
+        {
+            if (!CanRequest() || string.IsNullOrWhiteSpace(homeId)) return;
+            StartCoroutine(LoadHomeRoutine(homeId));
+        }
+
+        public void SaveSelectedHome()
+        {
+            if (!CanRequest() || !CanEditSelectedHome || string.IsNullOrEmpty(selectedHomeId)) return;
+            StartCoroutine(SaveHomeRoutine());
+        }
+
+        public bool PlaceFurniture(string assetId)
+        {
+            if (!CanEditSelectedHome || string.IsNullOrEmpty(selectedHomeId)) return false;
+            WorldHomeFurnitureCatalogEntry entry = FindCatalogEntry(assetId);
+            if (entry == null || entry.prefab == null || player == null) return false;
+
+            Vector3 position = player.transform.position + player.transform.forward * placementDistance;
+            position.y = Mathf.Max(position.y, player.transform.position.y);
+            GameObject instance = Instantiate(entry.prefab, position, Quaternion.identity);
+            instance.name = "Home Furniture " + assetId;
+            spawnedFurniture.Add(instance);
+            furnishing.Add(new WorldHomeFurnishing
+            {
+                id = Guid.NewGuid().ToString("N"),
+                assetId = assetId,
+                x = position.x, y = position.y, z = position.z,
+                yaw = instance.transform.eulerAngles.y,
+                scale = instance.transform.localScale.x
+            });
+            status = "Furniture placed. Save the home to persist this layout.";
+            return true;
+        }
+
+        private bool CanRequest()
+        {
+            if (busy) return false;
+            if (session == null || !session.IsAuthenticated)
+            {
+                status = "Enter a world before managing homes.";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(session.WorldId))
+            {
+                status = "The world session has no world ID.";
+                return false;
+            }
+            return true;
+        }
+
+        private WorldHomeFurnitureCatalogEntry FindCatalogEntry(string assetId)
+        {
+            foreach (WorldHomeFurnitureCatalogEntry entry in furnitureCatalog)
+                if (entry != null && entry.assetId == assetId) return entry;
+            return null;
+        }
+
+        private IEnumerator RequestHomes()
+        {
+            busy = true;
+            string url = session.ApiBaseUrl.TrimEnd('/') + "/api/world-homes?worldId=" +
+                UnityWebRequest.EscapeURL(session.WorldId);
+            using (UnityWebRequest request = CreateRequest(url, "GET", null))
+            {
+                yield return request.SendWebRequest();
+                if (!Succeeded(request)) SetFailure(request, "Home list");
+                else
+                {
+                    WorldHomeListResponse response = JsonUtility.FromJson<WorldHomeListResponse>(request.downloadHandler.text);
+                    homes.Clear();
+                    if (response != null && response.homes != null) homes.AddRange(response.homes);
+                    status = homes.Count + " home(s) available in this world.";
+                }
+            }
+            busy = false;
+        }
+
+        private IEnumerator CreateHomeRoutine(string homeName)
+        {
+            busy = true;
+            WorldHomeCreateRequest payload = new WorldHomeCreateRequest
+            {
+                worldId = session.WorldId,
+                name = homeName,
+                templateId = "starter.home",
+                visibility = "private",
+                transform = CurrentTransform(),
+                furnishing = new WorldHomeFurnishing[0]
+            };
+            using (UnityWebRequest request = CreateRequest(
+                session.ApiBaseUrl.TrimEnd('/') + "/api/world-homes", "POST", JsonUtility.ToJson(payload)))
+            {
+                yield return request.SendWebRequest();
+                if (!Succeeded(request)) SetFailure(request, "Home creation");
+                else
+                {
+                    WorldHomeCreateResponse response = JsonUtility.FromJson<WorldHomeCreateResponse>(request.downloadHandler.text);
+                    if (response != null && response.home != null)
+                    {
+                        selectedHomeId = response.home.id;
+                        selectedHomeName = response.home.name;
+                        selectedPermission = "owner";
+                        furnishing.Clear();
+                        ClearSpawnedFurniture();
+                        status = "Home created. Change visibility to invite before sharing.";
+                        RefreshHomes();
+                    }
+                    else status = "Home service returned an invalid response.";
+                }
+            }
+            busy = false;
+        }
+
+        private IEnumerator LoadHomeRoutine(string homeId)
+        {
+            busy = true;
+            using (UnityWebRequest request = CreateRequest(
+                session.ApiBaseUrl.TrimEnd('/') + "/api/world-homes/" + UnityWebRequest.EscapeURL(homeId),
+                "GET", null))
+            {
+                yield return request.SendWebRequest();
+                if (!Succeeded(request)) SetFailure(request, "Home loading");
+                else
+                {
+                    WorldHomeDetailResponse response = JsonUtility.FromJson<WorldHomeDetailResponse>(request.downloadHandler.text);
+                    if (response == null || response.home == null)
+                        status = "Home service returned an invalid response.";
+                    else
+                    {
+                        selectedHomeId = response.home.id;
+                        selectedHomeName = response.home.name;
+                        selectedPermission = response.home.permission;
+                        furnishing.Clear();
+                        if (response.home.furnishing != null) furnishing.AddRange(response.home.furnishing);
+                        RebuildFurniture();
+                        status = "Loaded " + selectedHomeName + " (" + selectedPermission + ").";
+                    }
+                }
+            }
+            busy = false;
+        }
+
+        private IEnumerator SaveHomeRoutine()
+        {
+            busy = true;
+            WorldHomeSaveRequest payload = new WorldHomeSaveRequest
+            {
+                transform = CurrentTransform(),
+                furnishing = furnishing.ToArray()
+            };
+            using (UnityWebRequest request = CreateRequest(
+                session.ApiBaseUrl.TrimEnd('/') + "/api/world-homes/" + UnityWebRequest.EscapeURL(selectedHomeId),
+                "PUT", JsonUtility.ToJson(payload)))
+            {
+                yield return request.SendWebRequest();
+                if (!Succeeded(request)) SetFailure(request, "Home save");
+                else status = "Home layout saved.";
+            }
+            busy = false;
+        }
+
+        private WorldHomeTransform CurrentTransform()
+        {
+            Vector3 p = player != null ? player.transform.position : transform.position;
+            float yaw = player != null ? player.transform.eulerAngles.y : transform.eulerAngles.y;
+            return new WorldHomeTransform { x = p.x, y = p.y, z = p.z, yaw = yaw };
+        }
+
+        private void RebuildFurniture()
+        {
+            ClearSpawnedFurniture();
+            foreach (WorldHomeFurnishing item in furnishing)
+            {
+                WorldHomeFurnitureCatalogEntry entry = FindCatalogEntry(item.assetId);
+                if (entry == null || entry.prefab == null) continue;
+                GameObject instance = Instantiate(entry.prefab,
+                    new Vector3(item.x, item.y, item.z), Quaternion.Euler(0f, item.yaw, 0f));
+                instance.name = "Home Furniture " + item.assetId;
+                instance.transform.localScale = Vector3.one * Mathf.Clamp(item.scale, 0.1f, 5f);
+                spawnedFurniture.Add(instance);
+            }
+        }
+
+        private void ClearSpawnedFurniture()
+        {
+            foreach (GameObject item in spawnedFurniture)
+                if (item != null) Destroy(item);
+            spawnedFurniture.Clear();
+        }
+
+        private UnityWebRequest CreateRequest(string url, string method, string body)
+        {
+            UnityWebRequest request = new UnityWebRequest(url, method);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Authorization", "Bearer " + session.AccessToken);
+            request.SetRequestHeader("Accept", "application/json");
+            if (body != null)
+            {
+                request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
+                request.SetRequestHeader("Content-Type", "application/json");
+            }
+            request.timeout = 15;
+            return request;
+        }
+
+        private static bool Succeeded(UnityWebRequest request)
+        {
+            return request.result == UnityWebRequest.Result.Success &&
+                request.responseCode >= 200 && request.responseCode < 300;
+        }
+
+        private void SetFailure(UnityWebRequest request, string operation)
+        {
+            status = operation + " failed (" + request.responseCode + "). " +
+                "The server may have denied access or the home service may be unavailable.";
+            Debug.LogWarning("UCENO " + status);
+        }
+
+        private void OnGUI()
+        {
+            if (!visible) return;
+            float scale = Mathf.Clamp(Screen.width / 600f, 1f, 1.6f);
+            float width = Mathf.Min(Screen.width - 24f, 440f * scale);
+            float height = Mathf.Min(Screen.height - 40f, 560f * scale);
+            Rect panel = new Rect(12f, 92f, width, height);
+            GUI.Box(panel, "UCENO HOMES  |  M TO CLOSE");
+            GUILayout.BeginArea(new Rect(panel.x + 12f, panel.y + 28f, panel.width - 24f, panel.height - 40f));
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("New home", GUILayout.Width(75f * scale));
+            newHomeName = GUILayout.TextField(newHomeName, GUILayout.Width(150f * scale));
+            if (GUILayout.Button("CREATE", GUILayout.Height(34f * scale))) CreateHome(newHomeName);
+            if (GUILayout.Button("REFRESH", GUILayout.Height(34f * scale))) RefreshHomes();
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(8f);
+            scroll = GUILayout.BeginScrollView(scroll, GUILayout.Height(height * 0.43f));
+            foreach (WorldHomeSummary home in homes)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(home.name + "  [" + home.permission + "]", GUILayout.MinWidth(100f));
+                if (GUILayout.Button("OPEN", GUILayout.Width(72f * scale))) LoadHome(home.id);
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.EndScrollView();
+
+            if (!string.IsNullOrEmpty(selectedHomeId))
+            {
+                GUILayout.Label("Selected: " + selectedHomeName + " (" + selectedPermission + ")");
+                if (CanEditSelectedHome)
+                {
+                    foreach (WorldHomeFurnitureCatalogEntry entry in furnitureCatalog)
+                    {
+                        if (entry == null || entry.prefab == null || string.IsNullOrWhiteSpace(entry.assetId)) continue;
+                        if (GUILayout.Button("PLACE " + entry.assetId, GUILayout.Height(32f * scale)))
+                            PlaceFurniture(entry.assetId);
+                    }
+                    if (GUILayout.Button("SAVE HOME LAYOUT", GUILayout.Height(38f * scale)))
+                        SaveSelectedHome();
+                }
+                else GUILayout.Label("Visitor access: layout editing is disabled.");
+            }
+            GUILayout.Space(6f);
+            GUILayout.Label(status, GUI.skin.label);
+            GUILayout.EndArea();
+        }
+    }
+}
