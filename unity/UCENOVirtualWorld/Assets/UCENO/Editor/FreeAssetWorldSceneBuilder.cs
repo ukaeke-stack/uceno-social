@@ -295,6 +295,9 @@ namespace UCENO.VirtualWorld.Editor
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
 
+            if (model.GetComponent<AvatarAppearanceProfile>() == null)
+                model.AddComponent<AvatarAppearanceProfile>();
+
             if (model.GetComponent<AvatarLocomotionDriver>() == null)
                 model.AddComponent<AvatarLocomotionDriver>();
 
