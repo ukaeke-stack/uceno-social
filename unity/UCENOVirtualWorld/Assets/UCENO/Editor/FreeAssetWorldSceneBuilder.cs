@@ -38,7 +38,6 @@ namespace UCENO.VirtualWorld.Editor
             "Models/modular_chainlink_fence/modular_chainlink_fence.fbx"
         };
 
-        [MenuItem("UCENO Virtual World/Build Realistic City Scene")]
         public static void CreateStarterScene()
         {
             ValidateSourceAssets();
