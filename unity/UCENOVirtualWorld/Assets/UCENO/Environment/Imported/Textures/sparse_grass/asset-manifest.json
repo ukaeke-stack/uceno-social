@@ -1,0 +1,20 @@
+{
+  "name": "Sparse Grass",
+  "asset_id": "sparse_grass",
+  "source": "https://polyhaven.com/a/sparse_grass",
+  "license": "CC0 1.0",
+  "authors": {
+    "Amal Kumar": "All"
+  },
+  "texture_resolutions": [
+    "1k"
+  ],
+  "maps": [
+    "sparse_grass_diff.jpg",
+    "sparse_grass_nor_gl.png",
+    "sparse_grass_rough.jpg",
+    "sparse_grass_ao.jpg",
+    "sparse_grass_arm.jpg"
+  ],
+  "runtime_api_dependency": false
+}
