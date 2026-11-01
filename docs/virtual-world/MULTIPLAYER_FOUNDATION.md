@@ -32,7 +32,7 @@ No credit top-up execution endpoint, transfer, seller settlement, refund, final 
 
 ## Setup
 
-1. Review and apply migrations `015_virtual_world_foundation.sql` through `020_credit_topup_intents.sql` in order; configure `ADMIN_USER_IDS` with authorized platform administrator UUIDs through the normal migration process. No API route runs DDL.
+1. Review and apply migrations `015_virtual_world_foundation.sql` through `023_virtual_world_animation_state.sql` in numeric order; configure `ADMIN_USER_IDS` with authorized platform administrator UUIDs through the normal migration process. No API route runs DDL.
 2. Configure server-only `WORLD_TOKEN_SECRET` with at least 32 random characters. Never commit it or put it in the Unity project.
 3. A signed-in Social client calls `POST /api/worlds/entry` with a world ID and client type.
 4. Pass the returned code to Unity `WorldSessionClient.RedeemEntryCode`; it redeems with `PUT /api/worlds/entry`.
@@ -182,3 +182,14 @@ issuing a room token. This closes an access-control gap in which a previously
 valid entry handoff could otherwise be used to request voice after a block
 change. These are admission checks; they do not replace revalidation by a
 dedicated authoritative world server.
+
+
+The payment provider decision for UCENO Virtual World is Paystack, with
+multi-currency transaction support planned. Migration 021 adds the database
+issuance function and Paystack metadata fields, but it is not a complete
+payment integration: the live Paystack initialization/verification/webhook
+configuration and end-to-end payment tests remain separate deployment work.
+Keep real payment credentials out of source control. Payment configuration may
+be deferred while world systems continue; do not represent top-ups as live
+until server-side Paystack verification and idempotent credit issuance have
+been tested. Marketplace escrow remains disabled.
