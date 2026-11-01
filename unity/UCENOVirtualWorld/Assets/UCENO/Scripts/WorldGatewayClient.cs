@@ -44,11 +44,21 @@ namespace UCENO.VirtualWorld
         public int gestureSequence;
     }
 
+    [Serializable] internal sealed class GatewayInteractionPacket
+    {
+        public string type = "interact";
+        public string objectId;
+        public string action;
+    }
+
     [Serializable] internal sealed class GatewayPacket
     {
         public string type;
         public string userId;
         public string code;
+        public string objectId;
+        public string objectState;
+        public string actorId;
         public GatewayVectorState state;
         public GatewaySnapshotPlayer[] players;
     }
@@ -115,6 +125,31 @@ namespace UCENO.VirtualWorld
                 return;
             }
             Connect();
+        }
+
+        public bool RequestInteraction(string objectId, string action)
+        {
+            if (!connected || socket == null || string.IsNullOrWhiteSpace(objectId) ||
+                (action != "toggle" && action != "use"))
+                return false;
+            _ = SendInteractionAsync(objectId, action);
+            return true;
+        }
+
+        private async Task SendInteractionAsync(string objectId, string action)
+        {
+            try
+            {
+                await socket.SendText(JsonUtility.ToJson(new GatewayInteractionPacket
+                {
+                    objectId = objectId,
+                    action = action
+                }));
+            }
+            catch (Exception error)
+            {
+                Debug.LogWarning("UCENO interaction request failed: " + error.Message);
+            }
         }
 
         public void Reconnect()
@@ -219,6 +254,20 @@ namespace UCENO.VirtualWorld
                     localPlayer.SetServerAuthority(true);
                 }
                 ConnectionStatus = "ONLINE";
+                return;
+            }
+
+            if (packet.type == "object_state")
+            {
+                foreach (WorldInteractable item in FindObjectsOfType<WorldInteractable>())
+                    if (item != null && item.ObjectId == packet.objectId)
+                        item.ApplyServerState(packet.objectState);
+                return;
+            }
+
+            if (packet.type == "interaction_rejected")
+            {
+                Debug.LogWarning("UCENO interaction rejected: " + packet.code);
                 return;
             }
 
