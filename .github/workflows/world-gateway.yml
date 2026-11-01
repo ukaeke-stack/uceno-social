@@ -107,7 +107,7 @@ jobs:
           for (const marker of ["owner_m.status", "home.ownerMembership === \"banned\"", "home.ownerMembership === \"suspended\""])
             if (!homeMembersApi.includes(marker)) throw new Error('Home invite API does not revalidate owner world membership: ' + marker);
           const homeRoute = fs.readFileSync('./app/api/world-homes/[homeId]/route.ts', 'utf8');
-          for (const marker of ['export async function GET', 'Home is unavailable', 'worldStatus', 'worldMembership', 'home.visibility !== "invite"', 'COALESCE(wm.status, \'none\') NOT IN', "w.status = 'published'", "h.visibility = 'invite'", 'Cache-Control'])
+          for (const marker of ['export async function GET', 'Home is unavailable', 'worldStatus', 'worldMembership', 'home.visibility !== "invite"', 'home.worldOwnerId !== session.id', 'w.owner_user_id = ${session.id}::uuid', 'COALESCE(wm.status, \'none\') NOT IN', "w.status = 'published'", "h.visibility = 'invite'", 'Cache-Control'])
             if (!homeRoute.includes(marker)) throw new Error('Missing access-controlled home retrieval behavior: ' + marker);
           for (const marker of ['const hasVisibility = body.visibility !== undefined && body.visibility !== ""', 'NOT ${hasVisibility} OR h.owner_user_id'])
             if (!homeRoute.includes(marker)) throw new Error('Home visibility changes are not owner-restricted: ' + marker);
