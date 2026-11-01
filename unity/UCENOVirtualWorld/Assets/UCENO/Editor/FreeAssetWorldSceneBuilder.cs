@@ -678,6 +678,7 @@ namespace UCENO.VirtualWorld.Editor
             eventsData.ApplyModifiedPropertiesWithoutUndo();
 
             player.AddComponent<WorldActivityHud>();
+            player.AddComponent<AvatarCustomizationHud>();
 
             WorldStatusHud hud = player.AddComponent<WorldStatusHud>();
             SerializedObject hudData = new SerializedObject(hud);
