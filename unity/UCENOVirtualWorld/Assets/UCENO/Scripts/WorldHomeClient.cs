@@ -275,6 +275,7 @@ namespace UCENO.VirtualWorld
                         selectedHomeName = response.home.name;
                         selectedPermission = "owner";
                         selectedVisibility = "private";
+                        selectedFurnitureIndex = -1;
                         members.Clear();
                         furnishing.Clear();
                         ClearSpawnedFurniture();
@@ -407,6 +408,7 @@ namespace UCENO.VirtualWorld
 
         private void RebuildFurniture()
         {
+            selectedFurnitureIndex = -1;
             ClearSpawnedFurniture();
             foreach (WorldHomeFurnishing item in furnishing)
             {
