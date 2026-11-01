@@ -6,7 +6,7 @@ store readiness or release performance.
 
 ## Editor import and scene generation
 
-- [ ] Open the project in Unity 6000.3.27f1 (Unity 6.3 LTS).
+- [ ] Open the project in Unity 6000.3.27f1 (Unity 6.3 LTS). If Unity Build Automation does not list that exact patch, select 6000.3 stable, not 6000.3 beta.
 - [ ] Set Player > Other Settings > Configuration > Active Input Handling to Both or Input Manager (Old), then restart the Editor if requested.
 - [ ] Confirm the Console has no C# compilation errors.
 - [ ] Confirm the imported avatar FBX is configured as a Unity Humanoid and has Idle, Walk and Run clips.
