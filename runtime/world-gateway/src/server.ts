@@ -28,6 +28,7 @@ type CollisionBox = {
   minZ: number; maxZ: number;
 };
 type Interactable = { id: string; kind: "door" | "seat" | "object"; x: number; y: number; z: number; yaw: number; state: string; actorId: string | null; occupantId: string | null };
+type EquippedWardrobeItem = { slot: string; itemId: string };
 
 function loadInteractables(): Map<string, Interactable> {
   const filePath = process.env.WORLD_INTERACTABLES_FILE || process.env.WORLD_COLLISION_BOXES_FILE;
@@ -248,6 +249,7 @@ type Player = {
   homeId: string | null;
   homeAnchor: { x: number; y: number; z: number; yaw: number } | null;
   eventId: string | null;
+  wardrobe: EquippedWardrobeItem[];
   returnState: { x: number; y: number; z: number; yaw: number } | null;
 };
 const players = new Map<string, Player>();
@@ -399,6 +401,16 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
   const x = finiteNumber(p.x, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.x : 0;
   const y = finiteNumber(p.y, GROUND_Y, WORLD_BOUNDS) ? p.y : GROUND_Y;
   const z = finiteNumber(p.z, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.z : 0;
+  const wardrobeRows = await sql`
+    SELECT e.slot, e.item_id AS "itemId"
+    FROM user_avatar_wardrobe_equipped e
+    JOIN user_avatar_wardrobe_inventory i
+      ON i.user_id = e.user_id AND i.item_id = e.item_id
+    JOIN avatar_wardrobe_items c
+      ON c.item_id = e.item_id AND c.slot = e.slot AND c.enabled = TRUE
+    WHERE e.user_id = ${userId}::uuid
+    ORDER BY e.slot
+  `;
   const rotation = rows[0]?.rotation || { y: 0, w: 1 };
   const yaw = finiteNumber(rotation.y, -1.01, 1.01) && finiteNumber(rotation.w, -1.01, 1.01)
     ? 2 * Math.atan2(rotation.y, rotation.w) : 0;
@@ -407,7 +419,7 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
-    lastInteractionAt: 0, homeId: null, homeAnchor: null, eventId: null, returnState: null
+    lastInteractionAt: 0, homeId: null, homeAnchor: null, eventId: null, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null
   };
 }
 
@@ -794,6 +806,25 @@ wss.on("connection", async (socket: WebSocket) => {
         for (const peer of players.values()) send(peer.socket, packet);
         return;
       }
+      if (msg && msg.type === "wardrobe_refresh") {
+        try {
+          const wardrobeRows = await sql`
+            SELECT e.slot, e.item_id AS "itemId"
+            FROM user_avatar_wardrobe_equipped e
+            JOIN user_avatar_wardrobe_inventory i
+              ON i.user_id = e.user_id AND i.item_id = e.item_id
+            JOIN avatar_wardrobe_items c
+              ON c.item_id = e.item_id AND c.slot = e.slot AND c.enabled = TRUE
+            WHERE e.user_id = ${player.id}::uuid
+            ORDER BY e.slot
+          `;
+          player.wardrobe = wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId }));
+        } catch (error) {
+          console.error("wardrobe_snapshot_refresh_failed", error);
+          send(socket, { type: "wardrobe_refresh_rejected", code: "wardrobe_unavailable" });
+        }
+        return;
+      }
       if (!msg || msg.type !== "input" || !Number.isSafeInteger(msg.sequence) ||
           msg.sequence <= player.lastSequence || !finiteNumber(msg.moveX, -1, 1) ||
           !finiteNumber(msg.moveZ, -1, 1) || !finiteNumber(msg.yaw, -Math.PI * 4, Math.PI * 4) ||
@@ -885,7 +916,7 @@ setInterval(async () => {
   const now = Date.now();
   const dt = Math.min(0.05, Math.max(0.001, (now - lastTick) / 1000));
   lastTick = now;
-  const snapshots: Array<{ userId: string; x: number; y: number; z: number; yaw: number; grounded: boolean; seated: boolean; sprint: boolean; gesture: string; gestureSequence: number }> = [];
+  const snapshots: Array<{ userId: string; x: number; y: number; z: number; yaw: number; grounded: boolean; seated: boolean; sprint: boolean; gesture: string; gestureSequence: number; wardrobe: EquippedWardrobeItem[] }> = [];
   for (const p of players.values()) {
     if (p.socket.readyState !== WebSocket.OPEN) continue;
     if (now - p.lastInputAt > 1500) { p.moveX = 0; p.moveZ = 0; p.sprint = false; }
@@ -908,7 +939,7 @@ setInterval(async () => {
     }
     if (p.y <= groundY) { p.y = groundY; p.vy = 0; p.grounded = true; }
     snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
-      seated: p.seated, sprint: p.sprint, gesture: p.gesture, gestureSequence: p.gestureSequence });
+      seated: p.seated, sprint: p.sprint, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe });
     if (now - p.lastCheckpointAt >= 5000) {
       p.lastCheckpointAt = now;
       void sql`
