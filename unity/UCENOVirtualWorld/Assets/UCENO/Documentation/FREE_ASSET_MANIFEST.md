@@ -32,7 +32,8 @@ https://polyhaven.com/, using the official public API:
 | Modular Urban Apartments Facade | Residential city frontage |
 | Modular Factory Facade | Industrial/commercial frontage |
 | Street Lamp 01 | Street lighting |
-| Jacaranda Tree | Natural street landscaping |
+| Pachira Aquatica 01 | Tropical street tree / planted areas |
+| Shrub 02 and Shrub 03 | Realistic street greenery and low planting |
 | Covered Car | Parked street vehicle |
 | Modular Chainlink Fence | Perimeter and service areas |
 
@@ -46,7 +47,7 @@ appropriate resolutions:
 | Sparse Grass | Natural ground surface |
 | Modern Buildings (HDRI) | City sky and ambient lighting |
 
-All Poly Haven models, textures and HDRIs are CC0 1.0 and may be used in commercial projects.
+All Poly Haven models, textures and HDRIs are CC0 1.0 and may be used in commercial projects. The Jacaranda Tree source was excluded because its FBX exceeded GitHub's 100 MB per-file limit and was too heavy for the initial Android asset budget.
 Poly Haven's API terms ask products built using its live API to make the source
 clear to users. UCENO will include a Poly Haven credit in its in-app credits.
 The API is used only in the development-time import workflow; the shipped game
