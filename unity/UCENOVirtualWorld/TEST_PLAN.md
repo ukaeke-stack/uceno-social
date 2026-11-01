@@ -204,3 +204,14 @@ possible.
 - Persistent world state, inventory, credits, purchases or advertising.
 - Avatar customization, voice, chat or user-created content.
 - Web build, VR build, release signing, store submission or production deployment.
+
+
+## Account appearance persistence acceptance tests (pending)
+
+1. Review and apply migration 026 to the separate UCENO database after migrations 015–025.
+2. Verify unauthenticated GET/PUT returns 401; a user cannot read or write another account's appearance; invalid keys, non-hex colors and oversized/unexpected payloads are rejected.
+3. Verify first GET returns an empty appearance without creating a row; PUT creates one account row; repeated PUT updates version and timestamp.
+4. Sign in on device A, change each palette field, reconnect and verify the account appearance loads. Sign in to the same account on device B and verify the same appearance loads; sign in as another account and verify no leakage.
+5. Test token expiry/reconnect, offline save failure/retry, and switching worlds under the same account.
+6. Open Unity 6.3 Editor and confirm compile/import, local avatar material-slot mapping, mobile HUD layout and no per-frame network calls.
+7. Keep wardrobe acceptance separate: supply real garment/hair/accessory prefabs, validate Humanoid bone/skin weights and slot replacement, then test equip/unequip replication and account persistence. No wardrobe pass can be claimed from palette tests.
