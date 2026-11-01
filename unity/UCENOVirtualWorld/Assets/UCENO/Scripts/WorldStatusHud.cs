@@ -36,7 +36,10 @@ namespace UCENO.VirtualWorld
                 ? "Left side: move  |  Right side: look"
                 : "WASD: move  |  Mouse: look  |  Shift: run";
 
+            Color previousGuiColor = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.68f);
             GUI.Box(new Rect(10f, 10f, panelWidth, panelHeight), GUIContent.none, panelStyle);
+            GUI.color = previousGuiColor;
             GUI.Label(
                 new Rect(22f, 16f, panelWidth - 24f, 22f * scale),
                 "UCENO VIRTUAL WORLD  •  " + speed,
