@@ -73,6 +73,8 @@ export async function GET(request: NextRequest, { params }: Context) {
   try {
     if (!await canAccessWorld(worldId, session.id))
       return NextResponse.json({ error: "World is unavailable" }, { status: 404 });
+    if (!await hasHealthyInstanceLease(worldId, session.id, session.instanceId))
+      return NextResponse.json({ error: "The assigned world instance is unavailable; reconnect to the world" }, { status: 503 });
     const sql = getDb();
     const peers = await sql`
       SELECT user_id AS "userId", position, rotation,
@@ -116,6 +118,8 @@ export async function POST(request: NextRequest, { params }: Context) {
   try {
     if (!await canAccessWorld(worldId, session.id))
       return NextResponse.json({ error: "World is unavailable" }, { status: 404 });
+    if (!await hasHealthyInstanceLease(worldId, session.id, session.instanceId))
+      return NextResponse.json({ error: "The assigned world instance is unavailable; reconnect to the world" }, { status: 503 });
     const sql = getDb();
     const animationState = body.animationState ?? {
       locomotion: "idle", seated: false, gesture: "none", gestureSequence: 0
