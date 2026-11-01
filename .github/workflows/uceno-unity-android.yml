@@ -1,13 +1,9 @@
 name: UCENO Unity Android Development Build
 
+# Android development APK builds are manual-only while feature work and
+# runtime verification are still in progress. Do not produce APKs on each push.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - feature/uceno-unity-foundation
-    paths:
-      - 'unity/UCENOVirtualWorld/**'
-      - '.github/workflows/uceno-unity-android.yml'
 
 permissions:
   contents: read
