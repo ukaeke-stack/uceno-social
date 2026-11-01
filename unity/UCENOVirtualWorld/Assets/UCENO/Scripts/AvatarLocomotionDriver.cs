@@ -170,8 +170,21 @@ namespace UCENO.VirtualWorld
 
         private void LateUpdate()
         {
-            if (UsesImportedController || animator == null || (motor == null && !networkDriven))
+            if (animator == null || (motor == null && !networkDriven))
                 return;
+
+            if (UsesImportedController)
+            {
+                bool importedSeated = motor != null ? motor.IsSeated : networkSeated;
+                if (!importedSeated && Time.time < gestureUntil && activeGesture == 3)
+                    ApplyDancePose();
+                else if (Time.time >= gestureUntil && motor != null && GestureName != "none")
+                {
+                    activeGesture = 0;
+                    GestureName = "none";
+                }
+                return;
+            }
 
             bool seated = motor != null ? motor.IsSeated : networkSeated;
             float speed = motor != null ? motor.AnimationSpeed : networkSpeed;
@@ -265,6 +278,23 @@ namespace UCENO.VirtualWorld
                 hips.localPosition = hipsPositionBase;
         }
 
+
+        private void ApplyDancePose()
+        {
+            float beat = Mathf.Sin(Time.time * 10f);
+            float sway = Mathf.Sin(Time.time * 4.8f) * 22f;
+            SetRotation(hips, hipsBase, new Vector3(beat * 7f, sway * 0.45f, sway * 0.25f));
+            SetRotation(chest, chestBase, new Vector3(-beat * 5f, sway * 0.7f, -sway * 0.18f));
+            SetRotation(head, headBase, new Vector3(beat * 3f, -sway * 0.15f, 0f));
+            SetRotation(leftUpperLeg, leftUpperLegBase, new Vector3(beat * 10f, 0f, -sway * 0.16f));
+            SetRotation(rightUpperLeg, rightUpperLegBase, new Vector3(-beat * 10f, 0f, sway * 0.16f));
+            if (leftUpperArm != null)
+                leftUpperArm.localRotation = leftUpperArmBase * Quaternion.Euler(-105f + beat * 12f, 0f, -35f + sway * 0.25f);
+            if (rightUpperArm != null)
+                rightUpperArm.localRotation = rightUpperArmBase * Quaternion.Euler(-105f - beat * 12f, 0f, 35f + sway * 0.25f);
+            SetRotation(leftLowerArm, leftLowerArmBase, new Vector3(-38f + beat * 18f, 0f, -8f));
+            SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(-38f - beat * 18f, 0f, 8f));
+        }
 
         private void ApplyNaturalAvatarColors()
         {
