@@ -101,6 +101,7 @@ namespace UCENO.VirtualWorld
         private readonly List<GameObject> spawnedFurniture = new List<GameObject>();
         private readonly List<WorldHomeMember> members = new List<WorldHomeMember>();
         private string selectedHomeId;
+        private WorldHomeTransform selectedHomeTransform = new WorldHomeTransform();
         private int selectedFurnitureIndex = -1;
         private string selectedHomeName = "";
         private string selectedPermission = "";
@@ -164,17 +165,19 @@ namespace UCENO.VirtualWorld
             WorldHomeFurnitureCatalogEntry entry = FindCatalogEntry(assetId);
             if (entry == null || entry.prefab == null || player == null) return false;
 
-            Vector3 position = player.transform.position + player.transform.forward * placementDistance;
-            position.y = Mathf.Max(position.y, player.transform.position.y);
-            GameObject instance = Instantiate(entry.prefab, position, Quaternion.identity);
+            Quaternion homeRotation = HomeRotation();
+            Vector3 worldPosition = player.transform.position + player.transform.forward * placementDistance;
+            worldPosition.y = Mathf.Max(worldPosition.y, player.transform.position.y);
+            Vector3 localPosition = Quaternion.Inverse(homeRotation) * (worldPosition - HomePosition());
+            GameObject instance = Instantiate(entry.prefab, worldPosition, homeRotation);
             instance.name = "Home Furniture " + assetId;
             spawnedFurniture.Add(instance);
             furnishing.Add(new WorldHomeFurnishing
             {
                 id = Guid.NewGuid().ToString("N"),
                 assetId = assetId,
-                x = position.x, y = position.y, z = position.z,
-                yaw = instance.transform.eulerAngles.y,
+                x = localPosition.x, y = localPosition.y, z = localPosition.z,
+                yaw = 0f,
                 scale = instance.transform.localScale.x
             });
             selectedFurnitureIndex = furnishing.Count - 1;
@@ -213,8 +216,9 @@ namespace UCENO.VirtualWorld
                 direction == 2 ? -right * furnitureMoveStep :
                 direction == 3 ? right * furnitureMoveStep : Vector3.zero;
             WorldHomeFurnishing item = furnishing[selectedFurnitureIndex];
-            item.x += delta.x;
-            item.z += delta.z;
+            Vector3 localDelta = Quaternion.Inverse(HomeRotation()) * delta;
+            item.x += localDelta.x;
+            item.z += localDelta.z;
             if (selectedFurnitureIndex < spawnedFurniture.Count && spawnedFurniture[selectedFurnitureIndex] != null)
                 spawnedFurniture[selectedFurnitureIndex].transform.position += delta;
             status = "Selected furniture moved. Save the home to persist the change.";
@@ -227,7 +231,7 @@ namespace UCENO.VirtualWorld
             WorldHomeFurnishing item = furnishing[selectedFurnitureIndex];
             item.yaw = Mathf.Repeat(item.yaw + degrees, 360f);
             if (selectedFurnitureIndex < spawnedFurniture.Count && spawnedFurniture[selectedFurnitureIndex] != null)
-                spawnedFurniture[selectedFurnitureIndex].transform.rotation = Quaternion.Euler(0f, item.yaw, 0f);
+                spawnedFurniture[selectedFurnitureIndex].transform.rotation = HomeRotation() * Quaternion.Euler(0f, item.yaw, 0f);
             status = "Selected furniture rotated. Save the home to persist the change.";
         }
 
@@ -296,6 +300,7 @@ namespace UCENO.VirtualWorld
                     {
                         selectedHomeId = response.home.id;
                         selectedHomeName = response.home.name;
+                        selectedHomeTransform = response.home.transform ?? payload.transform;
                         selectedPermission = "owner";
                         selectedVisibility = "private";
                         selectedFurnitureIndex = -1;
@@ -330,6 +335,7 @@ namespace UCENO.VirtualWorld
                     {
                         selectedHomeId = response.home.id;
                         selectedHomeName = response.home.name;
+                        selectedHomeTransform = response.home.transform ?? new WorldHomeTransform();
                         selectedPermission = response.home.permission;
                         selectedVisibility = response.home.visibility;
                         members.Clear();
@@ -407,7 +413,7 @@ namespace UCENO.VirtualWorld
             busy = true;
             WorldHomeSaveRequest payload = new WorldHomeSaveRequest
             {
-                transform = CurrentTransform(),
+                transform = selectedHomeTransform,
                 furnishing = furnishing.ToArray(),
                 visibility = selectedPermission == "owner" ? selectedVisibility : ""
             };
@@ -435,16 +441,30 @@ namespace UCENO.VirtualWorld
             return new WorldHomeTransform { x = p.x, y = p.y, z = p.z, yaw = yaw };
         }
 
+        private Vector3 HomePosition()
+        {
+            return new Vector3(selectedHomeTransform.x, selectedHomeTransform.y, selectedHomeTransform.z);
+        }
+
+        private Quaternion HomeRotation()
+        {
+            return Quaternion.Euler(0f, selectedHomeTransform.yaw, 0f);
+        }
+
         private void RebuildFurniture()
         {
             selectedFurnitureIndex = -1;
             ClearSpawnedFurniture();
+            Quaternion homeRotation = HomeRotation();
+            Vector3 homePosition = HomePosition();
             foreach (WorldHomeFurnishing item in furnishing)
             {
                 WorldHomeFurnitureCatalogEntry entry = FindCatalogEntry(item.assetId);
                 if (entry == null || entry.prefab == null) continue;
-                GameObject instance = Instantiate(entry.prefab,
-                    new Vector3(item.x, item.y, item.z), Quaternion.Euler(0f, item.yaw, 0f));
+                Vector3 localPosition = new Vector3(item.x, item.y, item.z);
+                Vector3 worldPosition = homePosition + homeRotation * localPosition;
+                Quaternion worldRotation = homeRotation * Quaternion.Euler(0f, item.yaw, 0f);
+                GameObject instance = Instantiate(entry.prefab, worldPosition, worldRotation);
                 instance.name = "Home Furniture " + item.assetId;
                 instance.transform.localScale = Vector3.one * Mathf.Clamp(item.scale, 0.1f, 5f);
                 spawnedFurniture.Add(instance);
