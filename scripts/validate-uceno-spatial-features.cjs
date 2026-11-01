@@ -50,7 +50,7 @@ requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldEventsClient.c
   "RequestEventExit()", "locationLabel", "activityType", "gateway.TriggerDance()", '"DANCE"'
 ]);
 requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarCustomizationHud.cs", [
-  "AVATAR APPEARANCE", "SAVE LOOK ON THIS DEVICE", "PlayerPrefs",
+  "AVATAR APPEARANCE", "SAVE LOOK ON THIS DEVICE", "CUSTOMIZE", "PlayerPrefs",
   "DrawChoiceRow", "SkinOptions", "ClothingOptions"
 ]);
 requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarSocialExpressionDriver.cs", [
