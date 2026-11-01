@@ -49,7 +49,10 @@ export async function GET(request: NextRequest) {
       LEFT JOIN virtual_home_members hm
         ON hm.home_id = h.id AND hm.user_id = ${session.id}::uuid
       WHERE h.world_id = ${worldId}::uuid
-        AND (h.owner_user_id = ${session.id}::uuid OR hm.user_id IS NOT NULL)
+        AND (h.owner_user_id = ${session.id}::uuid OR (h.visibility = 'invite' AND hm.user_id IS NOT NULL))
+        AND NOT EXISTS (SELECT 1 FROM user_blocks b
+          WHERE (b.blocker_id = h.owner_user_id AND b.blocked_id = ${session.id}::uuid)
+             OR (b.blocker_id = ${session.id}::uuid AND b.blocked_id = h.owner_user_id))
       ORDER BY h.updated_at DESC LIMIT 100
     `;
     return NextResponse.json({ homes }, { headers: { "Cache-Control": "no-store, private" } });
