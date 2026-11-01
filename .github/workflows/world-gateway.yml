@@ -65,6 +65,9 @@ jobs:
           for (const marker of ['RequestInteraction', 'object_state', 'objectState', 'occupantId', 'SetSeated']) if (!client.includes(marker)) throw new Error('Missing client interaction transport: ' + marker);
           if (!gateway.includes('Array.isArray((parsed as { boxes?: unknown }).boxes)'))
             throw new Error('Gateway does not accept the Unity-exported collision map format');
+          const authoring = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableAuthoring.cs', 'utf8');
+          for (const marker of ['Mark Selected as Door', 'Mark Selected as Seat', 'Mark Selected as Usable Object', 'WorldCollisionGeometryExporter.Export'])
+            if (!authoring.includes(marker)) throw new Error('Missing Unity interactable authoring tool: ' + marker);
           const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
           for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes.json'])
             if (!exporter.includes(marker)) throw new Error('Missing Unity geometry export behavior: ' + marker);
