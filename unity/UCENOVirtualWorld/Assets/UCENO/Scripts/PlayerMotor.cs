@@ -75,6 +75,9 @@ namespace UCENO.VirtualWorld
                 verticalVelocity = 0f;
             }
 
+            if (Input.GetKeyDown(KeyCode.Space))
+                RequestJump();
+
             Vector2 move = ReadMoveInput();
             Vector2 look = ReadLookInput();
             MovementInput = move;
