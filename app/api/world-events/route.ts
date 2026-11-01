@@ -107,6 +107,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Capacity must be between 1 and 5000" }, { status: 400 });
 
   try {
+    if (!await canAccessWorld(body.worldId, session.id))
+      return NextResponse.json({ error: "World is unavailable" }, { status: 404 });
     const sql = getDb();
     const access = await sql`
       SELECT w.status, w.owner_user_id AS "ownerUserId",
