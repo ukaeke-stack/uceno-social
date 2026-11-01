@@ -105,6 +105,9 @@ jobs:
           const homeClient = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldHomeClient.cs', 'utf8');
           for (const marker of ['RequestHomes', 'CreateHomeRoutine', 'LoadHomeRoutine', 'SaveHomeRoutine', 'PlaceFurniture', 'RotateSelectedFurniture', 'RemoveSelectedFurniture', 'InviteMemberRoutine', 'RevokeMemberRoutine', 'SHARING: ON', 'HOMES', 'Application.isMobilePlatform', 'CLOSE'])
             if (!homeClient.includes(marker)) throw new Error('Missing Unity home-management behavior: ' + marker);
+          const eventsClient = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldEventsClient.cs', 'utf8');
+          for (const marker of ['LoadEventsRoutine', 'SetAttendanceRoutine', '/api/world-events?worldId=', 'INTERESTED'])
+            if (!eventsClient.includes(marker)) throw new Error('Missing Unity world event RSVP behavior: ' + marker);
           const sceneBuilder = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs', 'utf8');
           if (!sceneBuilder.includes('WorldHomeClient homeClient = player.AddComponent<WorldHomeClient>()'))
             throw new Error('Generated Unity player is missing the home-management client.');
