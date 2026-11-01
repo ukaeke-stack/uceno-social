@@ -1,0 +1,16 @@
+{
+  "name": "Concrete Floor 01",
+  "asset_id": "concrete_floor_01",
+  "source": "https://polyhaven.com/a/concrete_floor_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Rob Tuytel": "All"
+  },
+  "texture_resolutions": [
+    "1k"
+  ],
+  "maps": [
+    "concrete_floor_01_nor_gl.png"
+  ],
+  "runtime_api_dependency": false
+}

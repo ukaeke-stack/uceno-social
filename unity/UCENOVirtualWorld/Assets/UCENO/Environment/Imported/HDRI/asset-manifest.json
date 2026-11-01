@@ -1,0 +1,12 @@
+{
+  "name": "Modern Buildings",
+  "asset_id": "modern_buildings",
+  "source": "https://polyhaven.com/a/modern_buildings",
+  "license": "CC0 1.0",
+  "authors": {
+    "Greg Zaal": "All"
+  },
+  "resolution": "1k",
+  "file": "modern_buildings_1k.hdr",
+  "runtime_api_dependency": false
+}

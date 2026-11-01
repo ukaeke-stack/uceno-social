@@ -1,0 +1,17 @@
+{
+  "name": "Asphalt 01",
+  "asset_id": "asphalt_01",
+  "source": "https://polyhaven.com/a/asphalt_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Dario Barresi": "Processing ",
+    "Charlotte Baglioni": "Photography"
+  },
+  "texture_resolutions": [
+    "1k"
+  ],
+  "maps": [
+    "asphalt_01_nor_gl.png"
+  ],
+  "runtime_api_dependency": false
+}
