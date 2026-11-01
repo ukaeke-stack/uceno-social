@@ -11,7 +11,10 @@
     "1k"
   ],
   "maps": [
+    "asphalt_01_diff.jpg",
     "asphalt_01_nor_gl.png",
+    "asphalt_01_rough.jpg",
+    "asphalt_01_ao.jpg",
     "asphalt_01_arm.jpg"
   ],
   "runtime_api_dependency": false
