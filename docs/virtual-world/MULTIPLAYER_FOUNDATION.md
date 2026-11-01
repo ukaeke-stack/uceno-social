@@ -8,6 +8,7 @@
 - Advertising campaign records limited to real money or Purchased Credits.
 - UCENO Social world-entry API: authenticated issue, 90-second single-use code, per-account request cap, hashed code storage, client binding and five-minute JWT.
 - Unity `WorldSessionClient` redeems a code over HTTPS and keeps the bearer token in memory only.
+- Authenticated `GET/PUT /api/worlds/:worldId/state` endpoints load and save bounded player checkpoints (position, rotation, spawn and compact state). These are explicit durable checkpoints, not per-frame networking.
 
 ## Setup
 
@@ -21,7 +22,7 @@
 
 - The world gateway must verify JWT signature, issuer `uceno-social`, audience `uceno-world-gateway`, expiry, subject, world and client claims.
 - Re-check moderation, world membership and bans at admission and reconnect; do not treat the token as permanent authorization.
-- Neon is for durable records, not per-frame movement snapshots.
+- Neon is for durable records and occasional checkpoints, not per-frame movement snapshots. The checkpoint endpoint bounds coordinates, validates normalized rotations, limits state JSON to 16 KB and checks world access.
 - This does not yet provide a live multiplayer server, authoritative movement, instance allocator, reconnect protocol or spatial voice.
 - Credit balances must only change through future transactional server-side ledger operations. These tables do not grant balances or process purchases.
 - Voice needs a separate authenticated audio plane (evaluate LiveKit), server-controlled room membership and proximity/zone rules, plus mute/block/report controls.
