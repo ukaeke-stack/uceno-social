@@ -92,12 +92,12 @@ jobs:
           const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
           for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes.json'])
             if (!exporter.includes(marker)) throw new Error('Missing Unity geometry export behavior: ' + marker);
+          const eventsApi = fs.readFileSync('./app/api/world-events/route.ts', 'utf8');
           if (!eventsApi.includes('if (!await canAccessWorld(body.worldId, session.id))'))
             throw new Error('Event creation does not enforce world visibility/block access.');
           const attendanceApi = fs.readFileSync('./app/api/world-events/[eventId]/attendance/route.ts', 'utf8');
           if (!attendanceApi.includes('event.blocked || event.membershipStatus'))
             throw new Error('Event RSVP does not enforce world block restrictions.');
-          const eventsApi = fs.readFileSync('./app/api/world-events/route.ts', 'utf8');
           for (const marker of ['const canHost =', 'membershipRole === "admin"', 'ownerUserId === session.id'])
             if (!eventsApi.includes(marker)) throw new Error('World event hosting permission is not returned securely: ' + marker);
           const homeMembers = fs.readFileSync('./app/api/world-homes/[homeId]/members/route.ts', 'utf8');
