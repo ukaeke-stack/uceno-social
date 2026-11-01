@@ -69,9 +69,13 @@ namespace UCENO.VirtualWorld
 
         private void OnGUI()
         {
-            if (profile == null || !visible) return;
+            if (profile == null) return;
             EnsureStyles();
             float scale = Mathf.Clamp(Screen.width / 520f, 1f, 1.7f);
+            Rect toggleRect = new Rect(Screen.width - 132f * scale, 88f * scale, 120f * scale, 42f * scale);
+            if (GUI.Button(toggleRect, visible ? "CLOSE LOOK" : "CUSTOMIZE", buttonStyle))
+                visible = !visible;
+            if (!visible) return;
             float width = Mathf.Min(Screen.width - 24f, 310f * scale);
             float rowHeight = 44f * scale;
             float height = 66f * scale + rowHeight * 5f + 54f * scale;
