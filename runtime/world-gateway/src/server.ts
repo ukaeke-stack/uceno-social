@@ -945,7 +945,8 @@ wss.on("connection", async (socket: WebSocket) => {
       // already reconnected, but release seats if moderation removed this
       // socket from the live-player map before the close event arrived.
       if (current && current.socket !== socket) return;
-      if (current?.voiceActive) {\n        current.voiceActive = false;\n        for (const peer of players.values())\n          if (peer.id !== current.id && sameVoiceSpace(current, peer) && withinVoiceRange(current, peer))\n            send(peer.socket, { type: "voice_presence", userId: current.id, active: false });\n      }\n      if (current && current.returnState) {
+      if (current?.voiceActive) leaveVoiceRoom(current);
+      if (current && current.returnState) {
         const destination = current.returnState;
         void sql`
           INSERT INTO virtual_world_player_state (world_id, user_id, position, rotation, updated_at)
