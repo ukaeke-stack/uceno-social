@@ -43,7 +43,16 @@ requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldHomeInteriorBu
 ]);
 requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldEventsClient.cs", [
   "USE MY CURRENT LOCATION", "RequestEventJoin(item.id)",
-  "RequestEventExit()", "locationLabel", "activityType"
+  "RequestEventExit()", "locationLabel", "activityType", "gateway.TriggerDance()", '"DANCE"'
+]);
+requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs", [
+  "TriggerDance()", 'nextGesture == "dance"', "activeGesture == 3"
+]);
+requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs", [
+  "TriggerDance()", "localAvatar.TriggerDance()"
+]);
+requireMarkers("runtime/world-gateway/src/server.ts", [
+  '"dance"'
 ]);
 
 console.log("UCENO spatial homes and event admission source-contract checks passed.");
