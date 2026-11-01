@@ -37,6 +37,13 @@ store readiness or release performance.
 - [ ] Camera follows smoothly while the player moves, turns, walks and runs.
 - [ ] Fall recovery returns the player to the spawn point if a collision failure sends them below the world.
 
+## Seated/rest interaction checks
+
+- [ ] Press C on desktop or tap SIT on Android; the avatar enters the seated/rest pose.
+- [ ] While seated, movement and sprint are disabled and the avatar remains in place.
+- [ ] Tap STAND or press C again; normal movement resumes without a stuck sprint or jump request.
+- [ ] Confirm the seated pose is visually acceptable on the imported humanoid. This is a ground-rest pose, not chair-specific sitting or IK.
+
 ## Android device checks
 
 Do not start an Android build until the Editor import and scene checks above pass.
