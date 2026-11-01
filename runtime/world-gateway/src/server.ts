@@ -349,6 +349,8 @@ wss.on("connection", async (socket: WebSocket) => {
         if (distance > 4.25 || now - player.lastInteractionAt < 250) {
           send(socket, { type: "interaction_rejected", code: "out_of_range_or_rate_limited" }); return;
         }
+        const previousState = target.state;
+        const previousActorId = target.actorId;
         if (target.kind === "seat") {
           if (msg.action === "sit" && target.occupantId && target.occupantId !== player.id) {
             send(socket, { type: "interaction_rejected", code: "seat_occupied" }); return;
@@ -370,16 +372,18 @@ wss.on("connection", async (socket: WebSocket) => {
             ? (target.state === "open" ? "closed" : "open")
             : (target.state === "active" ? "idle" : "active");
         }
-        player.lastInteractionAt = now;
         target.actorId = player.id;
         if (target.kind !== "seat") {
           try { persistObjectStates(); }
           catch (error) {
+            target.state = previousState;
+            target.actorId = previousActorId;
             console.error("Could not persist world object state:", error);
             send(socket, { type: "interaction_rejected", code: "state_persistence_failed" });
             return;
           }
         }
+        player.lastInteractionAt = now;
         const packet = {
           type: "object_state", objectId: target.id, objectState: target.state,
           actorId: player.id, occupantId: target.occupantId
