@@ -45,7 +45,10 @@ The gateway supports in-memory activity session coordination over the authentica
 - Only the creator can start or cancel a session. The server marks active
   participants as did-not-finish when their socket disconnects.
 - Activity sessions and results are currently in memory and are lost on restart.
-  Durable storage, recovery, and actual sports/adventure gameplay remain outstanding.
+  The gateway caps total sessions at 256 and nonterminal sessions at 32 per world;
+  idle lobbies expire after 30 minutes, active sessions after 2 hours, and terminal
+  session summaries are retained in memory for 30 minutes. Durable storage, recovery,
+  and actual sports/adventure gameplay remain outstanding.
 
 Checkpoint races require operator-authored server geometry. Configure either
 `WORLD_ACTIVITY_RACES` as JSON or `WORLD_ACTIVITY_RACES_FILE` as a path to a
