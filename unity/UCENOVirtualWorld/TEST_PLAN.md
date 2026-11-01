@@ -99,7 +99,8 @@ This checklist covers the Unity city client, world gateway interactions and the 
 - [ ] Confirm a decorator/co-owner cannot change home visibility by sending a modified API request.
 - [ ] As owner of an invite-visible home, grant visitor/decorator/co-owner access using a valid account UUID; verify the roster updates.
 - [ ] Revoke an invitee; verify the roster updates and that account receives 404 on the next home load.
-- [ ] Add real residential interior and furniture prefabs to the Unity home catalog; confirm placement, saved transforms, scale, rotation and reload visuals. The current scene does not yet supply catalog furniture.
+- [ ] Confirm the imported sofa, armchair, round table, bed and cabinet appear in the Unity home furniture catalogue; place each, save, reload and verify scale/rotation/position.
+- [ ] Add a real residential interior shell/prefab and configure its entrance/exit before claiming complete home visiting; the current apartment asset is an exterior facade, not a furnished interior.
 - [ ] Test placement on Android touch controls and confirm placed furniture cannot be moved outside the intended home boundary.
 
 ## Home access and invitation checks
