@@ -34,6 +34,10 @@ store readiness or release performance.
 - [ ] Avatar feet remain aligned with the ground; there is no visible floating, sinking or root-motion drift.
 - [ ] Player collides with building facades, the car, fence and other intended solid objects.
 - [ ] Player can walk on the road, sidewalks and grass verges without falling through them.
+- [ ] Run the scene builder and confirm it exports `runtime/world-gateway/data/uceno-city-collision-boxes.json`.
+- [ ] Inspect the exported JSON: it contains actual scene collider bounds, no player collider, no trigger colliders, and no more than 500 boxes.
+- [ ] Configure the deployed gateway's `WORLD_COLLISION_BOXES_FILE` to the exported file and confirm the gateway starts without collision-map validation errors.
+- [ ] With two clients connected to the same instance, verify server snapshots stop both players at building/car/fence bounds and still allow travel over roads and walkways.
 - [ ] Camera follows smoothly while the player moves, turns, walks and runs.
 - [ ] Fall recovery returns the player to the spawn point if a collision failure sends them below the world.
 
