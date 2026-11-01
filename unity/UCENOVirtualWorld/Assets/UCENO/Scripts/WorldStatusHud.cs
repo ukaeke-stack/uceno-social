@@ -15,6 +15,7 @@ namespace UCENO.VirtualWorld
         private GUIStyle labelStyle;
         private GUIStyle sprintStyle;
         private GUIStyle actionStyle;
+        private GUIStyle seatStyle;
         private AvatarLocomotionDriver avatar;
         private bool sprintToggle;
 
@@ -77,6 +78,9 @@ namespace UCENO.VirtualWorld
                     if (GUI.Button(new Rect(Screen.width - actionWidth - 18f, actionY - actionHeight - 8f, actionWidth, actionHeight), "CHEER", actionStyle))
                         avatar.TriggerCheer();
                 }
+                string seatLabel = player.IsSeated ? "STAND" : "SIT";
+                Rect seatRect = GetSeatControlRect();
+                if (GUI.Button(seatRect, seatLabel, seatStyle)) player.ToggleSeated();
                 Rect jumpRect = GetJumpControlRect();
                 if (GUI.Button(jumpRect, "JUMP", actionStyle))
                     player.RequestJump();
@@ -102,6 +106,14 @@ namespace UCENO.VirtualWorld
 
             Vector2 guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
             return GetSprintControlRect().Contains(guiPosition);
+        }
+
+        private static Rect GetSeatControlRect()
+        {
+            float scale = Mathf.Clamp(Screen.width / 520f, 1f, 2.1f);
+            float width = 92f * scale;
+            float height = 46f * scale;
+            return new Rect(Screen.width - width - 18f, Screen.height - height - 225f * scale, width, height);
         }
 
         private static Rect GetJumpControlRect()
@@ -149,6 +161,7 @@ namespace UCENO.VirtualWorld
                 fontStyle = FontStyle.Bold
             };
             actionStyle = new GUIStyle(sprintStyle);
+            seatStyle = new GUIStyle(sprintStyle);
         }
     }
 }
