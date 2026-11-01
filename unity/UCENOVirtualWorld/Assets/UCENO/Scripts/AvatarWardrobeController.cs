@@ -27,7 +27,8 @@ namespace UCENO.VirtualWorld
         private void Awake()
         {
             if (avatarAnimator == null) avatarAnimator = GetComponentInChildren<Animator>();
-            if (garmentRoot == null) garmentRoot = transform;
+            if (avatarAnimator == null) avatarAnimator = GetComponentInParent<Animator>();
+            if (garmentRoot == null) garmentRoot = avatarAnimator != null ? avatarAnimator.transform : transform;
             if (catalog == null) catalog = Resources.Load<AvatarWardrobeCatalog>("UCENO/AvatarWardrobeCatalog");
             RebuildBoneMap();
         }
