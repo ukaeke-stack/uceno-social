@@ -29,7 +29,7 @@ namespace UCENO.VirtualWorld
             float blend = 1f - Mathf.Exp(-followSharpness * Time.deltaTime);
 
             transform.position = Vector3.Lerp(transform.position, desiredPosition, blend);
-            transform.rotation = orbit;
+            transform.LookAt(lookPoint);
         }
     }
 }
