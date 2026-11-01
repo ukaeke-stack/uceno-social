@@ -1,5 +1,4 @@
 import { createServer } from "node:http";
-import { timingSafeEqual } from "node:crypto";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
 import { WebSocketServer, WebSocket } from "ws";
@@ -90,8 +89,8 @@ async function authenticate(token: string) {
 
 async function loadPlayer(userId: string, socket: WebSocket): Promise<Player> {
   const rows = await sql`
-    SELECT position FROM virtual_world_presence
-    WHERE user_id = ${userId}::uuid AND instance_id = ${INSTANCE_ID}::uuid
+    SELECT position FROM virtual_world_player_state
+    WHERE user_id = ${userId}::uuid
     LIMIT 1
   `;
   const p = rows[0]?.position || { x: 0, y: 0, z: 0 };
@@ -199,7 +198,7 @@ setInterval(async () => {
         INSERT INTO virtual_world_player_state (world_id, user_id, position, rotation, updated_at)
         SELECT s.world_id, ${p.id}::uuid,
           ${JSON.stringify({ x: p.x, y: p.y, z: p.z })}::jsonb,
-          ${JSON.stringify({ yaw: p.yaw })}::jsonb, NOW()
+          ${JSON.stringify({ x: 0, y: Math.sin(p.yaw / 2), z: 0, w: Math.cos(p.yaw / 2) })}::jsonb, NOW()
         FROM virtual_world_instance_sessions s
         WHERE s.user_id = ${p.id}::uuid AND s.instance_id = ${INSTANCE_ID}::uuid
           AND s.lease_expires_at > NOW()
@@ -218,9 +217,6 @@ const heartbeatSecret = process.env.WORLD_INSTANCE_HEARTBEAT_SECRET || "";
 if (heartbeatSecret.length >= 32) {
   const heartbeat = async () => {
     try {
-      const expected = Buffer.from(heartbeatSecret);
-      const supplied = Buffer.from(heartbeatSecret);
-      if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) return;
       await sql`
         UPDATE virtual_world_instances SET heartbeat_at = NOW(),
           current_players = ${players.size}
