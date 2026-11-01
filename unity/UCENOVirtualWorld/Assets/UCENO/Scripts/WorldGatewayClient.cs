@@ -210,7 +210,11 @@ namespace UCENO.VirtualWorld
                 connecting = false;
                 connected = false;
                 sendPending = false;
-                if (localPlayer != null) localPlayer.SetServerAuthority(false);
+                if (localPlayer != null)
+                {
+                    localPlayer.SetServerAuthority(false);
+                    localPlayer.SetSeated(false);
+                }
                 if (!destroying)
                 {
                     ConnectionStatus = "DISCONNECTED";
@@ -429,7 +433,11 @@ namespace UCENO.VirtualWorld
             connected = false;
             connecting = false;
             sendPending = false;
-            if (localPlayer != null) localPlayer.SetServerAuthority(false);
+            if (localPlayer != null)
+            {
+                localPlayer.SetServerAuthority(false);
+                localPlayer.SetSeated(false);
+            }
             if (old == null) return;
             try { await old.Close(); } catch { }
         }
