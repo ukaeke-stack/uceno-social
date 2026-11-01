@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -20,7 +21,16 @@ namespace UCENO.VirtualWorld
         public string myAttendance;
     }
 
-    [Serializable] internal sealed class WorldEventListResponse { public WorldEventSummary[] events; }
+    [Serializable] internal sealed class WorldEventListResponse { public WorldEventSummary[] events; public bool canHost; }
+    [Serializable] internal sealed class WorldEventCreateRequest
+    {
+        public string worldId;
+        public string title;
+        public string description;
+        public string startsAt;
+        public string endsAt;
+        public int capacity;
+    }
     [Serializable] internal sealed class WorldEventAttendanceRequest { public string attendanceStatus; }
 
     /// <summary>
@@ -34,12 +44,19 @@ namespace UCENO.VirtualWorld
         private readonly List<WorldEventSummary> events = new List<WorldEventSummary>();
         private bool visible;
         private bool busy;
+        private bool canHost;
+        private string newEventTitle = "";
+        private string newEventDescription = "";
+        private string startsAtUtc = "";
+        private string endsAtUtc = "";
         private string status = "Press N to view world events.";
         private Vector2 scroll;
 
         private void Awake()
         {
             if (session == null) session = FindObjectOfType<WorldSessionClient>();
+            startsAtUtc = DateTime.UtcNow.AddHours(1).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+            endsAtUtc = DateTime.UtcNow.AddHours(2).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
         }
 
         private void Update()
@@ -55,6 +72,21 @@ namespace UCENO.VirtualWorld
         {
             if (!CanRequest()) return;
             StartCoroutine(LoadEventsRoutine());
+        }
+
+        public void CreateEvent()
+        {
+            if (!CanRequest() || !canHost || string.IsNullOrWhiteSpace(newEventTitle)) return;
+            if (!DateTime.TryParse(startsAtUtc, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTime start) ||
+                !DateTime.TryParse(endsAtUtc, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTime end) ||
+                start <= DateTime.UtcNow.AddMinutes(1) || end <= start || end - start > TimeSpan.FromHours(24))
+            {
+                status = "Enter valid UTC start/end times. Start must be in the future; event duration is limited to 24 hours.";
+                return;
+            }
+            StartCoroutine(CreateEventRoutine(start, end));
         }
 
         public void SetAttendance(string eventId, string attendanceStatus)
@@ -90,10 +122,39 @@ namespace UCENO.VirtualWorld
                     WorldEventListResponse response = JsonUtility.FromJson<WorldEventListResponse>(request.downloadHandler.text);
                     events.Clear();
                     if (response != null && response.events != null) events.AddRange(response.events);
+                    canHost = response != null && response.canHost;
                     status = events.Count + " scheduled event(s) in this world.";
                 }
             }
             busy = false;
+        }
+
+        private IEnumerator CreateEventRoutine(DateTime start, DateTime end)
+        {
+            busy = true;
+            WorldEventCreateRequest payload = new WorldEventCreateRequest
+            {
+                worldId = session.WorldId,
+                title = newEventTitle.Trim(),
+                description = newEventDescription.Trim(),
+                startsAt = start.ToString("o", CultureInfo.InvariantCulture),
+                endsAt = end.ToString("o", CultureInfo.InvariantCulture),
+                capacity = 100
+            };
+            using (UnityWebRequest request = CreateRequest(
+                session.ApiBaseUrl.TrimEnd('/') + "/api/world-events", "POST", JsonUtility.ToJson(payload)))
+            {
+                yield return request.SendWebRequest();
+                if (!Succeeded(request)) SetFailure(request, "Event creation");
+                else
+                {
+                    newEventTitle = "";
+                    newEventDescription = "";
+                    status = "Event created with a 100-person capacity.";
+                }
+            }
+            busy = false;
+            StartCoroutine(LoadEventsRoutine());
         }
 
         private IEnumerator SetAttendanceRoutine(string eventId, string attendanceStatus)
@@ -181,6 +242,20 @@ namespace UCENO.VirtualWorld
             GUILayout.EndHorizontal();
 
             scroll = GUILayout.BeginScrollView(scroll, GUILayout.Height(height * 0.78f));
+            if (canHost)
+            {
+                GUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label("HOST AN EVENT");
+                newEventTitle = GUILayout.TextField(newEventTitle);
+                newEventDescription = GUILayout.TextArea(newEventDescription, GUILayout.Height(48f * scale));
+                GUILayout.Label("Start UTC (YYYY-MM-DDTHH:MM:SSZ)");
+                startsAtUtc = GUILayout.TextField(startsAtUtc);
+                GUILayout.Label("End UTC (YYYY-MM-DDTHH:MM:SSZ)");
+                endsAtUtc = GUILayout.TextField(endsAtUtc);
+                if (GUILayout.Button("CREATE EVENT (100 CAPACITY)", GUILayout.Height(34f * scale)))
+                    CreateEvent();
+                GUILayout.EndVertical();
+            }
             foreach (WorldEventSummary item in events)
             {
                 GUILayout.BeginVertical(GUI.skin.box);
