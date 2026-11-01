@@ -34,6 +34,7 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - run: npm --prefix runtime/world-gateway install
       - run: npm run build
 
   gateway-build:
