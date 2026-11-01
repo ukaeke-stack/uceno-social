@@ -1,6 +1,13 @@
 name: Import UCENO free environment assets
 
 on:
+  push:
+    branches:
+      - feature/uceno-unity-foundation
+    paths:
+      - 'scripts/download_polyhaven_assets.py'
+      - 'scripts/UCENO_ENV_ASSET_IMPORT.md'
+      - '.github/workflows/uceno-free-environment-assets.yml'
   pull_request:
     branches:
       - feature/uceno-unity-foundation
