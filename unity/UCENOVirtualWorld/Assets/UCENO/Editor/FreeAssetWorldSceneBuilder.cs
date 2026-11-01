@@ -442,7 +442,7 @@ namespace UCENO.VirtualWorld.Editor
             Place(apartment, parent, new Vector3(-13.4f, 0f, 0f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.70f);
             Place(factory, parent, new Vector3(13.4f, 0f, 0f), Quaternion.Euler(0f, -90f, 0f), Vector3.one * 0.58f);
 
-            foreach (float z in new[] { -24f, 24f })
+            foreach (float z in new[] { 0f })
             {
                 Place(lamp, parent, new Vector3(-6.9f, 0f, z), Quaternion.identity, Vector3.one);
                 Place(lamp, parent, new Vector3(6.9f, 0f, z), Quaternion.identity, Vector3.one);
