@@ -49,6 +49,10 @@ requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldEventsClient.c
   "USE MY CURRENT LOCATION", "RequestEventJoin(item.id)",
   "RequestEventExit()", "locationLabel", "activityType", "gateway.TriggerDance()", '"DANCE"'
 ]);
+requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarCustomizationHud.cs", [
+  "AVATAR APPEARANCE", "SAVE LOOK ON THIS DEVICE", "PlayerPrefs",
+  "DrawChoiceRow", "SkinOptions", "ClothingOptions"
+]);
 requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarSocialExpressionDriver.cs", [
   "SetLookTarget", "UpdateHeadLook", "CacheBlinkChannels", "UpdateBlink",
   "GetBlendShapeName", "DefaultExecutionOrder(100)"
@@ -94,7 +98,7 @@ requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldActivityHud.cs
   "ActivitySessions", "activity.raceId"
 ]);
 requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs", [
-  "player.AddComponent<WorldActivityHud>()"
+  "player.AddComponent<WorldActivityHud>()", "player.AddComponent<AvatarCustomizationHud>()"
 ]);
 
 console.log("UCENO spatial homes, event admission and activity sessions source-contract checks passed.");
