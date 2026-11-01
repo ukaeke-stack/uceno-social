@@ -446,6 +446,16 @@ namespace UCENO.VirtualWorld
             GUI.Box(panel, "UCENO HOMES  |  M TO CLOSE");
             GUILayout.BeginArea(new Rect(panel.x + 12f, panel.y + 28f, panel.width - 24f, panel.height - 40f));
             GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("CLOSE", GUILayout.Width(82f * scale), GUILayout.Height(30f * scale)))
+            {
+                visible = false;
+                GUILayout.EndHorizontal();
+                GUILayout.EndArea();
+                return;
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
             GUILayout.Label("New home", GUILayout.Width(75f * scale));
             newHomeName = GUILayout.TextField(newHomeName, GUILayout.Width(150f * scale));
             if (GUILayout.Button("CREATE", GUILayout.Height(34f * scale))) CreateHome(newHomeName);
