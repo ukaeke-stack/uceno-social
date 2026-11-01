@@ -7,6 +7,7 @@ on:
       - "db/migrations/024_virtual_world_instance_leases.sql"
       - "app/api/worlds/**"
       - "app/api/world-homes/**"
+      - "app/api/world-events/**"
       - "lib/world-client-session.ts"
       - "lib/world-home-layout.ts"
       - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/**"
