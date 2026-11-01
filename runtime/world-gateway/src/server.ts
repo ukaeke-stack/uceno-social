@@ -835,6 +835,9 @@ wss.on("connection", async (socket: WebSocket) => {
         return;
       }
       if (msg && msg.type === "voice_join") {
+        const joinNow = Date.now();
+        if (joinNow - player.lastVoiceSignalAt < 1000) return;
+        player.lastVoiceSignalAt = joinNow;
         if (player.voiceActive) return;
         player.voiceActive = true;
         for (const peer of players.values()) {
