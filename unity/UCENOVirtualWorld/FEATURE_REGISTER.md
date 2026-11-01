@@ -77,3 +77,14 @@ gateway file; seat occupancy remains transient and is released on disconnect.
 - Added Unity account appearance sync client and connected it to the customization HUD. It waits for a valid world session, loads the account palette, applies it to the local avatar, and sends updates after customization. The bearer token remains in memory.
 - This is source implementation only. Migration 026 is not confirmed applied, endpoints have not been integration-tested, and Unity Editor compilation/device cross-account synchronization have not been verified.
 - **Wardrobe swapping remains not implemented.** Current controls recolour existing material slots only; they do not equip/unequip actual clothing meshes, hair models or accessories. The imported avatar has one generated outfit and no verified interchangeable garment catalogue. Do not describe palette tinting as wardrobe support.
+
+
+## 2026-11-01 modular wardrobe implementation stage
+
+- Added migration 027 with a disabled-by-default wardrobe catalogue, account-owned inventory, and account-equipped slot records. Equipped rows have a composite foreign key to the user's inventory, preventing equipment of an item the account does not own.
+- Added authenticated GET/PUT `/api/worlds/:worldId/wardrobe`. The server derives the account from the world session, returns only enabled owned catalogue items, validates slot compatibility and ownership, and persists equip/unequip selections. No client-supplied user ID is accepted.
+- Added a data-driven Unity `AvatarWardrobeCatalog`, a Humanoid skinned-mesh `AvatarWardrobeController` that remaps garment bones onto the live avatar rig, an account inventory/equipment sync client, and an in-world wardrobe HUD.
+- The wardrobe HUD is attached by the existing avatar customization component. It presents the account's owned items by slot and supports equip/remove actions when inventory and prefab assets exist.
+- **Asset/content blocker:** no interchangeable garment/hair/accessory prefab catalogue has been imported or registered yet. The database catalogue is intentionally empty and disabled by default. A prefab must contain correctly weighted SkinnedMeshRenderers using matching Humanoid bone names and be placed under Resources with a matching catalog entry. Therefore actual wardrobe swapping is not yet end-to-end usable or verified.
+- **Multiplayer visual replication remains outstanding:** account equip persistence is not proof that remote clients currently receive and render wardrobe changes. The multiplayer snapshot protocol still needs an explicit validated equipped-item representation and remote avatar application.
+- Migration 027 is not applied or integration-tested. Unity Editor compilation, rig compatibility, visual review and two-device tests remain outstanding.
