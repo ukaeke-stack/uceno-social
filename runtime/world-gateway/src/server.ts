@@ -110,6 +110,57 @@ const COLLISION_BOXES = loadCollisionBoxes();
 const INTERACTABLES = loadInteractables();
 const OBJECT_STATE_FILE = process.env.WORLD_OBJECT_STATE_FILE || "";
 
+type RaceCheckpoint = { x: number; y: number; z: number; radius: number };
+type RaceDefinition = { id: string; checkpoints: RaceCheckpoint[] };
+
+function loadActivityRaces(): Map<string, RaceDefinition> {
+  const filePath = process.env.WORLD_ACTIVITY_RACES_FILE;
+  let raw = process.env.WORLD_ACTIVITY_RACES;
+  if (!raw && filePath) {
+    try { raw = readFileSync(filePath, "utf8"); }
+    catch (error) {
+      throw new Error("Could not read WORLD_ACTIVITY_RACES_FILE: " +
+        (error instanceof Error ? error.message : "unknown file error"));
+    }
+  }
+  if (!raw) return new Map();
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); }
+  catch { throw new Error("WORLD_ACTIVITY_RACES must be valid JSON"); }
+  const values = parsed && typeof parsed === "object" &&
+    Array.isArray((parsed as { races?: unknown }).races)
+      ? (parsed as { races: unknown[] }).races : null;
+  if (!values || values.length > 100)
+    throw new Error("WORLD_ACTIVITY_RACES must contain a races array with at most 100 entries");
+  const races = new Map<string, RaceDefinition>();
+  for (const [index, value] of values.entries()) {
+    if (!value || typeof value !== "object") throw new Error(`Race ${index} is invalid`);
+    const item = value as Record<string, unknown>;
+    if (typeof item.id !== "string" || !/^[a-zA-Z0-9_-]{1,64}$/.test(item.id) ||
+        races.has(item.id) || !Array.isArray(item.checkpoints) ||
+        item.checkpoints.length < 2 || item.checkpoints.length > 100)
+      throw new Error(`Race ${index} has invalid or duplicate fields`);
+    const checkpoints: RaceCheckpoint[] = item.checkpoints.map((rawCheckpoint, checkpointIndex) => {
+      if (!rawCheckpoint || typeof rawCheckpoint !== "object")
+        throw new Error(`Race ${item.id} checkpoint ${checkpointIndex} is invalid`);
+      const checkpoint = rawCheckpoint as Record<string, unknown>;
+      if (!finiteNumber(checkpoint.x, -WORLD_BOUNDS, WORLD_BOUNDS) ||
+          !finiteNumber(checkpoint.y, GROUND_Y, WORLD_BOUNDS) ||
+          !finiteNumber(checkpoint.z, -WORLD_BOUNDS, WORLD_BOUNDS) ||
+          (checkpoint.radius !== undefined && !finiteNumber(checkpoint.radius, 0.5, 20)))
+        throw new Error(`Race ${item.id} checkpoint ${checkpointIndex} has invalid coordinates/radius`);
+      return {
+        x: checkpoint.x, y: checkpoint.y, z: checkpoint.z,
+        radius: typeof checkpoint.radius === "number" ? checkpoint.radius : 2.5
+      };
+    });
+    races.set(item.id, { id: item.id, checkpoints });
+  }
+  return races;
+}
+
+const ACTIVITY_RACES = loadActivityRaces();
+
 function restorePersistentObjectStates(): void {
   if (!OBJECT_STATE_FILE) return;
   let raw: string;
@@ -204,6 +255,7 @@ const players = new Map<string, Player>();
 // not advertised as persistent: process restarts currently clear sessions/results.
 const activitySessions = new Map<string, ActivitySession>();
 const activityHosts = new Map<string, string>();
+const activityRaceIds = new Map<string, string>();
 
 function activityPayload(session: ActivitySession) {
   return {
@@ -439,18 +491,24 @@ wss.on("connection", async (socket: WebSocket) => {
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
       if (msg && msg.type === "activity_create") {
-        // Checkpoint races are intentionally withheld until the gateway validates
-        // checkpoint proximity against server-authored world geometry.
         if (player.homeId || player.eventId || player.returnState ||
-            !["dance", "sports", "adventure"].includes(msg.kind) ||
+            !["checkpoint_race", "dance", "sports", "adventure"].includes(msg.kind) ||
             (msg.maxParticipants !== undefined &&
               (!Number.isInteger(msg.maxParticipants) || msg.maxParticipants < 2 || msg.maxParticipants > 64))) {
           send(socket, { type: "activity_rejected", code: "invalid_activity_request_or_context_active" }); return;
         }
+        let checkpointCount = 2;
+        if (msg.kind === "checkpoint_race") {
+          if (typeof msg.raceId !== "string" || !ACTIVITY_RACES.has(msg.raceId)) {
+            send(socket, { type: "activity_rejected", code: "race_not_configured" }); return;
+          }
+          checkpointCount = ACTIVITY_RACES.get(msg.raceId)!.checkpoints.length;
+        }
         const id = randomUUID();
         const created = createActivitySession({
           id, worldId: player.worldId, instanceId: INSTANCE_ID,
-          kind: msg.kind, maxParticipants: msg.maxParticipants ?? 16
+          kind: msg.kind, maxParticipants: msg.maxParticipants ?? 16,
+          checkpointCount
         });
         if (!created.ok) {
           send(socket, { type: "activity_rejected", code: created.code }); return;
@@ -461,6 +519,7 @@ wss.on("connection", async (socket: WebSocket) => {
         }
         activitySessions.set(id, created.session);
         activityHosts.set(id, player.id);
+        if (msg.kind === "checkpoint_race") activityRaceIds.set(id, msg.raceId);
         broadcastActivity(created.session);
         return;
       }
@@ -846,6 +905,27 @@ setInterval(async () => {
           position = EXCLUDED.position, rotation = EXCLUDED.rotation, updated_at = NOW()
       `.catch((error) => console.error("checkpoint_write_failed", error));
     }
+  }
+  // Race progress is derived exclusively from server-simulated player positions.
+  // Clients cannot submit checkpoint indexes or claim their own finish times.
+  for (const session of activitySessions.values()) {
+    if (session.phase !== "active" || session.kind !== "checkpoint_race") continue;
+    const raceId = activityRaceIds.get(session.id);
+    const race = raceId ? ACTIVITY_RACES.get(raceId) : undefined;
+    if (!race) continue;
+    let changed = false;
+    for (const participant of session.participants.values()) {
+      if (participant.status !== "joined") continue;
+      const player = players.get(participant.userId);
+      const checkpoint = race.checkpoints[participant.checkpointIndex];
+      if (!player || player.worldId !== session.worldId || !checkpoint) continue;
+      const horizontalDistance = Math.hypot(player.x - checkpoint.x, player.z - checkpoint.z);
+      const verticalDistance = Math.abs(player.y - checkpoint.y);
+      if (horizontalDistance > checkpoint.radius || verticalDistance > checkpoint.radius) continue;
+      const result = recordCheckpoint(session, participant.userId, participant.checkpointIndex, now);
+      if (result.ok) changed = true;
+    }
+    if (changed) broadcastActivity(session);
   }
   if (snapshots.length) {
     const packet = JSON.stringify({ type: "snapshot", serverTime: now, players: snapshots });
