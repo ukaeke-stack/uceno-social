@@ -117,18 +117,28 @@ def download_asset(asset_id: str, metadata: dict, output_root: Path):
 
 def download_texture(asset_id: str, metadata: dict, output_root: Path):
     files = request_json(f"{API}/files/{urllib.parse.quote(asset_id)}")
-    maps_root = files.get("$map") or {}
-    resolution, maps = choose_resolution(maps_root)
     texture_dir = output_root / "Textures" / safe_name(metadata["name"])
     texture_dir.mkdir(parents=True, exist_ok=True)
     downloaded = []
+    resolutions_used = []
 
+    # Poly Haven's API places each map name (diff, nor_gl, rough, ao) at the
+    # top level; each map then contains resolution -> file format -> file.
     for map_name in ("diff", "nor_gl", "rough", "ao"):
-        formats = maps.get(map_name) or {}
-        if not isinstance(formats, dict):
+        try:
+            resolution, formats = choose_resolution(files.get(map_name) or {})
+        except RuntimeError:
             continue
+        resolutions_used.append(resolution)
         preferred = ("jpg", "png", "exr") if map_name in ("diff", "rough", "ao") else ("png", "jpg", "exr")
-        record = next((formats.get(ext) for ext in preferred if isinstance(formats.get(ext), dict) and formats[ext].get("url")), None)
+        record = next(
+            (
+                formats.get(ext)
+                for ext in preferred
+                if isinstance(formats.get(ext), dict) and formats[ext].get("url")
+            ),
+            None,
+        )
         if record is None:
             continue
         ext = Path(urllib.parse.urlparse(record["url"]).path).suffix.lower() or ".jpg"
@@ -137,7 +147,8 @@ def download_texture(asset_id: str, metadata: dict, output_root: Path):
         downloaded.append(filename)
 
     if not downloaded:
-        raise RuntimeError(f"No PBR maps were available for texture asset {metadata['name']}")
+        available = ", ".join(key for key in files.keys() if key not in ("blend", "gltf", "mtlx"))
+        raise RuntimeError(f"No PBR maps were available for texture asset {metadata['name']} (keys: {available})")
 
     manifest = {
         "name": metadata["name"],
@@ -145,14 +156,14 @@ def download_texture(asset_id: str, metadata: dict, output_root: Path):
         "source": f"https://polyhaven.com/a/{asset_id}",
         "license": "CC0 1.0",
         "authors": metadata.get("authors", {}),
-        "texture_resolution": resolution,
+        "texture_resolutions": sorted(set(resolutions_used)),
         "maps": downloaded,
         "runtime_api_dependency": False,
     }
     (texture_dir / "asset-manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
-    print(f"Imported PBR texture: {metadata['name']} ({resolution}, {len(downloaded)} maps)")
+    print(f"Imported PBR texture: {metadata['name']} ({len(downloaded)} maps)")
 
 
 def download_hdri(asset_id: str, metadata: dict, output_root: Path):
