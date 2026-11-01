@@ -1,6 +1,6 @@
 # UCENO Virtual World — Unity starter
 
-This is the first client-side prototype scaffold. It is not yet a multiplayer game and does not connect to UCENO accounts or production services.
+This is the first offline single-player city-world client. It is not yet a multiplayer game and does not connect to UCENO accounts or production services.
 
 ## Pinned Unity version
 
@@ -17,13 +17,13 @@ Unity 6.3 LTS is pinned for reproducible builds. Do not upgrade the editor versi
 2. Install Unity 6000.3.27f1 with Android Build Support, including Android SDK & NDK Tools and OpenJDK. Install Web Build Support when the Web client stage begins.
 3. Open this folder as an existing Unity project.
 4. Set **Edit → Project Settings → Player → Other Settings → Configuration → Active Input Handling** to **Both** or **Input Manager (Old)**. Restart the Editor if requested.
-5. In the Unity menu, choose **UCENO Virtual World → Create Starter Scene**.
+5. In the Unity menu, choose **UCENO Virtual World → Build Realistic City Scene**. This imports the bundled free models, creates reusable prefabs and builds the playable city scene.
 6. Press Play and follow the control instructions below.
 
 ## Controls
 
-- Android: drag on the left half of the screen to move; drag on the right half to rotate the camera horizontally and vertically. Two fingers can control movement and camera simultaneously.
-- Desktop: WASD/arrow keys to move; mouse movement to rotate the view.
+- Android: drag on the left half of the screen to move; drag on the right half to rotate the camera horizontally and vertically. Hold the **RUN** control to sprint. Two fingers can control movement and camera simultaneously.
+- Desktop: WASD/arrow keys to move; hold **Shift** to run; mouse movement to rotate the view.
 - A VR headset is not required for this prototype.
 
 ## Cloud build option A — Unity Build Automation
@@ -79,15 +79,21 @@ The exact sources, licences and replacement rules are recorded in
 `Assets/UCENO/Documentation/FREE_ASSET_MANIFEST.md`. The Poly Haven API is used
 only during development-time import; the shipped client does not call it.
 
-Imported models are not yet a finished scene. They must be assembled into
-reusable prefabs with collision, mobile-ready materials, lighting, LODs and
-animation wiring before the world can be considered visually complete. Asset
-import workflows do not run a Unity build and do not generate an APK.
+The Editor scene builder now assembles the imported models into reusable
+prefabs, adds collision, PBR road/ground materials, the city HDRI, lighting,
+a rigged Humanoid avatar and an idle/walk/run blend tree. The player movement
+and camera remain separate from the model hierarchy, so later professional
+assets can replace the free models without rewriting those systems.
+
+This scene has not yet been opened and compiled in the Unity Editor after the
+asset import. Unity compilation, rendering review and physical Android testing
+are still required. Asset-import workflows do not run a Unity build and do not
+generate an APK.
 
 ## Current scope and limitations
 
 - Offline single-player movement prototype only.
-- The current scene still uses the original placeholder environment and avatar until the imported free models are assembled into the new scene.
+- The runtime primitive environment and cube/sphere avatar have been removed. The Editor builder now requires the imported real assets and fails rather than falling back to placeholders.
 - No login, world-entry token exchange, networking, multiplayer, moderation checks, avatar customization, persistent world state, inventory, credits, purchases or advertising.
 - No Android APK or Web build has been generated yet.
 - Source review is not proof of Unity compilation. The cloud build and physical-device checklist must pass before treating the prototype as working.
