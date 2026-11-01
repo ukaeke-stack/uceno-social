@@ -39,6 +39,11 @@ REQUIRED_FILES = [
     IMPORTED / "Models/shrub_03/shrub_03.fbx",
     IMPORTED / "Models/covered_car/covered_car.fbx",
     IMPORTED / "Models/modular_chainlink_fence/modular_chainlink_fence.fbx",
+    IMPORTED / "Models/sofa_01/sofa_01.fbx",
+    IMPORTED / "Models/arm_chair_01/arm_chair_01.fbx",
+    IMPORTED / "Models/round_wooden_table_01/round_wooden_table_01.fbx",
+    IMPORTED / "Models/gothic_bed_01/gothic_bed_01.fbx",
+    IMPORTED / "Models/gothic_cabinet_01/gothic_cabinet_01.fbx",
 ]
 
 REQUIRED_TEXTURES = [
@@ -132,6 +137,11 @@ def main():
         "UCENO_Default_Avatar.fbx",
         "modular_urban_apartments_facade.fbx",
         "modular_factory_facade.fbx",
+        "sofa_01.fbx",
+        "arm_chair_01.fbx",
+        "round_wooden_table_01.fbx",
+        "gothic_bed_01.fbx",
+        "gothic_cabinet_01.fbx",
         "modern_buildings_1k.hdr",
         "Textures/asphalt_01",
         "Textures/concrete_floor_01",
@@ -173,6 +183,9 @@ def main():
             fail("WorldHomeClient is missing home management integration: " + required)
     if "WorldHomeClient homeClient = player.AddComponent<WorldHomeClient>()" not in builder:
         fail("Generated player does not include the world home management client.")
+    for asset_id in ("sofa_01", "arm_chair_01", "round_wooden_table_01", "gothic_bed_01", "gothic_cabinet_01"):
+        if asset_id not in builder:
+            fail("Generated home furniture catalogue is missing " + asset_id)
 
     session = read_text(ASSETS / "Scripts/WorldSessionClient.cs")
     if session.count("public string ApiBaseUrl") != 1:
