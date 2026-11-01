@@ -10,6 +10,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ li
   if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const { listingId } = await context.params;
   if (!UUID.test(listingId)) return NextResponse.json({ error: "Invalid listingId" }, { status: 400 });
+  if (process.env.MARKETPLACE_ESCROW_ENABLED !== "true") {
+    return NextResponse.json({ error: "Marketplace checkout is disabled until escrow settlement, refunds and digital-item delivery are configured." }, { status: 503 });
+  }
 
   let body: { quantity?: unknown; idempotencyKey?: unknown };
   try { body = await request.json(); }
