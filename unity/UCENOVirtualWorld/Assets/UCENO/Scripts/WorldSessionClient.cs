@@ -36,7 +36,6 @@ namespace UCENO.VirtualWorld
         public int ExpiresInSeconds { get; private set; }
         public string ApiBaseUrl => apiBaseUrl;
         public string WorldId { get; private set; }
-        public string ApiBaseUrl => apiBaseUrl;
         public bool IsAuthenticated => !string.IsNullOrEmpty(AccessToken);
 
         public void RedeemEntryCode(string code, Action<bool, string> completed)
