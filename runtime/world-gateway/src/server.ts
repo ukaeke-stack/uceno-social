@@ -256,6 +256,11 @@ const players = new Map<string, Player>();
 const activitySessions = new Map<string, ActivitySession>();
 const activityHosts = new Map<string, string>();
 const activityRaceIds = new Map<string, string>();
+const MAX_ACTIVITY_SESSIONS = 256;
+const MAX_NONTERMINAL_ACTIVITIES_PER_WORLD = 32;
+const ACTIVITY_LOBBY_TIMEOUT_MS = 30 * 60 * 1000;
+const ACTIVITY_MAX_RUNTIME_MS = 2 * 60 * 60 * 1000;
+const ACTIVITY_TERMINAL_RETENTION_MS = 30 * 60 * 1000;
 
 function activityPayload(session: ActivitySession) {
   return {
@@ -502,6 +507,13 @@ wss.on("connection", async (socket: WebSocket) => {
             (msg.maxParticipants !== undefined &&
               (!Number.isInteger(msg.maxParticipants) || msg.maxParticipants < 2 || msg.maxParticipants > 64))) {
           send(socket, { type: "activity_rejected", code: "invalid_activity_request_or_context_active" }); return;
+        }
+        const nonterminalInWorld = [...activitySessions.values()].filter(session =>
+          session.worldId === player.worldId &&
+          session.phase !== "completed" && session.phase !== "cancelled").length;
+        if (activitySessions.size >= MAX_ACTIVITY_SESSIONS ||
+            nonterminalInWorld >= MAX_NONTERMINAL_ACTIVITIES_PER_WORLD) {
+          send(socket, { type: "activity_rejected", code: "activity_capacity_reached" }); return;
         }
         let checkpointCount = 2;
         if (msg.kind === "checkpoint_race") {
@@ -910,6 +922,26 @@ setInterval(async () => {
         ON CONFLICT (world_id, user_id) DO UPDATE SET
           position = EXCLUDED.position, rotation = EXCLUDED.rotation, updated_at = NOW()
       `.catch((error) => console.error("checkpoint_write_failed", error));
+    }
+  }
+  // Bound in-memory session growth and close abandoned sessions without
+  // trusting clients to remain connected or send a leave message.
+  for (const session of activitySessions.values()) {
+    const terminal = session.phase === "completed" || session.phase === "cancelled";
+    if (terminal) {
+      if (session.completedAt !== null && now - session.completedAt > ACTIVITY_TERMINAL_RETENTION_MS) {
+        activitySessions.delete(session.id);
+        activityHosts.delete(session.id);
+        activityRaceIds.delete(session.id);
+      }
+      continue;
+    }
+    const staleLobby = session.phase === "lobby" && now - session.createdAt > ACTIVITY_LOBBY_TIMEOUT_MS;
+    const overlongRun = session.phase === "active" && session.startedAt !== null &&
+      now - session.startedAt > ACTIVITY_MAX_RUNTIME_MS;
+    if (staleLobby || overlongRun) {
+      const cancelled = cancelActivity(session, true, now);
+      if (cancelled.ok) broadcastActivity(session);
     }
   }
   // Race progress is derived exclusively from server-simulated player positions.
