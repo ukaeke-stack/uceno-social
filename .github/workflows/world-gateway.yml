@@ -53,6 +53,8 @@ jobs:
           const gateway = fs.readFileSync('./runtime/world-gateway/src/server.ts', 'utf8');
           for (const marker of ['WORLD_OBJECT_STATE_FILE', 'restorePersistentObjectStates', 'persistObjectStates', 'renameSync', 'state_persistence_failed'])
             if (!gateway.includes(marker)) throw new Error('Missing durable world-object state behavior: ' + marker);
+          for (const marker of ['const previousState = target.state', 'target.state = previousState', 'target.actorId = previousActorId'])
+            if (!gateway.includes(marker)) throw new Error('Missing interaction rollback on persistence failure: ' + marker);
           for (const marker of ['WORLD_COLLISION_BOXES_FILE', 'readFileSync', 'loadCollisionBoxes', 'PLAYER_RADIUS', 'PLAYER_HEIGHT', 'resolveHorizontalMovement', 'overlapsBox'])
             if (!gateway.includes(marker)) throw new Error('Missing server collision behavior: ' + marker);
           if (!gateway.includes('COLLISION_BOXES.some'))
