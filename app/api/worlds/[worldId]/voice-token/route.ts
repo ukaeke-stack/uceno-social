@@ -2,7 +2,7 @@ import { SignJWT } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
-import { readSession } from "@/lib/session";
+import { readWorldClientSession } from "@/lib/world-client-session";
 
 export const runtime = "nodejs";
 const schema = z.object({ zone: z.string().trim().min(1).max(48).regex(/^[a-zA-Z0-9_-]+$/).default("main") });
@@ -12,8 +12,9 @@ function validUuid(value: string) {
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ worldId: string }> }) {
-  const session = await readSession();
-  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  const { worldId } = await params;
+  const session = await readWorldClientSession(request, worldId);
+  if (!session) return NextResponse.json({ error: "Sign in or reconnect to this world" }, { status: 401 });
   if (process.env.WORLD_SPATIAL_VOICE_ENABLED !== "true") {
     return NextResponse.json({ error: "World voice is not enabled yet" }, { status: 503 });
   }
@@ -23,7 +24,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!apiKey || !apiSecret || !url) {
     return NextResponse.json({ error: "World voice service is not configured" }, { status: 503 });
   }
-  const { worldId } = await params;
   if (!validUuid(worldId)) return NextResponse.json({ error: "Invalid world ID" }, { status: 400 });
   const input = schema.safeParse(await request.json().catch(() => null));
   if (!input.success) return NextResponse.json({ error: "Invalid voice zone" }, { status: 400 });
