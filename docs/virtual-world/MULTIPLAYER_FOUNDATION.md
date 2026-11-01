@@ -33,7 +33,7 @@ No credit top-up execution endpoint, transfer, seller settlement, refund, final 
 ## Setup
 
 1. Review and apply migrations `015_virtual_world_foundation.sql` through `024_virtual_world_instance_leases.sql` in numeric order; configure `ADMIN_USER_IDS` with authorized platform administrator UUIDs through the normal migration process. No API route runs DDL.
-2. Configure server-only `WORLD_TOKEN_SECRET` with at least 32 random characters. Never commit it or put it in the Unity project.
+2. Configure server-only `WORLD_TOKEN_SECRET` and `WORLD_INSTANCE_HEARTBEAT_SECRET`, each with at least 32 random characters. Never commit them or put them in the Unity project.
 3. A signed-in Social client calls `POST /api/worlds/entry` with a world ID and client type.
 4. Pass the returned code to Unity `WorldSessionClient.RedeemEntryCode`; it redeems with `PUT /api/worlds/entry`.
 5. Configure the Unity component's API base URL to the actual UCENO Social origin before use.
@@ -244,3 +244,22 @@ instance claiming, an unavailable-instance response requires the signed-in
 client to request a fresh code. This behavior needs integration tests,
 concurrent-capacity tests, gateway endpoint validation, Unity compilation and
 two-device testing before production use.
+
+
+## Runtime instance heartbeat endpoint (November 2026)
+
+Registered runtime processes can call
+`POST /api/internal/world-instances/heartbeat` over HTTPS with
+`Authorization: Bearer <WORLD_INSTANCE_HEARTBEAT_SECRET>` and a JSON body
+containing `instanceId` and optional status (`ready`, `draining` or
+`offline`). The shared secret is compared in constant time. The endpoint
+updates the heartbeat and derives `current_players` from unexpired player
+leases; it does not trust a client-supplied player count or endpoint URL.
+
+The instance record and endpoint must be registered through the trusted
+operator/database process first. The heartbeat endpoint cannot create an
+instance or change its endpoint, world assignment or capacity. Do not mark an
+instance ready until its runtime is actually listening and has passed its own
+health check. If heartbeats stop, the allocator excludes the instance after
+30 seconds. Configure the heartbeat secret only in the server environment;
+never expose it to Unity clients.
