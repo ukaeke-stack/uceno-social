@@ -25,7 +25,11 @@ export async function POST(request: NextRequest, { params }: Context) {
     const sql = getDb();
     const rows = await sql`
       SELECT h.id, h.owner_user_id AS "ownerUserId", h.world_id AS "worldId",
+             h.visibility AS "homeVisibility",
              w.status AS "worldStatus", w.visibility AS "worldVisibility",
+             EXISTS (SELECT 1 FROM user_blocks b
+               WHERE (b.blocker_id = h.owner_user_id AND b.blocked_id = ${body.userId}::uuid)
+                  OR (b.blocker_id = ${body.userId}::uuid AND b.blocked_id = h.owner_user_id)) AS blocked,
              COALESCE(m.status, 'none') AS "targetMembership"
       FROM virtual_homes h
       JOIN virtual_worlds w ON w.id = h.world_id
@@ -38,7 +42,9 @@ export async function POST(request: NextRequest, { params }: Context) {
       return NextResponse.json({ error: "Home is unavailable" }, { status: 404 });
     if (home.ownerUserId !== session.id)
       return NextResponse.json({ error: "Only the home owner can manage invitations" }, { status: 403 });
-    if (home.targetMembership === "banned" || home.targetMembership === "suspended" ||
+    if (home.homeVisibility !== "invite")
+      return NextResponse.json({ error: "Change the home visibility to invite before sharing it" }, { status: 409 });
+    if (home.blocked || home.targetMembership === "banned" || home.targetMembership === "suspended" ||
         (home.worldVisibility === "private" && home.targetMembership !== "active"))
       return NextResponse.json({ error: "That account cannot access this world" }, { status: 403 });
 
