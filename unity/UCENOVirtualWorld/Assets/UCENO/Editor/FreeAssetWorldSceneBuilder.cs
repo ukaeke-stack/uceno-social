@@ -194,7 +194,7 @@ namespace UCENO.VirtualWorld.Editor
             Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (material == null)
             {
-                material = new Material(Shader.Find("Standard"));
+                material = new Material(RequireShader("Standard"));
                 AssetDatabase.CreateAsset(material, path);
             }
             material.color = color;
