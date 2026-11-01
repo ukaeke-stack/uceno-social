@@ -91,6 +91,9 @@ jobs:
           const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
           for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes.json'])
             if (!exporter.includes(marker)) throw new Error('Missing Unity geometry export behavior: ' + marker);
+          const eventsApi = fs.readFileSync('./app/api/world-events/route.ts', 'utf8');
+          for (const marker of ['const canHost =', 'membershipRole === "admin"', 'ownerUserId === session.id'])
+            if (!eventsApi.includes(marker)) throw new Error('World event hosting permission is not returned securely: ' + marker);
           const homeMembers = fs.readFileSync('./app/api/world-homes/[homeId]/members/route.ts', 'utf8');
           for (const marker of ['export async function GET', 'Only the home owner can view the invitation roster', 'FROM virtual_home_members', 'Cache-Control'])
             if (!homeMembers.includes(marker)) throw new Error('Missing private owner-only home invitation roster behavior: ' + marker);
@@ -106,7 +109,7 @@ jobs:
           for (const marker of ['RequestHomes', 'CreateHomeRoutine', 'LoadHomeRoutine', 'SaveHomeRoutine', 'PlaceFurniture', 'RotateSelectedFurniture', 'RemoveSelectedFurniture', 'InviteMemberRoutine', 'RevokeMemberRoutine', 'SHARING: ON', 'HOMES', 'Application.isMobilePlatform', 'CLOSE'])
             if (!homeClient.includes(marker)) throw new Error('Missing Unity home-management behavior: ' + marker);
           const eventsClient = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldEventsClient.cs', 'utf8');
-          for (const marker of ['LoadEventsRoutine', 'SetAttendanceRoutine', '/api/world-events?worldId=', 'INTERESTED'])
+          for (const marker of ['LoadEventsRoutine', 'CreateEventRoutine', 'SetAttendanceRoutine', '/api/world-events?worldId=', '/api/world-events', 'canHost', 'INTERESTED'])
             if (!eventsClient.includes(marker)) throw new Error('Missing Unity world event RSVP behavior: ' + marker);
           const sceneBuilder = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs', 'utf8');
           if (!sceneBuilder.includes('WorldHomeClient homeClient = player.AddComponent<WorldHomeClient>()'))
