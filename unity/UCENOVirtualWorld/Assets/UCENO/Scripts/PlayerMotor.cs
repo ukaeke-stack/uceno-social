@@ -28,6 +28,7 @@ namespace UCENO.VirtualWorld
         private int lookFingerId = -1;
         private bool sprintRequested;
         private bool jumpRequested;
+        private bool serverAuthoritative;
         public bool IsSeated { get; private set; }
 
         public void ToggleSeated()
@@ -40,6 +41,7 @@ namespace UCENO.VirtualWorld
             AnimationSpeed = 0f;
         }
 
+        public bool IsServerAuthoritative => serverAuthoritative;
         public float Yaw => yaw;
         public float Pitch => pitch;
         public Vector2 MovementInput { get; private set; }
@@ -56,6 +58,28 @@ namespace UCENO.VirtualWorld
         public void RequestJump()
         {
             jumpRequested = true;
+        }
+
+        public bool ConsumeJumpRequest()
+        {
+            bool requested = jumpRequested;
+            jumpRequested = false;
+            return requested && !IsSeated;
+        }
+
+        public void SetServerAuthority(bool enabled)
+        {
+            serverAuthoritative = enabled;
+            verticalVelocity = 0f;
+            if (!enabled) jumpRequested = false;
+        }
+
+        public void ApplyServerState(Vector3 position, float serverYawRadians)
+        {
+            yaw = serverYawRadians * Mathf.Rad2Deg;
+            controller.enabled = false;
+            transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
+            controller.enabled = true;
         }
 
         private void Awake()
@@ -76,7 +100,7 @@ namespace UCENO.VirtualWorld
 
         private void Update()
         {
-            if (transform.position.y < fallRecoveryHeight)
+            if (!serverAuthoritative && transform.position.y < fallRecoveryHeight)
             {
                 // Prevent an unnoticed collision failure from sending the
                 // player and camera infinitely below the test environment.
@@ -103,6 +127,9 @@ namespace UCENO.VirtualWorld
             yaw += look.x * lookSensitivity;
             pitch = Mathf.Clamp(pitch - look.y * lookSensitivity, minimumPitch, maximumPitch);
             transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+
+            if (serverAuthoritative)
+                return;
 
             Vector3 direction = transform.right * move.x + transform.forward * move.y;
             if (direction.sqrMagnitude > 1f) direction.Normalize();
