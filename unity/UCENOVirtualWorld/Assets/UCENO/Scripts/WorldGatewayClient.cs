@@ -79,6 +79,7 @@ namespace UCENO.VirtualWorld
     {
         public string id;
         public string hostUserId;
+        public string raceId;
         public string worldId;
         public string instanceId;
         public string kind;
