@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { createActivitySession, joinActivity, startActivity, leaveActivity, cancelActivity, type ActivitySession } from "./activity-session.js";
+import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, type ActivitySession } from "./activity-session.js";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
