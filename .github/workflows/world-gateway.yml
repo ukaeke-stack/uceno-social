@@ -52,11 +52,14 @@ jobs:
           const gateway = fs.readFileSync(root + 'WorldGatewayClient.cs', 'utf8');
           const motor = fs.readFileSync(root + 'PlayerMotor.cs', 'utf8');
           const presence = fs.readFileSync(root + 'WorldPresenceClient.cs', 'utf8');
+          const animation = fs.readFileSync(root + 'AvatarLocomotionDriver.cs', 'utf8');
           for (const marker of ['OnMessage', 'SendText', 'DispatchMessageQueue', 'ApplyServerState', 'SetServerAuthority'])
             if (!gateway.includes(marker)) throw new Error('Missing gateway behavior: ' + marker);
           for (const marker of ['SetServerAuthority', 'ConsumeJumpRequest', 'ApplyServerState'])
             if (!motor.includes(marker)) throw new Error('Missing motor behavior: ' + marker);
           if (!presence.includes('AddComponent<WorldGatewayClient>()'))
             throw new Error('WorldPresenceClient does not attach the gateway transport');
+          for (const marker of ['ApplyRemoteState', 'IsSeated', 'Wave', 'Cheer'])
+            if (!animation.includes(marker)) throw new Error('Missing remote avatar animation support: ' + marker);
           console.log('Unity package and gateway wiring checks passed. This is not a Unity Editor/Android build.');
           NODE
