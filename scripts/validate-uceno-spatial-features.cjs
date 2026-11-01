@@ -15,6 +15,10 @@ function requireMarkers(path, markers) {
 requireMarkers("db/migrations/025_virtual_world_event_locations.sql", [
   "activity_type", "location_label", "location JSONB", "virtual_world_events_activity_type_check"
 ]);
+requireMarkers("app/api/world-homes/route.ts", [
+  "virtual_world_player_state", "fresh authoritative world position",
+  "playerState.position", "playerState.rotation"
+]);
 requireMarkers("app/api/world-events/route.ts", [
   "ACTIVITY_TYPES", "validSpatialLocation", "activity_type AS \"activityType\"",
   "location_label AS \"locationLabel\"", "JSON.stringify(location)"
