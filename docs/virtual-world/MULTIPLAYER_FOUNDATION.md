@@ -23,7 +23,7 @@
 - The world gateway must verify JWT signature, issuer `uceno-social`, audience `uceno-world-gateway`, expiry, subject, world and client claims.
 - Re-check moderation, world membership and bans at admission and reconnect; do not treat the token as permanent authorization.
 - Neon is for durable records and occasional checkpoints, not per-frame movement snapshots. The checkpoint endpoint bounds coordinates, validates normalized rotations, limits state JSON to 16 KB and checks world access.
-- Event hosting is limited to world owners and active world admins. RSVP capacity is enforced by a database trigger; apply the updated migration before enabling the event endpoints.\n- This does not yet provide a live multiplayer server, authoritative movement, instance allocator, reconnect protocol or spatial voice.
+- Event hosting is limited to world owners and active world admins. RSVP capacity is enforced by a database trigger; apply the updated migration before enabling the event endpoints.\n- Home creation is available to signed-in users with access to a published world. Home sharing/invitation management, friends visibility, and Unity home-building UI are not implemented yet.\n- This does not yet provide a live multiplayer server, authoritative movement, instance allocator, reconnect protocol or spatial voice.
 - Credit balances must only change through future transactional server-side ledger operations. These tables do not grant balances or process purchases.
 - Voice needs a separate authenticated audio plane (evaluate LiveKit), server-controlled room membership and proximity/zone rules, plus mute/block/report controls.
 
