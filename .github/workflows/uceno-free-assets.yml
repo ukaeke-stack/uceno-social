@@ -33,6 +33,7 @@ jobs:
       - name: Check out UCENO source
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.head_ref || github.ref }}
           persist-credentials: true
 
       - name: Set up Node.js
