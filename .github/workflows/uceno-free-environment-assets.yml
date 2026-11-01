@@ -50,4 +50,6 @@ jobs:
             exit 0
           fi
           git commit -m "Import CC0 city models, PBR surfaces and HDRI"
+          git fetch origin "${BRANCH_NAME}"
+          git rebase "origin/${BRANCH_NAME}"
           git push origin "HEAD:${BRANCH_NAME}"
