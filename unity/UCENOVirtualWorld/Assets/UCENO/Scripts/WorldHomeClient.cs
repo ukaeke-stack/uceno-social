@@ -100,6 +100,7 @@ namespace UCENO.VirtualWorld
         private readonly List<GameObject> spawnedFurniture = new List<GameObject>();
         private readonly List<WorldHomeMember> members = new List<WorldHomeMember>();
         private string selectedHomeId;
+        private int selectedFurnitureIndex = -1;
         private string selectedHomeName = "";
         private string selectedPermission = "";
         private string selectedVisibility = "private";
@@ -110,6 +111,7 @@ namespace UCENO.VirtualWorld
         private bool visible;
         private bool busy;
         private Vector2 scroll;
+        private Vector2 furnitureScroll;
 
         public IReadOnlyList<WorldHomeSummary> Homes => homes;
         public string SelectedHomeId => selectedHomeId;
@@ -174,6 +176,7 @@ namespace UCENO.VirtualWorld
                 yaw = instance.transform.eulerAngles.y,
                 scale = instance.transform.localScale.x
             });
+            selectedFurnitureIndex = furnishing.Count - 1;
             status = "Furniture placed. Save the home to persist this layout.";
             return true;
         }
@@ -192,6 +195,30 @@ namespace UCENO.VirtualWorld
                 return false;
             }
             return true;
+        }
+
+        public void RotateSelectedFurniture(float degrees)
+        {
+            if (!CanEditSelectedHome || selectedFurnitureIndex < 0 ||
+                selectedFurnitureIndex >= furnishing.Count) return;
+            WorldHomeFurnishing item = furnishing[selectedFurnitureIndex];
+            item.yaw = Mathf.Repeat(item.yaw + degrees, 360f);
+            if (selectedFurnitureIndex < spawnedFurniture.Count && spawnedFurniture[selectedFurnitureIndex] != null)
+                spawnedFurniture[selectedFurnitureIndex].transform.rotation = Quaternion.Euler(0f, item.yaw, 0f);
+            status = "Selected furniture rotated. Save the home to persist the change.";
+        }
+
+        public void RemoveSelectedFurniture()
+        {
+            if (!CanEditSelectedHome || selectedFurnitureIndex < 0 ||
+                selectedFurnitureIndex >= furnishing.Count) return;
+            if (selectedFurnitureIndex < spawnedFurniture.Count && spawnedFurniture[selectedFurnitureIndex] != null)
+                Destroy(spawnedFurniture[selectedFurnitureIndex]);
+            if (selectedFurnitureIndex < spawnedFurniture.Count) spawnedFurniture.RemoveAt(selectedFurnitureIndex);
+            furnishing.RemoveAt(selectedFurnitureIndex);
+            selectedFurnitureIndex = furnishing.Count == 0 ? -1 :
+                Mathf.Clamp(selectedFurnitureIndex, 0, furnishing.Count - 1);
+            status = "Furniture removed. Save the home to persist the change.";
         }
 
         private WorldHomeFurnitureCatalogEntry FindCatalogEntry(string assetId)
@@ -505,6 +532,28 @@ namespace UCENO.VirtualWorld
                         if (entry == null || entry.prefab == null || string.IsNullOrWhiteSpace(entry.assetId)) continue;
                         if (GUILayout.Button("PLACE " + entry.assetId, GUILayout.Height(32f * scale)))
                             PlaceFurniture(entry.assetId);
+                    }
+                    if (furnishing.Count > 0)
+                    {
+                        GUILayout.Label("Placed furniture");
+                        furnitureScroll = GUILayout.BeginScrollView(furnitureScroll, GUILayout.Height(height * 0.22f));
+                        for (int i = 0; i < furnishing.Count; i++)
+                        {
+                            GUILayout.BeginHorizontal();
+                            string prefix = i == selectedFurnitureIndex ? "> " : "";
+                            if (GUILayout.Button(prefix + furnishing[i].assetId, GUILayout.MinWidth(100f)))
+                                selectedFurnitureIndex = i;
+                            GUILayout.EndHorizontal();
+                        }
+                        GUILayout.EndScrollView();
+                        if (selectedFurnitureIndex >= 0 && selectedFurnitureIndex < furnishing.Count)
+                        {
+                            GUILayout.BeginHorizontal();
+                            if (GUILayout.Button("ROTATE -15", GUILayout.Height(32f * scale))) RotateSelectedFurniture(-15f);
+                            if (GUILayout.Button("ROTATE +15", GUILayout.Height(32f * scale))) RotateSelectedFurniture(15f);
+                            if (GUILayout.Button("REMOVE", GUILayout.Height(32f * scale))) RemoveSelectedFurniture();
+                            GUILayout.EndHorizontal();
+                        }
                     }
                     if (GUILayout.Button("SAVE HOME LAYOUT", GUILayout.Height(38f * scale)))
                         SaveSelectedHome();
