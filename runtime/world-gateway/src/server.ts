@@ -362,8 +362,12 @@ wss.on("connection", async (socket: WebSocket) => {
       if (msg.jump && player.grounded && !player.seated) player.jumpQueued = true;
     });
     const releaseSeats = () => {
-      if (players.get(identity.userId)?.socket !== socket) return;
-      players.delete(identity.userId);
+      const current = players.get(identity.userId);
+      // Ignore a late close event from an older socket after this user has
+      // already reconnected, but release seats if moderation removed this
+      // socket from the live-player map before the close event arrived.
+      if (current && current.socket !== socket) return;
+      if (current?.socket === socket) players.delete(identity.userId);
       for (const target of INTERACTABLES.values()) {
         if (target.kind !== "seat" || target.occupantId !== identity.userId) continue;
         target.occupantId = null;
