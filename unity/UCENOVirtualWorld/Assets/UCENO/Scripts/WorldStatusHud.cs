@@ -20,6 +20,7 @@ namespace UCENO.VirtualWorld
         private GUIStyle actionStyle;
         private GUIStyle seatStyle;
         private AvatarLocomotionDriver avatar;
+        private WorldPresenceClient presence;
         private bool sprintToggle;
 
         private void Awake()
@@ -27,6 +28,7 @@ namespace UCENO.VirtualWorld
             if (player == null)
                 player = GetComponentInParent<PlayerMotor>();
             avatar = GetComponentInChildren<AvatarLocomotionDriver>();
+            presence = GetComponentInParent<WorldPresenceClient>();
             if (worldSession == null) worldSession = FindObjectOfType<WorldSessionClient>();
 
             if (Application.isMobilePlatform)
@@ -87,7 +89,10 @@ namespace UCENO.VirtualWorld
             }
             else if (worldSession != null && worldSession.IsAuthenticated)
             {
-                GUI.Label(new Rect(12f, 94f * scale, panelWidth, 24f * scale), "WORLD SESSION ACTIVE", labelStyle);
+                string network = presence == null
+                    ? "WORLD SESSION ACTIVE"
+                    : "WORLD " + presence.ConnectionStatus + "  |  " + presence.PeerCount + " nearby";
+                GUI.Label(new Rect(12f, 94f * scale, panelWidth, 28f * scale), network, labelStyle);
             }
 
             if (Application.isMobilePlatform && showSprintControl)
