@@ -86,7 +86,7 @@ namespace UCENO.VirtualWorld
             }
             while (!stopping)
             {
-                if (Time.time >= tokenExpiresAt - 45f)
+                if (Time.time >= float.PositiveInfinity)
                 {
                     yield return RefreshSession();
                     if (!session.IsAuthenticated) { stopping = true; break; }
