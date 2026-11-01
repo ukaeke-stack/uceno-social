@@ -24,6 +24,7 @@ namespace UCENO.VirtualWorld
 
         public float Yaw => yaw;
         public float Pitch => pitch;
+        public Vector2 MovementInput { get; private set; }
 
         private void Awake()
         {
@@ -41,6 +42,7 @@ namespace UCENO.VirtualWorld
         {
             Vector2 move = ReadMoveInput();
             Vector2 look = ReadLookInput();
+            MovementInput = move;
 
             yaw += look.x * lookSensitivity;
             pitch = Mathf.Clamp(
