@@ -86,6 +86,17 @@ This checklist covers the Unity city client, world gateway interactions and the 
 - [ ] Revoking a home member removes their shared-home access on the next request.
 - [ ] Verify these checks against a test database after required migrations are deployed; static source checks are not database integration tests.
 
+## Home access and invitation checks
+
+- [ ] An unauthenticated home retrieval request returns 401.
+- [ ] The owner can retrieve their home and receives the owner permission.
+- [ ] An invited visitor, decorator or co-owner can retrieve an invite-only home with only their granted permission.
+- [ ] A non-member cannot retrieve an invite-only home; the endpoint returns 404 without exposing its existence.
+- [ ] A revoked invitee loses access on the next request.
+- [ ] A blocked relationship, unpublished world, banned or suspended member, or inaccessible private world prevents home retrieval.
+- [ ] Private home layouts and furnishing data are never returned to unrelated users.
+- [ ] Run these checks against a deployed test database; source checks alone do not prove SQL behavior.
+
 ## Android device checks
 
 Do not start an Android build until the Editor import and scene checks above pass.
