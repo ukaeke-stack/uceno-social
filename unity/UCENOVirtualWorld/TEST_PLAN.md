@@ -59,6 +59,11 @@ store readiness or release performance.
 - [ ] Confirm unknown object IDs and mismatched action types are rejected.
 - [ ] Confirm the dedicated door hinge moves while the building root and surrounding geometry remain fixed.
 - [ ] Confirm the generic object state is synchronized to all clients; restart behavior is currently non-persistent and must not be treated as durable.
+- [ ] Mark an actual imported chair as a `seat` interactable with a unique ID and a seat position; confirm it appears in the exported JSON.
+- [ ] With two clients, first player sits and receives the seated pose only after server confirmation; second player sees the chair occupied and cannot claim it.
+- [ ] First player stands; verify the seat becomes available and another player can sit.
+- [ ] Disconnect a seated player; verify the gateway releases the seat and broadcasts availability.
+- [ ] Verify chair-specific avatar alignment/IK is not assumed: the current implementation only synchronizes the generic seated animation state.
 
 ## Android device checks
 
