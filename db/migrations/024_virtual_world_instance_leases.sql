@@ -87,7 +87,7 @@ BEGIN
   LIMIT 1;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'world_instance_unavailable' USING ERRCODE = 'P0001';
+    RETURN;
   END IF;
 
   INSERT INTO virtual_world_instance_sessions
