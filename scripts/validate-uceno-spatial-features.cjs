@@ -59,5 +59,29 @@ requireMarkers("runtime/world-gateway/src/server.ts", [
   '"dance"'
 ]);
 
-console.log("UCENO spatial homes and event admission source-contract checks passed.");
+requireMarkers("runtime/world-gateway/src/activity-session.ts", [
+  "createActivitySession", "joinActivity", "startActivity", "recordCheckpoint",
+  "leaveActivity", "cancelActivity", "checkpoint_out_of_order"
+]);
+requireMarkers("runtime/world-gateway/src/server.ts", [
+  "WORLD_ACTIVITY_RACES", "loadActivityRaces", "race_not_configured",
+  'msg.type === "activity_create"', 'msg.type === "activity_join"',
+  'msg.type === "activity_start"', 'msg.type === "activity_leave"',
+  'msg.type === "activity_cancel"', "recordCheckpoint(session",
+  "horizontalDistance > checkpoint.radius", "hostUserId:", "activityPayload(activity)"
+]);
+requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs", [
+  "GatewayActivitySessionState", "ActivityStateChanged", "ActivityRejected",
+  "RequestActivityCreate", "RequestActivityJoin", "RequestActivityStart",
+  "RequestActivityLeave", "RequestActivityCancel", 'packet.type == "activity_state"'
+]);
+requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldActivityHud.cs", [
+  '"CREATE RACE"', '"CREATE DANCE"', '"JOIN"', '"START"', '"LEAVE"', '"CANCEL"',
+  "ActivitySessions", "activity.raceId"
+]);
+requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs", [
+  "player.AddComponent<WorldActivityHud>()"
+]);
+
+console.log("UCENO spatial homes, event admission and activity sessions source-contract checks passed.");
 console.log("These checks do not replace database integration tests, Unity Editor compilation, or device testing.");
