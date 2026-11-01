@@ -103,6 +103,26 @@ caps the map at 500 colliders. Re-export after changing the Unity scene; the
 gateway does not automatically read files from the Unity project or synchronize
 scene edits while running.
 
+### Doors and world-object interaction foundation
+
+Add `WorldInteractable` to a real scene object and give it a unique stable ID.
+For a door, assign `doorPivot` to the actual door mesh hinge; leaving it empty
+prevents rotation rather than rotating the whole building. The scene exporter
+includes these marked objects and their world positions in the same JSON map.
+Configure the gateway's `WORLD_COLLISION_BOXES_FILE` (or
+`WORLD_INTERACTABLES_FILE`) to that map. Unity targets objects with a camera
+raycast; desktop uses **E**, and touch devices receive an on-screen action
+button. The server checks the object allowlist, interaction type, 4.25-unit
+range and request rate, then broadcasts the accepted state to connected players.
+
+Only doors and generic usable objects are currently supported by this first
+protocol. No door mesh or furniture item is marked as interactable in the
+generated city yet, so this is a reusable interaction system rather than a
+claim that doors/chairs are already usable. Object state currently lives in
+gateway memory and resets when that process restarts; durable object state,
+seat occupancy, furniture placement and chair-specific avatar animation are
+later work.
+
 This scene has not yet been opened and compiled in the Unity Editor after the
 asset import. Unity compilation, rendering review and physical Android testing
 are still required. Asset-import workflows do not run a Unity build and do not
