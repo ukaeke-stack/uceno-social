@@ -64,12 +64,28 @@ namespace UCENO.VirtualWorld
             networkSpeed = Mathf.Clamp01(speed);
             networkSeated = seated;
             networkSprinting = sprinting;
+            string nextGesture = gesture ?? "none";
             if (sequence > receivedGestureSequence)
             {
                 receivedGestureSequence = sequence;
-                GestureName = gesture ?? "none";
-                activeGesture = GestureName == "wave" ? 1 : GestureName == "cheer" ? 2 : 0;
+                if (UsesImportedController)
+                {
+                    string trigger = nextGesture == "wave" ? "Wave" : nextGesture == "cheer" ? "Cheer" : null;
+                    if (!string.IsNullOrEmpty(trigger))
+                    {
+                        foreach (AnimatorControllerParameter parameter in animator.parameters)
+                            if (parameter.type == AnimatorControllerParameterType.Trigger && parameter.name == trigger)
+                                animator.SetTrigger(trigger);
+                    }
+                }
+                activeGesture = nextGesture == "wave" ? 1 : nextGesture == "cheer" ? 2 : 0;
                 gestureUntil = Time.time + (activeGesture == 1 ? 1.8f : 1.6f);
+            }
+            GestureName = nextGesture;
+            if (nextGesture == "none")
+            {
+                activeGesture = 0;
+                gestureUntil = 0f;
             }
         }
 
@@ -138,6 +154,12 @@ namespace UCENO.VirtualWorld
             {
                 float speed = motor != null ? motor.AnimationSpeed : networkSpeed;
                 animator.SetFloat(MoveSpeedHash, speed, dampTime, Time.deltaTime);
+                if (motor == null && networkDriven)
+                {
+                    foreach (AnimatorControllerParameter parameter in animator.parameters)
+                        if (parameter.name == "IsSeated" && parameter.type == AnimatorControllerParameterType.Bool)
+                            animator.SetBool(parameter.name, networkSeated);
+                }
             }
         }
 
