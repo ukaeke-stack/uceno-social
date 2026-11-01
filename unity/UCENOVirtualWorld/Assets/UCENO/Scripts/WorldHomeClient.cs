@@ -61,6 +61,7 @@ namespace UCENO.VirtualWorld
     {
         public WorldHomeTransform transform;
         public WorldHomeFurnishing[] furnishing;
+        public string visibility;
     }
     [Serializable] internal sealed class WorldHomeCreateResponse { public WorldHomeDetail home; }
     [Serializable] internal sealed class WorldHomeFurnishingList { public WorldHomeFurnishing[] items; }
@@ -90,6 +91,7 @@ namespace UCENO.VirtualWorld
         private string selectedHomeId;
         private string selectedHomeName = "";
         private string selectedPermission = "";
+        private string selectedVisibility = "private";
         private string newHomeName = "My Home";
         private string status = "Press M to manage homes.";
         private bool visible;
@@ -232,6 +234,7 @@ namespace UCENO.VirtualWorld
                         selectedHomeId = response.home.id;
                         selectedHomeName = response.home.name;
                         selectedPermission = "owner";
+                        selectedVisibility = "private";
                         furnishing.Clear();
                         ClearSpawnedFurniture();
                         status = "Home created. Change visibility to invite before sharing.";
@@ -263,6 +266,7 @@ namespace UCENO.VirtualWorld
                         selectedHomeId = response.home.id;
                         selectedHomeName = response.home.name;
                         selectedPermission = response.home.permission;
+                        selectedVisibility = response.home.visibility;
                         furnishing.Clear();
                         if (response.home.furnishing != null) furnishing.AddRange(response.home.furnishing);
                         RebuildFurniture();
@@ -279,7 +283,8 @@ namespace UCENO.VirtualWorld
             WorldHomeSaveRequest payload = new WorldHomeSaveRequest
             {
                 transform = CurrentTransform(),
-                furnishing = furnishing.ToArray()
+                furnishing = furnishing.ToArray(),
+                visibility = selectedPermission == "owner" ? selectedVisibility : ""
             };
             using (UnityWebRequest request = CreateRequest(
                 session.ApiBaseUrl.TrimEnd('/') + "/api/world-homes/" + UnityWebRequest.EscapeURL(selectedHomeId),
@@ -379,6 +384,11 @@ namespace UCENO.VirtualWorld
             if (!string.IsNullOrEmpty(selectedHomeId))
             {
                 GUILayout.Label("Selected: " + selectedHomeName + " (" + selectedPermission + ")");
+                if (selectedPermission == "owner")
+                {
+                    if (GUILayout.Button(selectedVisibility == "invite" ? "SHARING: ON (TAP TO MAKE PRIVATE)" : "SHARING: OFF (TAP TO INVITE)", GUILayout.Height(32f * scale)))
+                        selectedVisibility = selectedVisibility == "invite" ? "private" : "invite";
+                }
                 if (CanEditSelectedHome)
                 {
                     foreach (WorldHomeFurnitureCatalogEntry entry in furnitureCatalog)
