@@ -209,6 +209,7 @@ namespace UCENO.VirtualWorld
         private IEnumerator CreateHomeRoutine(string homeName)
         {
             busy = true;
+            bool refreshAfterCreate = false;
             WorldHomeCreateRequest payload = new WorldHomeCreateRequest
             {
                 worldId = session.WorldId,
@@ -234,12 +235,13 @@ namespace UCENO.VirtualWorld
                         furnishing.Clear();
                         ClearSpawnedFurniture();
                         status = "Home created. Change visibility to invite before sharing.";
-                        RefreshHomes();
+                        refreshAfterCreate = true;
                     }
                     else status = "Home service returned an invalid response.";
                 }
             }
             busy = false;
+            if (refreshAfterCreate) RefreshHomes();
         }
 
         private IEnumerator LoadHomeRoutine(string homeId)
