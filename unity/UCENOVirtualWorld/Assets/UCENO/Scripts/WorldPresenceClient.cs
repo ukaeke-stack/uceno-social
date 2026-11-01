@@ -79,6 +79,7 @@ namespace UCENO.VirtualWorld
         {
             yield return new WaitUntil(() => session != null && session.IsAuthenticated);
             if (string.IsNullOrWhiteSpace(worldId)) worldId = ReadWorldId(session.AccessToken);
+            tokenExpiresAt = Time.time + Mathf.Max(1, session.ExpiresInSeconds);
             if (string.IsNullOrWhiteSpace(worldId))
             {
                 Debug.LogError("UCENO world token is missing its world scope. Request a new entry code.");
@@ -86,7 +87,8 @@ namespace UCENO.VirtualWorld
             }
             while (!stopping)
             {
-                if (Time.time >= float.PositiveInfinity)
+                // Renew before expiry; the API requires a fresh presence record.
+                if (Time.time >= tokenExpiresAt - 45f)
                 {
                     yield return RefreshSession();
                     if (!session.IsAuthenticated) { stopping = true; break; }
@@ -120,7 +122,9 @@ namespace UCENO.VirtualWorld
                     session.ClearSession();
                     yield break;
                 }
-                Debug.Log("UCENO world session renewal response received; client credential update is pending.");
+                session.SetRenewedSession(response.accessToken, response.expiresInSeconds);
+                tokenExpiresAt = Time.time + response.expiresInSeconds;
+                Debug.Log("UCENO world session renewed.");
             }
         }
 
