@@ -36,7 +36,10 @@ namespace UCENO.VirtualWorld
         public string GetEquippedId(AvatarWardrobeSlot slot) =>
             equippedIds.TryGetValue(slot, out string id) ? id : null;
 
-        public bool TryEquip(string itemId, out string error)
+        public bool TryEquip(string itemId, out string error) =>
+            TryEquip(itemId, null, out error);
+
+        public bool TryEquip(string itemId, string expectedPrefabKey, out string error)
         {
             error = null;
             if (catalog == null)
@@ -54,6 +57,12 @@ namespace UCENO.VirtualWorld
                 alreadyEquipped == item.itemId &&
                 equippedObjects.TryGetValue(item.slot, out GameObject existingObject) && existingObject != null)
                 return true;
+            if (!string.IsNullOrEmpty(expectedPrefabKey) &&
+                !string.Equals(item.prefabResourcePath, expectedPrefabKey, StringComparison.Ordinal))
+            {
+                error = "The local wardrobe prefab does not match the server catalogue."; 
+                return false;
+            }
             if (string.IsNullOrWhiteSpace(item.prefabResourcePath))
             {
                 error = "Wardrobe item has no prefab resource path.";
