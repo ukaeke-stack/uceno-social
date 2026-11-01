@@ -93,6 +93,8 @@ This checklist covers the Unity city client, world gateway interactions and the 
 - [ ] An invited visitor, decorator or co-owner can retrieve an invite-only home with only their granted permission.
 - [ ] A non-member cannot retrieve an invite-only home; the endpoint returns 404 without exposing its existence.
 - [ ] A revoked invitee loses access on the next request.
+- [ ] A decorator or co-owner whose world membership is banned or suspended cannot save a home layout after access is revoked.
+- [ ] A shared-home layout cannot be changed after its world is unpublished or the home is no longer invite-visible.
 - [ ] A blocked relationship, unpublished world, banned or suspended member, or inaccessible private world prevents home retrieval.
 - [ ] Private home layouts and furnishing data are never returned to unrelated users.
 - [ ] Run these checks against a deployed test database; source checks alone do not prove SQL behavior.
