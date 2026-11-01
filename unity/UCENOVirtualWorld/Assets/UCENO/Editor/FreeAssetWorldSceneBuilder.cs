@@ -57,6 +57,9 @@ namespace UCENO.VirtualWorld.Editor
             Material grass = CreatePbrMaterial(
                 "UCENO_Grass", "Textures/sparse_grass", new Color(0.78f, 0.82f, 0.72f),
                 new Vector2(16f, 16f), 0.12f);
+            Material grassVerge = CreatePbrMaterial(
+                "UCENO_Grass_Verge", "Textures/sparse_grass", new Color(0.78f, 0.82f, 0.72f),
+                new Vector2(2f, 12f), 0.12f);
             Material laneMarking = CreateSimpleMaterial("UCENO_Road_Marking", Color.white);
             Material centreMarking = CreateSimpleMaterial("UCENO_Centre_Marking", new Color(1f, 0.78f, 0.16f));
             Material skybox = CreateCitySkybox();
@@ -91,7 +94,7 @@ namespace UCENO.VirtualWorld.Editor
             GameObject world = new GameObject("UCENO Realistic City Block");
             Transform worldRoot = world.transform;
 
-            BuildGroundAndRoad(worldRoot, asphalt, concrete, grass, laneMarking, centreMarking);
+            BuildGroundAndRoad(worldRoot, asphalt, concrete, grass, grassVerge, laneMarking, centreMarking);
             BuildCityObjects(
                 worldRoot,
                 apartmentPrefab, factoryPrefab, lampPrefab,
@@ -391,6 +394,7 @@ namespace UCENO.VirtualWorld.Editor
             Material asphalt,
             Material concrete,
             Material grass,
+            Material grassVerge,
             Material edgeLine,
             Material centreLine)
         {
@@ -398,8 +402,8 @@ namespace UCENO.VirtualWorld.Editor
             CreatePlane("Main Asphalt Road", parent, new Vector3(0f, 0.005f, 0f), 10f, 90f, asphalt);
             CreatePlane("Left Concrete Walkway", parent, new Vector3(-6.25f, 0.02f, 0f), 2.5f, 90f, concrete);
             CreatePlane("Right Concrete Walkway", parent, new Vector3(6.25f, 0.02f, 0f), 2.5f, 90f, concrete);
-            CreatePlane("Left Grass Verge", parent, new Vector3(-8.5f, 0.01f, 0f), 2f, 90f, grass);
-            CreatePlane("Right Grass Verge", parent, new Vector3(8.5f, 0.01f, 0f), 2f, 90f, grass);
+            CreatePlane("Left Grass Verge", parent, new Vector3(-8.5f, 0.01f, 0f), 2f, 90f, grassVerge);
+            CreatePlane("Right Grass Verge", parent, new Vector3(8.5f, 0.01f, 0f), 2f, 90f, grassVerge);
 
             CreateRoadLine(parent, edgeLine, new Vector3(-4.7f, 0.035f, -45f), new Vector3(-4.7f, 0.035f, 45f), 0.055f);
             CreateRoadLine(parent, edgeLine, new Vector3(4.7f, 0.035f, -45f), new Vector3(4.7f, 0.035f, 45f), 0.055f);
