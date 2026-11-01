@@ -244,3 +244,16 @@ possible.
 4. Verify unavailable/removed assets do not crash avatar loading and produce a visible recoverable fallback.
 5. Add and test authoritative multiplayer snapshot replication for equipped item IDs; verify remote clients reject unknown catalogue IDs and render matching garments.
 6. Run Unity Editor compilation, visual review and two physical-device tests. Source checks alone do not count as a pass.
+
+
+## Proximity voice signaling acceptance tests (pending)
+
+1. Two authenticated users in the same world, same spatial context and within 24 metres opt in; each receives the other's voice-presence event.
+2. Users farther than 24 metres cannot exchange offers, answers or ICE candidates.
+3. Users in different homes, different events, or one in a home and one in the public world cannot exchange voice signaling.
+4. Users with a block in either direction cannot exchange voice signaling.
+5. A user who has not opted in cannot send or receive signaling; voice_leave and disconnect revoke presence.
+6. Entering/exiting a home or event ends the current voice session; the user must explicitly rejoin in the new context.
+7. Invalid signal types, missing/oversized SDP, oversized ICE candidates and signaling floods are rejected/rate-limited.
+8. Verify signaling with two Unity clients and an actual WebRTC implementation before attempting audio tests.
+9. Add and test microphone permission, audio capture/playback, STUN/TURN connectivity, 3D attenuation, mute/block/report and Android background/foreground behavior. No audio-media acceptance is passed by signaling tests alone.
