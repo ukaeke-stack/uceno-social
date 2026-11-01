@@ -1,6 +1,6 @@
 # UCENO Virtual World — Unity starter
 
-This is the first offline single-player city-world client. It is not yet a multiplayer game and does not connect to UCENO accounts or production services.
+This is the Unity city-world client. Source now includes UCENO one-time world-entry authentication, instance assignment, an authenticated WebSocket multiplayer gateway client, authoritative movement snapshots, remote avatars, gestures, seats and server-controlled object interactions. These integrations are not end-to-end verified until migrations and services are deployed, Unity compiles, and two physical devices pass the multiplayer tests.
 
 ## Pinned Unity version
 
@@ -115,7 +115,7 @@ raycast; desktop uses **E**, and touch devices receive an on-screen action
 button. The server checks the object allowlist, interaction type, 4.25-unit
 range and request rate, then broadcasts the accepted state to connected players.
 
-The interaction protocol now also supports explicitly marked seats.
+The interaction protocol now also supports explicitly marked seats. A newly connected client receives the current authoritative state of every configured interactable, including persisted door/object state and live seat occupancy; it does not have to wait for a future interaction broadcast.
 A seat has one server-controlled occupant; another player is rejected while it
 is occupied. The seated state is applied to the local avatar only after the
 gateway confirms the seat request and is replicated through player snapshots.
