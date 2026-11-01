@@ -20,6 +20,7 @@ namespace UCENO.VirtualWorld
         public string tokenType;
         public int expiresInSeconds;
         public string error;
+        public string worldId;
     }
 
     /// <summary>
@@ -33,6 +34,8 @@ namespace UCENO.VirtualWorld
 
         public string AccessToken { get; private set; }
         public int ExpiresInSeconds { get; private set; }
+        public string WorldId { get; private set; }
+        public string ApiBaseUrl => apiBaseUrl;
         public bool IsAuthenticated => !string.IsNullOrEmpty(AccessToken);
 
         public void RedeemEntryCode(string code, Action<bool, string> completed)
@@ -45,10 +48,17 @@ namespace UCENO.VirtualWorld
             StartCoroutine(RedeemRoutine(code.Trim(), completed));
         }
 
+        public void SetRenewedSession(string token, int expiresInSeconds)
+        {
+            AccessToken = token;
+            ExpiresInSeconds = expiresInSeconds;
+        }
+
         public void ClearSession()
         {
             AccessToken = null;
             ExpiresInSeconds = 0;
+            WorldId = null;
         }
 
         private IEnumerator RedeemRoutine(string code, Action<bool, string> completed)
@@ -94,6 +104,7 @@ namespace UCENO.VirtualWorld
 
                 AccessToken = response.accessToken;
                 ExpiresInSeconds = response.expiresInSeconds;
+                WorldId = response.worldId;
                 completed?.Invoke(true, null);
             }
         }
