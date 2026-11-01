@@ -31,14 +31,19 @@ namespace UCENO.VirtualWorld
         private bool serverAuthoritative;
         public bool IsSeated { get; private set; }
 
-        public void ToggleSeated()
+        public void SetSeated(bool seated)
         {
-            IsSeated = !IsSeated;
+            IsSeated = seated;
             sprintRequested = false;
             jumpRequested = false;
             MovementInput = Vector2.zero;
             IsSprinting = false;
             AnimationSpeed = 0f;
+        }
+
+        public void ToggleSeated()
+        {
+            SetSeated(!IsSeated);
         }
 
         public bool IsServerAuthoritative => serverAuthoritative;
