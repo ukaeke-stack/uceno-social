@@ -28,6 +28,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const access = await sql`
       SELECT w.visibility, w.status, w.owner_user_id AS "ownerUserId",
         COALESCE(m.status, 'none') AS "membershipStatus",
+        u.moderation_status AS "moderationStatus",
+        u.suspended_until AS "suspendedUntil",
         EXISTS (SELECT 1 FROM user_blocks b
           WHERE (b.blocker_id = ${session.id}::uuid AND b.blocked_id = w.owner_user_id)
              OR (b.blocker_id = w.owner_user_id AND b.blocked_id = ${session.id}::uuid)) AS blocked,
@@ -35,12 +37,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           WHERE p.world_id = w.id AND p.user_id = ${session.id}::uuid
             AND p.last_seen > NOW() - INTERVAL '30 seconds') AS present
       FROM virtual_worlds w
+      JOIN users u ON u.id = ${session.id}::uuid
       LEFT JOIN virtual_world_memberships m
-        ON m.world_id = w.id AND m.user_id = ${session.id}::uuid
+        ON m.world_id = w.id AND m.user_id = u.id
       WHERE w.id = ${worldId}::uuid LIMIT 1
     `;
     const world = access[0];
-    if (!world || world.status !== "published" || world.blocked || !world.present ||
+    const moderationAllowed = !!world && world.moderationStatus !== "disabled" &&
+      !(world.moderationStatus === "suspended" &&
+        (!world.suspendedUntil || new Date(world.suspendedUntil).getTime() > Date.now()));
+    if (!world || !moderationAllowed || world.status !== "published" || world.blocked || !world.present ||
         world.membershipStatus === "banned" || world.membershipStatus === "suspended" ||
         (world.visibility === "private" && world.membershipStatus !== "active" && world.ownerUserId !== session.id)) {
       return NextResponse.json({ error: "World access expired; request a new entry code" }, { status: 403 });
