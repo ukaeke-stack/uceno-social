@@ -119,13 +119,6 @@ def download_asset(asset_id: str, metadata: dict, output_root: Path):
 
 def download_texture(asset_id: str, metadata: dict, output_root: Path):
     files = request_json(f"{API}/files/{urllib.parse.quote(asset_id)}")
-    map_keys = [
-        key for key, value in files.items()
-        if isinstance(value, dict) and any(res in value for res in ("1k", "2k", "4k", "8k", "16k"))
-    ]
-    print(f"Poly Haven texture map keys for {asset_id}: {map_keys}")
-    for key in map_keys:
-        print(f"  {key}: {list(files[key].keys())}")
     texture_dir = output_root / "Textures" / safe_name(metadata["name"])
     texture_dir.mkdir(parents=True, exist_ok=True)
     downloaded = []
@@ -134,10 +127,10 @@ def download_texture(asset_id: str, metadata: dict, output_root: Path):
     # Poly Haven's API uses map names as top-level keys. Its naming varies
     # between short and descriptive aliases, so support both.
     map_aliases = (
-        ("diff", ("diff", "diffuse")),
+        ("diff", ("diff", "diffuse", "Diffuse")),
         ("nor_gl", ("nor_gl", "normal_gl")),
-        ("rough", ("rough", "roughness")),
-        ("ao", ("ao", "ambient_occlusion")),
+        ("rough", ("rough", "roughness", "Rough")),
+        ("ao", ("ao", "ambient_occlusion", "AO")),
         ("arm", ("arm", "ao_rough_metal")),
     )
     for output_name, aliases in map_aliases:
