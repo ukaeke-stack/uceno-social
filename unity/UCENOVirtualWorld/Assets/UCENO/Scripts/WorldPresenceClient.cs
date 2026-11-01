@@ -56,6 +56,7 @@ namespace UCENO.VirtualWorld
 
         private readonly Dictionary<string, RemotePlayer> remotePlayers = new Dictionary<string, RemotePlayer>();
         private float tokenExpiresAt;
+        private float refreshRetryAt;
         private bool stopping;
 
         public int PeerCount => remotePlayers.Count;
@@ -92,7 +93,7 @@ namespace UCENO.VirtualWorld
             while (!stopping)
             {
                 // Renew before expiry; the API requires a fresh presence record.
-                if (Time.time >= tokenExpiresAt - 45f)
+                if (Time.time >= tokenExpiresAt - 45f && Time.time >= refreshRetryAt)
                 {
                     yield return RefreshSession();
                     if (!session.IsAuthenticated) { stopping = true; break; }
@@ -106,6 +107,7 @@ namespace UCENO.VirtualWorld
 
         private IEnumerator RefreshSession()
         {
+            ConnectionStatus = "RENEWING";
             using (UnityWebRequest request = new UnityWebRequest(Endpoint("/session/refresh"), "POST"))
             {
                 request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes("{}"));
@@ -116,8 +118,20 @@ namespace UCENO.VirtualWorld
                 yield return request.SendWebRequest();
                 if (request.result != UnityWebRequest.Result.Success)
                 {
-                    Debug.LogWarning("UCENO world session renewal failed (" + request.responseCode + "). Re-enter the world.");
-                    session.ClearSession();
+                    if (request.responseCode == 401 || request.responseCode == 403)
+                    {
+                        Debug.LogWarning("UCENO world session renewal was rejected. Re-enter the world.");
+                        ConnectionStatus = "SESSION EXPIRED";
+                        session.ClearSession();
+                    }
+                    else
+                    {
+                        // Preserve the current token during temporary outages and
+                        // retry with a short delay while it remains valid.
+                        refreshRetryAt = Time.time + 8f;
+                        ConnectionStatus = "RETRYING";
+                        Debug.LogWarning("UCENO world session renewal failed (" + request.responseCode + "); retrying shortly.");
+                    }
                     yield break;
                 }
                 WorldSessionRefreshResponse response = JsonUtility.FromJson<WorldSessionRefreshResponse>(request.downloadHandler.text);
@@ -128,6 +142,8 @@ namespace UCENO.VirtualWorld
                 }
                 session.SetRenewedSession(response.accessToken, response.expiresInSeconds);
                 tokenExpiresAt = Time.time + response.expiresInSeconds;
+                refreshRetryAt = 0f;
+                ConnectionStatus = "ONLINE";
                 Debug.Log("UCENO world session renewed.");
             }
         }
