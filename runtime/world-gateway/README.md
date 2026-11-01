@@ -33,6 +33,53 @@ Standalone WebSocket runtime for an already-provisioned UCENO world instance.
 Build with `npm install && npm run build`; run with `npm start`. The Dockerfile
 builds and runs the service as a non-root user.
 
+
+## Activity sessions and checkpoint races
+
+The gateway supports in-memory activity session coordination over the authenticated
+`/world` WebSocket:
+
+- `activity_create` with kind `dance`, `sports`, or `adventure`
+- `activity_join`, `activity_start`, `activity_leave`, and `activity_cancel`
+- `activity_state` broadcasts participant status and race progress
+- Only the creator can start or cancel a session. The server marks active
+  participants as did-not-finish when their socket disconnects.
+- Activity sessions and results are currently in memory and are lost on restart.
+  Durable storage, recovery, and actual sports/adventure gameplay remain outstanding.
+
+Checkpoint races require operator-authored server geometry. Configure either
+`WORLD_ACTIVITY_RACES` as JSON or `WORLD_ACTIVITY_RACES_FILE` as a path to a
+JSON file. Example:
+
+```json
+{
+  "races": [
+    {
+      "id": "city-loop",
+      "checkpoints": [
+        { "x": 0, "y": 1.15, "z": 0, "radius": 2.5 },
+        { "x": 20, "y": 1.15, "z": 0, "radius": 2.5 },
+        { "x": 20, "y": 1.15, "z": 20, "radius": 2.5 }
+      ]
+    }
+  ]
+}
+```
+
+Each race needs 2–100 checkpoints. Coordinates must use the same world coordinate
+system as Unity; checkpoint radius defaults to 2.5 units and can be configured
+from 0.5 to 20 units. A client creates a race by sending
+`{ "type": "activity_create", "kind": "checkpoint_race", "raceId": "city-loop" }`.
+The gateway checks progress using server-simulated positions and the next
+configured checkpoint only. Clients cannot submit checkpoint indexes or finish
+times. If no race definitions are configured, race creation is rejected with
+`race_not_configured`.
+
+This is source-level functionality only until CI succeeds and the gateway is
+deployed with the race configuration. The Unity UI still needs to expose race
+creation, lobby state, countdown, checkpoint indicators, and results. No live
+race or two-device behavior is claimed as verified.
+
 ## Provisioning and deployment sequence
 
 1. Apply database migrations 015–024 in numeric order.
