@@ -92,15 +92,17 @@ export async function PUT(request: NextRequest) {
       UPDATE virtual_world_entry_codes AS ec
       SET consumed_at = NOW()
       FROM virtual_worlds AS w, users AS u
-      LEFT JOIN virtual_world_memberships AS m
-        ON m.world_id = w.id AND m.user_id = u.id
       WHERE ec.code_hash = ${digest(body.code)}
         AND ec.client_type = ${body.clientType}
         AND ec.consumed_at IS NULL AND ec.expires_at > NOW()
         AND w.id = ec.world_id AND u.id = ec.user_id
         AND w.status = 'published'
-        AND COALESCE(m.status, 'none') NOT IN ('banned', 'suspended')
-        AND (w.visibility <> 'private' OR m.status = 'active' OR w.owner_user_id = u.id)
+        AND COALESCE((SELECT m.status FROM virtual_world_memberships m
+          WHERE m.world_id = w.id AND m.user_id = u.id), 'none') NOT IN ('banned', 'suspended')
+        AND (w.visibility <> 'private' OR w.owner_user_id = u.id OR EXISTS (
+          SELECT 1 FROM virtual_world_memberships m
+          WHERE m.world_id = w.id AND m.user_id = u.id AND m.status = 'active'
+        ))
         AND u.moderation_status <> 'disabled'
         AND (u.moderation_status <> 'suspended' OR u.suspended_until <= NOW())
         AND NOT EXISTS (
