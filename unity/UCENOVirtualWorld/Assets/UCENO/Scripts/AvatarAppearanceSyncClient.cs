@@ -34,12 +34,20 @@ namespace UCENO.VirtualWorld
         private bool saving;
         private bool pendingSave;
         private bool loaded;
+        private bool loading;
+        private float nextLoadAttempt;
 
         public void Initialize(WorldSessionClient worldSession, AvatarAppearanceProfile appearanceProfile)
         {
             session = worldSession;
             profile = appearanceProfile;
-            if (isActiveAndEnabled) StartCoroutine(LoadRoutine());
+        }
+
+        private void Update()
+        {
+            if (!loaded && !loading && session != null && session.IsAuthenticated &&
+                Time.unscaledTime >= nextLoadAttempt)
+                StartCoroutine(LoadRoutine());
         }
 
         public void Save(AvatarAppearanceProfile.Palette palette)
@@ -51,8 +59,9 @@ namespace UCENO.VirtualWorld
 
         private IEnumerator LoadRoutine()
         {
+            loading = true;
             if (session == null || profile == null || !session.IsAuthenticated ||
-                string.IsNullOrEmpty(session.WorldId)) yield break;
+                string.IsNullOrEmpty(session.WorldId)) { loading = false; yield break; }
             string url = session.ApiBaseUrl.TrimEnd('/') + "/api/worlds/" + UnityWebRequest.EscapeURL(session.WorldId) + "/appearance";
             using (UnityWebRequest request = UnityWebRequest.Get(url))
             {
@@ -76,10 +85,12 @@ namespace UCENO.VirtualWorld
                         if (hud == null) hud = GetComponentInChildren<AvatarCustomizationHud>();
                         if (hud != null) hud.ApplyAccountPalette(palette);
                     }
+                    loaded = true;
                 }
                 else Debug.LogWarning("UCENO account appearance load failed: " + request.responseCode);
             }
-            loaded = true;
+            if (!loaded) nextLoadAttempt = Time.unscaledTime + 10f;
+            loading = false;
         }
 
         private IEnumerator SaveRoutine(AvatarAppearanceProfile.Palette initial)
