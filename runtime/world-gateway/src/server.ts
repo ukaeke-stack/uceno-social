@@ -121,7 +121,8 @@ server.on("upgrade", async (req, socket, head) => {
   try {
     if (req.url !== "/world" || !req.headers.authorization?.startsWith("Bearer "))
       throw new Error("unauthorized");
-    const token = req.headers.authorization.slice(7);\n    const identity = await authenticate(token);
+    const token = req.headers.authorization.slice(7);
+    const identity = await authenticate(token);
     if (players.size >= MAX_CLIENTS && !players.has(identity.userId)) throw new Error("instance_full");
     wss.handleUpgrade(req, socket, head, (ws) => {
       upgradeIdentity.set(ws, { ...identity, token });
@@ -173,7 +174,25 @@ wss.on("connection", async (socket: WebSocket) => {
   }
 });
 
-// Re-check the original signed session periodically so bans, suspensions, blocks,\n// world shutdowns and expired tokens revoke already-open sockets.\nsetInterval(() => {\n  const now = Date.now();\n  for (const player of players.values()) {\n    if (now - player.lastAuthorizationCheck < 15000 || player.authorizationCheckInProgress) continue;\n    player.lastAuthorizationCheck = now;\n    player.authorizationCheckInProgress = true;\n    void authenticate(player.token).catch(() => {\n      if (players.get(player.id)?.socket === player.socket) {\n        send(player.socket, { type: "error", code: "access_revoked" });\n        player.socket.close(4003, "access_revoked");\n        players.delete(player.id);\n      }\n    }).finally(() => { player.authorizationCheckInProgress = false; });\n  }\n}, 5000);\n\nlet lastTick = Date.now();
+// Re-check the original signed session periodically so bans, suspensions, blocks,
+ // world shutdowns and expired tokens revoke already-open sockets.
+setInterval(() => {
+  const now = Date.now();
+  for (const player of players.values()) {
+    if (now - player.lastAuthorizationCheck < 15000 || player.authorizationCheckInProgress) continue;
+    player.lastAuthorizationCheck = now;
+    player.authorizationCheckInProgress = true;
+    void authenticate(player.token).catch(() => {
+      if (players.get(player.id)?.socket === player.socket) {
+        send(player.socket, { type: "error", code: "access_revoked" });
+        player.socket.close(4003, "access_revoked");
+        players.delete(player.id);
+      }
+    }).finally(() => { player.authorizationCheckInProgress = false; });
+  }
+}, 5000);
+
+let lastTick = Date.now();
 setInterval(async () => {
   const now = Date.now();
   const dt = Math.min(0.05, Math.max(0.001, (now - lastTick) / 1000));
