@@ -166,3 +166,19 @@ supported parameters only when those parameters exist; avatars without an
 Animator Controller use the procedural driver for movement, seated poses and
 gesture playback. Controller clips and chair-specific IK still require prefab
 and in-Editor verification.
+
+
+## Entry-code redemption hardening (November 2026)
+
+The Unity entry-code exchange now revalidates access at the moment the
+single-use code is consumed. A code no longer grants a token if the world has
+been unpublished, a private-world membership has been removed, the user has
+been banned or suspended, moderation has disabled the account, or an owner
+block has been added since code issuance. The response now includes the
+world ID explicitly as well as embedding it in the scoped JWT.
+
+The LiveKit voice-token route also checks owner-block relationships before
+issuing a room token. This closes an access-control gap in which a previously
+valid entry handoff could otherwise be used to request voice after a block
+change. These are admission checks; they do not replace revalidation by a
+dedicated authoritative world server.
