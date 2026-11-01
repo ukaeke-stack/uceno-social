@@ -54,7 +54,7 @@ async function authenticate(token: string) {
   const rows = await sql`
     SELECT u.id, u.moderation_status AS "moderationStatus",
       u.suspended_until AS "suspendedUntil",
-      w.status AS "worldStatus", w.visibility,
+      w.status AS "worldStatus", w.visibility, w.owner_user_id AS "ownerUserId",
       COALESCE(m.status, 'none') AS "membershipStatus",
       EXISTS (
         SELECT 1 FROM virtual_world_instance_sessions s
@@ -82,15 +82,15 @@ async function authenticate(token: string) {
        (!row.suspendedUntil || new Date(row.suspendedUntil).getTime() > Date.now())) ||
       row.worldStatus !== "published" || row.blocked || !row.leaseHealthy ||
       row.membershipStatus === "banned" || row.membershipStatus === "suspended" ||
-      (row.visibility === "private" && row.membershipStatus !== "active"))
+      (row.visibility === "private" && row.membershipStatus !== "active" && row.ownerUserId !== row.id))
     throw new Error("access_revoked");
   return { userId: row.id as string, worldId: payload.world_id as string };
 }
 
-async function loadPlayer(userId: string, socket: WebSocket): Promise<Player> {
+async function loadPlayer(userId: string, worldId: string, socket: WebSocket): Promise<Player> {
   const rows = await sql`
     SELECT position FROM virtual_world_player_state
-    WHERE user_id = ${userId}::uuid
+    WHERE world_id = ${worldId}::uuid AND user_id = ${userId}::uuid
     LIMIT 1
   `;
   const p = rows[0]?.position || { x: 0, y: 0, z: 0 };
@@ -138,7 +138,7 @@ wss.on("connection", async (socket: WebSocket) => {
   try {
     const old = players.get(identity.userId);
     if (old) { old.socket.close(4001, "replaced_by_reconnect"); players.delete(identity.userId); }
-    const player = await loadPlayer(identity.userId, socket);
+    const player = await loadPlayer(identity.userId, identity.worldId, socket);
     players.set(identity.userId, player);
     send(socket, { type: "welcome", userId: identity.userId, tickRate: TICK_RATE,
       state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
