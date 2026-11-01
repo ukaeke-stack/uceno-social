@@ -59,7 +59,7 @@ namespace UCENO.VirtualWorld
 
         private static void CreateLighting()
         {
-            if (Object.FindObjectOfType<Light>() != null) return;
+            if (Object.FindFirstObjectByType<Light>() != null) return;
             GameObject lightObject = new GameObject("Sun");
             Light sun = lightObject.AddComponent<Light>();
             sun.type = LightType.Directional;
