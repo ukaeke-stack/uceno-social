@@ -430,8 +430,16 @@ namespace UCENO.VirtualWorld
 
         private void OnGUI()
         {
-            if (!visible) return;
             float scale = Mathf.Clamp(Screen.width / 600f, 1f, 1.6f);
+            if (Application.isMobilePlatform && !visible)
+            {
+                if (GUI.Button(new Rect(12f, 94f, 118f * scale, 42f * scale), "HOMES"))
+                {
+                    visible = true;
+                    if (session != null && session.IsAuthenticated) RefreshHomes();
+                }
+            }
+            if (!visible) return;
             float width = Mathf.Min(Screen.width - 24f, 440f * scale);
             float height = Mathf.Min(Screen.height - 40f, 560f * scale);
             Rect panel = new Rect(12f, 92f, width, height);
