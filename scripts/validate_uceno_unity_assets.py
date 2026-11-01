@@ -151,9 +151,15 @@ def main():
     camera = read_text(ASSETS / "Scripts/FollowCamera.cs")
     if "Physics.SphereCast" not in camera:
         fail("FollowCamera is missing city-geometry collision handling.")
+    if "previousPinchDistance" not in camera or "maximumDistance" not in camera:
+        fail("FollowCamera is missing bounded pinch/wheel zoom controls.")
+
+    avatar = read_text(ASSETS / "Scripts/AvatarLocomotionDriver.cs")
+    if "TriggerWave" not in avatar or "TriggerCheer" not in avatar:
+        fail("Avatar wave/cheer gesture actions are missing.")
 
     hud = read_text(ASSETS / "Scripts/WorldStatusHud.cs")
-    if "GUI.Button" not in hud or "Position:" not in hud or '"JUMP"' not in hud or '"RUN"' not in hud:
+    if "GUI.Button" not in hud or "Position:" not in hud or '"JUMP"' not in hud or '"RUN"' not in hud or '"WAVE"' not in hud or '"CHEER"' not in hud:
         fail("World status HUD, mobile jump control, or sprint control is missing.")
 
     if "RequestJump" not in motor or "KeyCode.Space" not in motor or "jumpHeight" not in motor:
