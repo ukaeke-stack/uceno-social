@@ -78,6 +78,7 @@ This checklist covers the Unity city client, world gateway interactions and the 
 - [ ] Unauthenticated requests to home and home-member APIs return 401.
 - [ ] Home listing only returns homes owned by the signed-in user or explicitly shared with that user.
 - [ ] Home creation rejects invalid world IDs, templates, oversized transforms, oversized furnishing arrays and more than 100 furnishing entries.
+- [ ] Home create/update reject non-finite or out-of-range coordinates, invalid asset IDs, invalid yaw/scale values, malformed furniture records and more than 100 items.
 - [ ] Home layout updates are accepted only from the owner, a co-owner or a decorator; visitors cannot modify the layout.
 - [ ] Only the home owner can grant, list or revoke home members.
 - [ ] The owner-only member roster returns only user IDs, permission and invitation timestamp; it does not expose account email, phone or profile details.
