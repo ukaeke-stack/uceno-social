@@ -74,21 +74,27 @@ jobs:
             --formats fbx \
             --detail medium \
             --out "$RUNNER_TEMP/uceno-avatar-export"
-          mkdir -p "$RUNNER_TEMP/uceno-avatar-extracted"
-          archive="$(find "$RUNNER_TEMP/uceno-avatar-export" -maxdepth 1 -type f -name '*.zip' -print -quit)"
-          test -n "$archive"
-          unzip -q "$archive" -d "$RUNNER_TEMP/uceno-avatar-extracted"
-          avatar="$(find "$RUNNER_TEMP/uceno-avatar-extracted" -type f -name 'UCENO_Default_Avatar.fbx' -print -quit)"
-          test -n "$avatar"
-          mkdir -p "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported"
-          cp "$avatar" "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported/UCENO_Default_Avatar.fbx"
-          license="$(find "$RUNNER_TEMP/uceno-avatar-extracted" -type f -name 'LICENSE.txt' -print -quit)"
-          if [ -n "$license" ]; then
-            mkdir -p "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Documentation/Ara3DGen"
-            cp "$license" "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Documentation/Ara3DGen/LICENSE.txt"
+          avatar="$(find "$RUNNER_TEMP/uceno-avatar-export" -type f -name 'UCENO_Default_Avatar.fbx' -print -quit)"
+          if [ -z "$avatar" ]; then
+            mkdir -p "$RUNNER_TEMP/uceno-avatar-extracted"
+            archive="$(find "$RUNNER_TEMP/uceno-avatar-export" -maxdepth 1 -type f -name '*.zip' -print -quit)"
+            if [ -n "$archive" ]; then
+              unzip -q "$archive" -d "$RUNNER_TEMP/uceno-avatar-extracted"
+              avatar="$(find "$RUNNER_TEMP/uceno-avatar-extracted" -type f -name 'UCENO_Default_Avatar.fbx' -print -quit)"
+            fi
           fi
+          test -n "$avatar"
+          import_dir="$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported"
+          mkdir -p "$import_dir"
+          cp -a "$RUNNER_TEMP/uceno-avatar-export/." "$import_dir/"
+          if [ "$avatar" != "$import_dir/UCENO_Default_Avatar.fbx" ]; then
+            cp "$avatar" "$import_dir/UCENO_Default_Avatar.fbx"
+          fi
+          license_dir="$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Documentation/Ara3DGen"
+          mkdir -p "$license_dir"
+          cp "$RUNNER_TEMP/ara3dgen/scripts/ASSETS_LICENSE.txt" "$license_dir/ASSETS_LICENSE.txt"
           echo "Generated avatar:"
-          ls -lh "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported/UCENO_Default_Avatar.fbx"
+          ls -lh "$import_dir/UCENO_Default_Avatar.fbx"
 
       - name: Download selected Poly Haven CC0 city and nature models
         run: |
