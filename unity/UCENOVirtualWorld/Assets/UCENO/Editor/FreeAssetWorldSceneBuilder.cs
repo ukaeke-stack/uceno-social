@@ -114,6 +114,9 @@ namespace UCENO.VirtualWorld.Editor
                 apartmentPrefab, factoryPrefab, lampPrefab,
                 pachiraPrefab, shrub02Prefab, shrub03Prefab,
                 carPrefab, fencePrefab);
+            BuildDistrictFeatures(
+                worldRoot, asphalt, concrete, laneMarking, centreMarking,
+                pachiraPrefab, shrub03Prefab, lampPrefab, carPrefab);
             ConfigureLighting(skybox);
 
             WorldSessionClient worldSession = world.AddComponent<WorldSessionClient>();
@@ -527,6 +530,75 @@ namespace UCENO.VirtualWorld.Editor
             instance.transform.localScale = scale;
             SetStaticRecursive(instance);
             return instance;
+        }
+
+        private static void BuildDistrictFeatures(
+            Transform parent,
+            Material asphalt,
+            Material concrete,
+            Material laneMarking,
+            Material centreMarking,
+            GameObject treePrefab,
+            GameObject shrubPrefab,
+            GameObject lampPrefab,
+            GameObject carPrefab)
+        {
+            // A compact civic square gives the starter district a recognisable
+            // destination rather than leaving it as a single repeated road.
+            Transform square = new GameObject("Civic Garden Square").transform;
+            square.SetParent(parent, false);
+            square.localPosition = new Vector3(37f, 0f, 0f);
+
+            CreatePlane("Garden Square Paving", square, new Vector3(0f, 0.025f, 0f), 27f, 34f, concrete);
+            CreatePlane("Garden Lawn", square, new Vector3(0f, 0.045f, 0f), 15f, 22f, grassMaterialFromParent(parent));
+            CreatePlane("North Walk", square, new Vector3(0f, 0.065f, 12.4f), 25f, 2.1f, concrete);
+            CreatePlane("South Walk", square, new Vector3(0f, 0.065f, -12.4f), 25f, 2.1f, concrete);
+            CreatePlane("West Walk", square, new Vector3(-9.2f, 0.065f, 0f), 2.1f, 21f, concrete);
+            CreatePlane("East Walk", square, new Vector3(9.2f, 0.065f, 0f), 2.1f, 21f, concrete);
+
+            // Tree and planting beds frame the lawn and preserve a clear centre.
+            for (int z = -8; z <= 8; z += 8)
+            {
+                Place(treePrefab, square, new Vector3(-11.2f, 0f, z), Quaternion.Euler(0f, z * 7f, 0f), Vector3.one * 0.34f);
+                Place(treePrefab, square, new Vector3(11.2f, 0f, z + 3f), Quaternion.Euler(0f, z * 9f, 0f), Vector3.one * 0.34f);
+                Place(shrubPrefab, square, new Vector3(-7.7f, 0f, z + 2f), Quaternion.identity, Vector3.one * 0.42f);
+                Place(shrubPrefab, square, new Vector3(7.7f, 0f, z - 2f), Quaternion.identity, Vector3.one * 0.42f);
+            }
+
+            Place(lampPrefab, square, new Vector3(-11.5f, 0f, -13.5f), Quaternion.identity, Vector3.one * 0.85f);
+            Place(lampPrefab, square, new Vector3(11.5f, 0f, 13.5f), Quaternion.identity, Vector3.one * 0.85f);
+
+            // Mark a pedestrian crossing on the main road. Separate short
+            // meshes are cheaper than a large transparent decal on mobile.
+            for (int i = -4; i <= 4; i++)
+            {
+                float x = i * 0.92f;
+                CreatePlane("Pedestrian Crossing Stripe", parent,
+                    new Vector3(x, 0.043f, 0f), 0.48f, 3.6f, laneMarking);
+            }
+
+            // A marked pull-in bay gives parked vehicles a defined location.
+            CreatePlane("East Parking Bay", parent, new Vector3(10.4f, 0.018f, 94f), 3.1f, 27f, asphalt);
+            for (int z = 82; z <= 106; z += 6)
+                CreateRoadLine(parent, laneMarking,
+                    new Vector3(8.9f, 0.045f, z), new Vector3(11.9f, 0.045f, z), 0.045f);
+
+            Place(carPrefab, parent, new Vector3(10.2f, 0.04f, 88f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.78f);
+            Place(carPrefab, parent, new Vector3(10.2f, 0.04f, 100f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.78f);
+        }
+
+        private static Material grassMaterialFromParent(Transform parent)
+        {
+            // Reuse the already-created grass material from the scene builder.
+            Renderer existing = parent.GetComponentInChildren<Renderer>();
+            if (existing != null && existing.sharedMaterial != null &&
+                existing.sharedMaterial.name == "UCENO_Grass")
+                return existing.sharedMaterial;
+
+            Material grass = AssetDatabase.LoadAssetAtPath<Material>(MaterialRoot + "/UCENO_Grass.mat");
+            if (grass == null)
+                throw new BuildFailedException("UCENO_Grass material was not created before district layout.");
+            return grass;
         }
 
         private static void ConfigureLighting(Material skybox)
