@@ -94,6 +94,7 @@ namespace UCENO.VirtualWorld
         [SerializeField] private WorldHomeFurnitureCatalogEntry[] furnitureCatalog =
             new WorldHomeFurnitureCatalogEntry[0];
         [SerializeField] private float placementDistance = 2.2f;
+        [SerializeField] private float furnitureMoveStep = 0.25f;
 
         private readonly List<WorldHomeSummary> homes = new List<WorldHomeSummary>();
         private readonly List<WorldHomeFurnishing> furnishing = new List<WorldHomeFurnishing>();
@@ -195,6 +196,28 @@ namespace UCENO.VirtualWorld
                 return false;
             }
             return true;
+        }
+
+        public void MoveSelectedFurniture(int direction)
+        {
+            if (!CanEditSelectedHome || selectedFurnitureIndex < 0 ||
+                selectedFurnitureIndex >= furnishing.Count || player == null) return;
+            Vector3 forward = player.transform.forward;
+            Vector3 right = player.transform.right;
+            forward.y = 0f;
+            right.y = 0f;
+            forward.Normalize();
+            right.Normalize();
+            Vector3 delta = direction == 0 ? forward * furnitureMoveStep :
+                direction == 1 ? -forward * furnitureMoveStep :
+                direction == 2 ? -right * furnitureMoveStep :
+                direction == 3 ? right * furnitureMoveStep : Vector3.zero;
+            WorldHomeFurnishing item = furnishing[selectedFurnitureIndex];
+            item.x += delta.x;
+            item.z += delta.z;
+            if (selectedFurnitureIndex < spawnedFurniture.Count && spawnedFurniture[selectedFurnitureIndex] != null)
+                spawnedFurniture[selectedFurnitureIndex].transform.position += delta;
+            status = "Selected furniture moved. Save the home to persist the change.";
         }
 
         public void RotateSelectedFurniture(float degrees)
@@ -556,6 +579,14 @@ namespace UCENO.VirtualWorld
                         GUILayout.EndScrollView();
                         if (selectedFurnitureIndex >= 0 && selectedFurnitureIndex < furnishing.Count)
                         {
+                            GUILayout.BeginHorizontal();
+                            if (GUILayout.Button("FORWARD", GUILayout.Height(32f * scale))) MoveSelectedFurniture(0);
+                            if (GUILayout.Button("BACK", GUILayout.Height(32f * scale))) MoveSelectedFurniture(1);
+                            GUILayout.EndHorizontal();
+                            GUILayout.BeginHorizontal();
+                            if (GUILayout.Button("LEFT", GUILayout.Height(32f * scale))) MoveSelectedFurniture(2);
+                            if (GUILayout.Button("RIGHT", GUILayout.Height(32f * scale))) MoveSelectedFurniture(3);
+                            GUILayout.EndHorizontal();
                             GUILayout.BeginHorizontal();
                             if (GUILayout.Button("ROTATE -15", GUILayout.Height(32f * scale))) RotateSelectedFurniture(-15f);
                             if (GUILayout.Button("ROTATE +15", GUILayout.Height(32f * scale))) RotateSelectedFurniture(15f);
