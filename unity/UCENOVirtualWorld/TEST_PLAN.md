@@ -86,6 +86,20 @@ This checklist covers the Unity city client, world gateway interactions and the 
 - [ ] Revoking a home member removes their shared-home access on the next request.
 - [ ] Verify these checks against a test database after required migrations are deployed; static source checks are not database integration tests.
 
+## Unity home manager and layout checks
+
+- [ ] Enter a world and press M; the home manager opens and loads only homes accessible to the signed-in account.
+- [ ] Create a home; confirm the server returns a home ID and it appears in the refreshed home list.
+- [ ] Open an owned home; confirm the permission label is owner and the saved furnishing layout loads.
+- [ ] Open an invited home as visitor; confirm furniture is visible but layout editing and save controls are unavailable.
+- [ ] Open an invited home as decorator or co-owner; confirm catalog furniture placement is enabled and the server accepts a layout save.
+- [ ] As owner, switch visibility between private and invite and save; confirm the server persists the change.
+- [ ] Confirm a decorator/co-owner cannot change home visibility by sending a modified API request.
+- [ ] As owner of an invite-visible home, grant visitor/decorator/co-owner access using a valid account UUID; verify the roster updates.
+- [ ] Revoke an invitee; verify the roster updates and that account receives 404 on the next home load.
+- [ ] Add real residential interior and furniture prefabs to the Unity home catalog; confirm placement, saved transforms, scale, rotation and reload visuals. The current scene does not yet supply catalog furniture.
+- [ ] Test placement on Android touch controls and confirm placed furniture cannot be moved outside the intended home boundary.
+
 ## Home access and invitation checks
 
 - [ ] An unauthenticated home retrieval request returns 401.
