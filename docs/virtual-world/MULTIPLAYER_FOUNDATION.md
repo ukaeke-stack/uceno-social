@@ -19,7 +19,8 @@
   - Listing prices are validated as non-negative integer Purchased Credits; stock and metadata are bounded.
 - Migration 016 adds a concurrency-safe marketplace purchase function: it locks the listing, validates stock and buyer, debits only Purchased Credits, writes an idempotent ledger row and reserves stock in one database transaction. The resulting order remains in escrow; no seller payout or item delivery is performed.
 - `POST /api/marketplace/:listingId/purchase` is implemented but deliberately feature-gated. It returns 503 unless `MARKETPLACE_ESCROW_ENABLED=true`; do not enable it until seller settlement, refunds, dispute handling and digital-item delivery are implemented and tested.
-- `GET /api/marketplace/orders?role=all|buyer|seller` returns the signed-in user's own order history; escrow status does not imply item delivery or seller payout.\n- Migration 017 adds a locked, server-authoritative order state machine. `POST /api/marketplace/orders/:orderId/actions` supports seller delivery declaration, buyer delivery confirmation and buyer dispute intake. These transitions are role-checked and replay-safe; they do not release escrow, refund credits or pay sellers. Disputed orders are marked for a future authorized review workflow.
+- `GET /api/marketplace/orders?role=all|buyer|seller` returns the signed-in user's own order history; escrow status does not imply item delivery or seller payout.
+- Migration 017 adds a locked, server-authoritative order state machine. `POST /api/marketplace/orders/:orderId/actions` supports seller delivery declaration, buyer delivery confirmation and buyer dispute intake. These transitions are role-checked and replay-safe; they do not release escrow, refund credits or pay sellers. Disputed orders are marked for a future authorized review workflow.
 
 ## Important transaction boundary
 
