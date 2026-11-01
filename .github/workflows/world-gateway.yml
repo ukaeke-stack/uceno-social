@@ -106,7 +106,7 @@ jobs:
           for (const marker of ['const hasVisibility = body.visibility !== undefined && body.visibility !== ""', 'NOT ${hasVisibility} OR h.owner_user_id'])
             if (!homeRoute.includes(marker)) throw new Error('Home visibility changes are not owner-restricted: ' + marker);
           const homeClient = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldHomeClient.cs', 'utf8');
-          for (const marker of ['RequestHomes', 'CreateHomeRoutine', 'LoadHomeRoutine', 'SaveHomeRoutine', 'PlaceFurniture', 'RotateSelectedFurniture', 'RemoveSelectedFurniture', 'InviteMemberRoutine', 'RevokeMemberRoutine', 'SHARING: ON', 'HOMES', 'Application.isMobilePlatform', 'CLOSE'])
+          for (const marker of ['RequestHomes', 'CreateHomeRoutine', 'LoadHomeRoutine', 'SaveHomeRoutine', 'PlaceFurniture', 'MoveSelectedFurniture', 'RotateSelectedFurniture', 'RemoveSelectedFurniture', 'InviteMemberRoutine', 'RevokeMemberRoutine', 'SHARING: ON', 'HOMES', 'Application.isMobilePlatform', 'CLOSE'])
             if (!homeClient.includes(marker)) throw new Error('Missing Unity home-management behavior: ' + marker);
           const eventsClient = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldEventsClient.cs', 'utf8');
           for (const marker of ['LoadEventsRoutine', 'CreateEventRoutine', 'SetAttendanceRoutine', '/api/world-events?worldId=', '/api/world-events', 'canHost', 'INTERESTED'])
