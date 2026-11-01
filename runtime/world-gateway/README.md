@@ -12,7 +12,7 @@ Standalone WebSocket runtime for an already-provisioned UCENO world instance.
 - Accepts sequenced movement input (move axes, yaw, sprint, jump, seated state and wave/cheer gesture state), rejects
   malformed or excessive input, and simulates horizontal movement, gravity,
   jump and ground contact at 20 ticks/second on the server.
-- Broadcasts server-generated world snapshots to connected players.
+- Broadcasts server-generated world snapshots to connected players.\n- Sends the current authoritative state of all configured doors, seats and usable objects to every newly connected/reconnected client, so late joiners do not render stale default states.
 - Stops movement when input goes stale, bounds world coordinates and limits
   players to the configured instance capacity.
 - Writes durable player checkpoints every five seconds. The live simulation
