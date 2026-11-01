@@ -44,12 +44,15 @@ async function canAccessWorld(worldId: string, userId: string) {
   const rows = await sql`
     SELECT w.status, w.visibility, w.owner_user_id AS "ownerUserId",
       COALESCE(m.status, 'none') AS "membershipStatus",
+      u.moderation_status AS "moderationStatus",
+      u.suspended_until AS "suspendedUntil",
       EXISTS (SELECT 1 FROM user_blocks b
         WHERE (b.blocker_id = ${userId}::uuid AND b.blocked_id = w.owner_user_id)
            OR (b.blocker_id = w.owner_user_id AND b.blocked_id = ${userId}::uuid)) AS blocked
     FROM virtual_worlds w
+    JOIN users u ON u.id = ${userId}::uuid
     LEFT JOIN virtual_world_memberships m
-      ON m.world_id = w.id AND m.user_id = ${userId}::uuid
+      ON m.world_id = w.id AND m.user_id = u.id
     WHERE w.id = ${worldId}::uuid LIMIT 1
   `;
   const world = rows[0];
