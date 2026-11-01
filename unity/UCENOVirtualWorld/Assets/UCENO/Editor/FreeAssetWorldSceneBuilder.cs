@@ -234,20 +234,28 @@ namespace UCENO.VirtualWorld.Editor
             AnimationClip idle = FindClip(clips, "idle", "stand");
             AnimationClip walk = FindClip(clips, "walk");
             AnimationClip run = FindClip(clips, "run");
-            if (idle == null || walk == null || run == null)
-            {
-                string names = string.Join(", ", clips.Select(clip => clip.name));
-                throw new BuildFailedException(
-                    "The imported Humanoid FBX must contain Idle, Walk and Run clips. Found: " + names);
-            }
-
             Avatar avatar = AssetDatabase.LoadAllAssetsAtPath(AvatarPath)
                 .OfType<Avatar>()
                 .FirstOrDefault(candidate => candidate != null && candidate.isHuman);
             if (avatar == null)
                 throw new BuildFailedException("UCENO_Default_Avatar.fbx did not import as a valid Unity Humanoid.");
 
-            AnimatorController controller = CreateLocomotionController(idle, walk, run);
+            // Some FBX exporters include a valid skinned Humanoid but omit
+            // embedded animation takes. Keep the real character usable: use
+            // imported clips when all three exist, otherwise the locomotion
+            // driver animates the imported Humanoid skeleton procedurally.
+            AnimatorController controller = null;
+            if (idle != null && walk != null && run != null)
+            {
+                controller = CreateLocomotionController(idle, walk, run);
+            }
+            else
+            {
+                string names = string.Join(", ", clips.Select(clip => clip.name));
+                Debug.LogWarning(
+                    "UCENO avatar FBX has no complete Idle/Walk/Run clip set. " +
+                    "Using skeletal locomotion fallback. Imported clips: " + names);
+            }
             GameObject source = AssetDatabase.LoadAssetAtPath<GameObject>(AvatarPath);
             GameObject wrapper = new GameObject("UCENO Default Humanoid");
             GameObject model = UnityEngine.Object.Instantiate(source);
