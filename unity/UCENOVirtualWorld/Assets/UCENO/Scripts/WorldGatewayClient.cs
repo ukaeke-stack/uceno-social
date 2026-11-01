@@ -88,6 +88,8 @@ namespace UCENO.VirtualWorld
         private bool destroying;
         private int sequence;
         private float nextInputAt;
+        private float nextReconnectAt;
+        private int reconnectAttempts;
         private string localUserId;
         private AvatarLocomotionDriver localAvatar;
 
@@ -155,6 +157,7 @@ namespace UCENO.VirtualWorld
             {
                 connecting = false;
                 connected = true;
+                reconnectAttempts = 0;
                 ConnectionStatus = "AUTHENTICATING";
                 Debug.Log("UCENO authoritative gateway transport opened.");
             };
@@ -170,7 +173,11 @@ namespace UCENO.VirtualWorld
                 connected = false;
                 sendPending = false;
                 if (localPlayer != null) localPlayer.SetServerAuthority(false);
-                if (!destroying) ConnectionStatus = "DISCONNECTED";
+                if (!destroying)
+                {
+                    ConnectionStatus = "DISCONNECTED";
+                    ScheduleReconnect();
+                }
                 Debug.LogWarning("UCENO gateway closed: " + code);
             };
             _ = ConnectAsync(socket);
@@ -184,6 +191,7 @@ namespace UCENO.VirtualWorld
                 connecting = false;
                 connected = false;
                 ConnectionStatus = "RETRYING";
+                ScheduleReconnect();
                 Debug.LogWarning("UCENO gateway connection failed: " + error.Message);
             }
         }
@@ -276,6 +284,10 @@ namespace UCENO.VirtualWorld
         private void Update()
         {
             socket?.DispatchMessageQueue();
+            if (!connected && !connecting && !destroying && session != null &&
+                session.IsAuthenticated && !string.IsNullOrWhiteSpace(session.InstanceEndpoint) &&
+                Time.unscaledTime >= nextReconnectAt)
+                Connect();
             if (connected && socket != null && localPlayer != null &&
                 Time.unscaledTime >= nextInputAt && !sendPending)
             {
@@ -317,6 +329,13 @@ namespace UCENO.VirtualWorld
             try { await socket.SendText(JsonUtility.ToJson(input)); }
             catch (Exception error) { Debug.LogWarning("UCENO gateway input send failed: " + error.Message); }
             finally { sendPending = false; }
+        }
+
+        private void ScheduleReconnect()
+        {
+            reconnectAttempts = Mathf.Min(reconnectAttempts + 1, 5);
+            float delay = Mathf.Min(30f, 2f * Mathf.Pow(2f, reconnectAttempts - 1));
+            nextReconnectAt = Time.unscaledTime + delay;
         }
 
         private void RemoveRemote(string id)
