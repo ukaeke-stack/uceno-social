@@ -17,6 +17,15 @@ CREATE INDEX IF NOT EXISTS virtual_world_instance_sessions_capacity_idx
 CREATE INDEX IF NOT EXISTS virtual_world_instance_sessions_expiry_idx
   ON virtual_world_instance_sessions(lease_expires_at);
 
+-- Bind ephemeral presence to the assigned runtime so clients do not render
+-- players who belong to another instance of the same world.
+ALTER TABLE virtual_world_presence
+  ADD COLUMN IF NOT EXISTS instance_id UUID
+  REFERENCES virtual_world_instances(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS virtual_world_presence_instance_seen_idx
+  ON virtual_world_presence(instance_id, last_seen DESC);
+
 CREATE OR REPLACE FUNCTION claim_virtual_world_instance(
   p_world_id UUID,
   p_user_id UUID
