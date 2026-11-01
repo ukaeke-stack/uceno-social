@@ -125,7 +125,8 @@ namespace UCENO.VirtualWorld
                 cameraObject.AddComponent<AudioListener>();
             }
             camera.enabled = true;
-            camera.clearFlags = CameraClearFlags.Skybox;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.38f, 0.68f, 0.90f, 1f);
             camera.fieldOfView = 62f;
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = 500f;
