@@ -51,11 +51,23 @@ namespace UCENO.VirtualWorld
         public string action;
     }
 
+    [Serializable] internal sealed class GatewayContextRequest
+    {
+        public string type;
+        public string id;
+    }
+
     [Serializable] internal sealed class GatewayPacket
     {
         public string type;
         public string userId;
         public string code;
+        public string contextType;
+        public string contextId;
+        public string activityType;
+        public string locationLabel;
+        public string homeId;
+        public string eventId;
         public string objectId;
         public string objectState;
         public string actorId;
@@ -107,6 +119,8 @@ namespace UCENO.VirtualWorld
         public string ConnectionStatus { get; private set; } = "WAITING";
         public int PeerCount => remotePlayers.Count;
         public string LocalUserId => localUserId;
+        public event Action<string, string, Vector3, float> SpatialLocationEntered;
+        public event Action SpatialLocationExited;
 
         public void Configure(WorldSessionClient worldSession, PlayerMotor player, GameObject avatarPrefab)
         {
@@ -127,6 +141,45 @@ namespace UCENO.VirtualWorld
                 return;
             }
             Connect();
+        }
+
+        public bool RequestHomeEntry(string homeId) =>
+            RequestSpatialContext("home_enter", homeId);
+
+        public bool RequestHomeExit() =>
+            RequestSpatialContext("home_exit", "");
+
+        public bool RequestEventJoin(string eventId) =>
+            RequestSpatialContext("event_join", eventId);
+
+        public bool RequestEventExit() =>
+            RequestSpatialContext("event_exit", "");
+
+        private bool RequestSpatialContext(string type, string id)
+        {
+            if (!connected || socket == null ||
+                (type != "home_enter" && type != "home_exit" &&
+                 type != "event_join" && type != "event_exit") ||
+                ((type == "home_enter" || type == "event_join") && string.IsNullOrWhiteSpace(id)))
+                return false;
+            _ = SendSpatialContextAsync(type, id);
+            return true;
+        }
+
+        private async Task SendSpatialContextAsync(string type, string id)
+        {
+            try
+            {
+                await socket.SendText(JsonUtility.ToJson(new GatewayContextRequest
+                {
+                    type = type,
+                    id = id
+                }));
+            }
+            catch (Exception error)
+            {
+                Debug.LogWarning("UCENO spatial context request failed: " + error.Message);
+            }
         }
 
         public bool RequestInteraction(string objectId, string action)
@@ -260,6 +313,37 @@ namespace UCENO.VirtualWorld
                     localPlayer.SetServerAuthority(true);
                 }
                 ConnectionStatus = "ONLINE";
+                return;
+            }
+
+            if (packet.type == "spatial_location_entered")
+            {
+                if (packet.state != null && localPlayer != null)
+                {
+                    Vector3 spawn = new Vector3(packet.state.x, packet.state.y, packet.state.z);
+                    localPlayer.ApplyServerState(spawn, packet.state.yaw);
+                    localPlayer.SetServerAuthority(true);
+                    SpatialLocationEntered?.Invoke(packet.contextType, packet.contextId, spawn, packet.state.yaw);
+                }
+                return;
+            }
+
+            if (packet.type == "spatial_location_exited")
+            {
+                if (packet.state != null && localPlayer != null)
+                {
+                    localPlayer.ApplyServerState(
+                        new Vector3(packet.state.x, packet.state.y, packet.state.z),
+                        packet.state.yaw);
+                    localPlayer.SetServerAuthority(true);
+                }
+                SpatialLocationExited?.Invoke();
+                return;
+            }
+
+            if (packet.type == "spatial_location_rejected")
+            {
+                Debug.LogWarning("UCENO spatial location request rejected: " + packet.code);
                 return;
             }
 
