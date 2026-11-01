@@ -30,7 +30,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ l
   if (body.itemType !== undefined && (typeof body.itemType !== "string" || !TYPES.has(body.itemType)))
     return NextResponse.json({ error: "Invalid itemType" }, { status: 400 });
   if (body.assetKey !== undefined && body.assetKey !== null &&
-      (typeof body.assetKey !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,179}$/.test(body.assetKey) && !body.assetKey.split("/").some((part: string) => part === "." || part === "..")))
+      (typeof body.assetKey !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,179}$/.test(body.assetKey) || body.assetKey.split("/").some((part: string) => part === "." || part === "..")))
     return NextResponse.json({ error: "Invalid assetKey" }, { status: 400 });
   if (body.pricePurchasedCredits !== undefined &&
       (typeof body.pricePurchasedCredits !== "number" || !Number.isSafeInteger(body.pricePurchasedCredits) ||
