@@ -80,6 +80,7 @@ export async function GET(request: NextRequest, { params }: Context) {
         last_seen AS "lastSeen"
       FROM virtual_world_presence
       WHERE world_id = ${worldId}::uuid AND user_id <> ${session.id}::uuid
+        AND (${session.instanceId}::uuid IS NULL OR instance_id = ${session.instanceId}::uuid)
         AND last_seen > NOW() - INTERVAL '30 seconds'
         AND NOT EXISTS (
           SELECT 1 FROM user_blocks b
@@ -122,12 +123,13 @@ export async function POST(request: NextRequest, { params }: Context) {
     const sequence = body.sequence ?? null;
     const rows = await sql`
       INSERT INTO virtual_world_presence
-        (world_id, user_id, position, rotation, animation_state, client_sequence, last_seen)
-      VALUES (${worldId}::uuid, ${session.id}::uuid,
+        (world_id, user_id, instance_id, position, rotation, animation_state, client_sequence, last_seen)
+      VALUES (${worldId}::uuid, ${session.id}::uuid, ${session.instanceId}::uuid,
         ${JSON.stringify(body.position)}::jsonb,
         ${JSON.stringify(body.rotation ?? { x: 0, y: 0, z: 0, w: 1 })}::jsonb,
         ${JSON.stringify(animationState)}::jsonb, COALESCE(${sequence}::bigint, 1), NOW())
       ON CONFLICT (world_id, user_id) DO UPDATE SET
+        instance_id = EXCLUDED.instance_id,
         position = EXCLUDED.position, rotation = EXCLUDED.rotation,
         animation_state = EXCLUDED.animation_state,
         client_sequence = virtual_world_presence.client_sequence + 1,
