@@ -82,7 +82,7 @@ race or two-device behavior is claimed as verified.
 
 ## Provisioning and deployment sequence
 
-1. Apply database migrations 015–024 in numeric order.
+1. Apply database migrations 015–025 in numeric order.
 2. Create a runtime instance record with the target world, region, reachable
    WebSocket URL in `endpoint`, capacity and status `provisioning`.
 3. Deploy this service with the matching `WORLD_INSTANCE_ID` and secrets.
