@@ -32,7 +32,7 @@ No credit top-up execution endpoint, transfer, seller settlement, refund, final 
 
 ## Setup
 
-1. Review and apply migrations `015_virtual_world_foundation.sql` through `023_virtual_world_animation_state.sql` in numeric order; configure `ADMIN_USER_IDS` with authorized platform administrator UUIDs through the normal migration process. No API route runs DDL.
+1. Review and apply migrations `015_virtual_world_foundation.sql` through `024_virtual_world_instance_leases.sql` in numeric order; configure `ADMIN_USER_IDS` with authorized platform administrator UUIDs through the normal migration process. No API route runs DDL.
 2. Configure server-only `WORLD_TOKEN_SECRET` with at least 32 random characters. Never commit it or put it in the Unity project.
 3. A signed-in Social client calls `POST /api/worlds/entry` with a world ID and client type.
 4. Pass the returned code to Unity `WorldSessionClient.RedeemEntryCode`; it redeems with `PUT /api/worlds/entry`.
@@ -208,3 +208,39 @@ renewed after a player has left or stopped sending presence.
 This is admission and request authorization hardening, not a replacement for
 a continuously authoritative simulation server. Changes have not yet been
 validated against a deployed database or Unity runtime.
+
+
+## Runtime instance assignment and lease protocol (November 2026)
+
+Migration 024 adds a per-player instance lease table and an atomic database
+claim function. During Unity entry-code redemption, the API selects an already
+provisioned instance only when it is marked `ready`, has a non-null endpoint,
+and has sent a heartbeat within 30 seconds. Capacity is calculated from active
+player leases rather than trusting the instance's manually maintained
+`current_players` counter. The database locks the selected instance row while
+checking capacity, and the same player reuses a still-healthy assignment when
+possible.
+
+A lease lasts 45 seconds. Presence writes and reads are scoped to the assigned
+instance; session renewal requires the lease and instance heartbeat to remain
+healthy. Refreshed JWTs retain the instance claim. If an instance stops
+heartbeating, is marked draining/offline, or its lease expires, Unity presence
+and renewal are rejected and the client must reconnect through a new entry
+handoff.
+
+Unity's entry response now exposes `instanceId`, `instanceEndpoint` and
+`region` alongside the scoped bearer token. The Unity session component
+retains these values in memory. This is the allocation/admission protocol only:
+it does not provision a server process, deploy a container, run a world
+simulation, route packets, or implement authoritative physics. An operator or
+future orchestration service must register each runtime instance, publish its
+reachable endpoint, mark it ready only after health checks, and keep
+`heartbeat_at` current. No runtime instances are created automatically.
+
+Migration 024 must be applied after migrations 015–023. Until at least one
+healthy ready instance exists for a world, Unity entry redemption will not
+return a usable world session. Because the one-time code is consumed before
+instance claiming, an unavailable-instance response requires the signed-in
+client to request a fresh code. This behavior needs integration tests,
+concurrent-capacity tests, gateway endpoint validation, Unity compilation and
+two-device testing before production use.
