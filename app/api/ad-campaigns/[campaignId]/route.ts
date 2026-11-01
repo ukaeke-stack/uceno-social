@@ -29,7 +29,11 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ c
     const sql = getDb();
     const result = await sql`
       UPDATE virtual_ad_campaigns
-      SET status = ${body.status as string}
+      SET status = ${body.status as string},
+          review_status = CASE WHEN ${body.status as string} = 'pending_review' THEN 'pending' ELSE review_status END,
+          reviewed_at = CASE WHEN ${body.status as string} = 'pending_review' THEN NULL ELSE reviewed_at END,
+          reviewer_user_id = CASE WHEN ${body.status as string} = 'pending_review' THEN NULL ELSE reviewer_user_id END,
+          review_note = CASE WHEN ${body.status as string} = 'pending_review' THEN NULL ELSE review_note END
       WHERE id = ${campaignId}::uuid
         AND advertiser_user_id = ${session.id}::uuid
         AND (
