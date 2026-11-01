@@ -49,6 +49,7 @@ namespace UCENO.VirtualWorld
         private float cycle;
         private float gestureUntil;
         private int activeGesture;
+        private bool wasSeated;
 
         public void TriggerWave() { activeGesture = 1; gestureUntil = Time.time + 1.8f; }
         public void TriggerCheer() { activeGesture = 2; gestureUntil = Time.time + 1.6f; }
@@ -120,6 +121,12 @@ namespace UCENO.VirtualWorld
             if (UsesImportedController || animator == null || motor == null)
                 return;
 
+            if (motor.IsSeated != wasSeated)
+            {
+                wasSeated = motor.IsSeated;
+                if (wasSeated) { activeGesture = 0; gestureUntil = 0f; }
+            }
+
             float speed = motor.AnimationSpeed;
             float sprint = motor.IsSprinting ? 1f : 0f;
             float amplitude = Mathf.Lerp(walkLegSwing, runLegSwing, sprint) * speed;
@@ -150,7 +157,23 @@ namespace UCENO.VirtualWorld
             SetRotation(leftLowerArm, leftLowerArmBase, new Vector3(-8f + Mathf.Abs(armSwing) * 0.12f, 0f, 0f));
             SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(-8f + Mathf.Abs(armSwing) * 0.12f, 0f, 0f));
 
-            if (Time.time < gestureUntil)
+            if (motor.IsSeated)
+            {
+                // Procedural seated/rest pose for the imported humanoid.
+                // This is a ground-rest pose; chair-specific IK is a later system.
+                SetRotation(hips, hipsBase, new Vector3(-8f, 0f, 0f));
+                SetRotation(chest, chestBase, new Vector3(8f, 0f, 0f));
+                SetRotation(leftUpperLeg, leftUpperLegBase, new Vector3(-82f, 0f, -8f));
+                SetRotation(rightUpperLeg, rightUpperLegBase, new Vector3(-82f, 0f, 8f));
+                SetRotation(leftLowerLeg, leftLowerLegBase, new Vector3(92f, 0f, 0f));
+                SetRotation(rightLowerLeg, rightLowerLegBase, new Vector3(92f, 0f, 0f));
+                SetRotation(leftUpperArm, leftUpperArmBase, new Vector3(-18f, 0f, -relaxedArmDrop));
+                SetRotation(rightUpperArm, rightUpperArmBase, new Vector3(-18f, 0f, relaxedArmDrop));
+                SetRotation(leftLowerArm, leftLowerArmBase, new Vector3(-35f, 0f, 0f));
+                SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(-35f, 0f, 0f));
+            }
+
+            if (!motor.IsSeated && Time.time < gestureUntil)
             {
                 float pulse = Mathf.Sin(Mathf.Clamp01((gestureUntil - Time.time) / 1.8f) * Mathf.PI);
                 if (activeGesture == 1 && rightUpperArm != null)
