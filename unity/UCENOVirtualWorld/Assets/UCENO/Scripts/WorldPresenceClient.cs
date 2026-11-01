@@ -52,7 +52,7 @@ namespace UCENO.VirtualWorld
         [SerializeField] private WorldSessionClient session;
         [SerializeField] private PlayerMotor localPlayer;
         [SerializeField] private GameObject remoteAvatarPrefab;
-        [SerializeField] private float sendInterval = 1.1f;
+        [SerializeField] private float sendInterval = 10f;
         [SerializeField] private float pollInterval = 1.5f;
         [SerializeField] private float interpolation = 12f;
         [SerializeField] private float peerTimeout = 35f;
@@ -79,8 +79,9 @@ namespace UCENO.VirtualWorld
         private bool stopping;
         private long presenceSequence;
         private AvatarLocomotionDriver localAvatar;
+        private WorldGatewayClient gateway;
 
-        public int PeerCount => remotePlayers.Count;
+        public int PeerCount => gateway != null ? gateway.PeerCount : remotePlayers.Count;
         public string ConnectionStatus { get; private set; } = "WAITING";
 
         private void Start()
@@ -98,6 +99,9 @@ namespace UCENO.VirtualWorld
                 return;
             }
             tokenExpiresAt = Time.time + Mathf.Max(1, session.ExpiresInSeconds);
+            gateway = GetComponent<WorldGatewayClient>();
+            if (gateway == null) gateway = gameObject.AddComponent<WorldGatewayClient>();
+            gateway.Configure(session, localPlayer, remoteAvatarPrefab);
             StartCoroutine(RuntimeLoop());
         }
 
@@ -121,9 +125,7 @@ namespace UCENO.VirtualWorld
                     if (!session.IsAuthenticated) { stopping = true; break; }
                 }
                 yield return SendPresence();
-                yield return FetchPeers();
-                RemoveExpiredPeers();
-                yield return new WaitForSeconds(Mathf.Max(1f, Mathf.Min(sendInterval, pollInterval)));
+                yield return new WaitForSeconds(Mathf.Clamp(sendInterval, 5f, 15f));
             }
         }
 
@@ -163,6 +165,7 @@ namespace UCENO.VirtualWorld
                     yield break;
                 }
                 session.SetRenewedSession(response.accessToken, response.expiresInSeconds);
+                if (gateway != null) gateway.Reconnect();
                 tokenExpiresAt = Time.time + response.expiresInSeconds;
                 refreshRetryAt = 0f;
                 ConnectionStatus = "ONLINE";
@@ -318,6 +321,8 @@ namespace UCENO.VirtualWorld
 
         private void Update()
         {
+            if (gateway != null && gateway.ConnectionStatus != "WAITING")
+                ConnectionStatus = gateway.ConnectionStatus;
             foreach (RemotePlayer remote in remotePlayers.Values)
             {
                 if (remote.root == null) continue;
