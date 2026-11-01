@@ -3,9 +3,8 @@ using UnityEngine;
 namespace UCENO.VirtualWorld
 {
     /// <summary>
-    /// In-world appearance controls for the local avatar. Choices are saved
-    /// locally on this device; account/cloud synchronization is a separate
-    /// backend feature and is deliberately not implied here.
+    /// In-world appearance controls. Palette choices are cached locally and
+    /// synchronized to the authenticated account when a world session is active.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class AvatarCustomizationHud : MonoBehaviour
