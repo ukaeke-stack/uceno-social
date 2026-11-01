@@ -7,7 +7,7 @@ using UnityEngine.Networking;
 
 namespace UCENO.VirtualWorld
 {
-    [Serializable] internal sealed class WardrobeInventoryItem
+    [Serializable] public sealed class WardrobeInventoryItem
     {
         public string itemId;
         public string displayName;
