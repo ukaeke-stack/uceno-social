@@ -30,6 +30,7 @@ export async function GET(_request: NextRequest, { params }: Context) {
              h.name, h.template_id AS "templateId", h.transform, h.furnishing,
              h.visibility, h.updated_at AS "updatedAt",
              w.status AS "worldStatus", w.visibility AS "worldVisibility",
+             w.owner_user_id AS "worldOwnerId",
              COALESCE(wm.status, 'none') AS "worldMembership",
              CASE WHEN h.owner_user_id = ${session.id}::uuid THEN 'owner'
                   ELSE hm.permission END AS permission,
@@ -115,7 +116,7 @@ export async function PUT(request: NextRequest, { params }: Context) {
             AND w.status = 'published'
             AND COALESCE(wm.status, 'none') NOT IN ('banned', 'suspended')
             AND (w.visibility <> 'private' OR wm.status = 'active'
-              OR h.owner_user_id = ${session.id}::uuid)
+              OR w.owner_user_id = ${session.id}::uuid)
             AND (h.owner_user_id = ${session.id}::uuid OR h.visibility = 'invite')
         )
         AND NOT EXISTS (
