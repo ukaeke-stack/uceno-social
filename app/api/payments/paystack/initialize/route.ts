@@ -81,6 +81,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ authorizationUrl: intent.checkoutUrl, accessCode: intent.accessCode, reference: intent.providerReference });
       }
     } else {
+      // Basic database-backed abuse guard. Existing idempotent retries above are
+      // allowed; only creation of a new intent consumes this short-window quota.
+      const recent = await sql`
+        SELECT COUNT(*)::integer AS count
+        FROM uceno_credit_topup_intents
+        WHERE user_id = ${session.id}::uuid
+          AND provider = 'paystack'
+          AND created_at > NOW() - INTERVAL '15 minutes'
+      `;
+      if (Number(recent[0]?.count ?? 0) >= 5) {
+        return NextResponse.json({ error: "Too many checkout attempts. Try again later." }, { status: 429 });
+      }
       const created = await sql`
         INSERT INTO uceno_credit_topup_intents
           (user_id, provider, client_idempotency_key, amount_minor, currency, purchased_credits)
