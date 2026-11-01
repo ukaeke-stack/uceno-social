@@ -179,6 +179,8 @@ def main():
         fail("WorldPresenceClient contains a disabled token-renewal guard.")
     if "public int PeerCount" not in presence or "ConnectionStatus" not in presence:
         fail("WorldPresenceClient is missing multiplayer connection status.")
+    if "maxVisiblePeerDistance = 110f" not in presence or "maxRemoteAvatars = 12" not in presence:
+        fail("WorldPresenceClient is missing mobile remote-avatar visibility limits.")
     if "presence.PeerCount" not in hud or "presence.ConnectionStatus" not in hud:
         fail("World status HUD does not display multiplayer connection status.")
 
