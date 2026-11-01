@@ -79,11 +79,9 @@ export async function POST(request: NextRequest) {
       typeof body.templateId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(body.templateId)) {
     return NextResponse.json({ error: "A valid worldId, home name and templateId are required" }, { status: 400 });
   }
-  const transform = body.transform ?? {};
   const furnishing = body.furnishing ?? [];
-  if (!isValidHomeTransform(transform) || !isValidHomeFurnishing(furnishing) ||
-      !boundedJson(transform, 4000) || !boundedJson(furnishing, 12000) || (body.visibility !== undefined &&
-      body.visibility !== "private" && body.visibility !== "invite")) {
+  if (!isValidHomeFurnishing(furnishing) || !boundedJson(furnishing, 12000) ||
+      (body.visibility !== undefined && body.visibility !== "private" && body.visibility !== "invite")) {
     return NextResponse.json({ error: "Invalid home layout, furnishing or visibility settings" }, { status: 400 });
   }
 
@@ -91,6 +89,33 @@ export async function POST(request: NextRequest) {
     if (!await accessibleWorld(body.worldId, session.id))
       return NextResponse.json({ error: "World is unavailable" }, { status: 404 });
     const sql = getDb();
+    // Home placement is derived from the latest gateway checkpoint, never
+    // from a client-supplied transform. Require a fresh authoritative position.
+    const playerStates = await sql`
+      SELECT position, rotation, updated_at AS "updatedAt"
+      FROM virtual_world_player_state
+      WHERE world_id = ${body.worldId}::uuid AND user_id = ${session.id}::uuid
+      LIMIT 1
+    `;
+    const playerState = playerStates[0];
+    if (!playerState || Date.now() - new Date(playerState.updatedAt).getTime() > 30000) {
+      return NextResponse.json({ error: "A fresh authoritative world position is required before creating a home" }, { status: 409 });
+    }
+    const position = playerState.position as Record<string, unknown>;
+    const rotation = playerState.rotation as Record<string, unknown>;
+    const yaw = 2 * Math.atan2(
+      typeof rotation?.y === "number" ? rotation.y : 0,
+      typeof rotation?.w === "number" ? rotation.w : 1
+    ) * 180 / Math.PI;
+    const transform = {
+      x: position?.x,
+      y: position?.y,
+      z: position?.z,
+      yaw
+    };
+    if (!isValidHomeTransform(transform) || !boundedJson(transform, 4000)) {
+      return NextResponse.json({ error: "The authoritative player position is invalid" }, { status: 409 });
+    }
     const rows = await sql`
       INSERT INTO virtual_homes
         (world_id, owner_user_id, name, template_id, transform, furnishing, visibility)
