@@ -124,7 +124,7 @@ namespace UCENO.VirtualWorld
             AnimationSpeed = move.sqrMagnitude <= 0.01f
                 ? 0f
                 : (IsSprinting ? 1f : Mathf.Clamp01(move.magnitude) * 0.5f);
-            yaw += look.x * lookSensitivity;
+            yaw = Mathf.Repeat(yaw + look.x * lookSensitivity + 180f, 360f) - 180f;
             pitch = Mathf.Clamp(pitch - look.y * lookSensitivity, minimumPitch, maximumPitch);
             transform.rotation = Quaternion.Euler(0f, yaw, 0f);
 
