@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
+import { isValidHomeFurnishing, isValidHomeTransform } from "@/lib/world-home-layout";
 
 export const runtime = "nodejs";
 type Context = { params: Promise<{ homeId: string }> };
@@ -81,9 +82,8 @@ export async function PUT(request: NextRequest, { params }: Context) {
   const hasFurnishing = Object.prototype.hasOwnProperty.call(body, "furnishing");
   const hasVisibility = body.visibility !== undefined && body.visibility !== "";
   if ((!hasTransform && !hasFurnishing && !hasVisibility) ||
-      (hasTransform && (!isRecord(body.transform) || !withinBytes(body.transform, 4000))) ||
-      (hasFurnishing && (!Array.isArray(body.furnishing) || body.furnishing.length > 100 ||
-        !withinBytes(body.furnishing, 12000))) ||
+      (hasTransform && (!isValidHomeTransform(body.transform) || !withinBytes(body.transform, 4000))) ||
+      (hasFurnishing && (!isValidHomeFurnishing(body.furnishing) || !withinBytes(body.furnishing, 12000))) ||
       (hasVisibility && body.visibility !== "private" && body.visibility !== "invite")) {
     return NextResponse.json({ error: "Provide a valid bounded transform or furnishing layout" }, { status: 400 });
   }
