@@ -309,7 +309,7 @@ wss.on("connection", async (socket: WebSocket) => {
           ? (target.state === "open" ? "closed" : "open")
           : (target.state === "active" ? "idle" : "active");
         target.actorId = player.id;
-        const packet = { type: "object_state", objectId: target.id, state: target.state, actorId: player.id };
+        const packet = { type: "object_state", objectId: target.id, objectState: target.state, actorId: player.id };
         for (const peer of players.values()) send(peer.socket, packet);
         return;
       }
