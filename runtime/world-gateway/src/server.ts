@@ -627,6 +627,18 @@ wss.on("connection", async (socket: WebSocket) => {
       // already reconnected, but release seats if moderation removed this
       // socket from the live-player map before the close event arrived.
       if (current && current.socket !== socket) return;
+      if (current && current.returnState) {
+        const destination = current.returnState;
+        void sql`
+          INSERT INTO virtual_world_player_state (world_id, user_id, position, rotation, updated_at)
+          VALUES (${current.worldId}::uuid, ${current.id}::uuid,
+            ${JSON.stringify({ x: destination.x, y: destination.y, z: destination.z })}::jsonb,
+            ${JSON.stringify({ x: 0, y: Math.sin(destination.yaw / 2), z: 0, w: Math.cos(destination.yaw / 2) })}::jsonb,
+            NOW())
+          ON CONFLICT (world_id, user_id) DO UPDATE SET
+            position = EXCLUDED.position, rotation = EXCLUDED.rotation, updated_at = NOW()
+        `.catch(error => console.error("spatial_return_checkpoint_failed", error));
+      }
       if (current?.socket === socket) players.delete(identity.userId);
       for (const target of INTERACTABLES.values()) {
         if (target.kind !== "seat" || target.occupantId !== identity.userId) continue;
