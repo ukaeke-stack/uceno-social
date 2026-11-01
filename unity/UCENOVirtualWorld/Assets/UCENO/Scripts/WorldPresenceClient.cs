@@ -216,9 +216,8 @@ namespace UCENO.VirtualWorld
                     {
                         if (remotePlayers.TryGetValue(peer.userId, out RemotePlayer distant))
                         {
-                            distant.targetPosition = peerPosition;
-                            distant.lastReceived = Time.time;
-                            if (distant.root != null) distant.root.gameObject.SetActive(false);
+                            if (distant.root != null) Destroy(distant.root.gameObject);
+                            remotePlayers.Remove(peer.userId);
                         }
                         continue;
                     }
@@ -234,7 +233,6 @@ namespace UCENO.VirtualWorld
                         remote = new RemotePlayer { root = avatar.transform };
                         remotePlayers.Add(peer.userId, remote);
                     }
-                    if (remote.root != null && !remote.root.gameObject.activeSelf) remote.root.gameObject.SetActive(true);
                     remote.targetPosition = peerPosition;
                     remote.targetRotation = new Quaternion(peer.rotation.x, peer.rotation.y, peer.rotation.z, peer.rotation.w);
                     remote.lastReceived = Time.time;
