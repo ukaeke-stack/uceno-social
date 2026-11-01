@@ -19,10 +19,10 @@ This register is the scope ledger for the connected UCENO social platform and vi
 | Area | Required features | Current evidence/status |
 |---|---|---|
 | Gateway and navigation | Central world-selection gateway, account continuity, destination cards, return-to-gateway flow, world availability/status | **Not implemented in Unity client.** Architecture decision accepted; UCENO City foundation scene exists separately. |
-| UCENO City | Natural city environment, roads, sidewalks, buildings, vegetation, street furniture, vehicles, lighting, collision, navigation | **Partial foundation.** Imported CC0 city assets and Editor scene builder exist; scene generation and visual correctness still require Unity Editor verification. |
+| UCENO City | Natural city environment, roads, sidewalks, buildings, vegetation, street furniture, vehicles, lighting, collision, navigation | **Partial foundation.** Imported CC0 city assets and Editor scene builder exist. Scene builder now exports actual enabled Unity collider bounds for gateway collision; the map handoff and runtime behavior still require Editor/server/device verification. |
 | Connected districts | Beach Resort, Entertainment, Sports, Residential, Nature, Business/Conference and other themed districts | **Not implemented as playable connected districts.** |
 | Avatar | Real human body, face, hair, clothing, proportions, skin tone, animation, facial expression, gesture, customization, optional photo likeness | **Partial.** One imported Humanoid FBX, procedural locomotion, wave/cheer, and basic seated/rest pose. Full creator, wardrobe, facial expression system, and photo likeness are not implemented. |
-| Movement and interaction | Walk, run, jump, sit/stand, swim, emotes, object interaction, doors, vehicles, furniture interaction | **Partial.** Walk/run/jump, wave/cheer, sit/stand rest pose and camera controls are in source. Swim, contextual interactions, usable doors, vehicles and furniture are not implemented. |
+| Movement and interaction | Walk, run, jump, sit/stand, swim, emotes, object interaction, doors, vehicles, furniture interaction | **Partial.** Walk/run/jump, wave/cheer, sit/stand rest pose and camera controls are in source. A server-authoritative raycast interaction protocol now supports configured doors and generic objects, but no scene doors/furniture are marked yet; seat occupancy, vehicles and swimming remain unimplemented. |
 | Social presence | Friends, presence, private/group text chat, proximity voice, public voice, private rooms | **Some social-platform APIs/UI exist outside the Unity world.** Unity avatar/world integration and proximity/public spatial voice are not verified or implemented here. |
 | Multiplayer | Shared avatars, synchronized movement, world instances, party/group travel, authoritative simulation, reconnect and presence | **Not implemented in Unity world.** No claim of multiplayer or simulated remote players. Distributed scaling target is architectural only. |
 | Homes and spaces | Private homes, ownership/permissions, invitations, furnishing, decoration, persistence | **Not implemented.** |
@@ -41,6 +41,8 @@ This register is the scope ledger for the connected UCENO social platform and vi
 - Camera collision and bounded mouse-wheel/pinch zoom.
 - Mobile SIT/STAND and desktop C seated/rest toggle. The current pose is a ground-rest approximation, not chair-specific animation or inverse kinematics.
 - Position/movement HUD and static source validation.
+- Editor export of real scene collider bounds and marked interactables for the world gateway.
+- Server-validated, range-limited door/object interaction requests and state broadcasts; state is currently in gateway memory only.
 
 ## Implementation sequence
 
