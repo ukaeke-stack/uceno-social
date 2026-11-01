@@ -96,11 +96,13 @@ BEGIN
      v_listing.price_purchased_credits, v_total, 'escrowed', p_idempotency_key)
   RETURNING * INTO v_order;
 
-  INSERT INTO uceno_credit_ledger
-    (user_id, credit_type, amount, reason, reference_type, reference_id, idempotency_key)
-  VALUES
-    (p_buyer_user_id, 'purchased', -v_total, 'marketplace_purchase_escrow',
-     'marketplace_order', v_order.id::text, 'marketplace-purchase:' || v_order.id::text);
+  IF v_total > 0 THEN
+    INSERT INTO uceno_credit_ledger
+      (user_id, credit_type, amount, reason, reference_type, reference_id, idempotency_key)
+    VALUES
+      (p_buyer_user_id, 'purchased', -v_total, 'marketplace_purchase_escrow',
+       'marketplace_order', v_order.id::text, 'marketplace-purchase:' || v_order.id::text);
+  END IF;
 
   IF v_listing.stock IS NOT NULL THEN
     UPDATE virtual_marketplace_listings
