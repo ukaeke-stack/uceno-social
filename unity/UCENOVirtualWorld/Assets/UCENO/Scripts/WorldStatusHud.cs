@@ -53,16 +53,30 @@ namespace UCENO.VirtualWorld
 
             if (Application.isMobilePlatform && showSprintControl)
             {
-                float width = 118f * scale;
-                float height = 58f * scale;
-                Rect sprintRect = new Rect(Screen.width - width - 18f, Screen.height - height - 28f, width, height);
-                bool held = GUI.RepeatButton(sprintRect, "RUN", sprintStyle);
+                bool held = GUI.RepeatButton(GetSprintControlRect(), "RUN", sprintStyle);
                 player.SetSprinting(held);
             }
             else
             {
                 player.SetSprinting(false);
             }
+        }
+
+        public static bool IsPointerOnSprintControl(Vector2 screenPosition)
+        {
+            if (!Application.isMobilePlatform)
+                return false;
+
+            Vector2 guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
+            return GetSprintControlRect().Contains(guiPosition);
+        }
+
+        private static Rect GetSprintControlRect()
+        {
+            float scale = Mathf.Clamp(Screen.width / 520f, 1f, 2.1f);
+            float width = 118f * scale;
+            float height = 58f * scale;
+            return new Rect(Screen.width - width - 18f, Screen.height - height - 28f, width, height);
         }
 
         private void OnDisable()
