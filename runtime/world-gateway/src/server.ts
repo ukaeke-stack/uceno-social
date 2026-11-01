@@ -353,7 +353,8 @@ wss.on("connection", async (socket: WebSocket) => {
       player.lastInputAt = now;
       player.moveX = msg.moveX; player.moveZ = msg.moveZ;
       player.yaw = msg.yaw; player.sprint = msg.sprint && !msg.seated;
-      player.seated = msg.seated;
+      player.seated = Array.from(INTERACTABLES.values()).some(item =>
+        item.kind === "seat" && item.occupantId === player.id);
       if (msg.gestureSequence >= player.gestureSequence) {
         player.gestureSequence = msg.gestureSequence;
         player.gesture = msg.gesture;
