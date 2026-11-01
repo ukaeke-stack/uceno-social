@@ -83,7 +83,7 @@ jobs:
           for (const marker of ['export async function GET', 'Only the home owner can view the invitation roster', 'FROM virtual_home_members', 'Cache-Control'])
             if (!homeMembers.includes(marker)) throw new Error('Missing private owner-only home invitation roster behavior: ' + marker);
           const homeRoute = fs.readFileSync('./app/api/world-homes/[homeId]/route.ts', 'utf8');
-          for (const marker of ['export async function GET', 'Home is unavailable', 'worldStatus', 'worldMembership', 'home.visibility !== "invite"', 'Cache-Control'])
+          for (const marker of ['export async function GET', 'Home is unavailable', 'worldStatus', 'worldMembership', 'home.visibility !== "invite"', 'COALESCE(wm.status, \'none\') NOT IN', "w.status = 'published'", "h.visibility = 'invite'", 'Cache-Control'])
             if (!homeRoute.includes(marker)) throw new Error('Missing access-controlled home retrieval behavior: ' + marker);
           console.log('Home retrieval and invitation roster authorization source checks passed.');
           console.log('Static collision configuration and movement-resolution source checks passed.');
