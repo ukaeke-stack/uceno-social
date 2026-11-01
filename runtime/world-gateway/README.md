@@ -57,7 +57,9 @@ sharding, anti-cheat heuristics beyond input validation/rate limits, or
 cross-instance migration. All players on one instance share one in-memory
 simulation process. Multiple replicas must not use the same instance ID.
 
-The current Unity client still uses HTTP presence polling; it does not yet
-connect to this WebSocket protocol. Do not treat multiplayer as end-to-end
-complete until a Unity WebSocket client is added and two physical devices are
-tested against a deployed gateway.
+The Unity client now connects to this WebSocket protocol, sends sequenced input
+at 20 Hz and applies server snapshots to the local and remote avatars. HTTP
+presence remains as a low-frequency lease/session heartbeat; it is no longer
+used to render remote movement. End-to-end multiplayer is not yet verified:
+the gateway must be deployed, the database migrations applied, and two physical
+devices tested against the same ready instance.
