@@ -27,6 +27,11 @@ MODEL_NAMES = (
     "Shrub 03",
     "Covered Car",
     "Modular Chainlink Fence",
+    "Sofa 01",
+    "Arm Chair 01",
+    "Round Wooden Table 01",
+    "Gothic Bed 01",
+    "Gothic Cabinet 01",
 )
 TEXTURE_NAMES = ("Asphalt 01", "Concrete Floor 01", "Sparse Grass")
 HDRI_NAMES = ("Modern Buildings",)
