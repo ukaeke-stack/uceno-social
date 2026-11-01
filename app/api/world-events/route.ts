@@ -61,7 +61,19 @@ export async function GET(request: NextRequest) {
         AND e.status = 'scheduled' AND e.ends_at > NOW()
       ORDER BY e.starts_at ASC LIMIT 100
     `;
-    return NextResponse.json({ events }, { headers: { "Cache-Control": "no-store, private" } });
+    const hostAccess = await sql`
+      SELECT w.owner_user_id AS "ownerUserId",
+             COALESCE(m.role, 'member') AS "membershipRole",
+             COALESCE(m.status, 'none') AS "membershipStatus"
+      FROM virtual_worlds w
+      LEFT JOIN virtual_world_memberships m
+        ON m.world_id = w.id AND m.user_id = ${session.id}::uuid
+      WHERE w.id = ${worldId}::uuid LIMIT 1
+    `;
+    const host = hostAccess[0];
+    const canHost = !!host && (host.ownerUserId === session.id ||
+      (host.membershipStatus === "active" && host.membershipRole === "admin"));
+    return NextResponse.json({ events, canHost }, { headers: { "Cache-Control": "no-store, private" } });
   } catch (error) {
     console.error("World event list failed", error);
     return NextResponse.json({ error: "Events are unavailable" }, { status: 503 });
