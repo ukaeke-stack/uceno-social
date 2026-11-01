@@ -59,6 +59,11 @@ export async function GET(_request: NextRequest, { params }: Context) {
       FROM virtual_world_presence
       WHERE world_id = ${worldId}::uuid AND user_id <> ${session.id}::uuid
         AND last_seen > NOW() - INTERVAL '30 seconds'
+        AND NOT EXISTS (
+          SELECT 1 FROM user_blocks b
+          WHERE (b.blocker_id = ${session.id}::uuid AND b.blocked_id = virtual_world_presence.user_id)
+             OR (b.blocker_id = virtual_world_presence.user_id AND b.blocked_id = ${session.id}::uuid)
+        )
       ORDER BY last_seen DESC LIMIT 64
     `;
     return NextResponse.json({ peers, serverTime: new Date().toISOString() }, {
@@ -93,9 +98,13 @@ export async function POST(request: NextRequest, { params }: Context) {
         ${JSON.stringify(body.rotation ?? { x: 0, y: 0, z: 0, w: 1 })}::jsonb, NOW())
       ON CONFLICT (world_id, user_id) DO UPDATE SET
         position = EXCLUDED.position, rotation = EXCLUDED.rotation, last_seen = NOW()
+      WHERE virtual_world_presence.last_seen <= NOW() - INTERVAL '1 second'
       RETURNING last_seen AS "lastSeen"
     `;
-    return NextResponse.json({ present: true, lastSeen: rows[0]?.lastSeen }, {
+    if (!rows[0]) return NextResponse.json({ error: "Presence updates are limited to once per second" }, {
+      status: 429, headers: { "Retry-After": "1", "Cache-Control": "no-store, private" }
+    });
+    return NextResponse.json({ present: true, lastSeen: rows[0].lastSeen }, {
       headers: { "Cache-Control": "no-store, private" }
     });
   } catch (error) {
