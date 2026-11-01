@@ -326,6 +326,8 @@ namespace UCENO.VirtualWorld.Editor
             GameObject model = UnityEngine.Object.Instantiate(source);
             model.name = source.name;
             model.transform.SetParent(wrapper.transform, false);
+            Bounds modelBounds = CalculateLocalBounds(model);
+            model.transform.localPosition += Vector3.up * -modelBounds.min.y;
 
             if (addCollider)
                 AddEnvironmentCollider(wrapper, prefabName, CalculateLocalBounds(wrapper));
