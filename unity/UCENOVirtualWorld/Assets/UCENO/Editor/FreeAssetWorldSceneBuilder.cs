@@ -323,17 +323,32 @@ namespace UCENO.VirtualWorld.Editor
             model.transform.SetParent(wrapper.transform, false);
 
             if (addCollider)
-            {
-                Bounds bounds = CalculateLocalBounds(wrapper);
-                BoxCollider collider = wrapper.AddComponent<BoxCollider>();
-                collider.center = bounds.center;
-                collider.size = Vector3.Max(bounds.size, new Vector3(0.2f, 0.2f, 0.2f));
-            }
+                AddEnvironmentCollider(wrapper, prefabName, CalculateLocalBounds(wrapper));
 
             string prefabPath = PrefabRoot + "/Environment/" + prefabName + ".prefab";
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(wrapper, prefabPath);
             UnityEngine.Object.DestroyImmediate(wrapper);
             return prefab;
+        }
+
+        private static void AddEnvironmentCollider(GameObject wrapper, string prefabName, Bounds bounds)
+        {
+            if (prefabName.Contains("Shrub"))
+                return;
+
+            if (prefabName.Contains("Pachira") || prefabName.Contains("Street_Lamp"))
+            {
+                CapsuleCollider capsule = wrapper.AddComponent<CapsuleCollider>();
+                capsule.direction = 1;
+                capsule.center = bounds.center;
+                capsule.height = Mathf.Max(bounds.size.y, 0.6f);
+                capsule.radius = Mathf.Clamp(Mathf.Min(bounds.size.x, bounds.size.z) * 0.12f, 0.12f, 0.42f);
+                return;
+            }
+
+            BoxCollider box = wrapper.AddComponent<BoxCollider>();
+            box.center = bounds.center;
+            box.size = Vector3.Max(bounds.size, new Vector3(0.2f, 0.2f, 0.2f));
         }
 
         private static Bounds CalculateLocalBounds(GameObject root)
