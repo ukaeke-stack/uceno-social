@@ -65,7 +65,7 @@ namespace UCENO.VirtualWorld
             if (session != null && string.IsNullOrWhiteSpace(apiBaseUrl)) apiBaseUrl = session.ApiBaseUrl;
             if (session != null && string.IsNullOrWhiteSpace(worldId)) worldId = ReadWorldId(session.AccessToken);
             if (session == null || localPlayer == null || remoteAvatarPrefab == null ||
-                string.IsNullOrWhiteSpace(apiBaseUrl) || string.IsNullOrWhiteSpace(worldId))
+                string.IsNullOrWhiteSpace(apiBaseUrl))
             {
                 Debug.LogError("UCENO multiplayer is not configured: API URL, world ID, session, player and real avatar prefab are required.");
                 enabled = false;
@@ -78,6 +78,12 @@ namespace UCENO.VirtualWorld
         private IEnumerator RuntimeLoop()
         {
             yield return new WaitUntil(() => session != null && session.IsAuthenticated);
+            if (string.IsNullOrWhiteSpace(worldId)) worldId = ReadWorldId(session.AccessToken);
+            if (string.IsNullOrWhiteSpace(worldId))
+            {
+                Debug.LogError("UCENO world token is missing its world scope. Request a new entry code.");
+                yield break;
+            }
             while (!stopping)
             {
                 if (Time.time >= tokenExpiresAt - 45f)
