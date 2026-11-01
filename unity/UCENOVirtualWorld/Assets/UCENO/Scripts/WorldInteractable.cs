@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 
 namespace UCENO.VirtualWorld
@@ -57,7 +58,9 @@ namespace UCENO.VirtualWorld
         private void OnValidate()
         {
             if (string.IsNullOrWhiteSpace(objectId))
-                objectId = gameObject.name.ToLowerInvariant().Replace(" ", "-");
+                objectId = new string(gameObject.name.ToLowerInvariant()
+                    .Select(character => char.IsLetterOrDigit(character) || "._:-".IndexOf(character) >= 0
+                        ? character : '-').ToArray());
             openAngle = Mathf.Clamp(openAngle, 15f, 150f);
             animationSpeed = Mathf.Clamp(animationSpeed, 30f, 720f);
         }
