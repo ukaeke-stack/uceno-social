@@ -126,6 +126,11 @@ namespace UCENO.VirtualWorld
                 yield return request.SendWebRequest();
                 if (request.result != UnityWebRequest.Result.Success)
                     Debug.LogWarning("UCENO wardrobe save failed: " + request.responseCode);
+                else
+                {
+                    WorldGatewayClient gateway = FindObjectOfType<WorldGatewayClient>();
+                    if (gateway != null) gateway.RequestWardrobeRefresh();
+                }
             }
         }
 
