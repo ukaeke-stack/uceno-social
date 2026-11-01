@@ -29,6 +29,7 @@ REQUIRED_FILES = [
     ASSETS / "Scripts/WorldStatusHud.cs",
     ASSETS / "Scripts/WorldSessionClient.cs",
     ASSETS / "Scripts/WorldHomeClient.cs",
+    ASSETS / "Scripts/WorldEventsClient.cs",
     ASSETS / "Scripts/WorldPresenceClient.cs",
     IMPORTED / "HDRI/modern_buildings_1k.hdr",
     IMPORTED / "Models/modular_urban_apartments_facade/modular_urban_apartments_facade.fbx",
@@ -186,6 +187,14 @@ def main():
     for asset_id in ("sofa_01", "arm_chair_01", "round_wooden_table_01", "gothic_bed_01", "gothic_cabinet_01"):
         if asset_id not in builder:
             fail("Generated home furniture catalogue is missing " + asset_id)
+
+    events_client = read_text(ASSETS / "Scripts/WorldEventsClient.cs")
+    for required in ("LoadEventsRoutine", "SetAttendanceRoutine", "/api/world-events?worldId=",
+                     "/attendance", "EVENTS", "INTERESTED"):
+        if required not in events_client:
+            fail("WorldEventsClient is missing event discovery/RSVP behavior: " + required)
+    if "WorldEventsClient eventsClient = player.AddComponent<WorldEventsClient>()" not in builder:
+        fail("Generated player does not include the world events client.")
 
     session = read_text(ASSETS / "Scripts/WorldSessionClient.cs")
     if session.count("public string ApiBaseUrl") != 1:
