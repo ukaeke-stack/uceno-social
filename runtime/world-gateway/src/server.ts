@@ -319,6 +319,15 @@ function withinVoiceRange(a: Player, b: Player): boolean {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) <= 24;
 }
 
+function leaveVoiceRoom(player: Player): void {
+  if (!player.voiceActive) return;
+  player.voiceActive = false;
+  for (const peer of players.values()) {
+    if (peer.id !== player.id && sameVoiceSpace(player, peer) && withinVoiceRange(player, peer))
+      send(peer.socket, { type: "voice_presence", userId: player.id, active: false });
+  }
+}
+
 async function isBlockedPair(a: string, b: string): Promise<boolean> {
   const rows = await sql`
     SELECT EXISTS (SELECT 1 FROM user_blocks
@@ -659,6 +668,7 @@ wss.on("connection", async (socket: WebSocket) => {
             send(socket, { type: "spatial_location_rejected", code: "home_access_denied_or_invalid_anchor" }); return;
           }
           releasePlayerSeats(player.id);
+          leaveVoiceRoom(player);
           player.returnState = { x: player.x, y: player.y, z: player.z, yaw: player.yaw };
           player.homeId = home.id;
           player.homeAnchor = anchor;
@@ -680,6 +690,7 @@ wss.on("connection", async (socket: WebSocket) => {
           send(socket, { type: "spatial_location_rejected", code: "not_inside_home" }); return;
         }
         const destination = player.returnState;
+        leaveVoiceRoom(player);
         player.homeId = null; player.homeAnchor = null; player.returnState = null;
         player.x = destination.x; player.y = destination.y; player.z = destination.z; player.yaw = destination.yaw;
         player.vx = 0; player.vy = 0; player.vz = 0;
@@ -729,6 +740,7 @@ wss.on("connection", async (socket: WebSocket) => {
             send(socket, { type: "spatial_location_rejected", code: "event_join_denied_or_not_open" }); return;
           }
           releasePlayerSeats(player.id);
+          leaveVoiceRoom(player);
           player.returnState = { x: player.x, y: player.y, z: player.z, yaw: player.yaw };
           player.eventId = event.id;
           player.homeId = null;
@@ -752,6 +764,7 @@ wss.on("connection", async (socket: WebSocket) => {
           send(socket, { type: "spatial_location_rejected", code: "not_inside_event" }); return;
         }
         const destination = player.returnState;
+        leaveVoiceRoom(player);
         player.eventId = null; player.homeAnchor = null; player.returnState = null;
         player.x = destination.x; player.y = destination.y; player.z = destination.z; player.yaw = destination.yaw;
         player.vx = 0; player.vy = 0; player.vz = 0;
@@ -843,12 +856,7 @@ wss.on("connection", async (socket: WebSocket) => {
         return;
       }
       if (msg && msg.type === "voice_leave") {
-        if (!player.voiceActive) return;
-        player.voiceActive = false;
-        for (const peer of players.values()) {
-          if (peer.id !== player.id && sameVoiceSpace(player, peer) && withinVoiceRange(player, peer))
-            send(peer.socket, { type: "voice_presence", userId: player.id, active: false });
-        }
+        leaveVoiceRoom(player);
         return;
       }
       if (msg && msg.type === "voice_signal") {
@@ -998,7 +1006,7 @@ setInterval(async () => {
   const now = Date.now();
   const dt = Math.min(0.05, Math.max(0.001, (now - lastTick) / 1000));
   lastTick = now;
-  const snapshots: Array<{ userId: string; x: number; y: number; z: number; yaw: number; grounded: boolean; seated: boolean; sprint: boolean; gesture: string; gestureSequence: number; wardrobe: EquippedWardrobeItem[]; voiceActive: boolean }> = [];
+  const snapshots: Array<{ userId: string; x: number; y: number; z: number; yaw: number; grounded: boolean; seated: boolean; sprint: boolean; gesture: string; gestureSequence: number; wardrobe: EquippedWardrobeItem[] }> = [];
   for (const p of players.values()) {
     if (p.socket.readyState !== WebSocket.OPEN) continue;
     if (now - p.lastInputAt > 1500) { p.moveX = 0; p.moveZ = 0; p.sprint = false; }
@@ -1021,7 +1029,7 @@ setInterval(async () => {
     }
     if (p.y <= groundY) { p.y = groundY; p.vy = 0; p.grounded = true; }
     snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
-      seated: p.seated, sprint: p.sprint, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe, voiceActive: p.voiceActive });
+      seated: p.seated, sprint: p.sprint, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe });
     if (now - p.lastCheckpointAt >= 5000) {
       p.lastCheckpointAt = now;
       void sql`
