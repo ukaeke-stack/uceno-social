@@ -122,7 +122,10 @@ namespace UCENO.VirtualWorld
             for (int i = 0; i < Input.touchCount; i++)
             {
                 Touch touch = Input.GetTouch(i);
-                if (touch.phase == TouchPhase.Began && touch.position.x >= Screen.width * 0.5f && lookFingerId == -1)
+                if (touch.phase == TouchPhase.Began &&
+                    touch.position.x >= Screen.width * 0.5f &&
+                    lookFingerId == -1 &&
+                    !WorldStatusHud.IsPointerOnSprintControl(touch.position))
                     lookFingerId = touch.fingerId;
                 if (touch.fingerId != lookFingerId) continue;
                 if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
