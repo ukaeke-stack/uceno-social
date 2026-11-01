@@ -247,6 +247,10 @@ type Player = {
   lastSequence: number; lastCheckpointAt: number; lastAuthorizationCheck: number; authorizationCheckInProgress: boolean;
   lastInteractionAt: number;
   lastWardrobeRefreshAt: number;
+  voiceActive: boolean;
+  lastVoiceSignalAt: number;
+  voiceSignalWindowAt: number;
+  voiceSignalCount: number;
   homeId: string | null;
   homeAnchor: { x: number; y: number; z: number; yaw: number } | null;
   eventId: string | null;
@@ -305,6 +309,23 @@ function findAccessibleActivity(sessionId: unknown, player: Player): ActivitySes
   const session = activitySessions.get(sessionId);
   return session && session.worldId === player.worldId &&
     session.instanceId === INSTANCE_ID ? session : null;
+}
+
+function sameVoiceSpace(a: Player, b: Player): boolean {
+  return a.worldId === b.worldId && a.homeId === b.homeId && a.eventId === b.eventId;
+}
+
+function withinVoiceRange(a: Player, b: Player): boolean {
+  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) <= 24;
+}
+
+async function isBlockedPair(a: string, b: string): Promise<boolean> {
+  const rows = await sql`
+    SELECT EXISTS (SELECT 1 FROM user_blocks
+      WHERE (blocker_id = ${a}::uuid AND blocked_id = ${b}::uuid)
+         OR (blocker_id = ${b}::uuid AND blocked_id = ${a}::uuid)) AS blocked
+  `;
+  return rows[0]?.blocked === true;
 }
 
 function send(socket: WebSocket, value: unknown) {
@@ -420,7 +441,7 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
-    lastInteractionAt: 0, lastWardrobeRefreshAt: 0, homeId: null, homeAnchor: null, eventId: null, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null
+    lastInteractionAt: 0, lastWardrobeRefreshAt: 0, voiceActive: false, lastVoiceSignalAt: 0, voiceSignalWindowAt: Date.now(), voiceSignalCount: 0, homeId: null, homeAnchor: null, eventId: null, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null
   };
 }
 
@@ -463,7 +484,7 @@ const server = createServer(async (req, res) => {
   }
   res.writeHead(404); res.end();
 });
-const wss = new WebSocketServer({ noServer: true, maxPayload: 4096, perMessageDeflate: false });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 16384, perMessageDeflate: false });
 const upgradeIdentity = new WeakMap<WebSocket, { userId: string; worldId: string; token: string }>();
 
 server.on("upgrade", async (req, socket, head) => {
@@ -807,6 +828,63 @@ wss.on("connection", async (socket: WebSocket) => {
         for (const peer of players.values()) send(peer.socket, packet);
         return;
       }
+      if (msg && msg.type === "voice_join") {
+        if (player.voiceActive) return;
+        player.voiceActive = true;
+        for (const peer of players.values()) {
+          if (peer.id === player.id || !peer.voiceActive || !sameVoiceSpace(player, peer) ||
+              !withinVoiceRange(player, peer) || peer.socket.readyState !== WebSocket.OPEN) continue;
+          try {
+            if (await isBlockedPair(player.id, peer.id)) continue;
+            send(player.socket, { type: "voice_presence", userId: peer.id, active: true });
+            send(peer.socket, { type: "voice_presence", userId: player.id, active: true });
+          } catch (error) { console.error("voice_presence_check_failed", error); }
+        }
+        return;
+      }
+      if (msg && msg.type === "voice_leave") {
+        if (!player.voiceActive) return;
+        player.voiceActive = false;
+        for (const peer of players.values()) {
+          if (peer.id !== player.id && sameVoiceSpace(player, peer) && withinVoiceRange(player, peer))
+            send(peer.socket, { type: "voice_presence", userId: player.id, active: false });
+        }
+        return;
+      }
+      if (msg && msg.type === "voice_signal") {
+        const targetId = typeof msg.targetUserId === "string" ? msg.targetUserId : "";
+        const target = players.get(targetId);
+        const kindValid = msg.signalType === "offer" || msg.signalType === "answer" || msg.signalType === "candidate";
+        const payloadValid = msg.signalType === "candidate"
+          ? typeof msg.candidate === "string" && msg.candidate.length > 0 && msg.candidate.length <= 2048
+          : typeof msg.sdp === "string" && msg.sdp.length > 0 && msg.sdp.length <= 12000;
+        if (!player.voiceActive || !target || !target.voiceActive || !kindValid || !payloadValid ||
+            targetId === player.id || !sameVoiceSpace(player, target) || !withinVoiceRange(player, target)) {
+          send(socket, { type: "voice_signal_rejected", code: "peer_unavailable_or_invalid_signal" }); return;
+        }
+        const signalNow = Date.now();
+        if (signalNow - player.voiceSignalWindowAt >= 1000) {
+          player.voiceSignalWindowAt = signalNow; player.voiceSignalCount = 0;
+        }
+        if (++player.voiceSignalCount > 30) {
+          send(socket, { type: "voice_signal_rejected", code: "signal_rate_limited" }); return;
+        }
+        player.lastVoiceSignalAt = signalNow;
+        try {
+          if (await isBlockedPair(player.id, target.id)) {
+            send(socket, { type: "voice_signal_rejected", code: "peer_blocked" }); return;
+          }
+          send(target.socket, { type: "voice_signal", fromUserId: player.id, signalType: msg.signalType,
+            sdp: msg.signalType === "candidate" ? undefined : msg.sdp,
+            candidate: msg.signalType === "candidate" ? msg.candidate : undefined,
+            sdpMid: typeof msg.sdpMid === "string" ? msg.sdpMid.slice(0, 128) : null,
+            sdpMLineIndex: Number.isInteger(msg.sdpMLineIndex) ? msg.sdpMLineIndex : null });
+        } catch (error) {
+          console.error("voice_signal_relay_failed", error);
+          send(socket, { type: "voice_signal_rejected", code: "voice_signaling_unavailable" });
+        }
+        return;
+      }
       if (msg && msg.type === "wardrobe_refresh") {
         const refreshNow = Date.now();
         if (refreshNow - player.lastWardrobeRefreshAt < 1000) return;
@@ -859,7 +937,7 @@ wss.on("connection", async (socket: WebSocket) => {
       // already reconnected, but release seats if moderation removed this
       // socket from the live-player map before the close event arrived.
       if (current && current.socket !== socket) return;
-      if (current && current.returnState) {
+      if (current?.voiceActive) {\n        current.voiceActive = false;\n        for (const peer of players.values())\n          if (peer.id !== current.id && sameVoiceSpace(current, peer) && withinVoiceRange(current, peer))\n            send(peer.socket, { type: "voice_presence", userId: current.id, active: false });\n      }\n      if (current && current.returnState) {
         const destination = current.returnState;
         void sql`
           INSERT INTO virtual_world_player_state (world_id, user_id, position, rotation, updated_at)
@@ -920,7 +998,7 @@ setInterval(async () => {
   const now = Date.now();
   const dt = Math.min(0.05, Math.max(0.001, (now - lastTick) / 1000));
   lastTick = now;
-  const snapshots: Array<{ userId: string; x: number; y: number; z: number; yaw: number; grounded: boolean; seated: boolean; sprint: boolean; gesture: string; gestureSequence: number; wardrobe: EquippedWardrobeItem[] }> = [];
+  const snapshots: Array<{ userId: string; x: number; y: number; z: number; yaw: number; grounded: boolean; seated: boolean; sprint: boolean; gesture: string; gestureSequence: number; wardrobe: EquippedWardrobeItem[]; voiceActive: boolean }> = [];
   for (const p of players.values()) {
     if (p.socket.readyState !== WebSocket.OPEN) continue;
     if (now - p.lastInputAt > 1500) { p.moveX = 0; p.moveZ = 0; p.sprint = false; }
@@ -943,7 +1021,7 @@ setInterval(async () => {
     }
     if (p.y <= groundY) { p.y = groundY; p.vy = 0; p.grounded = true; }
     snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
-      seated: p.seated, sprint: p.sprint, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe });
+      seated: p.seated, sprint: p.sprint, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe, voiceActive: p.voiceActive });
     if (now - p.lastCheckpointAt >= 5000) {
       p.lastCheckpointAt = now;
       void sql`
