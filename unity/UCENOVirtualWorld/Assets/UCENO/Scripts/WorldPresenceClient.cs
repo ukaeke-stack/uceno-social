@@ -68,6 +68,7 @@ namespace UCENO.VirtualWorld
             public Vector3 lastSamplePosition;
             public float lastSampleTime;
             public Animator animator;
+            public AvatarLocomotionDriver locomotion;
             public bool hasMovementSample;
             public int lastGestureSequence;
         }
@@ -255,10 +256,10 @@ namespace UCENO.VirtualWorld
                             continue;
                         GameObject avatar = Instantiate(remoteAvatarPrefab);
                         avatar.name = "Remote Player " + peer.userId;
-                        foreach (AvatarLocomotionDriver driver in avatar.GetComponentsInChildren<AvatarLocomotionDriver>())
-                            driver.enabled = false;
+                        AvatarLocomotionDriver remoteDriver = avatar.GetComponentInChildren<AvatarLocomotionDriver>();
+                        if (remoteDriver != null) remoteDriver.enabled = true;
                         Animator remoteAnimator = avatar.GetComponentInChildren<Animator>();
-                        remote = new RemotePlayer { root = avatar.transform, animator = remoteAnimator };
+                        remote = new RemotePlayer { root = avatar.transform, animator = remoteAnimator, locomotion = remoteDriver };
                         remotePlayers.Add(peer.userId, remote);
                     }
                     float sampleTime = Time.time;
@@ -275,28 +276,42 @@ namespace UCENO.VirtualWorld
                     remote.targetRotation = new Quaternion(peer.rotation.x, peer.rotation.y, peer.rotation.z, peer.rotation.w);
                     remote.lastReceived = sampleTime;
 
-                    // Derive locomotion from authoritative server-observed position
-                    // samples. This keeps the wire format backward-compatible.
+                    // Server-validated presence samples drive the remote humanoid.
+                    // A local Animator Controller uses its MoveSpeed parameter;
+                    // the procedural driver handles seated poses and gestures
+                    // when the imported avatar has no controller.
+                    float normalizedSpeed = peer.animationState != null
+                        ? (peer.animationState.locomotion == "run" ? 1f :
+                           peer.animationState.locomotion == "walk" ? 0.5f : 0f)
+                        : Mathf.Clamp01(replicatedSpeed / 6.5f);
                     if (remote.animator != null && remote.animator.runtimeAnimatorController != null)
                     {
-                        float normalizedSpeed = Mathf.Clamp01(replicatedSpeed / 6.5f);
-                        remote.animator.SetFloat(Animator.StringToHash("MoveSpeed"), normalizedSpeed, 0.15f, Time.deltaTime);
-                        if (peer.animationState != null)
+                        foreach (AnimatorControllerParameter parameter in remote.animator.parameters)
                         {
-                            remote.animator.SetBool(Animator.StringToHash("IsSeated"), peer.animationState.seated);
-                            if (peer.animationState.gestureSequence > remote.lastGestureSequence)
+                            if (parameter.name == "MoveSpeed" && parameter.type == AnimatorControllerParameterType.Float)
+                                remote.animator.SetFloat(parameter.name, normalizedSpeed, 0.15f, Time.deltaTime);
+                            if (peer.animationState != null && parameter.name == "IsSeated" &&
+                                parameter.type == AnimatorControllerParameterType.Bool)
+                                remote.animator.SetBool(parameter.name, peer.animationState.seated);
+                        }
+                        if (peer.animationState != null &&
+                            peer.animationState.gestureSequence > remote.lastGestureSequence)
+                        {
+                            string trigger = peer.animationState.gesture == "wave" ? "Wave" :
+                                peer.animationState.gesture == "cheer" ? "Cheer" : null;
+                            if (!string.IsNullOrEmpty(trigger))
                             {
-                                string trigger = peer.animationState.gesture == "wave" ? "Wave" : peer.animationState.gesture == "cheer" ? "Cheer" : null;
-                                if (!string.IsNullOrEmpty(trigger))
-                                {
-                                    foreach (AnimatorControllerParameter parameter in remote.animator.parameters)
-                                        if (parameter.type == AnimatorControllerParameterType.Trigger && parameter.name == trigger)
-                                            remote.animator.SetTrigger(trigger);
-                                }
-                                remote.lastGestureSequence = peer.animationState.gestureSequence;
+                                foreach (AnimatorControllerParameter parameter in remote.animator.parameters)
+                                    if (parameter.type == AnimatorControllerParameterType.Trigger && parameter.name == trigger)
+                                        remote.animator.SetTrigger(trigger);
                             }
+                            remote.lastGestureSequence = peer.animationState.gestureSequence;
                         }
                     }
+                    if (remote.locomotion != null && peer.animationState != null)
+                        remote.locomotion.ApplyRemoteState(normalizedSpeed, peer.animationState.seated,
+                            peer.animationState.locomotion == "run", peer.animationState.gesture,
+                            peer.animationState.gestureSequence);
                 }
             }
         }
