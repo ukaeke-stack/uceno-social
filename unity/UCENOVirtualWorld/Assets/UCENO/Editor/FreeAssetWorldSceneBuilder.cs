@@ -35,7 +35,12 @@ namespace UCENO.VirtualWorld.Editor
             "Models/shrub_02/shrub_02.fbx",
             "Models/shrub_03/shrub_03.fbx",
             "Models/covered_car/covered_car.fbx",
-            "Models/modular_chainlink_fence/modular_chainlink_fence.fbx"
+            "Models/modular_chainlink_fence/modular_chainlink_fence.fbx",
+            "Models/sofa_01/sofa_01.fbx",
+            "Models/arm_chair_01/arm_chair_01.fbx",
+            "Models/round_wooden_table_01/round_wooden_table_01.fbx",
+            "Models/gothic_bed_01/gothic_bed_01.fbx",
+            "Models/gothic_cabinet_01/gothic_cabinet_01.fbx"
         };
 
         public static void CreateStarterScene()
@@ -90,6 +95,15 @@ namespace UCENO.VirtualWorld.Editor
                 "Models/modular_chainlink_fence/modular_chainlink_fence.fbx",
                 "UCENO_Chainlink_Fence", true);
 
+            GameObject[] homeFurniturePrefabs =
+            {
+                CreateModelPrefab("Models/sofa_01/sofa_01.fbx", "UCENO_Home_Sofa_01", true),
+                CreateModelPrefab("Models/arm_chair_01/arm_chair_01.fbx", "UCENO_Home_Arm_Chair_01", true),
+                CreateModelPrefab("Models/round_wooden_table_01/round_wooden_table_01.fbx", "UCENO_Home_Round_Table_01", true),
+                CreateModelPrefab("Models/gothic_bed_01/gothic_bed_01.fbx", "UCENO_Home_Gothic_Bed_01", true),
+                CreateModelPrefab("Models/gothic_cabinet_01/gothic_cabinet_01.fbx", "UCENO_Home_Gothic_Cabinet_01", true)
+            };
+
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             GameObject world = new GameObject("UCENO Realistic City Block");
             Transform worldRoot = world.transform;
@@ -103,7 +117,7 @@ namespace UCENO.VirtualWorld.Editor
             ConfigureLighting(skybox);
 
             WorldSessionClient worldSession = world.AddComponent<WorldSessionClient>();
-            GameObject player = BuildPlayer(worldRoot, avatarPrefab, worldSession);
+            GameObject player = BuildPlayer(worldRoot, avatarPrefab, worldSession, homeFurniturePrefabs);
             BuildCamera(player.transform);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -545,7 +559,7 @@ namespace UCENO.VirtualWorld.Editor
             QualitySettings.streamingMipmapsActive = true;
         }
 
-        private static GameObject BuildPlayer(Transform parent, GameObject avatarPrefab, WorldSessionClient worldSession)
+        private static GameObject BuildPlayer(Transform parent, GameObject avatarPrefab, WorldSessionClient worldSession, GameObject[] homeFurniturePrefabs)
         {
             GameObject player = new GameObject("UCENO Local Player");
             player.transform.SetParent(parent, false);
@@ -584,6 +598,14 @@ namespace UCENO.VirtualWorld.Editor
             SerializedObject homeData = new SerializedObject(homeClient);
             homeData.FindProperty("session").objectReferenceValue = worldSession;
             homeData.FindProperty("player").objectReferenceValue = motor;
+            SerializedProperty catalog = homeData.FindProperty("furnitureCatalog");
+            catalog.arraySize = homeFurniturePrefabs.Length;
+            string[] furnitureIds = { "sofa_01", "arm_chair_01", "round_wooden_table_01", "gothic_bed_01", "gothic_cabinet_01" };
+            for (int i = 0; i < homeFurniturePrefabs.Length; i++)
+            {
+                catalog.GetArrayElementAtIndex(i).FindPropertyRelative("assetId").stringValue = furnitureIds[i];
+                catalog.GetArrayElementAtIndex(i).FindPropertyRelative("prefab").objectReferenceValue = homeFurniturePrefabs[i];
+            }
             homeData.ApplyModifiedPropertiesWithoutUndo();
 
             WorldStatusHud hud = player.AddComponent<WorldStatusHud>();
