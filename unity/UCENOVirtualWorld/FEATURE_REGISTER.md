@@ -22,9 +22,9 @@ This register is the scope ledger for the connected UCENO social platform and vi
 | UCENO City | Natural city environment, roads, sidewalks, buildings, vegetation, street furniture, vehicles, lighting, collision, navigation | **Partial foundation.** Imported CC0 city assets and Editor scene builder exist. Scene builder now exports actual enabled Unity collider bounds for gateway collision; the map handoff and runtime behavior still require Editor/server/device verification. |
 | Connected districts | Beach Resort, Entertainment, Sports, Residential, Nature, Business/Conference and other themed districts | **Not implemented as playable connected districts.** |
 | Avatar | Real human body, face, hair, clothing, proportions, skin tone, animation, facial expression, gesture, customization, optional photo likeness | **Partial.** One imported Humanoid FBX, procedural locomotion, wave/cheer, and basic seated/rest pose. Full creator, wardrobe, facial expression system, and photo likeness are not implemented. |
-| Movement and interaction | Walk, run, jump, sit/stand, swim, emotes, object interaction, doors, vehicles, furniture interaction | **Partial.** Walk/run/jump, wave/cheer, sit/stand rest pose and camera controls are in source. A server-authoritative raycast interaction protocol now supports configured doors and generic objects, but no scene doors/furniture are marked yet; seat occupancy, vehicles and swimming remain unimplemented. |
+| Movement and interaction | Walk, run, jump, sit/stand, swim, emotes, object interaction, doors, vehicles, furniture interaction | **Partial.** Walk/run/jump, wave/cheer, and generic seated animation are in source. A server-authoritative raycast protocol supports configured doors, generic props and single-occupant seats; disconnect releases seat occupancy. Unity Editor authoring commands can mark real imported props, but the current generated city has no configured door/chair assets yet. Chair-specific alignment/IK, vehicles and swimming remain unimplemented. |
 | Social presence | Friends, presence, private/group text chat, proximity voice, public voice, private rooms | **Some social-platform APIs/UI exist outside the Unity world.** Unity avatar/world integration and proximity/public spatial voice are not verified or implemented here. |
-| Multiplayer | Shared avatars, synchronized movement, world instances, party/group travel, authoritative simulation, reconnect and presence | **Not implemented in Unity world.** No claim of multiplayer or simulated remote players. Distributed scaling target is architectural only. |
+| Multiplayer | Shared avatars, synchronized movement, world instances, party/group travel, authoritative simulation, reconnect and presence | **Partial source foundation.** Authenticated Unity WebSocket client and Node gateway implement server-authoritative kinematic movement, remote snapshots, reconnect, checkpoints and bounded per-instance capacity. Actual deployment, Unity compilation, two-device testing, lag/reconciliation, distributed scaling and spatial voice remain unverified/outstanding. |
 | Homes and spaces | Private homes, ownership/permissions, invitations, furnishing, decoration, persistence | **Not implemented.** |
 | Activities | Sports, racing, adventure, concerts, social gatherings, education, casual multiplayer, cinema and community events | **Not implemented as playable activities.** Categories are approved scope, not delivered features. |
 | Economy and commerce | Inventory, marketplace, creator shops, earned/purchased credits, transfers, purchase history, refunds and entitlements | **Not implemented in Unity world.** Existing social-platform commerce must be audited and integrated; credit types must never be merged. |
@@ -39,10 +39,11 @@ This register is the scope ledger for the connected UCENO social platform and vi
 - Imported human Humanoid avatar prefab and procedural fallback locomotion.
 - WASD/touch movement, camera look, sprint, jump, wave and cheer.
 - Camera collision and bounded mouse-wheel/pinch zoom.
-- Mobile SIT/STAND and desktop C seated/rest toggle. The current pose is a ground-rest approximation, not chair-specific animation or inverse kinematics.
+- Generic seated/rest animation state; server-authoritative seat claim/release and single-occupant enforcement are implemented in source. Chair-specific alignment/IK is not.
 - Position/movement HUD and static source validation.
-- Editor export of real scene collider bounds and marked interactables for the world gateway.
-- Server-validated, range-limited door/object interaction requests and state broadcasts; state is currently in gateway memory only.
+- Editor export of actual scene collider bounds and explicitly marked interactables for the world gateway.
+- Unity Editor menu commands to mark selected real props as doors, seats or usable objects and export the current scene collision map.
+- Server-validated, range-limited door/object interactions and synchronized seat occupancy. Object/seat state is currently in gateway memory only.
 
 ## Implementation sequence
 
