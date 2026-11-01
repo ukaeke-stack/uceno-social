@@ -215,3 +215,32 @@ possible.
 5. Test token expiry/reconnect, offline save failure/retry, and switching worlds under the same account.
 6. Open Unity 6.3 Editor and confirm compile/import, local avatar material-slot mapping, mobile HUD layout and no per-frame network calls.
 7. Keep wardrobe acceptance separate: supply real garment/hair/accessory prefabs, validate Humanoid bone/skin weights and slot replacement, then test equip/unequip replication and account persistence. No wardrobe pass can be claimed from palette tests.
+
+
+## Modular wardrobe acceptance tests (pending)
+
+### Database and API
+1. Apply migration 027 after migration 026 on the separate UCENO database.
+2. Verify catalogue rows are disabled by default and the migration inserts no fake/demo inventory.
+3. Verify unauthenticated GET/PUT returns 401; GET returns only the authenticated account's enabled owned items.
+4. Verify a user cannot equip another user's item, a disabled catalogue item, an item assigned to a different slot, or an unknown item ID; each must fail without changing equipped state.
+5. Verify null selection unequips only the requested slot; other equipped slots remain unchanged.
+6. Verify inventory deletion cascades to the corresponding equipped row.
+7. Verify item identifiers and prefab keys are constrained and no client can submit a user ID.
+
+### Unity asset and rig integration
+1. Create a Resources/UCENO/AvatarWardrobeCatalog asset and register only imported, licensed and reviewed prefabs.
+2. Each garment prefab must have one or more SkinnedMeshRenderers, non-empty mesh/bone arrays, and bone names matching the imported avatar Humanoid rig.
+3. Test a top, outerwear, bottom, shoes, hair and accessory separately; confirm missing prefab, missing bone, non-skinned mesh and invalid catalog entry fail safely without destroying the currently equipped garment.
+4. Equip a second item in the same slot; verify the previous garment is removed and there is no duplicate geometry or orphaned renderer.
+5. Unequip each slot; verify the base avatar remains intact.
+6. Verify garments follow idle, walk, run, jump, sit and gesture animations without clipping or detached joints.
+7. Verify the wardrobe UI is usable on Android touch and does not overlap movement/camera controls.
+
+### Account persistence and multiplayer
+1. Equip on device A, reconnect, and verify the same account retrieves the equipped item IDs.
+2. Sign into the same account on device B and verify the server returns the same selections.
+3. Sign into another account and verify no inventory or equipment leakage.
+4. Verify unavailable/removed assets do not crash avatar loading and produce a visible recoverable fallback.
+5. Add and test authoritative multiplayer snapshot replication for equipped item IDs; verify remote clients reject unknown catalogue IDs and render matching garments.
+6. Run Unity Editor compilation, visual review and two physical-device tests. Source checks alone do not count as a pass.
