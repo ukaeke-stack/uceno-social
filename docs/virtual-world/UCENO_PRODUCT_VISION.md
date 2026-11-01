@@ -95,6 +95,13 @@ Status: **Implemented in source**. The scene must be regenerated in Unity for
 the district layout to appear. Appearance customization currently recolours
 recognised material slots; it does not yet provide mesh/wardrobe swaps, face
 morphs, hair selection, body-shape editing or a saved account-backed wardrobe.
+An `AvatarSocialExpressionDriver` is now attached to the generated humanoid
+prefab. It adds subtle idle head motion, an optional gaze target API and
+automatic blinking when the imported face mesh exposes compatible blink
+blendshapes. Models without facial blendshapes still receive head motion; they
+do not gain a fabricated face rig. This is source-level functionality, not a
+claim of visually verified facial animation.
+
 Unity Editor compilation, visual inspection and physical-device performance
 testing remain outstanding. The starter district is not yet a finished
 photorealistic city.
