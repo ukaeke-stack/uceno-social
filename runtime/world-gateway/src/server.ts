@@ -263,6 +263,7 @@ function activityPayload(session: ActivitySession) {
     session: {
       id: session.id,
       hostUserId: activityHosts.get(session.id) || "",
+      raceId: activityRaceIds.get(session.id) || "",
       worldId: session.worldId,
       instanceId: session.instanceId,
       kind: session.kind,
