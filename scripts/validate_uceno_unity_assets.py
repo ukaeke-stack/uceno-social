@@ -28,6 +28,7 @@ REQUIRED_FILES = [
     ASSETS / "Scripts/AvatarLocomotionDriver.cs",
     ASSETS / "Scripts/WorldStatusHud.cs",
     ASSETS / "Scripts/WorldSessionClient.cs",
+    ASSETS / "Scripts/WorldHomeClient.cs",
     ASSETS / "Scripts/WorldPresenceClient.cs",
     IMPORTED / "HDRI/modern_buildings_1k.hdr",
     IMPORTED / "Models/modular_urban_apartments_facade/modular_urban_apartments_facade.fbx",
@@ -163,6 +164,15 @@ def main():
     hud = read_text(ASSETS / "Scripts/WorldStatusHud.cs")
     if "GUI.Button" not in hud or "Position:" not in hud or '"JUMP"' not in hud or '"RUN"' not in hud or '"WAVE"' not in hud or '"CHEER"' not in hud:
         fail("World status HUD, mobile jump control, or sprint control is missing.")
+
+    home_client = read_text(ASSETS / "Scripts/WorldHomeClient.cs")
+    for required in ("RequestHomes", "CreateHomeRoutine", "LoadHomeRoutine",
+                     "SaveHomeRoutine", "PlaceFurniture", "CanEditSelectedHome",
+                     "/api/world-homes?worldId=", "SAVE HOME LAYOUT"):
+        if required not in home_client:
+            fail("WorldHomeClient is missing home management integration: " + required)
+    if "WorldHomeClient homeClient = player.AddComponent<WorldHomeClient>()" not in builder:
+        fail("Generated player does not include the world home management client.")
 
     session = read_text(ASSETS / "Scripts/WorldSessionClient.cs")
     if session.count("public string ApiBaseUrl") != 1:
