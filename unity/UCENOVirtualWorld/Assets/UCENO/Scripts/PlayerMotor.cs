@@ -28,6 +28,17 @@ namespace UCENO.VirtualWorld
         private int lookFingerId = -1;
         private bool sprintRequested;
         private bool jumpRequested;
+        public bool IsSeated { get; private set; }
+
+        public void ToggleSeated()
+        {
+            IsSeated = !IsSeated;
+            sprintRequested = false;
+            jumpRequested = false;
+            MovementInput = Vector2.zero;
+            IsSprinting = false;
+            AnimationSpeed = 0f;
+        }
 
         public float Yaw => yaw;
         public float Pitch => pitch;
@@ -75,10 +86,13 @@ namespace UCENO.VirtualWorld
                 verticalVelocity = 0f;
             }
 
-            if (Input.GetKeyDown(KeyCode.Space))
+            if (Input.GetKeyDown(KeyCode.C))
+                ToggleSeated();
+
+            if (Input.GetKeyDown(KeyCode.Space) && !IsSeated)
                 RequestJump();
 
-            Vector2 move = ReadMoveInput();
+            Vector2 move = IsSeated ? Vector2.zero : ReadMoveInput();
             Vector2 look = ReadLookInput();
             MovementInput = move;
             IsSprinting = move.sqrMagnitude > 0.01f &&
@@ -96,12 +110,12 @@ namespace UCENO.VirtualWorld
             if (controller.isGrounded && verticalVelocity < 0f)
                 verticalVelocity = -2f;
 
-            if (jumpRequested && controller.isGrounded)
+            if (!IsSeated && jumpRequested && controller.isGrounded)
                 verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
             jumpRequested = false;
 
             verticalVelocity = Mathf.Max(verticalVelocity + gravity * Time.deltaTime, -maximumFallSpeed);
-            Vector3 velocity = direction * (moveSpeed * (IsSprinting ? sprintMultiplier : 1f));
+            Vector3 velocity = IsSeated ? Vector3.zero : direction * (moveSpeed * (IsSprinting ? sprintMultiplier : 1f));
             velocity.y = verticalVelocity;
             controller.Move(velocity * Time.deltaTime);
         }
