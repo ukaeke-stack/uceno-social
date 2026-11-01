@@ -10,6 +10,7 @@ namespace UCENO.VirtualWorld
         [SerializeField] private float sprintMultiplier = 1.65f;
         [SerializeField] private float gravity = -20f;
         [SerializeField] private float maximumFallSpeed = 30f;
+        [SerializeField] private float jumpHeight = 1.15f;
         [SerializeField] private float fallRecoveryHeight = -3f;
         [SerializeField] private Vector3 spawnPosition = new Vector3(0f, 1.15f, 0f);
 
@@ -26,6 +27,7 @@ namespace UCENO.VirtualWorld
         private int moveFingerId = -1;
         private int lookFingerId = -1;
         private bool sprintRequested;
+        private bool jumpRequested;
 
         public float Yaw => yaw;
         public float Pitch => pitch;
@@ -39,6 +41,12 @@ namespace UCENO.VirtualWorld
             sprintRequested = value;
         }
 
+        /// <summary>Requests one grounded jump from keyboard or mobile HUD.</summary>
+        public void RequestJump()
+        {
+            jumpRequested = true;
+        }
+
         private void Awake()
         {
             controller = GetComponent<CharacterController>();
@@ -50,6 +58,7 @@ namespace UCENO.VirtualWorld
             moveFingerId = -1;
             lookFingerId = -1;
             sprintRequested = false;
+            jumpRequested = false;
             IsSprinting = false;
             AnimationSpeed = 0f;
         }
@@ -83,6 +92,10 @@ namespace UCENO.VirtualWorld
 
             if (controller.isGrounded && verticalVelocity < 0f)
                 verticalVelocity = -2f;
+
+            if (jumpRequested && controller.isGrounded)
+                verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            jumpRequested = false;
 
             verticalVelocity = Mathf.Max(verticalVelocity + gravity * Time.deltaTime, -maximumFallSpeed);
             Vector3 velocity = direction * (moveSpeed * (IsSprinting ? sprintMultiplier : 1f));
