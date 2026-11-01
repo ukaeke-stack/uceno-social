@@ -141,3 +141,28 @@ Migration 023 must be reviewed and applied after 022 before deploying the
 updated presence route. Do not claim synchronized animation is runtime-proven
 until the Unity Editor compiles and two physical devices verify walk/run,
 sit/stand, wave and cheer replication in both directions.
+
+
+## Server-observed movement sanity checks
+
+The presence write now compares each submitted transform with the previously
+stored transform using database time. Updates are limited to one per second
+and are rejected when displacement exceeds a bounded speed envelope
+(12 world units/second plus a 1-unit tolerance, with a 3-unit minimum allowance
+for initial movement). The database increments the accepted sample sequence
+on each update, so a Unity client restart does not permanently fail because
+its in-memory sequence counter restarted.
+
+This limits obvious teleport/speed abuse but does not make movement
+authoritative: the client still supplies its position, and the server does not
+simulate input, gravity, jump arcs, collision geometry, terrain or vehicle
+physics. A production authoritative movement service still needs a defined
+world coordinate/physics contract, trusted instance simulation, input command
+sequencing, server-owned player state, reconnect reconciliation and adversarial
+tests. Do not describe the current endpoint as authoritative multiplayer.
+
+Remote avatars now enable their locomotion driver. Animator Controllers receive
+supported parameters only when those parameters exist; avatars without an
+Animator Controller use the procedural driver for movement, seated poses and
+gesture playback. Controller clips and chair-specific IK still require prefab
+and in-Editor verification.
