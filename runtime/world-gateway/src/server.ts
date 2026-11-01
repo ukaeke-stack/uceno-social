@@ -859,7 +859,7 @@ wss.on("connection", async (socket: WebSocket) => {
         const targetId = typeof msg.targetUserId === "string" ? msg.targetUserId : "";
         const target = players.get(targetId);
         const payloadValid = isValidVoiceSignal(msg.signalType, msg.sdp, msg.candidate);
-        if (!player.voiceActive || !target || !target.voiceActive || !kindValid || !payloadValid ||
+        if (!player.voiceActive || !target || !target.voiceActive || !payloadValid ||
             targetId === player.id || !sameSpatialVoiceRoom(player, target) || !isWithinVoiceRange(player, target)) {
           send(socket, { type: "voice_signal_rejected", code: "peer_unavailable_or_invalid_signal" }); return;
         }
