@@ -24,9 +24,10 @@ export function isValidHomeFurnishing(value: unknown): boolean {
     if (!isRecord(item)) return false;
     if (typeof item.id !== "string" || !/^[a-z0-9-]{1,80}$/i.test(item.id)) return false;
     if (typeof item.assetId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(item.assetId)) return false;
-    if (!finiteBounded(item.x, -100000, 100000) ||
-        !finiteBounded(item.y, -100000, 100000) ||
-        !finiteBounded(item.z, -100000, 100000) ||
+    // Furniture positions are home-local coordinates, not arbitrary world positions.
+    if (!finiteBounded(item.x, -25, 25) ||
+        !finiteBounded(item.y, -2, 10) ||
+        !finiteBounded(item.z, -25, 25) ||
         !finiteBounded(item.yaw, -360, 360) ||
         !finiteBounded(item.scale, 0.05, 10)) return false;
     return true;
