@@ -36,10 +36,24 @@ export async function readWorldClientSession(request: NextRequest, worldId: stri
         (payload.client_type !== "unity-android" && payload.client_type !== "unity-desktop")) return null;
 
     const sql = getDb();
-    const accounts = await sql`SELECT handle, moderation_status AS "moderationStatus",
-      suspended_until AS "suspendedUntil" FROM users WHERE id = ${payload.sub}::uuid LIMIT 1`;
+    const accounts = await sql`
+      SELECT u.handle, u.moderation_status AS "moderationStatus",
+        u.suspended_until AS "suspendedUntil",
+        EXISTS (
+          SELECT 1
+          FROM virtual_world_instance_sessions s
+          JOIN virtual_world_instances i ON i.id = s.instance_id
+          WHERE s.world_id = ${worldId}::uuid
+            AND s.user_id = u.id
+            AND s.instance_id = ${payload.instance_id}::uuid
+            AND s.lease_expires_at > NOW()
+            AND i.status = 'ready' AND i.endpoint IS NOT NULL
+            AND i.heartbeat_at > NOW() - INTERVAL '30 seconds'
+        ) AS "instanceHealthy"
+      FROM users u WHERE u.id = ${payload.sub}::uuid LIMIT 1
+    `;
     const account = accounts[0];
-    if (!account || account.moderationStatus === "disabled") return null;
+    if (!account || !account.instanceHealthy || account.moderationStatus === "disabled") return null;
     if (account.moderationStatus === "suspended") {
       const until = account.suspendedUntil ? new Date(account.suspendedUntil).getTime() : Number.POSITIVE_INFINITY;
       if (until > Date.now()) return null;
