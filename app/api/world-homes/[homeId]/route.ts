@@ -80,7 +80,7 @@ export async function PUT(request: NextRequest, { params }: Context) {
     body = parsed;
   } catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
 
-  const hasTransform = Object.prototype.hasOwnProperty.call(body, "transform");
+  const hasTransform = body.transform !== undefined && body.transform !== null;
   const hasFurnishing = Object.prototype.hasOwnProperty.call(body, "furnishing");
   const hasVisibility = body.visibility !== undefined && body.visibility !== "";
   if ((!hasTransform && !hasFurnishing && !hasVisibility) ||
@@ -100,6 +100,12 @@ export async function PUT(request: NextRequest, { params }: Context) {
           updated_at = NOW()
       WHERE h.id = ${homeId}::uuid
         AND (NOT ${hasVisibility} OR h.owner_user_id = ${session.id}::uuid)
+        AND (NOT ${hasTransform} OR h.owner_user_id = ${session.id}::uuid OR EXISTS (
+          SELECT 1 FROM virtual_home_members transform_editor
+          WHERE transform_editor.home_id = h.id
+            AND transform_editor.user_id = ${session.id}::uuid
+            AND transform_editor.permission = 'co_owner'
+        ))
         AND (
           h.owner_user_id = ${session.id}::uuid
           OR EXISTS (
