@@ -84,6 +84,7 @@ This checklist covers the Unity city client, world gateway interactions and the 
 - [ ] Cancel RSVP; confirm the personal attendance is cleared and the going count adjusts.
 - [ ] Try RSVP against a full event; confirm the server rejects it and the UI reports failure.
 - [ ] Verify banned/suspended users and users without private-world access cannot RSVP.
+- [ ] Verify blocked users cannot create events or RSVP, even when they call the APIs directly.
 - [ ] Do not treat RSVP as a spatial join; event location/teleport and activity scene integration are not implemented yet.
 
 ## Home sharing API checks
