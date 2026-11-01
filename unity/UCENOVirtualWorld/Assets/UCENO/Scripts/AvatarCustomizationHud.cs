@@ -60,6 +60,8 @@ namespace UCENO.VirtualWorld
             LoadColor("trousers", ref palette.trousers);
             LoadColor("shoes", ref palette.shoes);
             profile.Apply(palette);
+            if (GetComponent<AvatarWardrobeHud>() == null)
+                gameObject.AddComponent<AvatarWardrobeHud>();
             WorldSessionClient session = FindObjectOfType<WorldSessionClient>();
             if (session != null)
             {
