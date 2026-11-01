@@ -98,8 +98,11 @@ nearby peers.
 This is an initial polling implementation only:
 - It is not authoritative movement simulation, anti-cheat, prediction or
   server-side collision validation.
-- Remote player animation state is not yet replicated; remote avatars currently
-  follow position and rotation only.
+- Remote player animation state is not sent as a separate network field. The
+  client estimates locomotion speed from successive server-observed position
+  samples and drives the imported humanoid `MoveSpeed` animator parameter. This
+  provides basic walk/run blending when the imported controller supports it;
+  seated state, gestures and exact sprint state are not yet synchronized.
 - The Unity client now renews its bearer token approximately 45 seconds
   before expiry and replaces the in-memory token after a successful refresh.
   Temporary network/server failures are retried after a short delay; rejected
