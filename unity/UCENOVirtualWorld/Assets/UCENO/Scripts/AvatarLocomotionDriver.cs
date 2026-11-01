@@ -147,7 +147,6 @@ namespace UCENO.VirtualWorld
                 rightLowerArm.localRotation = rightLowerArmBase * Quaternion.Euler(-8f, 0f, 0f);
 
             if (hips != null) hipsPositionBase = hips.localPosition;
-            ApplyNaturalAvatarColors();
         }
 
         private void Update()
@@ -294,80 +293,6 @@ namespace UCENO.VirtualWorld
                 rightUpperArm.localRotation = rightUpperArmBase * Quaternion.Euler(-105f - beat * 12f, 0f, 35f + sway * 0.25f);
             SetRotation(leftLowerArm, leftLowerArmBase, new Vector3(-38f + beat * 18f, 0f, -8f));
             SetRotation(rightLowerArm, rightLowerArmBase, new Vector3(-38f - beat * 18f, 0f, 8f));
-        }
-
-        private void ApplyNaturalAvatarColors()
-        {
-            if (animator == null) return;
-
-            Color skin = new Color(0.58f, 0.34f, 0.21f, 1f);
-            Color hair = new Color(0.09f, 0.055f, 0.035f, 1f);
-            Color shirt = new Color(0.12f, 0.28f, 0.48f, 1f);
-            Color trousers = new Color(0.12f, 0.14f, 0.18f, 1f);
-            Color shoes = new Color(0.075f, 0.06f, 0.05f, 1f);
-
-            foreach (Renderer renderer in animator.GetComponentsInChildren<Renderer>(true))
-            {
-                Material[] materials = renderer.sharedMaterials;
-                if (materials == null || materials.Length == 0) continue;
-                bool hasSemanticNames = false;
-                foreach (Material candidate in materials)
-                {
-                    if (candidate == null) continue;
-                    string candidateName = candidate.name.ToLowerInvariant();
-                    if (candidateName.Contains("skin") || candidateName.Contains("body") ||
-                        candidateName.Contains("face") || candidateName.Contains("head") ||
-                        candidateName.Contains("hair") || candidateName.Contains("brow") ||
-                        candidateName.Contains("shirt") || candidateName.Contains("cloth") ||
-                        candidateName.Contains("pant") || candidateName.Contains("shoe"))
-                    {
-                        hasSemanticNames = true;
-                        break;
-                    }
-                }
-
-                for (int i = 0; i < materials.Length; i++)
-                {
-                    Material material = materials[i];
-                    if (material == null) continue;
-                    string materialName = material.name.ToLowerInvariant();
-                    Color tint;
-
-                    if (materialName.Contains("skin") || materialName.Contains("body") ||
-                        materialName.Contains("face") || materialName.Contains("head"))
-                        tint = skin;
-                    else if (materialName.Contains("hair") || materialName.Contains("brow"))
-                        tint = hair;
-                    else if (materialName.Contains("shirt") || materialName.Contains("top") ||
-                             materialName.Contains("cloth") || materialName.Contains("jacket"))
-                        tint = shirt;
-                    else if (materialName.Contains("pant") || materialName.Contains("trouser"))
-                        tint = trousers;
-                    else if (materialName.Contains("shoe"))
-                        tint = shoes;
-                    else if (hasSemanticNames)
-                        continue;
-                    else
-                    {
-                        // Some generated FBX files use generic material names.
-                        // Give those slots a restrained human palette instead of
-                        // leaving the entire character pure white.
-                        switch (i)
-                        {
-                            case 0: tint = skin; break;
-                            case 1: tint = shirt; break;
-                            case 2: tint = trousers; break;
-                            default: tint = i % 2 == 0 ? shoes : hair; break;
-                        }
-                    }
-
-                    MaterialPropertyBlock block = new MaterialPropertyBlock();
-                    renderer.GetPropertyBlock(block, i);
-                    block.SetColor("_Color", tint);
-                    block.SetColor("_BaseColor", tint);
-                    renderer.SetPropertyBlock(block, i);
-                }
-            }
         }
 
         private Transform Bone(HumanBodyBones bone)
