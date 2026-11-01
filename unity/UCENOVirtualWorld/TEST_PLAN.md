@@ -73,6 +73,16 @@ This checklist covers the Unity city client, world gateway interactions and the 
 - [ ] Verify the root/facing anchor aligns the avatar with the chair; full foot/hand IK is not implemented.
 
 
+## Playable dance event checks
+
+- [ ] Create a future event with activity type dance and a venue at the host's current position.
+- [ ] RSVP GOING and join the venue during the 30-minute admission window.
+- [ ] Tap DANCE; confirm the local humanoid performs the procedural dance animation.
+- [ ] Join the same event from a second client; confirm the second avatar receives the dance gesture through server snapshots and displays the same animation.
+- [ ] Confirm a client cannot forge an unsupported gesture string or a gesture sequence older than its last accepted sequence.
+- [ ] Confirm the dance action is not offered outside a joined dance event.
+- [ ] Test repeated dance actions, gesture expiry and movement while dancing on Android after the Editor gate passes.
+
 ## World events client checks
 
 - [ ] Enter a published world and open EVENTS on Android or press N on desktop.
