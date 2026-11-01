@@ -93,6 +93,14 @@ jobs:
           const sceneBuilder = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs', 'utf8');
           if (!sceneBuilder.includes('WorldHomeClient homeClient = player.AddComponent<WorldHomeClient>()'))
             throw new Error('Generated Unity player is missing the home-management client.');
+          const layoutValidation = fs.readFileSync('./lib/world-home-layout.ts', 'utf8');
+          for (const marker of ['Number.isFinite', '-100000', '100000', 'assetId', 'item.scale', 'value.length > 100'])
+            if (!layoutValidation.includes(marker)) throw new Error('Missing bounded home layout validation: ' + marker);
+          for (const [file, marker] of [
+            ['./app/api/world-homes/route.ts', 'isValidHomeFurnishing(furnishing)'],
+            ['./app/api/world-homes/[homeId]/route.ts', 'isValidHomeFurnishing(body.furnishing)']
+          ]) if (!fs.readFileSync(file, 'utf8').includes(marker))
+            throw new Error('Home endpoint does not apply layout validation: ' + file);
           console.log('Home retrieval and invitation roster authorization source checks passed.');
           console.log('Static collision configuration and movement-resolution source checks passed.');
           NODE
