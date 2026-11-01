@@ -105,7 +105,8 @@ claim of visually verified facial animation.
 An `AvatarCustomizationHud` now provides selectable skin, hair, top, trousers
 and shoe color palettes. The player can open it with the C key (keyboard) and
 save the selected palette in local device preferences. It is attached to the
-generated player scene. This is device-local customization only; it is not yet
+generated player scene and includes an on-screen toggle for touch devices (the C
+key also toggles it on desktop). This is device-local customization only; it is not yet
 synced to the UCENO account or shared across devices, and it does not swap
 actual clothing meshes or hairstyles.
 
