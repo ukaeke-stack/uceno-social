@@ -77,6 +77,8 @@ This checklist covers the Unity city client, world gateway interactions and the 
 
 - [ ] Enter a published world and open EVENTS on Android or press N on desktop.
 - [ ] Confirm only scheduled, future events for the current world are listed.
+- [ ] As world owner or active admin, create an event with a future UTC start/end; verify it appears in the event list.
+- [ ] As a normal member, verify the host form is hidden and direct event creation is rejected with 403.
 - [ ] RSVP going; confirm the server count and personal RSVP state refresh.
 - [ ] RSVP interested; confirm the state persists after closing and reopening the panel.
 - [ ] Cancel RSVP; confirm the personal attendance is cleared and the going count adjusts.
