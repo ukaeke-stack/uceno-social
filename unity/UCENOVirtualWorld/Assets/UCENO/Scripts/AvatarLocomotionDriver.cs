@@ -50,9 +50,11 @@ namespace UCENO.VirtualWorld
         private float gestureUntil;
         private int activeGesture;
         private bool wasSeated;
+        public int GestureSequence { get; private set; }
+        public string GestureName { get; private set; } = "none";
 
-        public void TriggerWave() { activeGesture = 1; gestureUntil = Time.time + 1.8f; }
-        public void TriggerCheer() { activeGesture = 2; gestureUntil = Time.time + 1.6f; }
+        public void TriggerWave() { activeGesture = 1; GestureName = "wave"; GestureSequence++; gestureUntil = Time.time + 1.8f; }
+        public void TriggerCheer() { activeGesture = 2; GestureName = "cheer"; GestureSequence++; gestureUntil = Time.time + 1.6f; }
 
         private bool UsesImportedController =>
             animator != null && animator.runtimeAnimatorController != null;
@@ -189,7 +191,7 @@ namespace UCENO.VirtualWorld
                     SetRotation(chest, chestBase, new Vector3(-5f * pulse, 0f, 0f));
                 }
             }
-            else activeGesture = 0;
+            else { activeGesture = 0; GestureName = "none"; }
 
             if (hips != null)
                 hips.localPosition = hipsPositionBase;
