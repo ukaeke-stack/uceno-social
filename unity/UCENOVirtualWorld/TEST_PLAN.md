@@ -98,6 +98,7 @@ This checklist covers the Unity city client, world gateway interactions and the 
 - [ ] The owner-only member roster returns only user IDs, permission and invitation timestamp; it does not expose account email, phone or profile details.
 - [ ] A user blocked by the home owner or blocking the owner cannot be invited or access the shared home.
 - [ ] A banned or suspended world member cannot be invited into a home.
+- [ ] A home owner who is not the world owner and has lost active membership in a private world cannot load or edit that home.
 - [ ] A home owner whose world membership is banned or suspended cannot grant new home invitations.
 - [ ] Revoking a home member removes their shared-home access on the next request.
 - [ ] Verify these checks against a test database after required migrations are deployed; static source checks are not database integration tests.
