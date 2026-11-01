@@ -580,6 +580,12 @@ namespace UCENO.VirtualWorld.Editor
             presenceData.FindProperty("remoteAvatarPrefab").objectReferenceValue = avatarPrefab;
             presenceData.ApplyModifiedPropertiesWithoutUndo();
 
+            WorldHomeClient homeClient = player.AddComponent<WorldHomeClient>();
+            SerializedObject homeData = new SerializedObject(homeClient);
+            homeData.FindProperty("session").objectReferenceValue = worldSession;
+            homeData.FindProperty("player").objectReferenceValue = motor;
+            homeData.ApplyModifiedPropertiesWithoutUndo();
+
             WorldStatusHud hud = player.AddComponent<WorldStatusHud>();
             SerializedObject hudData = new SerializedObject(hud);
             hudData.FindProperty("player").objectReferenceValue = motor;
