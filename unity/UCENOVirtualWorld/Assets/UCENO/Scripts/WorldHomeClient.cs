@@ -132,6 +132,7 @@ namespace UCENO.VirtualWorld
             {
                 gateway.SpatialLocationEntered += HandleSpatialLocationEntered;
                 gateway.SpatialLocationExited += HandleSpatialLocationExited;
+                gateway.SpatialLocationRejected += HandleSpatialLocationRejected;
             }
         }
 
@@ -141,6 +142,7 @@ namespace UCENO.VirtualWorld
             {
                 gateway.SpatialLocationEntered -= HandleSpatialLocationEntered;
                 gateway.SpatialLocationExited -= HandleSpatialLocationExited;
+                gateway.SpatialLocationRejected -= HandleSpatialLocationRejected;
             }
             if (activeInterior != null) Destroy(activeInterior);
             ClearSpawnedFurniture();
@@ -490,6 +492,11 @@ namespace UCENO.VirtualWorld
             activeHomeId = contextId;
             RebuildFurniture();
             status = "Inside " + selectedHomeName + ". Home entry was authorized by the world server.";
+        }
+
+        private void HandleSpatialLocationRejected(string code)
+        {
+            status = "The world server rejected home entry: " + code + ". Check the invitation, world access and server availability.";
         }
 
         private void HandleSpatialLocationExited()
