@@ -14,6 +14,7 @@ namespace UCENO.VirtualWorld
         private GUIStyle panelStyle;
         private GUIStyle labelStyle;
         private GUIStyle sprintStyle;
+        private GUIStyle actionStyle;
         private bool sprintToggle;
 
         private void Awake()
@@ -57,6 +58,9 @@ namespace UCENO.VirtualWorld
 
             if (Application.isMobilePlatform && showSprintControl)
             {
+                Rect jumpRect = GetJumpControlRect();
+                if (GUI.Button(jumpRect, "JUMP", actionStyle))
+                    player.RequestJump();
                 // Toggle sprint on tap instead of requiring a continuous press.
                 // This is more reliable on touch screens and allows the player
                 // to keep steering with the other thumb.
@@ -79,6 +83,14 @@ namespace UCENO.VirtualWorld
 
             Vector2 guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
             return GetSprintControlRect().Contains(guiPosition);
+        }
+
+        private static Rect GetJumpControlRect()
+        {
+            float scale = Mathf.Clamp(Screen.width / 520f, 1f, 2.1f);
+            float width = 118f * scale;
+            float height = 58f * scale;
+            return new Rect(Screen.width - width - 18f, Screen.height - height - 105f * scale, width, height);
         }
 
         private static Rect GetSprintControlRect()
@@ -117,6 +129,7 @@ namespace UCENO.VirtualWorld
                 fontSize = Mathf.Max(15, Screen.width / 38),
                 fontStyle = FontStyle.Bold
             };
+            actionStyle = new GUIStyle(sprintStyle);
         }
     }
 }
