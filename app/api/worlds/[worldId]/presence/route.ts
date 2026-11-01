@@ -64,6 +64,23 @@ async function canAccessWorld(worldId: string, userId: string) {
     (world.visibility !== "private" || world.membershipStatus === "active" || world.ownerUserId === userId);
 }
 
+async function hasHealthyInstanceLease(worldId: string, userId: string, instanceId: string | null) {
+  if (!instanceId) return true;
+  const sql = getDb();
+  const rows = await sql`
+    SELECT EXISTS (
+      SELECT 1 FROM virtual_world_instance_sessions s
+      JOIN virtual_world_instances i ON i.id = s.instance_id
+      WHERE s.world_id = ${worldId}::uuid AND s.user_id = ${userId}::uuid
+        AND s.instance_id = ${instanceId}::uuid
+        AND s.lease_expires_at > NOW()
+        AND i.status = 'ready' AND i.endpoint IS NOT NULL
+        AND i.heartbeat_at > NOW() - INTERVAL '30 seconds'
+    ) AS healthy
+  `;
+  return rows[0]?.healthy === true;
+}
+
 // GET returns fresh peers only. This is polling presence, not authoritative movement replication.
 export async function GET(request: NextRequest, { params }: Context) {
   const { worldId } = await params;
@@ -121,6 +138,20 @@ export async function POST(request: NextRequest, { params }: Context) {
     if (!await hasHealthyInstanceLease(worldId, session.id, session.instanceId))
       return NextResponse.json({ error: "The assigned world instance is unavailable; reconnect to the world" }, { status: 503 });
     const sql = getDb();
+    // Extend only a lease that is still valid and attached to the same
+    // healthy instance. Presence heartbeats keep long-running sessions alive.
+    if (session.instanceId) {
+      const renewed = await sql`
+        UPDATE virtual_world_instance_sessions
+        SET lease_expires_at = NOW() + INTERVAL '45 seconds', updated_at = NOW()
+        WHERE world_id = ${worldId}::uuid AND user_id = ${session.id}::uuid
+          AND instance_id = ${session.instanceId}::uuid
+          AND lease_expires_at > NOW()
+        RETURNING instance_id
+      `;
+      if (!renewed[0])
+        return NextResponse.json({ error: "The assigned world lease expired; reconnect to the world" }, { status: 503 });
+    }
     const animationState = body.animationState ?? {
       locomotion: "idle", seated: false, gesture: "none", gestureSequence: 0
     };
