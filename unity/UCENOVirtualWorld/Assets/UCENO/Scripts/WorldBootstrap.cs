@@ -104,15 +104,8 @@ namespace UCENO.VirtualWorld
             controller.center = Vector3.zero;
             controller.skinWidth = 0.08f;
             controller.minMoveDistance = 0f;
-            GameObject head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            head.name = "Player Head";
-            head.transform.SetParent(player.transform, false);
-            head.transform.localPosition = new Vector3(0f, 0.78f, 0f);
-            head.transform.localScale = new Vector3(0.58f, 0.58f, 0.58f);
-            ApplyMaterial(head, new Color(0.88f, 0.66f, 0.48f));
-            Collider headCollider = head.GetComponent<Collider>();
-            if (headCollider != null) Destroy(headCollider);
             localPlayer = player.AddComponent<PlayerMotor>();
+            player.AddComponent<ProceduralAvatar>();
 
             Camera camera = Camera.main;
             if (camera == null)
