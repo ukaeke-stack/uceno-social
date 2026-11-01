@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { readSession } from "@/lib/session";
+import { isValidHomeFurnishing, isValidHomeTransform } from "@/lib/world-home-layout";
 
 export const runtime = "nodejs";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -80,9 +81,8 @@ export async function POST(request: NextRequest) {
   }
   const transform = body.transform ?? {};
   const furnishing = body.furnishing ?? [];
-  if (!isRecord(transform) || !Array.isArray(furnishing) ||
-      !boundedJson(transform, 4000) || !boundedJson(furnishing, 12000) ||
-      furnishing.length > 100 || (body.visibility !== undefined &&
+  if (!isValidHomeTransform(transform) || !isValidHomeFurnishing(furnishing) ||
+      !boundedJson(transform, 4000) || !boundedJson(furnishing, 12000) || (body.visibility !== undefined &&
       body.visibility !== "private" && body.visibility !== "invite")) {
     return NextResponse.json({ error: "Invalid home layout, furnishing or visibility settings" }, { status: 400 });
   }
