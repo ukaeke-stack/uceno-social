@@ -328,6 +328,19 @@ wss.on("connection", async (socket: WebSocket) => {
     send(socket, { type: "welcome", userId: identity.userId, tickRate: TICK_RATE,
       state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
 
+    // A joining or reconnecting client must receive the current authoritative
+    // state of every scene interactable. Broadcasting only future changes
+    // leaves late joiners with stale door/object visuals and unknown seat use.
+    for (const target of INTERACTABLES.values()) {
+      send(socket, {
+        type: "object_state",
+        objectId: target.id,
+        objectState: target.state,
+        actorId: target.actorId,
+        occupantId: target.occupantId
+      });
+    }
+
     socket.on("message", (raw) => {
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
