@@ -123,7 +123,7 @@ export async function PUT(request: NextRequest, { params }: Context) {
           WHERE (b.blocker_id = h.owner_user_id AND b.blocked_id = ${session.id}::uuid)
              OR (b.blocker_id = ${session.id}::uuid AND b.blocked_id = h.owner_user_id)
         )
-      RETURNING h.id, h.name, h.transform, h.furnishing, h.updated_at AS "updatedAt"
+      RETURNING h.id, h.name, h.transform, h.furnishing, h.visibility, h.updated_at AS "updatedAt"
     `;
     if (!rows[0]) {
       const exists = await sql`SELECT id FROM virtual_homes WHERE id = ${homeId}::uuid LIMIT 1`;
