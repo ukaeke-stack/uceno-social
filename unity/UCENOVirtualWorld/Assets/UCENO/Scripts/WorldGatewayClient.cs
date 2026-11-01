@@ -143,6 +143,7 @@ namespace UCENO.VirtualWorld
             catch (Exception error)
             {
                 ConnectionStatus = "BAD ENDPOINT";
+                ScheduleReconnect();
                 Debug.LogError("UCENO gateway endpoint rejected: " + error.Message);
                 return;
             }
