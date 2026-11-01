@@ -8,6 +8,7 @@ on:
       - "app/api/worlds/**"
       - "app/api/world-homes/**"
       - "lib/world-client-session.ts"
+      - "lib/world-home-layout.ts"
       - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/**"
       - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/**"
       - "unity/UCENOVirtualWorld/Packages/manifest.json"
