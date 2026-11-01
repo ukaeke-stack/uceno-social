@@ -17,12 +17,24 @@ export async function GET(_request: NextRequest, { params }: Context) {
   try {
     const sql = getDb();
     const home = await sql`
-      SELECT owner_user_id AS "ownerUserId", visibility
-      FROM virtual_homes WHERE id = ${homeId}::uuid LIMIT 1
+      SELECT h.owner_user_id AS "ownerUserId", h.visibility,
+             w.status AS "worldStatus", w.visibility AS "worldVisibility",
+             w.owner_user_id AS "worldOwnerId",
+             COALESCE(m.status, 'none') AS "ownerMembership"
+      FROM virtual_homes h
+      JOIN virtual_worlds w ON w.id = h.world_id
+      LEFT JOIN virtual_world_memberships m
+        ON m.world_id = h.world_id AND m.user_id = ${session.id}::uuid
+      WHERE h.id = ${homeId}::uuid LIMIT 1
     `;
     if (!home[0]) return NextResponse.json({ error: "Home not found" }, { status: 404 });
     if (home[0].ownerUserId !== session.id)
       return NextResponse.json({ error: "Only the home owner can view the invitation roster" }, { status: 403 });
+    if (home[0].worldStatus !== "published" ||
+        home[0].ownerMembership === "banned" || home[0].ownerMembership === "suspended" ||
+        (home[0].worldVisibility === "private" && home[0].ownerMembership !== "active" &&
+          home[0].worldOwnerId !== session.id))
+      return NextResponse.json({ error: "Home invitation roster is unavailable" }, { status: 404 });
 
     const members = await sql`
       SELECT user_id AS "userId", permission, created_at AS "createdAt"
