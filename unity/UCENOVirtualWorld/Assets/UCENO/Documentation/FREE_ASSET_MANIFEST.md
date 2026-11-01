@@ -52,7 +52,8 @@ appropriate resolutions:
 
 All Poly Haven models, textures and HDRIs are CC0 1.0 and may be used in commercial projects. The Jacaranda Tree source was excluded because its FBX exceeded GitHub's 100 MB per-file limit and was too heavy for the initial Android asset budget.
 Poly Haven's API terms ask products built using its live API to make the source
-clear to users. UCENO will include a Poly Haven credit in its in-app credits.
+clear to users. Before public release, UCENO must include a visible Poly Haven
+credit in its in-app Credits/About page.
 The API is used only in the development-time import workflow; the shipped game
 will not make runtime requests to Poly Haven.
 
