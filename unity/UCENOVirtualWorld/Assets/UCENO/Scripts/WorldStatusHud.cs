@@ -10,6 +10,9 @@ namespace UCENO.VirtualWorld
     {
         [SerializeField] private PlayerMotor player;
         [SerializeField] private bool showSprintControl = true;
+        [SerializeField] private WorldSessionClient worldSession;
+        private string entryCode = "";
+        private string connectionMessage = "Paste a one-time world-entry code from UCENO Social.";
 
         private GUIStyle panelStyle;
         private GUIStyle labelStyle;
@@ -24,6 +27,7 @@ namespace UCENO.VirtualWorld
             if (player == null)
                 player = GetComponentInParent<PlayerMotor>();
             avatar = GetComponentInChildren<AvatarLocomotionDriver>();
+            if (worldSession == null) worldSession = FindObjectOfType<WorldSessionClient>();
 
             if (Application.isMobilePlatform)
                 Application.targetFrameRate = 60;
@@ -65,6 +69,26 @@ namespace UCENO.VirtualWorld
                 "Position: " + player.transform.position.ToString("F1") + "   " + controls,
                 labelStyle
             );
+
+            if (worldSession != null && !worldSession.IsAuthenticated)
+            {
+                float connectY = 94f * scale;
+                GUI.Label(new Rect(12f, connectY, panelWidth, 22f * scale), "WORLD ENTRY CODE", labelStyle);
+                entryCode = GUI.TextField(new Rect(12f, connectY + 24f * scale, panelWidth * 0.62f, 38f * scale), entryCode);
+                if (GUI.Button(new Rect(20f + panelWidth * 0.64f, connectY + 24f * scale, panelWidth * 0.34f - 20f, 38f * scale), "ENTER", actionStyle))
+                {
+                    worldSession.RedeemEntryCode(entryCode, (success, error) =>
+                    {
+                        connectionMessage = success ? "Connected. Multiplayer presence is starting." : error;
+                        if (success) entryCode = "";
+                    });
+                }
+                GUI.Label(new Rect(12f, connectY + 66f * scale, panelWidth, 36f * scale), connectionMessage, labelStyle);
+            }
+            else if (worldSession != null && worldSession.IsAuthenticated)
+            {
+                GUI.Label(new Rect(12f, 94f * scale, panelWidth, 24f * scale), "WORLD SESSION ACTIVE", labelStyle);
+            }
 
             if (Application.isMobilePlatform && showSprintControl)
             {
