@@ -90,3 +90,23 @@ preserve the Humanoid rig contract and animator parameters. Environment
 replacement must preserve prefab-level collision and interaction components.
 Never replace imported files in place without checking their licence and updating
 the relevant asset manifest.
+
+
+## Starter district composition update
+
+The Editor scene builder now composes the imported assets into a small civic
+district as well as the main street:
+
+- A paved garden square with a lawn, perimeter paths, tropical trees, shrubs and
+  street lamps.
+- A pedestrian crossing with separate low-cost marking meshes.
+- A marked pull-in parking bay with parked vehicle models.
+- The square and street features reuse the imported 1K CC0 PBR materials and
+  existing prefabs; no runtime asset downloads or new paid dependencies.
+
+This is a layout improvement, not a claim that the city is already photorealistic.
+The current building sources are facade modules and the scene still needs
+architectural depth/interiors, more varied building silhouettes, street-level
+props, authored animation clips, avatar customization and visual review in the
+Unity Editor. The scene builder must be run in Unity before these changes appear
+in a playable scene. Unity compilation and Android performance remain unverified.
