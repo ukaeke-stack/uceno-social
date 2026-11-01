@@ -53,7 +53,10 @@ async function canAccessWorld(worldId: string, userId: string) {
     WHERE w.id = ${worldId}::uuid LIMIT 1
   `;
   const world = rows[0];
-  return !!world && world.status === "published" && !world.blocked &&
+  const moderationAllowed = !!world && world.moderationStatus !== "disabled" &&
+    !(world.moderationStatus === "suspended" &&
+      (!world.suspendedUntil || new Date(world.suspendedUntil).getTime() > Date.now()));
+  return !!world && moderationAllowed && world.status === "published" && !world.blocked &&
     world.membershipStatus !== "banned" && world.membershipStatus !== "suspended" &&
     (world.visibility !== "private" || world.membershipStatus === "active" || world.ownerUserId === userId);
 }
