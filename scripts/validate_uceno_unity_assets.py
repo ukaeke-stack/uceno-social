@@ -27,6 +27,8 @@ REQUIRED_FILES = [
     ASSETS / "Scripts/FollowCamera.cs",
     ASSETS / "Scripts/AvatarLocomotionDriver.cs",
     ASSETS / "Scripts/WorldStatusHud.cs",
+    ASSETS / "Scripts/WorldSessionClient.cs",
+    ASSETS / "Scripts/WorldPresenceClient.cs",
     IMPORTED / "HDRI/modern_buildings_1k.hdr",
     IMPORTED / "Models/modular_urban_apartments_facade/modular_urban_apartments_facade.fbx",
     IMPORTED / "Models/modular_factory_facade/modular_factory_facade.fbx",
@@ -161,6 +163,24 @@ def main():
     hud = read_text(ASSETS / "Scripts/WorldStatusHud.cs")
     if "GUI.Button" not in hud or "Position:" not in hud or '"JUMP"' not in hud or '"RUN"' not in hud or '"WAVE"' not in hud or '"CHEER"' not in hud:
         fail("World status HUD, mobile jump control, or sprint control is missing.")
+
+    session = read_text(ASSETS / "Scripts/WorldSessionClient.cs")
+    if session.count("public string ApiBaseUrl") != 1:
+        fail("WorldSessionClient must expose exactly one ApiBaseUrl property.")
+    if "SetRenewedSession" not in session or "AccessToken = token" not in session:
+        fail("WorldSessionClient is missing the in-memory renewed-token setter.")
+
+    presence = read_text(ASSETS / "Scripts/WorldPresenceClient.cs")
+    if "Time.time >= tokenExpiresAt - 45f" not in presence:
+        fail("WorldPresenceClient is missing early world-token renewal.")
+    if "session.SetRenewedSession(response.accessToken, response.expiresInSeconds)" not in presence:
+        fail("WorldPresenceClient does not install the renewed bearer token.")
+    if "float.PositiveInfinity" in presence:
+        fail("WorldPresenceClient contains a disabled token-renewal guard.")
+    if "public int PeerCount" not in presence or "ConnectionStatus" not in presence:
+        fail("WorldPresenceClient is missing multiplayer connection status.")
+    if "presence.PeerCount" not in hud or "presence.ConnectionStatus" not in hud:
+        fail("World status HUD does not display multiplayer connection status.")
 
     if "RequestJump" not in motor or "KeyCode.Space" not in motor or "jumpHeight" not in motor:
         fail("Player jump action is missing keyboard/mobile input or grounded jump physics.")
