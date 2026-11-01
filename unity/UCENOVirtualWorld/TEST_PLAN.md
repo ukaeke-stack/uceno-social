@@ -73,6 +73,17 @@ This checklist covers the Unity city client, world gateway interactions and the 
 - [ ] Verify the root/facing anchor aligns the avatar with the chair; full foot/hand IK is not implemented.
 
 
+## World events client checks
+
+- [ ] Enter a published world and open EVENTS on Android or press N on desktop.
+- [ ] Confirm only scheduled, future events for the current world are listed.
+- [ ] RSVP going; confirm the server count and personal RSVP state refresh.
+- [ ] RSVP interested; confirm the state persists after closing and reopening the panel.
+- [ ] Cancel RSVP; confirm the personal attendance is cleared and the going count adjusts.
+- [ ] Try RSVP against a full event; confirm the server rejects it and the UI reports failure.
+- [ ] Verify banned/suspended users and users without private-world access cannot RSVP.
+- [ ] Do not treat RSVP as a spatial join; event location/teleport and activity scene integration are not implemented yet.
+
 ## Home sharing API checks
 
 - [ ] Unauthenticated requests to home and home-member APIs return 401.
