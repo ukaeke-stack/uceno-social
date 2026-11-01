@@ -117,6 +117,12 @@ namespace UCENO.VirtualWorld
                 renderer.updateWhenOffscreen = false;
             }
 
+            if (equippedIds.TryGetValue(item.slot, out string currentId) && currentId == item.itemId &&
+                equippedObjects.TryGetValue(item.slot, out GameObject currentObject) && currentObject != null)
+            {
+                Destroy(instance);
+                return true;
+            }
             if (equippedObjects.TryGetValue(item.slot, out GameObject previous) && previous != null)
                 Destroy(previous);
             equippedObjects[item.slot] = instance;
@@ -137,11 +143,23 @@ namespace UCENO.VirtualWorld
         public void ApplyEquipped(IEnumerable<KeyValuePair<AvatarWardrobeSlot, string>> items)
         {
             if (items == null) return;
+            Dictionary<AvatarWardrobeSlot, string> requested =
+                new Dictionary<AvatarWardrobeSlot, string>();
             foreach (KeyValuePair<AvatarWardrobeSlot, string> item in items)
+                requested[item.Key] = item.Value;
+
+            foreach (AvatarWardrobeSlot slot in Enum.GetValues(typeof(AvatarWardrobeSlot)))
             {
-                if (string.IsNullOrEmpty(item.Value)) Unequip(item.Key);
-                else if (!TryEquip(item.Value, out string error))
-                    Debug.LogWarning("UCENO wardrobe item could not be applied (" + item.Value + "): " + error);
+                if (!requested.TryGetValue(slot, out string itemId) || string.IsNullOrEmpty(itemId))
+                {
+                    if (equippedIds.ContainsKey(slot)) Unequip(slot);
+                    continue;
+                }
+                if (equippedIds.TryGetValue(slot, out string currentId) && currentId == itemId &&
+                    equippedObjects.TryGetValue(slot, out GameObject current) && current != null)
+                    continue;
+                if (!TryEquip(itemId, out string error))
+                    Debug.LogWarning("UCENO wardrobe item could not be applied (" + itemId + "): " + error);
             }
         }
 
