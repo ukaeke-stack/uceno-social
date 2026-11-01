@@ -353,10 +353,9 @@ namespace UCENO.VirtualWorld
                 !string.IsNullOrEmpty(uri.Fragment))
                 throw new FormatException("Instance endpoint must be an absolute URL without credentials, query or fragment.");
 
-            string scheme = uri.Scheme == "https" ? "wss" :
-                uri.Scheme == "http" ? "ws" : uri.Scheme;
-            if (scheme != "wss" && scheme != "ws")
-                throw new FormatException("Instance endpoint must use HTTPS/WSS.");
+            string scheme = uri.Scheme == "https" ? "wss" : uri.Scheme;
+            if (scheme != "wss")
+                throw new FormatException("Instance endpoint must use HTTPS/WSS; plaintext WebSockets are rejected.");
             string path = uri.AbsolutePath.TrimEnd('/');
             if (!path.EndsWith("/world", StringComparison.OrdinalIgnoreCase))
                 path += "/world";
