@@ -101,6 +101,8 @@ This checklist covers the Unity city client, world gateway interactions and the 
 
 - [ ] Apply migration 025 only after the previously reviewed migrations are applied and the UCENO database is confirmed to be the separate UCENO Neon project.
 - [ ] Create a new home and confirm its saved layout includes the five imported starter furniture assets.
+- [ ] Attempt to create a home with a forged client transform; confirm the saved anchor is taken from a fresh server checkpoint and not from the submitted transform.
+- [ ] Attempt creation without a recent gateway checkpoint; confirm the API rejects the request rather than trusting a stale client position.
 - [ ] Open the home as owner; confirm the runtime room shell, imported furniture, windows, entry door and lighting are visible.
 - [ ] Open the same invite-only home as a visitor; confirm the same room and furniture render while layout controls remain unavailable.
 - [ ] Attempt home entry with a forged home ID, a home in another world, a revoked invitation, a blocked owner relationship, banned/suspended membership and a private world without active membership; confirm the gateway rejects every request.
