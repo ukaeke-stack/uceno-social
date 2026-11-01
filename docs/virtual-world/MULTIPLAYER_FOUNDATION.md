@@ -116,3 +116,28 @@ The world session component defaults to `https://uceno-social.onrender.com`.
 The website must issue an entry code for the selected published world; the
 player pastes that short-lived code into the Unity HUD. Do not paste account
 passwords, browser cookies or API secrets into the Unity client.
+
+
+## Versioned avatar animation replication (November 2026)
+
+Migration 023 adds an ephemeral JSON animation-state snapshot and a per-client
+presence sequence number. The presence API validates the allowed locomotion
+states (idle/walk/run), seated flag, gesture names (none/wave/cheer) and
+non-negative gesture sequence. The peer response includes this state and the
+latest accepted sequence. The Unity sender publishes movement, seated state
+and gesture sequence alongside its transform; remote clients can consume the
+state without inferring gestures from position deltas.
+
+This is animation-state replication metadata, not authoritative simulation.
+The current polling transport remains approximately one update per second,
+and the remote prefab's Animator Controller must define compatible
+`MoveSpeed`, `IsSeated`, `Wave` and `Cheer` parameters for those controller
+bindings to animate. The imported fallback procedural driver still needs
+dedicated remote-state wiring and runtime verification. No collision
+authority, server-side input simulation, prediction/reconciliation, lag
+compensation, WebSocket transport or load-tested instance authority is claimed.
+
+Migration 023 must be reviewed and applied after 022 before deploying the
+updated presence route. Do not claim synchronized animation is runtime-proven
+until the Unity Editor compiles and two physical devices verify walk/run,
+sit/stand, wave and cheer replication in both directions.
