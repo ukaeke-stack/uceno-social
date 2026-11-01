@@ -1,0 +1,41 @@
+name: World Gateway Activity Tests
+
+on:
+  push:
+    branches:
+      - feature/uceno-unity-foundation
+    paths:
+      - "runtime/world-gateway/src/**"
+      - "runtime/world-gateway/tests/**"
+      - "runtime/world-gateway/package.json"
+      - "runtime/world-gateway/tsconfig.json"
+      - ".github/workflows/world-gateway-activity-tests.yml"
+  pull_request:
+    paths:
+      - "runtime/world-gateway/src/**"
+      - "runtime/world-gateway/tests/**"
+      - "runtime/world-gateway/package.json"
+      - "runtime/world-gateway/tsconfig.json"
+      - ".github/workflows/world-gateway-activity-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  activity-domain:
+    name: Compile gateway and test activity state machine
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: runtime/world-gateway
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Compile TypeScript and run activity tests
+        run: npm run test:activity
