@@ -156,6 +156,21 @@ function overlapsBox(x: number, y: number, z: number, box: CollisionBox): boolea
 }
 
 function resolveHorizontalMovement(player: Player, nextX: number, nextZ: number) {
+  if (player.homeAnchor) {
+    // Residential interiors are a server-owned 12 x 10 metre room.
+    // The client cannot walk through walls or move the home anchor.
+    const dx = nextX - player.homeAnchor.x;
+    const dz = nextZ - player.homeAnchor.z;
+    const cos = Math.cos(player.homeAnchor.yaw);
+    const sin = Math.sin(player.homeAnchor.yaw);
+    const localX = dx * cos - dz * sin;
+    const localZ = dx * sin + dz * cos;
+    const boundedX = Math.max(-5.45, Math.min(5.45, localX));
+    const boundedZ = Math.max(-4.45, Math.min(4.45, localZ));
+    player.x = player.homeAnchor.x + boundedX * cos + boundedZ * sin;
+    player.z = player.homeAnchor.z - boundedX * sin + boundedZ * cos;
+    return;
+  }
   const candidateX = Math.max(-WORLD_BOUNDS, Math.min(WORLD_BOUNDS, nextX));
   const blockedX = COLLISION_BOXES.some(box => overlapsBox(candidateX, player.y, player.z, box));
   if (!blockedX) player.x = candidateX;
@@ -178,6 +193,7 @@ type Player = {
   lastSequence: number; lastCheckpointAt: number; lastAuthorizationCheck: number; authorizationCheckInProgress: boolean;
   lastInteractionAt: number;
   homeId: string | null;
+  homeAnchor: { x: number; y: number; z: number; yaw: number } | null;
   eventId: string | null;
   returnState: { x: number; y: number; z: number; yaw: number } | null;
 };
@@ -286,7 +302,7 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
-    lastInteractionAt: 0, homeId: null, eventId: null, returnState: null
+    lastInteractionAt: 0, homeId: null, homeAnchor: null, eventId: null, returnState: null
   };
 }
 
@@ -407,15 +423,16 @@ wss.on("connection", async (socket: WebSocket) => {
               home.worldOwnerId === player.id) &&
             (home.ownerUserId === player.id ||
               (home.visibility === "invite" && !!home.permission));
-          const anchor = allowed ? readSpatialTransform(home.transform, -2.8) : null;
+          const anchor = allowed ? readSpatialTransform(home.transform) : null;
           if (!allowed || !anchor) {
             send(socket, { type: "spatial_location_rejected", code: "home_access_denied_or_invalid_anchor" }); return;
           }
           releasePlayerSeats(player.id);
           player.returnState = { x: player.x, y: player.y, z: player.z, yaw: player.yaw };
           player.homeId = home.id;
+          player.homeAnchor = anchor;
           player.eventId = null;
-          player.x = anchor.x; player.y = anchor.y; player.z = anchor.z; player.yaw = anchor.yaw;
+          player.x = anchor.x; player.y = anchor.y; player.z = anchor.z - 4.0; player.yaw = anchor.yaw;
           player.vx = 0; player.vy = 0; player.vz = 0;
           player.moveX = 0; player.moveZ = 0; player.sprint = false;
           player.grounded = true; player.seated = false; player.jumpQueued = false;
@@ -432,7 +449,7 @@ wss.on("connection", async (socket: WebSocket) => {
           send(socket, { type: "spatial_location_rejected", code: "not_inside_home" }); return;
         }
         const destination = player.returnState;
-        player.homeId = null; player.returnState = null;
+        player.homeId = null; player.homeAnchor = null; player.returnState = null;
         player.x = destination.x; player.y = destination.y; player.z = destination.z; player.yaw = destination.yaw;
         player.vx = 0; player.vy = 0; player.vz = 0;
         player.moveX = 0; player.moveZ = 0; player.sprint = false;
@@ -484,6 +501,7 @@ wss.on("connection", async (socket: WebSocket) => {
           player.returnState = { x: player.x, y: player.y, z: player.z, yaw: player.yaw };
           player.eventId = event.id;
           player.homeId = null;
+          player.homeAnchor = null;
           player.x = destination.x; player.y = destination.y; player.z = destination.z; player.yaw = destination.yaw;
           player.vx = 0; player.vy = 0; player.vz = 0;
           player.moveX = 0; player.moveZ = 0; player.sprint = false;
@@ -503,7 +521,7 @@ wss.on("connection", async (socket: WebSocket) => {
           send(socket, { type: "spatial_location_rejected", code: "not_inside_event" }); return;
         }
         const destination = player.returnState;
-        player.eventId = null; player.returnState = null;
+        player.eventId = null; player.homeAnchor = null; player.returnState = null;
         player.x = destination.x; player.y = destination.y; player.z = destination.z; player.yaw = destination.yaw;
         player.vx = 0; player.vy = 0; player.vz = 0;
         player.moveX = 0; player.moveZ = 0; player.sprint = false;
@@ -668,6 +686,10 @@ setInterval(async () => {
     p.vy -= GRAVITY * dt;
     resolveHorizontalMovement(p, p.x + p.vx * dt, p.z + p.vz * dt);
     p.y += p.vy * dt;
+    if (p.homeAnchor && p.y > p.homeAnchor.y + 3.05) {
+      p.y = p.homeAnchor.y + 3.05;
+      p.vy = 0;
+    }
     if (p.y <= GROUND_Y) { p.y = GROUND_Y; p.vy = 0; p.grounded = true; }
     snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
       seated: p.seated, sprint: p.sprint, gesture: p.gesture, gestureSequence: p.gestureSequence });
