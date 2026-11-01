@@ -14,6 +14,56 @@ function withinBytes(value: unknown, limit: number) {
 }
 
 // PUT /api/world-homes/:homeId — owners and decorators may update the layout.
+
+// GET /api/world-homes/:homeId — load a home only for its owner or an active invitee.
+export async function GET(_request: NextRequest, { params }: Context) {
+  const session = await readSession();
+  if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  const { homeId } = await params;
+  if (!UUID.test(homeId)) return NextResponse.json({ error: "Invalid home ID" }, { status: 400 });
+
+  try {
+    const sql = getDb();
+    const rows = await sql`
+      SELECT h.id, h.world_id AS "worldId", h.owner_user_id AS "ownerUserId",
+             h.name, h.template_id AS "templateId", h.transform, h.furnishing,
+             h.visibility, h.updated_at AS "updatedAt",
+             w.status AS "worldStatus", w.visibility AS "worldVisibility",
+             COALESCE(wm.status, 'none') AS "worldMembership",
+             CASE WHEN h.owner_user_id = ${session.id}::uuid THEN 'owner'
+                  ELSE hm.permission END AS permission,
+             EXISTS (SELECT 1 FROM user_blocks b
+               WHERE (b.blocker_id = h.owner_user_id AND b.blocked_id = ${session.id}::uuid)
+                  OR (b.blocker_id = ${session.id}::uuid AND b.blocked_id = h.owner_user_id)) AS blocked
+      FROM virtual_homes h
+      JOIN virtual_worlds w ON w.id = h.world_id
+      LEFT JOIN virtual_world_memberships wm
+        ON wm.world_id = h.world_id AND wm.user_id = ${session.id}::uuid
+      LEFT JOIN virtual_home_members hm
+        ON hm.home_id = h.id AND hm.user_id = ${session.id}::uuid
+      WHERE h.id = ${homeId}::uuid LIMIT 1
+    `;
+    const home = rows[0];
+    if (!home || home.worldStatus !== "published" || home.blocked ||
+        home.worldMembership === "banned" || home.worldMembership === "suspended" ||
+        (home.worldVisibility === "private" &&
+          home.worldMembership !== "active" && home.ownerUserId !== session.id) ||
+        (home.ownerUserId !== session.id &&
+          (home.visibility !== "invite" || !home.permission))) {
+      return NextResponse.json({ error: "Home is unavailable" }, { status: 404 });
+    }
+    const { ownerUserId: _ownerUserId, worldStatus: _worldStatus,
+      worldVisibility: _worldVisibility, worldMembership: _worldMembership,
+      blocked: _blocked, ...visibleHome } = home;
+    return NextResponse.json({ home: visibleHome }, {
+      headers: { "Cache-Control": "no-store, private" }
+    });
+  } catch (error) {
+    console.error("World home load failed", error);
+    return NextResponse.json({ error: "Home is unavailable" }, { status: 503 });
+  }
+}
+
 export async function PUT(request: NextRequest, { params }: Context) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
