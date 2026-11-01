@@ -21,6 +21,10 @@ namespace UCENO.VirtualWorld
         public int expiresInSeconds;
         public string error;
         public string worldId;
+        public string instanceId;
+        public string instanceEndpoint;
+        public string region;
+        public string leaseExpiresAt;
     }
 
     /// <summary>
@@ -36,6 +40,9 @@ namespace UCENO.VirtualWorld
         public int ExpiresInSeconds { get; private set; }
         public string ApiBaseUrl => apiBaseUrl;
         public string WorldId { get; private set; }
+        public string InstanceId { get; private set; }
+        public string InstanceEndpoint { get; private set; }
+        public string InstanceRegion { get; private set; }
         public bool IsAuthenticated => !string.IsNullOrEmpty(AccessToken);
 
         public void RedeemEntryCode(string code, Action<bool, string> completed)
@@ -59,6 +66,9 @@ namespace UCENO.VirtualWorld
             AccessToken = null;
             ExpiresInSeconds = 0;
             WorldId = null;
+            InstanceId = null;
+            InstanceEndpoint = null;
+            InstanceRegion = null;
         }
 
         private IEnumerator RedeemRoutine(string code, Action<bool, string> completed)
@@ -95,7 +105,9 @@ namespace UCENO.VirtualWorld
 
                 WorldEntryExchangeResponse response = JsonUtility.FromJson<WorldEntryExchangeResponse>(request.downloadHandler.text);
                 if (response == null || string.IsNullOrEmpty(response.accessToken) ||
-                    response.tokenType != "Bearer" || response.expiresInSeconds <= 0)
+                    response.tokenType != "Bearer" || response.expiresInSeconds <= 0 ||
+                    string.IsNullOrEmpty(response.worldId) || string.IsNullOrEmpty(response.instanceId) ||
+                    string.IsNullOrEmpty(response.instanceEndpoint))
                 {
                     ClearSession();
                     completed?.Invoke(false, "The world service returned an invalid session.");
@@ -105,6 +117,9 @@ namespace UCENO.VirtualWorld
                 AccessToken = response.accessToken;
                 ExpiresInSeconds = response.expiresInSeconds;
                 WorldId = response.worldId;
+                InstanceId = response.instanceId;
+                InstanceEndpoint = response.instanceEndpoint;
+                InstanceRegion = response.region;
                 completed?.Invoke(true, null);
             }
         }
