@@ -41,6 +41,7 @@ namespace UCENO.VirtualWorld
         };
 
         private AvatarAppearanceProfile profile;
+        private AvatarAppearanceSyncClient appearanceSync;
         private AvatarAppearanceProfile.Palette palette;
         private bool visible;
         private GUIStyle titleStyle;
@@ -60,6 +61,19 @@ namespace UCENO.VirtualWorld
             LoadColor("trousers", ref palette.trousers);
             LoadColor("shoes", ref palette.shoes);
             profile.Apply(palette);
+            WorldSessionClient session = FindObjectOfType<WorldSessionClient>();
+            if (session != null)
+            {
+                appearanceSync = GetComponent<AvatarAppearanceSyncClient>();
+                if (appearanceSync == null) appearanceSync = gameObject.AddComponent<AvatarAppearanceSyncClient>();
+                appearanceSync.Initialize(session, profile);
+            }
+        }
+
+        public void ApplyAccountPalette(AvatarAppearanceProfile.Palette accountPalette)
+        {
+            palette = accountPalette;
+            if (profile != null) profile.Apply(palette);
         }
 
         private void Update()
@@ -119,6 +133,7 @@ namespace UCENO.VirtualWorld
                     selected = options[i];
                     profile.Apply(palette);
                     SaveColor(key, selected);
+                    if (appearanceSync != null) appearanceSync.Save(palette);
                 }
             }
             y += rowHeight;
@@ -132,6 +147,7 @@ namespace UCENO.VirtualWorld
             SaveColor("trousers", palette.trousers);
             SaveColor("shoes", palette.shoes);
             PlayerPrefs.Save();
+            if (appearanceSync != null) appearanceSync.Save(palette);
         }
 
         private static void SaveColor(string key, Color color)
