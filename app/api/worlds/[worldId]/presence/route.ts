@@ -91,7 +91,8 @@ export async function GET(request: NextRequest, { params }: Context) {
   }
 }
 
-// POST refreshes ephemeral transform and animation metadata. Clients should send at most once per second.
+// POST validates plausible displacement against server elapsed time, then stores ephemeral transform and animation metadata.
+ // This is a server-side speed/teleport sanity check, not authoritative physics or collision simulation.
 export async function POST(request: NextRequest, { params }: Context) {
   const { worldId } = await params;
   const session = await readWorldClientSession(request, worldId);
@@ -123,14 +124,17 @@ export async function POST(request: NextRequest, { params }: Context) {
       ON CONFLICT (world_id, user_id) DO UPDATE SET
         position = EXCLUDED.position, rotation = EXCLUDED.rotation,
         animation_state = EXCLUDED.animation_state,
-        client_sequence = CASE WHEN EXCLUDED.client_sequence > virtual_world_presence.client_sequence
-          THEN EXCLUDED.client_sequence ELSE virtual_world_presence.client_sequence + 1 END,
+        client_sequence = virtual_world_presence.client_sequence + 1,
         last_seen = NOW()
       WHERE virtual_world_presence.last_seen <= NOW() - INTERVAL '1 second'
-        AND (${sequence}::bigint IS NULL OR EXCLUDED.client_sequence > virtual_world_presence.client_sequence)
+        AND sqrt(
+          power((EXCLUDED.position->>'x')::double precision - (virtual_world_presence.position->>'x')::double precision, 2) +
+          power((EXCLUDED.position->>'y')::double precision - (virtual_world_presence.position->>'y')::double precision, 2) +
+          power((EXCLUDED.position->>'z')::double precision - (virtual_world_presence.position->>'z')::double precision, 2)
+        ) <= GREATEST(3.0, 12.0 * EXTRACT(EPOCH FROM (NOW() - virtual_world_presence.last_seen)) + 1.0)
       RETURNING last_seen AS "lastSeen", client_sequence AS "sequence"
     `;
-    if (!rows[0]) return NextResponse.json({ error: "Presence update was rate-limited or sequence was stale" }, {
+    if (!rows[0]) return NextResponse.json({ error: "Presence update was rate-limited or movement exceeded the allowed server-observed speed" }, {
       status: 429, headers: { "Retry-After": "1", "Cache-Control": "no-store, private" }
     });
     return NextResponse.json({ present: true, lastSeen: rows[0].lastSeen, sequence: rows[0].sequence }, {
