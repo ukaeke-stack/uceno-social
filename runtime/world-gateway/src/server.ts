@@ -259,6 +259,24 @@ async function persistDatabaseObjectState(worldId: string, actorId: string, targ
   target.version = Number(rows[0].version);
   return true;
 }
+
+async function refreshDistrictObjectStates(worldId: string, districtId: string): Promise<void> {
+  const rows = await sql`
+    SELECT object_id AS "objectId", object_kind AS "objectKind",
+      object_state AS "objectState", version, updated_by AS "updatedBy"
+    FROM virtual_world_object_states
+    WHERE world_id = ${worldId}::uuid AND district_id = ${districtId}
+  `;
+  for (const row of rows) {
+    const target = INTERACTABLES.get(row.objectId);
+    if (!target || target.kind === "seat" || target.districtId !== districtId ||
+        target.kind !== row.objectKind || !isPersistentObjectState(target.kind, row.objectState) ||
+        Number(row.version) <= target.version) continue;
+    target.state = row.objectState;
+    target.version = Number(row.version);
+    target.actorId = row.updatedBy ?? null;
+  }
+}
 const secret = new TextEncoder().encode(TOKEN_SECRET);
 type Player = {
   id: string; worldId: string; token: string; socket: WebSocket; x: number; y: number; z: number;
@@ -657,10 +675,11 @@ wss.on("connection", async (socket: WebSocket) => {
         const pending = player.pendingDistrict;
         if (pending && typeof msg.districtId === "string" && typeof msg.nonce === "string" &&
             msg.districtId === pending.id && msg.nonce === pending.nonce) {
+          await refreshDistrictObjectStates(player.worldId, pending.id);
           player.activeDistrictId = pending.id;
           player.pendingDistrict = null;
-          // District state is sent only after the client confirms its streamed
-          // scene is ready, so object visuals cannot race ahead of district loading.
+          // Fetch the latest durable district version before sending the scene
+          // snapshot; this also covers a fast re-entry on another runtime instance.
           for (const target of INTERACTABLES.values()) {
             if (target.districtId !== pending.id) continue;
             send(socket, { type: "object_state", objectId: target.id,
