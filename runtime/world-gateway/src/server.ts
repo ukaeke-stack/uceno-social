@@ -281,7 +281,7 @@ function fenceProcess(reason: string): void {
   processAuthority = false;
   console.error("instance_process_fenced", { processId: PROCESS_ID, generation: processGeneration, reason });
   for (const player of players.values()) player.socket.close(1012, "instance_process_replaced");
-  server.close();
+  if (server.listening) server.close();
 }
 
 function assertProcessAuthority(): void {
@@ -1767,6 +1767,10 @@ setInterval(async () => {
 
 let lastTick = Date.now();
 setInterval(async () => {
+  if (!processAuthority || Date.now() >= processLeaseUntil) {
+    fenceProcess("simulation_tick_without_process_lease");
+    return;
+  }
   const now = Date.now();
   const dt = Math.min(0.05, Math.max(0.001, (now - lastTick) / 1000));
   lastTick = now;
@@ -1921,6 +1925,10 @@ setInterval(async () => {
 
 let worldRelayPollInProgress = false;
 setInterval(async () => {
+  if (!processAuthority || Date.now() >= processLeaseUntil) {
+    fenceProcess("relay_poll_without_process_lease");
+    return;
+  }
   if (!worldRelayCursorReady || worldRelayPollInProgress) return;
   worldRelayPollInProgress = true;
   try {
@@ -2008,6 +2016,10 @@ setInterval(heartbeat, 3000);
 
 let objectRefreshInProgress = false;
 setInterval(async () => {
+  if (!processAuthority || Date.now() >= processLeaseUntil) {
+    fenceProcess("object_refresh_without_process_lease");
+    return;
+  }
   if (objectRefreshInProgress) return;
   objectRefreshInProgress = true;
   try {
@@ -2041,7 +2053,10 @@ setInterval(async () => {
 }, 2500);
 
 void acquireProcessOwnership()
-  .then(() => heartbeat())
+  .then(async () => {
+    await heartbeat();
+    assertProcessAuthority();
+  })
   .then(() => restorePersistedActivities())
   .then(() => server.listen(PORT, () => console.log("UCENO world gateway listening on " + PORT + " for instance " + INSTANCE_ID + "; process " + PROCESS_ID + "; generation " + processGeneration + "; restored " + activitySessions.size + " activities")))
   .catch(async error => {
