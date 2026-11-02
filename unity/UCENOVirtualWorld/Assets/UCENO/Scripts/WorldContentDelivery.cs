@@ -215,9 +215,33 @@ namespace UCENO.VirtualWorld
             foreach (AsyncOperationHandle<IList<UnityEngine.Object>> handle in pendingLoadHandles.Values)
                 if (handle.IsValid()) Addressables.Release(handle);
             foreach (AsyncOperationHandle<SceneInstance> handle in residentSceneHandles.Values)
+            {
                 if (handle.IsValid()) Addressables.UnloadSceneAsync(handle, true);
+            }
             foreach (AsyncOperationHandle<SceneInstance> handle in pendingSceneHandles.Values)
-                if (handle.IsValid()) Addressables.UnloadSceneAsync(handle, true);
+            {
+                if (!handle.IsValid()) continue;
+                if (handle.IsDone)
+                {
+                    if (handle.Status == AsyncOperationStatus.Succeeded)
+                        Addressables.UnloadSceneAsync(handle, true);
+                    else
+                        Addressables.Release(handle);
+                    continue;
+                }
+
+                // A scene load cannot be cancelled safely once Addressables has
+                // started it. If this component is destroyed mid-load, unload
+                // the scene as soon as the operation completes instead of
+                // calling UnloadSceneAsync on an incomplete SceneInstance.
+                handle.Completed += operation =>
+                {
+                    if (operation.Status == AsyncOperationStatus.Succeeded)
+                        Addressables.UnloadSceneAsync(operation, true);
+                    else if (operation.IsValid())
+                        Addressables.Release(operation);
+                };
+            }
             pendingLoadHandles.Clear();
             residentHandles.Clear();
             residentSceneHandles.Clear();
