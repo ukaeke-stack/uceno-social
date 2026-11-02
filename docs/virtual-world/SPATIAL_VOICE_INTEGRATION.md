@@ -125,7 +125,7 @@ spatial voice as operational until all verification gates pass.
   current session. Android OS behavior and reconnection are not yet device-tested.
 - Server pair-room revocation and room deletion are implemented in source, but
   existing token invalidation and connected-participant eviction have not been
-  proven against a provisioned LiveKit service. A 30-second token TTL alone is
+  proven against a provisioned LiveKit service. A 15-second token TTL alone is
   not immediate revocation.
 - No two-device test has been run. Do not mark positional voice, push-to-talk,
   background handling or revocation as verified until the acceptance matrix in
@@ -147,7 +147,7 @@ spatial voice as operational until all verification gates pass.
   and disposed when the pair room is removed.
 - Speaker mute now affects only remote voice AudioSources; it no longer changes
   the global Unity AudioListener volume or unintentionally silences world audio.
-- Voice presence retries after gateway reconnection. Returned token responses
+- Voice presence retries after gateway reconnection. A gateway disconnect closes local peer rooms; eligible peer token/connect attempts retry up to five times with bounded exponential backoff. Returned token responses
   are checked for expected pair-room naming, local identity, peer identity,
   bounded expiry and secure WSS URL before LiveKit connect.
 
@@ -181,3 +181,11 @@ passed merely because the workflow has been added.
 - Mobile camera-look input now ignores touches over the voice panel and sprint control, so voice interactions do not rotate the camera. PTT is released when the HUD is disabled.
 - Per-peer mute remains available in the voice client API but is not yet exposed as an individual contact list in the HUD. The panel is a runtime IMGUI HUD, not a polished Unity Canvas design.
 - No Unity Editor compilation or Android touch test has been run. Verify panel scaling, touch down/up behavior, permission prompts, camera-look exclusion, and interaction with movement controls on physical devices.
+
+
+## Voice reconnect hardening — 2026-11-02
+
+- When the authoritative world gateway is offline, the client closes active pair rooms and stops their microphone sources rather than leaving independent media sessions running without current world presence.
+- Voice presence requests retry on a bounded interval after the gateway returns. Each peer token/connect attempt retries up to five times with exponential delays capped at 16 seconds.
+- The HUD's connected-peer count now excludes peers still connecting.
+- These changes remain source-only; gateway reconnect, revocation races, and token failure recovery require the two-device acceptance tests.
