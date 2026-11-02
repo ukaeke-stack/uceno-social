@@ -11,6 +11,8 @@ assert.match(voice, /public bool LocalMicMuted => localMuted/);
 assert.match(voice, /public bool PushToTalkHeld => pushToTalkHeld/);
 assert.match(voice, /public bool SetAudioRoute\(string route\)/);
 assert.match(voice, /public void SetPushToTalkHeld\(bool held\)/);
+assert.match(voice, /ConnectPeerWithRetry/);
+assert.match(voice, /StopAllPeerRooms\(\)/);
 assert.doesNotMatch(voice, /private void OnGUI\(\)/, "voice debug overlay must stay out of the client");
 
 assert.match(hud, /DrawVoiceControls\(scale\)/);
