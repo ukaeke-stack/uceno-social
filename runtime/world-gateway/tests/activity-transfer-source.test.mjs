@@ -12,7 +12,7 @@ test("activity transfer consumes its ticket and advances the player fence atomic
   const transaction = source.slice(transactionStart, transactionEnd);
   assert.match(transaction, /await tx\x60UPDATE virtual_world_activity_transfer_tickets/);
   assert.match(transaction, /await tx\x60INSERT INTO virtual_world_player_sessions/);
-  assert.match(transaction, /if \(!fenced\[0\]\) throw new Error\("transfer_session_claim_failed"\)/);
+  assert.match(transaction, /return fenced\[0\] \? fenced : null/);\n  assert.match(transaction, /if \(!consumed\[0\]\) return null/);
   assert.match(source, /if \(!claimed \|\| !claimed\[0\]\)/);
   assert.doesNotMatch(transaction, /await sql\x60UPDATE virtual_world_activity_transfer_tickets/);
 });
@@ -53,7 +53,7 @@ test("stale activity host takeover preserves an active participant checkpoint an
   assert.match(takeover, /replacement_instance\.heartbeat_at > NOW\(\) - INTERVAL '30 seconds'/);
   assert.match(takeover, /participant->>'userId' = \$\{player\.id\}/);
   assert.match(takeover, /participant->>'status' = 'joined'/);
-  assert.match(takeover, /restoreActivitySession\(rows\[0\]\.state\)/);
+  assert.match(takeover, /restoreActivitySession\(rows\)/);\n  assert.match(takeover, /await sql\.begin\(async tx/);\n  assert.match(takeover, /owner_lease_expires_at > clock_timestamp\(\)[\s\S]*FOR SHARE/);
   assert.match(takeover, /activityHostGenerations\.set\(sessionId, restored\.hostGeneration\)/);
 });
 
