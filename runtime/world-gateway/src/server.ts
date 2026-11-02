@@ -61,7 +61,7 @@ function loadWorldDistricts(): WorldDistrict[] {
 const WORLD_DISTRICTS = loadWorldDistricts();
 
 function loadInteractables(): Map<string, Interactable> {
-  const filePath = process.env.WORLD_INTERACTABLES_FILE || process.env.WORLD_COLLISION_BOXES_FILE;
+  const filePath = process.env.WORLD_INTERACTABLES_FILE;
   let raw = process.env.WORLD_INTERACTABLES;
   if (!raw && filePath) {
     try { raw = readFileSync(filePath, "utf8"); }
@@ -74,9 +74,10 @@ function loadInteractables(): Map<string, Interactable> {
   let parsed: unknown;
   try { parsed = JSON.parse(raw); }
   catch { throw new Error("World interactables must be valid JSON"); }
-  const values = parsed && typeof parsed === "object" &&
-    Array.isArray((parsed as { interactables?: unknown }).interactables)
-      ? (parsed as { interactables: unknown[] }).interactables : [];
+  if (!parsed || typeof parsed !== "object" ||
+      !Array.isArray((parsed as { interactables?: unknown }).interactables))
+    throw new Error("World interactables must contain an interactables array");
+  const values = (parsed as { interactables: unknown[] }).interactables;
   if (values.length > 500) throw new Error("World interactables cannot exceed 500 entries");
   const result = new Map<string, Interactable>();
   for (const [index, value] of values.entries()) {
