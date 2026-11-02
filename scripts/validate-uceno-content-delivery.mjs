@@ -27,6 +27,8 @@ const checks = [
   ["Travel request is gated on successful content download", /if \(!succeeded\)[\s\S]*?Travel cancelled/.test(gateway) && /SendSpatialContextAsync\(type, id\)/.test(gateway)],
   ["Failed preload does not send spatial admission", /Travel cancelled:[\s\S]*?spatialTransitionPending = false;[\s\S]*?yield break;/.test(gateway)],
   ["Transition feedback is visible", /spatialTransitionStatus/.test(gateway) && /private void OnGUI\(\)/.test(gateway)],
+  ["Activity join preloads its content label", /PreloadBeforeActivityJoin/.test(gateway) && /EnsureContent\(label/.test(gateway)],
+  ["Sports, racing, dance and adventure labels are mapped", /activity-sports/.test(gateway) && /activity-racing/.test(gateway) && /activity-dance/.test(gateway) && /activity-adventure/.test(gateway)],
   ["Architecture documents automatic loading and persistent cache", /automatically|on demand|preflight/i.test(architecture) && /persistent.*cache/i.test(architecture)],
   ["Acceptance tests cover interrupted downloads", /Interrupt the connection mid-download/.test(tests))
 ];
