@@ -87,9 +87,9 @@ namespace UCENO.VirtualWorld
                 yield break;
             }
 
-            if (residentHandles.Count >= Mathf.Max(1, maxConcurrentResidentLabels))
+            if (residentHandles.Count + residencyLoads.Count >= Mathf.Max(1, maxConcurrentResidentLabels))
             {
-                completed?.Invoke(false, "The active world-content memory limit has been reached. Leave another area before loading this one.");
+                completed?.Invoke(false, "The active resident-label limit has been reached. Leave another area before loading this one.");
                 ContentFailed?.Invoke(label);
                 yield break;
             }
