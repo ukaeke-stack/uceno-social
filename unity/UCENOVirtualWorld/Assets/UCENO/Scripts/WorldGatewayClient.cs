@@ -190,6 +190,8 @@ namespace UCENO.VirtualWorld
         }
 
         private readonly Dictionary<string, RemotePlayer> remotePlayers = new Dictionary<string, RemotePlayer>();
+        // Prevent delayed packets from an older gateway replica from rolling back a newer object state.
+        private readonly Dictionary<string, long> objectStateVersions = new Dictionary<string, long>();
         private WebSocket socket;
         private bool connected;
         private bool connecting;
@@ -876,6 +878,15 @@ namespace UCENO.VirtualWorld
 
             if (packet.type == "object_state")
             {
+                if (string.IsNullOrWhiteSpace(packet.objectId) || string.IsNullOrWhiteSpace(packet.objectState))
+                    return;
+                if (packet.version > 0)
+                {
+                    if (objectStateVersions.TryGetValue(packet.objectId, out long knownVersion) &&
+                        packet.version < knownVersion)
+                        return;
+                    objectStateVersions[packet.objectId] = packet.version;
+                }
                 foreach (WorldInteractable item in FindObjectsOfType<WorldInteractable>())
                     if (item != null && item.ObjectId == packet.objectId)
                         item.ApplyServerState(packet.objectState, packet.occupantId);
