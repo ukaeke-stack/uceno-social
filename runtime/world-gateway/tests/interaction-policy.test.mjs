@@ -52,3 +52,15 @@ test("interaction reach and cooldown reject impossible or spammed requests", () 
   assert.equal(isInteractionAllowed(1, NaN), false);
   assert.equal(isInteractionAllowed(1, 250, 0, 250), false);
 });
+
+test("furniture uses the generic active/idle state transition", () => {
+  assert.deepEqual(resolveInteraction({ kind: "furniture", state: "idle", occupantId: null }, "user-a", "use"),
+    { ok: true, state: "active", occupantId: null, seated: false });
+});
+
+test("vehicle use toggles engine state without persisting driver occupancy", () => {
+  assert.deepEqual(resolveInteraction({ kind: "vehicle", state: "engine_off", occupantId: null }, "user-a", "use"),
+    { ok: true, state: "engine_on", occupantId: null, seated: false });
+  assert.deepEqual(resolveInteraction({ kind: "vehicle", state: "engine_on", occupantId: null }, "user-a", "use"),
+    { ok: true, state: "engine_off", occupantId: null, seated: false });
+});
