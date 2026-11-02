@@ -53,3 +53,17 @@ export function resolveInteraction(
     seated: false
   };
 }
+
+/** Server-side reach and interaction-frequency gate. */
+export function isInteractionAllowed(
+  distance: number,
+  elapsedSincePreviousMs: number,
+  maxDistance = 4.25,
+  cooldownMs = 250
+): boolean {
+  return Number.isFinite(distance) && Number.isFinite(elapsedSincePreviousMs) &&
+    Number.isFinite(maxDistance) && Number.isFinite(cooldownMs) &&
+    distance >= 0 && elapsedSincePreviousMs >= 0 &&
+    maxDistance > 0 && cooldownMs >= 0 &&
+    distance <= maxDistance && elapsedSincePreviousMs >= cooldownMs;
+}
