@@ -436,7 +436,7 @@ async function persistActivity(session: ActivitySession): Promise<boolean> {
         VALUES (${session.worldId}::uuid, ${INSTANCE_ID}::uuid, 'activity_state',
           ${JSON.stringify(activityPayload(session))}::jsonb)`
         .catch(error => console.error("activity_state_relay_publish_failed", session.id, error));
-      if (session.phase !== "completed" && session.phase !== "cancelled") return;
+      if (session.phase !== "completed" && session.phase !== "cancelled") return true;
       const ordered = [...session.participants.values()]
         .filter(p => p.status === "finished" || p.status === "dnf" || p.status === "left")
         .sort((a, b) => a.status === "finished" && b.status === "finished"
