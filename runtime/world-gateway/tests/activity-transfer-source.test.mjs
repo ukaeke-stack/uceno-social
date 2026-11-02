@@ -22,7 +22,7 @@ test("active competition transfer is limited to an already-joined participant", 
   const issueEnd = source.indexOf('res.writeHead(200, headers)', issueStart);
   const issue = source.slice(issueStart, issueEnd);
   assert.match(issue, /activity\.phase IN \('lobby', 'active'\)/);
-  assert.match(issue, /persisted?\.session\.participants\.get\(identity\.userId\)/);
+  assert.match(issue, /persisted\?\.session\.participants\.get\(identity\.userId\)/);
   assert.match(issue, /target\[0\]\.phase === "active" && \(!participant \|\| participant\.status !== "joined"\)/);
   assert.match(issue, /host_generation/);
   assert.match(issue, /transfer_host_generation/);
