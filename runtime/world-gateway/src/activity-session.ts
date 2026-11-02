@@ -165,3 +165,11 @@ export function cancelActivity(session: ActivitySession, actorIsAuthorizedHost: 
   session.version++;
   return { ok: true, session };
 }
+
+/** Selects a deterministic replacement host after the current host leaves. */
+export function selectNextActivityHost(session: ActivitySession, departingHostId: string): string | null {
+  const candidates = [...session.participants.values()]
+    .filter(participant => participant.userId !== departingHostId && participant.status === "joined")
+    .sort((a, b) => a.joinedAt - b.joinedAt || a.userId.localeCompare(b.userId));
+  return candidates[0]?.userId ?? null;
+}
