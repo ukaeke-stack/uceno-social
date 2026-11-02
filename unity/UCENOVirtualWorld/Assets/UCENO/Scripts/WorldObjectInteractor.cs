@@ -15,6 +15,17 @@ namespace UCENO.VirtualWorld
 
         private WorldInteractable currentTarget;
         private GUIStyle buttonStyle;
+        private const float ButtonHeight = 52f;
+
+        /// <summary>Returns true when a pointer is over the interaction action, using screen-space coordinates.</summary>
+        public static bool IsPointerOnInteractionControl(Vector2 screenPosition)
+        {
+            float width = Mathf.Clamp(Screen.width * 0.30f, 130f, 220f);
+            Rect guiRect = new Rect((Screen.width - width) * 0.5f,
+                Screen.height - ButtonHeight - 34f, width, ButtonHeight);
+            Vector2 guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
+            return guiRect.Contains(guiPosition);
+        }
 
         private void Awake()
         {
@@ -72,7 +83,7 @@ namespace UCENO.VirtualWorld
                     ? (currentTarget.OccupantId == "" ? "SIT" : currentTarget.OccupantId == GetLocalUserId() ? "STAND" : "OCCUPIED")
                     : "INTERACT";
             float width = Mathf.Clamp(Screen.width * 0.30f, 130f, 220f);
-            float height = 52f;
+            float height = ButtonHeight;
             Rect rect = new Rect((Screen.width - width) * 0.5f,
                 Screen.height - height - 34f, width, height);
             bool seatHeldByOther = currentTarget.Kind == "seat" &&
