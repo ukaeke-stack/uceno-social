@@ -186,7 +186,7 @@ namespace UCENO.VirtualWorld.Editor
                                 Bounds bounds = collider.bounds;
                                 if (bounds.size.sqrMagnitude < 0.0001f) continue;
                                 Vector3 center = bounds.center;
-                                if (!Contains(district, center.x, center.z)) continue;
+                                if (!OverlapsDistrict(district, bounds)) continue;
                                 boxes.Add(new Box
                                 {
                                     minX = Round(bounds.min.x), maxX = Round(bounds.max.x),
@@ -215,6 +215,8 @@ namespace UCENO.VirtualWorld.Editor
                         }
                     }
 
+                    if (boxes.Count == 0)
+                        throw new InvalidOperationException("District " + district.id + " has no colliders. Add or load its scene before exporting.");
                     if (boxes.Count > 500 || interactables.Count > 500)
                         throw new InvalidOperationException("District " + district.id +
                             " exceeds the gateway limit of 500 colliders or interactables.");
@@ -257,6 +259,12 @@ namespace UCENO.VirtualWorld.Editor
         {
             return x >= district.minX && x < district.maxX &&
                 z >= district.minZ && z < district.maxZ;
+        }
+
+        private static bool OverlapsDistrict(DistrictBounds district, Bounds bounds)
+        {
+            return bounds.min.x < district.maxX && bounds.max.x > district.minX &&
+                bounds.min.z < district.maxZ && bounds.max.z > district.minZ;
         }
 
         private static float Round(float value)
