@@ -1872,16 +1872,21 @@ setInterval(async () => {
         }
       } else if (row.eventType === 'activity_state') {
         const payload = row.payload as { type?: string; session?: { id?: string; worldId?: string; instanceId?: string; hostGeneration?: number } };
-        if (payload?.type !== 'activity_state' || payload.session?.worldId !== row.worldId ||
-            payload.session?.instanceId !== row.instanceId || typeof payload.session?.id !== 'string') continue;
+        const session = payload?.session;
+        if (payload?.type !== 'activity_state' || !session ||
+            session.worldId !== row.worldId || session.instanceId !== row.instanceId ||
+            typeof session.id !== 'string' || !Number.isSafeInteger(session.hostGeneration) ||
+            (session.hostGeneration ?? 0) < 1) continue;
+        const sessionId = session.id;
+        const hostGeneration = session.hostGeneration as number;
         await sql.begin(async tx => {
           // Hold the activity row lock through fan-out. A takeover must either
           // commit before this check (and suppress the stale event) or wait
           // until this already-authorized broadcast has completed.
           const authority = await tx`SELECT 1 FROM virtual_world_activity_sessions
-            WHERE id = ${payload.session.id}::uuid AND world_id = ${row.worldId}::uuid
+            WHERE id = ${sessionId}::uuid AND world_id = ${row.worldId}::uuid
               AND instance_id = ${row.instanceId}::uuid
-              AND host_generation = ${payload.session.hostGeneration}
+              AND host_generation = ${hostGeneration}
             FOR UPDATE`;
           if (!authority[0]) return;
           const packet = JSON.stringify(payload);
