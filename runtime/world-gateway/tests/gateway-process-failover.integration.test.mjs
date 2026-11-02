@@ -208,6 +208,439 @@ test("two real gateway processes: primary loss leaves the replacement process re
         AND (owner_process_id IS NULL OR owner_lease_expires_at IS NULL OR owner_lease_expires_at <= NOW())
       RETURNING owner_generation INTO v_generation;
       RETURN v_generation;
+    END $procimport test from "node:test";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { createServer } from "node:net";
+import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
+import postgres from "postgres";
+import WebSocket from "ws";
+import { SignJWT } from "jose";
+
+const databaseUrl = process.env.TEST_DATABASE_URL;
+const tokenSecret = "process-failover-test-secret-with-more-than-32-characters";
+
+async function freePort() {
+  const server = createServer();
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  const port = address.port;
+  await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  return port;
+}
+
+async function waitForReady(port, child, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null || child.signalCode !== null)
+      throw new Error(`gateway process exited before readiness (code=${child.exitCode}, signal=${child.signalCode})`);
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/ready`);
+      if (response.status === 200) return await response.json();
+      lastError = new Error(`readiness returned ${response.status}: ${await response.text()}`);
+    } catch (error) {
+      lastError = error;
+    }
+    await delay(150);
+  }
+  throw lastError ?? new Error("gateway readiness timed out");
+}
+
+function startGateway(port, instanceId, scopedDatabaseUrl) {
+  const processDatabaseUrl = new URL(scopedDatabaseUrl);
+  processDatabaseUrl.searchParams.set("application_name", "uceno-gateway-" + instanceId);
+  const child = spawn(process.execPath, ["dist/server.js"], {
+    cwd: new URL("../", import.meta.url),
+    env: {
+      ...process.env,
+      NODE_ENV: "test",
+      PORT: String(port),
+      WORLD_INSTANCE_ID: instanceId,
+      DATABASE_URL: processDatabaseUrl.toString(),
+      WORLD_TOKEN_SECRET: tokenSecret,
+      WORLD_INSTANCE_CAPACITY: "8"
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  let output = "";
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data", chunk => { output += chunk; });
+  child.stderr.on("data", chunk => { output += chunk; });
+  child.testOutput = () => output;
+  return child;
+}
+
+async function receiveSocketMessage(socket, expectedType, timeoutMs = 5000, predicate = () => true) {
+  return new Promise((resolve, reject) => {
+    const seen = [];
+    const cleanup = () => {
+      clearTimeout(timeout);
+      socket.off("message", onMessage);
+      socket.off("error", onError);
+    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error(`timed out waiting for matching ${expectedType}; received: ${JSON.stringify(seen)}`));
+    }, timeoutMs);
+    const onMessage = raw => {
+      let packet;
+      try { packet = JSON.parse(raw.toString()); } catch { return; }
+      if (seen.length < 12) seen.push(packet);
+      if (packet.type !== expectedType || !predicate(packet)) return;
+      cleanup();
+      resolve(packet);
+    };
+    const onError = error => {
+      cleanup();
+      reject(error);
+    };
+    socket.on("message", onMessage);
+    socket.on("error", onError);
+  });
+}
+
+async function connectAuthenticated(port, instanceId, worldId, userId) {
+  const token = await new SignJWT({
+    world_id: worldId, instance_id: instanceId, client_type: "unity-android"
+  }).setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuer("uceno-social").setAudience("uceno-world-gateway")
+    .setSubject(userId).setIssuedAt().setExpirationTime("1h")
+    .sign(new TextEncoder().encode(tokenSecret));
+  const socket = new WebSocket(`ws://127.0.0.1:${port}/world`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("authenticated WebSocket upgrade timed out")), 5000);
+    socket.once("open", () => { clearTimeout(timeout); resolve(); });
+    socket.once("unexpected-response", (_request, response) => {
+      clearTimeout(timeout);
+      response.resume();
+      reject(new Error(`authenticated WebSocket upgrade rejected: ${response.statusCode}`));
+    });
+    socket.once("error", error => { clearTimeout(timeout); reject(error); });
+  });
+  const welcome = await receiveSocketMessage(socket, "welcome");
+  assert.equal(welcome.instanceId, instanceId);
+  return { socket, welcome };
+}
+
+async function assertWebSocketRejectsWrongInstance(port, instanceId) {
+  const token = await new SignJWT({
+    world_id: randomUUID(),
+    instance_id: randomUUID(),
+    client_type: "unity-android"
+  }).setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuer("uceno-social").setAudience("uceno-world-gateway")
+    .setSubject(randomUUID()).setIssuedAt().setExpirationTime("1m")
+    .sign(new TextEncoder().encode(tokenSecret));
+  assert.notEqual(instanceId, "", "test instance id must be configured");
+  await new Promise((resolve, reject) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/world`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const timeout = setTimeout(() => {
+      socket.terminate();
+      reject(new Error("WebSocket authentication rejection timed out"));
+    }, 5000);
+    socket.once("unexpected-response", (_request, response) => {
+      clearTimeout(timeout);
+      assert.equal(response.statusCode, 401);
+      response.resume();
+      resolve();
+    });
+    socket.once("open", () => {
+      clearTimeout(timeout);
+      socket.terminate();
+      reject(new Error("gateway accepted a token scoped to a different instance"));
+    });
+    socket.once("error", error => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
+
+function stopGateway(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise(resolve => {
+    child.once("exit", resolve);
+    child.kill("SIGKILL");
+  });
+}
+
+test("two real gateway processes: primary loss leaves the replacement process ready", {
+  skip: !databaseUrl,
+  timeout: 45000
+}, async t => {
+  const admin = postgres(databaseUrl, { max: 6, idle_timeout: 5 });
+  const schema = `uceno_gateway_process_${randomUUID().replace(/-/g, "")}`;
+  const scoped = new URL(databaseUrl);
+  scoped.searchParams.set("options", `-csearch_path=${schema},public`);
+  const instanceA = randomUUID();
+  const instanceB = randomUUID();
+  const instanceC = randomUUID();
+  const portA = await freePort();
+  const portB = await freePort();
+  const portC = await freePort();
+  const worldId = randomUUID();
+  const userId = randomUUID();
+  const activityId = randomUUID();
+  const createdAt = Date.now();
+  let gatewayA;
+  let gatewayB;
+  let gatewayC;
+  let duplicateGatewayA;
+
+  try {
+    await admin.unsafe(`CREATE SCHEMA "${schema}"`);
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_instances (
+      id UUID PRIMARY KEY, status TEXT NOT NULL, heartbeat_at TIMESTAMPTZ,
+      endpoint TEXT, current_players INTEGER NOT NULL DEFAULT 0,
+      owner_process_id UUID, owner_generation BIGINT NOT NULL DEFAULT 0,
+      owner_lease_expires_at TIMESTAMPTZ
+    )`);
+    await admin.unsafe(`CREATE FUNCTION "${schema}".claim_world_instance_process(
+      p_instance_id UUID, p_process_id UUID, p_lease_seconds INTEGER DEFAULT 12
+    ) RETURNS BIGINT LANGUAGE plpgsql AS $
+    DECLARE v_generation BIGINT;
+    BEGIN
+      UPDATE virtual_world_instances SET owner_process_id = p_process_id,
+        owner_generation = owner_generation + 1,
+        owner_lease_expires_at = NOW() + make_interval(secs => p_lease_seconds),
+        heartbeat_at = NOW(), current_players = 0
+      WHERE id = p_instance_id AND status IN ('ready','draining')
+        AND (owner_process_id IS NULL OR owner_lease_expires_at IS NULL OR owner_lease_expires_at <= NOW())
+      RETURNING owner_generation INTO v_generation;
+      RETURN v_generation;
+    );
+    await admin.unsafe(`CREATE FUNCTION "${schema}".renew_world_instance_process(
+      p_instance_id UUID, p_process_id UUID, p_generation BIGINT,
+      p_current_players INTEGER, p_lease_seconds INTEGER DEFAULT 12
+    ) RETURNS BOOLEAN LANGUAGE plpgsql AS $
+    BEGIN
+      UPDATE virtual_world_instances SET heartbeat_at = NOW(),
+        current_players = p_current_players,
+        owner_lease_expires_at = NOW() + make_interval(secs => p_lease_seconds)
+      WHERE id = p_instance_id AND status IN ('ready','draining')
+        AND owner_process_id = p_process_id AND owner_generation = p_generation
+        AND owner_lease_expires_at > NOW();
+      RETURN FOUND;
+    END $procimport test from "node:test";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { createServer } from "node:net";
+import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
+import postgres from "postgres";
+import WebSocket from "ws";
+import { SignJWT } from "jose";
+
+const databaseUrl = process.env.TEST_DATABASE_URL;
+const tokenSecret = "process-failover-test-secret-with-more-than-32-characters";
+
+async function freePort() {
+  const server = createServer();
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  const port = address.port;
+  await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  return port;
+}
+
+async function waitForReady(port, child, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null || child.signalCode !== null)
+      throw new Error(`gateway process exited before readiness (code=${child.exitCode}, signal=${child.signalCode})`);
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/ready`);
+      if (response.status === 200) return await response.json();
+      lastError = new Error(`readiness returned ${response.status}: ${await response.text()}`);
+    } catch (error) {
+      lastError = error;
+    }
+    await delay(150);
+  }
+  throw lastError ?? new Error("gateway readiness timed out");
+}
+
+function startGateway(port, instanceId, scopedDatabaseUrl) {
+  const processDatabaseUrl = new URL(scopedDatabaseUrl);
+  processDatabaseUrl.searchParams.set("application_name", "uceno-gateway-" + instanceId);
+  const child = spawn(process.execPath, ["dist/server.js"], {
+    cwd: new URL("../", import.meta.url),
+    env: {
+      ...process.env,
+      NODE_ENV: "test",
+      PORT: String(port),
+      WORLD_INSTANCE_ID: instanceId,
+      DATABASE_URL: processDatabaseUrl.toString(),
+      WORLD_TOKEN_SECRET: tokenSecret,
+      WORLD_INSTANCE_CAPACITY: "8"
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  let output = "";
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data", chunk => { output += chunk; });
+  child.stderr.on("data", chunk => { output += chunk; });
+  child.testOutput = () => output;
+  return child;
+}
+
+async function receiveSocketMessage(socket, expectedType, timeoutMs = 5000, predicate = () => true) {
+  return new Promise((resolve, reject) => {
+    const seen = [];
+    const cleanup = () => {
+      clearTimeout(timeout);
+      socket.off("message", onMessage);
+      socket.off("error", onError);
+    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error(`timed out waiting for matching ${expectedType}; received: ${JSON.stringify(seen)}`));
+    }, timeoutMs);
+    const onMessage = raw => {
+      let packet;
+      try { packet = JSON.parse(raw.toString()); } catch { return; }
+      if (seen.length < 12) seen.push(packet);
+      if (packet.type !== expectedType || !predicate(packet)) return;
+      cleanup();
+      resolve(packet);
+    };
+    const onError = error => {
+      cleanup();
+      reject(error);
+    };
+    socket.on("message", onMessage);
+    socket.on("error", onError);
+  });
+}
+
+async function connectAuthenticated(port, instanceId, worldId, userId) {
+  const token = await new SignJWT({
+    world_id: worldId, instance_id: instanceId, client_type: "unity-android"
+  }).setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuer("uceno-social").setAudience("uceno-world-gateway")
+    .setSubject(userId).setIssuedAt().setExpirationTime("1h")
+    .sign(new TextEncoder().encode(tokenSecret));
+  const socket = new WebSocket(`ws://127.0.0.1:${port}/world`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("authenticated WebSocket upgrade timed out")), 5000);
+    socket.once("open", () => { clearTimeout(timeout); resolve(); });
+    socket.once("unexpected-response", (_request, response) => {
+      clearTimeout(timeout);
+      response.resume();
+      reject(new Error(`authenticated WebSocket upgrade rejected: ${response.statusCode}`));
+    });
+    socket.once("error", error => { clearTimeout(timeout); reject(error); });
+  });
+  const welcome = await receiveSocketMessage(socket, "welcome");
+  assert.equal(welcome.instanceId, instanceId);
+  return { socket, welcome };
+}
+
+async function assertWebSocketRejectsWrongInstance(port, instanceId) {
+  const token = await new SignJWT({
+    world_id: randomUUID(),
+    instance_id: randomUUID(),
+    client_type: "unity-android"
+  }).setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuer("uceno-social").setAudience("uceno-world-gateway")
+    .setSubject(randomUUID()).setIssuedAt().setExpirationTime("1m")
+    .sign(new TextEncoder().encode(tokenSecret));
+  assert.notEqual(instanceId, "", "test instance id must be configured");
+  await new Promise((resolve, reject) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/world`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const timeout = setTimeout(() => {
+      socket.terminate();
+      reject(new Error("WebSocket authentication rejection timed out"));
+    }, 5000);
+    socket.once("unexpected-response", (_request, response) => {
+      clearTimeout(timeout);
+      assert.equal(response.statusCode, 401);
+      response.resume();
+      resolve();
+    });
+    socket.once("open", () => {
+      clearTimeout(timeout);
+      socket.terminate();
+      reject(new Error("gateway accepted a token scoped to a different instance"));
+    });
+    socket.once("error", error => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
+
+function stopGateway(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise(resolve => {
+    child.once("exit", resolve);
+    child.kill("SIGKILL");
+  });
+}
+
+test("two real gateway processes: primary loss leaves the replacement process ready", {
+  skip: !databaseUrl,
+  timeout: 45000
+}, async t => {
+  const admin = postgres(databaseUrl, { max: 6, idle_timeout: 5 });
+  const schema = `uceno_gateway_process_${randomUUID().replace(/-/g, "")}`;
+  const scoped = new URL(databaseUrl);
+  scoped.searchParams.set("options", `-csearch_path=${schema},public`);
+  const instanceA = randomUUID();
+  const instanceB = randomUUID();
+  const instanceC = randomUUID();
+  const portA = await freePort();
+  const portB = await freePort();
+  const portC = await freePort();
+  const worldId = randomUUID();
+  const userId = randomUUID();
+  const activityId = randomUUID();
+  const createdAt = Date.now();
+  let gatewayA;
+  let gatewayB;
+  let gatewayC;
+  let duplicateGatewayA;
+
+  try {
+    await admin.unsafe(`CREATE SCHEMA "${schema}"`);
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_instances (
+      id UUID PRIMARY KEY, status TEXT NOT NULL, heartbeat_at TIMESTAMPTZ,
+      endpoint TEXT, current_players INTEGER NOT NULL DEFAULT 0,
+      owner_process_id UUID, owner_generation BIGINT NOT NULL DEFAULT 0,
+      owner_lease_expires_at TIMESTAMPTZ
+    )`);
+    await admin.unsafe(`CREATE FUNCTION "${schema}".claim_world_instance_process(
+      p_instance_id UUID, p_process_id UUID, p_lease_seconds INTEGER DEFAULT 12
+    ) RETURNS BIGINT LANGUAGE plpgsql AS $
+    DECLARE v_generation BIGINT;
+    BEGIN
+      UPDATE virtual_world_instances SET owner_process_id = p_process_id,
+        owner_generation = owner_generation + 1,
+        owner_lease_expires_at = NOW() + make_interval(secs => p_lease_seconds),
+        heartbeat_at = NOW(), current_players = 0
+      WHERE id = p_instance_id AND status IN ('ready','draining')
+        AND (owner_process_id IS NULL OR owner_lease_expires_at IS NULL OR owner_lease_expires_at <= NOW())
+      RETURNING owner_generation INTO v_generation;
+      RETURN v_generation;
     END $`);
     await admin.unsafe(`CREATE FUNCTION "${schema}".renew_world_instance_process(
       p_instance_id UUID, p_process_id UUID, p_generation BIGINT,
@@ -221,7 +654,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
         AND owner_process_id = p_process_id AND owner_generation = p_generation
         AND owner_lease_expires_at > NOW();
       RETURN FOUND;
-    END $`);
+    );
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_realtime_events (
       id BIGSERIAL PRIMARY KEY, world_id UUID, instance_id UUID,
       event_type TEXT NOT NULL, payload JSONB NOT NULL DEFAULT '{}'::jsonb,
