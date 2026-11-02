@@ -153,6 +153,12 @@ namespace UCENO.VirtualWorld
             if (GUI.Button(toggleRect, toggleText, voiceButtonStyle))
                 voicePanelOpen = !voicePanelOpen;
             voicePanelVisible = voicePanelOpen;
+            Event currentEvent = Event.current;
+            if (currentEvent.type == EventType.MouseUp && spatialVoice.PushToTalkHeld)
+            {
+                spatialVoice.SetPushToTalkHeld(false);
+                currentEvent.Use();
+            }
             if (!voicePanelOpen) return;
 
             float innerWidth = width - 16f * scale;
@@ -188,11 +194,6 @@ namespace UCENO.VirtualWorld
                 if (e.type == EventType.MouseDown && talk.Contains(e.mousePosition))
                 {
                     spatialVoice.SetPushToTalkHeld(true);
-                    e.Use();
-                }
-                else if (e.type == EventType.MouseUp && spatialVoice.PushToTalkHeld)
-                {
-                    spatialVoice.SetPushToTalkHeld(false);
                     e.Use();
                 }
                 currentY += rowHeight + 3f * scale;
