@@ -251,15 +251,18 @@ test("two real gateway processes: primary loss leaves the replacement process re
       [worldId, userId, instanceB]);
     const persistedActivity = {
       id: activityId, worldId, instanceId: instanceA, hostUserId: userId,
-      hostGeneration: 1, raceId: null, kind: "checkpoint_race", phase: "lobby",
-      version: 1, createdAt, startedAt: null, completedAt: null,
-      maxParticipants: 8, checkpointCount: 2, participants: []
+      hostGeneration: 1, raceId: null, kind: "checkpoint_race", phase: "active",
+      version: 7, createdAt, startedAt: createdAt, completedAt: null,
+      maxParticipants: 8, checkpointCount: 3, participants: [{
+        userId, status: "joined", joinedAt: createdAt, lastActionAt: createdAt,
+        checkpointIndex: 2, finishTime: null
+      }]
     };
     await admin.unsafe(`INSERT INTO "${schema}".virtual_world_activity_sessions
       (id, world_id, instance_id, host_user_id, host_generation, activity_kind,
        phase, version, state, created_at, updated_at)
       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race',
-       'lobby', 1, $5::jsonb, NOW(), NOW())`,
+       'active', 7, $5::jsonb, NOW(), NOW())`,
       [activityId, worldId, instanceA, userId, persistedActivity]);
     gatewayA = startGateway(portA, instanceA, scoped.toString());
     gatewayB = startGateway(portB, instanceB, scoped.toString());
@@ -323,9 +326,12 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal(authority[0].instance_id, instanceB);
       assert.equal(authority[0].host_user_id, userId);
       assert.equal(Number(authority[0].host_generation), 2);
-      assert.equal(Number(authority[0].version), 2);
+      assert.equal(Number(authority[0].version), 8);
       assert.equal(authority[0].state.instanceId, instanceB);
       assert.equal(Number(authority[0].state.hostGeneration), 2);
+      assert.equal(authority[0].state.phase, "active");
+      assert.equal(authority[0].state.participants[0].userId, userId);
+      assert.equal(authority[0].state.participants[0].checkpointIndex, 2);
       replacementSocket.socket.close();
     });
   } catch (error) {
