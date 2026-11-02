@@ -5,6 +5,8 @@ import { createServer } from "node:net";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import postgres from "postgres";
+import WebSocket from "ws";
+import { SignJWT } from "jose";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const tokenSecret = "process-failover-test-secret-with-more-than-32-characters";
@@ -62,6 +64,42 @@ function startGateway(port, instanceId, scopedDatabaseUrl) {
   return child;
 }
 
+async function assertWebSocketRejectsWrongInstance(port, instanceId) {
+  const token = await new SignJWT({
+    world_id: randomUUID(),
+    instance_id: randomUUID(),
+    client_type: "unity-android"
+  }).setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuer("uceno-social").setAudience("uceno-world-gateway")
+    .setSubject(randomUUID()).setIssuedAt().setExpirationTime("1m")
+    .sign(new TextEncoder().encode(tokenSecret));
+  assert.notEqual(instanceId, "", "test instance id must be configured");
+  await new Promise((resolve, reject) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/world`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const timeout = setTimeout(() => {
+      socket.terminate();
+      reject(new Error("WebSocket authentication rejection timed out"));
+    }, 5000);
+    socket.once("unexpected-response", (_request, response) => {
+      clearTimeout(timeout);
+      assert.equal(response.statusCode, 401);
+      response.resume();
+      resolve();
+    });
+    socket.once("open", () => {
+      clearTimeout(timeout);
+      socket.terminate();
+      reject(new Error("gateway accepted a token scoped to a different instance"));
+    });
+    socket.once("error", error => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+  });
+}
+
 function stopGateway(child) {
   if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
   return new Promise(resolve => {
@@ -97,9 +135,12 @@ test("two real gateway processes: primary loss leaves the replacement process re
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_activity_sessions (
-      id UUID PRIMARY KEY, instance_id UUID NOT NULL, phase TEXT NOT NULL,
-      state JSONB NOT NULL DEFAULT '{}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      completed_at TIMESTAMPTZ
+      id UUID PRIMARY KEY, world_id UUID NOT NULL, instance_id UUID NOT NULL,
+      host_user_id UUID, host_generation BIGINT NOT NULL DEFAULT 1,
+      race_id UUID, activity_kind TEXT NOT NULL DEFAULT 'race', phase TEXT NOT NULL,
+      version BIGINT NOT NULL DEFAULT 1, state JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), started_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_activity_transfer_tickets (
       expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ
@@ -114,6 +155,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
     const readyB = await waitForReady(portB, gatewayB);
     assert.equal(readyA.instanceId, instanceA);
     assert.equal(readyB.instanceId, instanceB);
+    await assertWebSocketRejectsWrongInstance(portA, instanceA);
+    await assertWebSocketRejectsWrongInstance(portB, instanceB);
     const heartbeatDeadline = Date.now() + 5000;
     let liveHeartbeats = [];
     while (Date.now() < heartbeatDeadline) {
