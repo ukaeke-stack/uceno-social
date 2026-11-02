@@ -56,6 +56,7 @@ namespace UCENO.VirtualWorld
         private bool pushToTalkHeld;
         private bool localMuted = true;
         private bool speakerEnabled = true;
+        private string audioRoute = "speaker";
         private bool appPaused;
         private bool voicePresenceRequested;
         private string status = "VOICE OFF";
@@ -63,6 +64,7 @@ namespace UCENO.VirtualWorld
         public bool VoiceEnabled => voiceEnabled;
         public bool IsMuted => localMuted || (pushToTalkMode && !pushToTalkHeld);
         public string Status => status;
+        public string AudioRoute => audioRoute;
 
         private void Start()
         {
@@ -92,6 +94,7 @@ namespace UCENO.VirtualWorld
                 status = "NO MICROPHONE FOUND";
                 return;
             }
+            if (!SetAudioRoute(audioRoute)) status = "AUDIO ROUTE UNAVAILABLE — USING SYSTEM DEFAULT";
             voiceEnabled = true;
             localMuted = false;
             pushToTalkHeld = false;
@@ -107,6 +110,7 @@ namespace UCENO.VirtualWorld
             if (gateway != null) gateway.SetVoiceActive(false);
             voicePresenceRequested = false;
             StopAllPeerRooms();
+            ClearAudioRoute();
             status = "VOICE OFF";
         }
 
@@ -140,6 +144,44 @@ namespace UCENO.VirtualWorld
                 AudioSource source = output != null ? output.GetComponent<AudioSource>() : null;
                 if (source != null) source.mute = !speakerEnabled || muted;
             }
+        }
+
+        public bool SetAudioRoute(string route)
+        {
+            if (route != "speaker" && route != "earpiece" && route != "bluetooth") return false;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using (var plugin = new AndroidJavaClass("com.uceno.virtualworld.UCENOAudioRoute"))
+                {
+                    bool applied = plugin.CallStatic<bool>("setRoute", route);
+                    if (applied) audioRoute = route;
+                    else status = "AUDIO ROUTE NOT AVAILABLE";
+                    return applied;
+                }
+            }
+            catch (Exception error)
+            {
+                Debug.LogWarning("UCENO Android audio routing unavailable: " + error.Message);
+                status = "AUDIO ROUTE UNAVAILABLE";
+                return false;
+            }
+#else
+            audioRoute = route;
+            return true;
+#endif
+        }
+
+        private void ClearAudioRoute()
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using (var plugin = new AndroidJavaClass("com.uceno.virtualworld.UCENOAudioRoute"))
+                    plugin.CallStatic("clearRoute");
+            }
+            catch (Exception error) { Debug.LogWarning("UCENO audio route cleanup failed: " + error.Message); }
+#endif
         }
 
         public void SetSpeakerEnabled(bool enabled)
@@ -373,12 +415,14 @@ namespace UCENO.VirtualWorld
             {
                 pushToTalkHeld = false;
                 StopAllPeerRooms();
+                ClearAudioRoute();
                 if (gateway != null) gateway.SetVoiceActive(false);
                 voicePresenceRequested = false;
                 status = "VOICE PAUSED IN BACKGROUND";
             }
             else if (voiceEnabled)
             {
+                SetAudioRoute(audioRoute);
                 voicePresenceRequested = gateway != null && gateway.SetVoiceActive(true);
                 status = "VOICE RECONNECTING";
             }
@@ -412,7 +456,13 @@ namespace UCENO.VirtualWorld
                     if (e.type == EventType.MouseUp)
                     { SetPushToTalkHeld(false); e.Use(); }
                 }
-                if (GUILayout.Button(speakerEnabled ? "Speaker: On" : "Speaker: Off", GUILayout.Height(30)))
+                GUILayout.Label("Output route: " + audioRoute);
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("Speaker")) SetAudioRoute("speaker");
+                if (GUILayout.Button("Earpiece")) SetAudioRoute("earpiece");
+                if (GUILayout.Button("Bluetooth")) SetAudioRoute("bluetooth");
+                GUILayout.EndHorizontal();
+                if (GUILayout.Button(speakerEnabled ? "Remote audio: On" : "Remote audio: Muted", GUILayout.Height(30)))
                     SetSpeakerEnabled(!speakerEnabled);
                 foreach (PeerAudio peer in peers.Values)
                 {
