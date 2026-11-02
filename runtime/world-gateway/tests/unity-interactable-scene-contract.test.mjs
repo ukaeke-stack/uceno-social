@@ -9,6 +9,7 @@ const read = (path) => readFileSync(resolve(repoRoot, path), "utf8");
 
 const sceneBuilder = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs");
 const exporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableRegistryExporter.cs");
+const authoring = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableAuthoring.cs");
 const validator = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldDistrictSceneValidator.cs");
 const gateway = read("runtime/world-gateway/src/server.ts");
 const client = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldObjectInteractor.cs");
@@ -35,6 +36,7 @@ test("scene export creates the exact file and schema loaded by the authoritative
   assert.match(exporter, /world-interactables\.json/);
   assert.match(exporter, /interactables = entries\.ToArray\(\)/);
   assert.match(exporter, /GetComponentsInChildren<Collider>\(true\)/);
+  assert.match(exporter, /collider\.enabled && !collider\.isTrigger/);
   assert.match(exporter, /marker\.Kind == "door" && !marker\.HasDoorPivot/);
   assert.match(exporter, /GlobalObjectId\.GetGlobalObjectIdSlow/);
   assert.match(gateway, /process\.env\.WORLD_INTERACTABLES_FILE/);
@@ -44,7 +46,7 @@ test("scene export creates the exact file and schema loaded by the authoritative
 test("editor preflight enforces the same stable ID, collider, hinge and district contract", () => {
   assert.match(validator, /id\.StartsWith\("scene:", StringComparison\.Ordinal\)/);
   assert.match(validator, /id\.Length == 38/);
-  assert.match(validator, /item\.GetComponentsInChildren<Collider>\(true\)\.Length == 0/);
+  assert.match(validator, /collider\.enabled && !collider\.isTrigger/);
   assert.match(validator, /item\.Kind == "door" && !item\.HasDoorPivot/);
   assert.match(validator, /matches != 1/);
 });
@@ -54,4 +56,14 @@ test("player targeting submits object IDs and applies only server-broadcast stat
   assert.match(client, /gateway\.RequestInteraction\(currentTarget\.ObjectId, action\)/);
   assert.match(gatewayClient, /item\.ApplyServerState\(packet\.objectState, packet\.occupantId\)/);
   assert.match(gateway, /type: "object_state", objectId: target\.id/);
+});
+
+
+test("imported prop authoring requires a real hinge child and creates raycastable colliders", () => {
+  assert.match(authoring, /Use Selected Child as Parent Door Pivot/);
+  assert.match(authoring, /selected != marker\.transform/);
+  assert.match(authoring, /doorPivot\"\)\.objectReferenceValue = null/);
+  assert.match(authoring, /Add Targeting Collider From Renderers/);
+  assert.match(authoring, /renderer\.bounds/);
+  assert.match(authoring, /box\.isTrigger = false/);
 });

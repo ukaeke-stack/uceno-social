@@ -111,8 +111,11 @@ namespace UCENO.VirtualWorld.Editor
                                 !ids.Add(id))
                                 throw new InvalidOperationException("Every interactable must have a unique stable scene ID: " + id);
 
-                            if (marker.GetComponentsInChildren<Collider>(true).Length == 0)
-                                throw new InvalidOperationException("Interactable has no collider for player targeting: " + id);
+                            Collider[] targetingColliders = marker.GetComponentsInChildren<Collider>(true);
+                            if (!targetingColliders.Any(collider =>
+                                collider != null && collider.enabled && !collider.isTrigger))
+                                throw new InvalidOperationException(
+                                    "Interactable has no enabled non-trigger collider for player raycast targeting: " + id);
                             if (marker.Kind == "door" && !marker.HasDoorPivot)
                                 throw new InvalidOperationException("Door marker must reference the actual hinged door mesh/pivot: " + id);
 

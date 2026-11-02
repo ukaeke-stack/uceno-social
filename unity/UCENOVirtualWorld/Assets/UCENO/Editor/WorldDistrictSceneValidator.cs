@@ -56,8 +56,11 @@ namespace UCENO.VirtualWorld.Editor
                         if (!IsGatewayObjectId(id) || !ids.Add(id))
                             throw new InvalidOperationException("Invalid or duplicate gateway object ID across loaded scenes: " + id);
 
-                        if (item.GetComponentsInChildren<Collider>(true).Length == 0)
-                            throw new InvalidOperationException("Interactable has no collider for player targeting: " + id);
+                        Collider[] targetingColliders = item.GetComponentsInChildren<Collider>(true);
+                        if (!targetingColliders.Any(collider =>
+                            collider != null && collider.enabled && !collider.isTrigger))
+                            throw new InvalidOperationException(
+                                "Interactable has no enabled non-trigger collider for player raycast targeting: " + id);
                         if (item.Kind == "door" && !item.HasDoorPivot)
                             throw new InvalidOperationException("Door marker must reference the actual hinged door mesh/pivot: " + id);
 
@@ -74,7 +77,7 @@ namespace UCENO.VirtualWorld.Editor
                 }
 
                 EditorUtility.DisplayDialog("UCENO district validation",
-                    "Validated " + checkedObjects + " gateway-ready interactables across loaded scenes. IDs are unique, every object has a targeting collider, doors have a real pivot, and every object belongs to exactly one configured district.",
+                    "Validated " + checkedObjects + " gateway-ready interactables across loaded scenes. IDs are unique, every object has an enabled non-trigger targeting collider, doors have a real pivot, and every object belongs to exactly one configured district.",
                     "OK");
             }
             catch (Exception error)
