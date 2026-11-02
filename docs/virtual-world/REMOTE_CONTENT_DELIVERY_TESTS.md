@@ -44,3 +44,13 @@
 - [ ] Profile actual resident memory and frame time on a low-memory Android device; the four-label cap is not a substitute for byte-level profiling.
 - [ ] Verify runtime labels contain loadable assets rather than only Addressable scenes; scene streaming requires separate additive scene lifecycle handling.
 - [ ] Leave the last configured district or enter a separate home/event context; confirm the gateway notifies Unity and the active district assets are released.
+
+- [ ] Run the Unity editor scene builder with imported source assets and Addressables Settings present; confirm it creates the boot scene plus four additive district scenes.
+- [ ] Confirm shared terrain, road, player, camera and session objects remain in the boot scene while district buildings, plants, vehicles, civic square and parking geometry are partitioned by world Z.
+- [ ] Confirm the collision export includes colliders from all four district regions before geometry is moved into additive scenes.
+- [ ] Confirm each generated district scene is in the remote Addressables group, uses Pack Separately, has the matching district label as its address, and uses remote build/load path variables.
+- [ ] Enter each configured district; confirm its additive scene activates before the gateway accepts the boundary acknowledgement.
+- [ ] Leave each district; confirm Addressables unloads the additive scene after the final residency lease is released.
+- [ ] Cross district boundaries in both directions; confirm the outgoing scene remains loaded until the incoming scene is active and accepted.
+- [ ] Confirm a failed scene load does not send district_content_ready and the player remains held at the boundary with retry available.
+- [ ] Build Android and WebGL Addressables catalogs separately and verify each uses platform-compatible bundles and matching gateway labels.
