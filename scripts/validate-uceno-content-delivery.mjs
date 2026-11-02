@@ -7,6 +7,9 @@ const manifest = JSON.parse(read("unity/UCENOVirtualWorld/Packages/manifest.json
 const delivery = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldContentDelivery.cs");
 const areaBinding = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldAreaContentBinding.cs");
 const gateway = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs");
+const gatewayServer = read("runtime/world-gateway/src/server.ts");
+const districtPolicy = read("runtime/world-gateway/src/district-policy.ts");
+const districtTests = read("runtime/world-gateway/tests/district-policy.test.mjs");
 const architecture = read("docs/virtual-world/REMOTE_CONTENT_DELIVERY.md");
 const tests = read("docs/virtual-world/REMOTE_CONTENT_DELIVERY_TESTS.md");
 
@@ -29,8 +32,14 @@ const checks = [
   ["Transition feedback is visible", /spatialTransitionStatus/.test(gateway) && /private void OnGUI\(\)/.test(gateway)],
   ["Activity join preloads its content label", /PreloadBeforeActivityJoin/.test(gateway) && /EnsureContent\(label/.test(gateway)],
   ["Sports, racing, dance and adventure labels are mapped", /activity-sports/.test(gateway) && /activity-racing/.test(gateway) && /activity-dance/.test(gateway) && /activity-adventure/.test(gateway)],
+  ["Server district boundaries are validated and non-overlapping", /parseWorldDistricts/.test(gatewayServer) && /overlap/.test(districtPolicy)],
+  ["Server pauses movement pending district content acknowledgement", /district_content_required/.test(gatewayServer) && /district_content_ready/.test(gatewayServer)],
+  ["District acknowledgement requires matching nonce and district", /msg\.districtId === pending\.id && msg\.nonce === pending\.nonce/.test(gatewayServer)],
+  ["Client downloads server-selected district labels before acknowledgement", /district_content_required/.test(gateway) && /EnsureContent\(label/.test(gateway) && /district_content_ready/.test(gateway)),
+  ["Client can retry and clears cancelled district transitions", /RetryPendingDistrictContent/.test(gateway) && /district_content_cancelled/.test(gateway)),
+  ["District policy tests cover bounds and overlaps", /rejects overlapping district rectangles/.test(districtTests) && /rejects malformed JSON/.test(districtTests)),
   ["Architecture documents automatic loading and persistent cache", /automatically|on demand|preflight/i.test(architecture) && /persistent.*cache/i.test(architecture)],
-  ["Acceptance tests cover interrupted downloads", /Interrupt the connection mid-download/.test(tests))
+  ["Acceptance tests cover interrupted downloads and district boundary gates", /Interrupt the connection mid-download/.test(tests) && /district boundary/.test(tests))
 ];
 
 let failed = false;
