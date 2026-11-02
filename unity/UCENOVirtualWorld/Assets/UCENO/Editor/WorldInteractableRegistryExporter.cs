@@ -46,7 +46,7 @@ namespace UCENO.VirtualWorld.Editor
     public static class WorldInteractableRegistryExporter
     {
         [MenuItem("UCENO/World/Export Scene Interactables to Gateway Registry", false, 105)]
-        public static void Export()
+        public static void Export(bool showDialog = true)
         {
             try
             {
@@ -131,15 +131,18 @@ namespace UCENO.VirtualWorld.Editor
                 File.Copy(temporary, output, true);
                 File.Delete(temporary);
                 AssetDatabase.Refresh();
-                EditorUtility.DisplayDialog("UCENO gateway registry",
-                    "Exported " + entries.Count + " scene interactables to:\n" + output +
-                    "\n\nConfigure WORLD_INTERACTABLES_FILE to this file in the gateway runtime.",
-                    "OK");
+                if (showDialog)
+                    EditorUtility.DisplayDialog("UCENO gateway registry",
+                        "Exported " + entries.Count + " scene interactables to:\n" + output +
+                        "\n\nConfigure WORLD_INTERACTABLES_FILE to this file in the gateway runtime.",
+                        "OK");
             }
             catch (Exception error)
             {
-                EditorUtility.DisplayDialog("UCENO gateway registry export failed", error.Message, "OK");
+                if (showDialog)
+                    EditorUtility.DisplayDialog("UCENO gateway registry export failed", error.Message, "OK");
                 Debug.LogException(error);
+                throw;
             }
         }
 
