@@ -44,6 +44,26 @@ This is the preferred route if you only have an Android phone and cannot run the
 5. Use an automatically generated debug keystore for development testing. Do not upload a production signing key for this prototype.
 6. Save the configuration, but do not trigger a build yet. The Unity Editor import/compile and visual checks must be completed first. An APK build will be requested only after those checks pass and the user authorizes it.
 
+### Unity Build Automation registry artifact handoff
+
+Configure **Advanced Settings → Script Hooks → Post-Build Script** as
+`scripts/uba-upload-world-registry.sh`. Keep the existing Pre-Export Method
+`UCENO.VirtualWorld.Editor.BuildCommand.PrepareAndroidBuild`. The scene builder
+exports the scene interactable registry; the post-build script validates it and
+uploads a separate private, non-primary **UCENO World Interactables Registry**
+artifact with a SHA-256 checksum before Unity Build Automation completes its
+artifact upload.
+
+Add the Unity Build Automation target environment variable
+`UCENO_UBA_API_KEY` containing the Build Automation API key. The script reads
+UBA's built-in `ORG_ID`, `PROJECT_ID`, `BUILD_TARGET`, and
+`UCB_BUILD_NUMBER` variables. Never add the API key to GitHub or the repository.
+
+After a successful Dashboard build, download the registry artifact separately
+from the APK, verify its checksum, then manually mount it into the gateway and
+set `WORLD_INTERACTABLES_FILE`. This is a transfer path, not automatic gateway
+deployment. Full instructions: `docs/virtual-world/UNITY_BUILD_AUTOMATION_ARTIFACT_HANDOFF.md`.
+
 ## Cloud build option B — GitHub Actions
 
 The repository also includes `.github/workflows/uceno-unity-android.yml` using GameCI. This alternative needs a Unity Personal license file and GitHub secrets; it is less convenient if you have no computer available to activate/export the license.
