@@ -103,19 +103,30 @@ provisioned by this code change.
 
 ## Activity sessions and checkpoint races
 
-The gateway supports in-memory activity session coordination over the authenticated
-`/world` WebSocket:
+The gateway coordinates activity sessions over the authenticated `/world`
+WebSocket. Session state is persisted in PostgreSQL and restored by the instance
+that currently owns the session:
 
 - `activity_create` with kind `dance`, `sports`, or `adventure`
 - `activity_join`, `activity_start`, `activity_leave`, and `activity_cancel`
 - `activity_state` broadcasts participant status and race progress
 - Only the creator can start or cancel a session. The server marks active
   participants as did-not-finish when their socket disconnects.
-- Activity sessions and results are currently in memory and are lost on restart.
-  The gateway caps total sessions at 256 and nonterminal sessions at 32 per world;
+- Durable session state and relay events are written transactionally. Activity
+  ownership includes an instance ID and monotonically increasing host generation;
+  stale hosts cannot overwrite a newer generation or publish a state event through
+  the guarded persistence path.
+- Stale activity hosts can be taken over by a healthy replacement instance. Transfer
+  tickets are single-use, expiring and authorization-checked; player-session fencing
+  similarly prevents an older connection from replacing a newer session.
+- On startup, an instance restores only activity sessions assigned to that instance.
+  This is activity-session recovery, not recovery of the full live player simulation.
+- The gateway caps total sessions at 256 and nonterminal sessions at 32 per world;
   idle lobbies expire after 30 minutes, active sessions after 2 hours, and terminal
-  session summaries are retained in memory for 30 minutes. Durable storage, recovery,
-  and actual sports/adventure gameplay remain outstanding.
+  session summaries are retained in memory for 30 minutes. Durable activity storage,
+  takeover and fencing are implemented in source; multi-process WebSocket failover
+  and production recovery still require runtime verification. Actual sports/adventure
+  gameplay remains outstanding.
 
 Checkpoint races require operator-authored server geometry. Configure either
 `WORLD_ACTIVITY_RACES` as JSON or `WORLD_ACTIVITY_RACES_FILE` as a path to a
@@ -145,10 +156,11 @@ configured checkpoint only. Clients cannot submit checkpoint indexes or finish
 times. If no race definitions are configured, race creation is rejected with
 `race_not_configured`.
 
-This is source-level functionality only until CI succeeds and the gateway is
-deployed with the race configuration. The Unity UI still needs to expose race
-creation, lobby state, countdown, checkpoint indicators, and results. No live
-race or two-device behavior is claimed as verified.
+This is source-level functionality until the gateway is deployed with the race
+configuration. The Unity UI still needs to expose race creation, lobby state,
+countdown, checkpoint indicators, and results. CI verifies the gateway source and
+database fencing tests; it does not establish live race behavior or multi-process
+WebSocket failover on deployed infrastructure.
 
 ## Provisioning and deployment sequence
 
@@ -172,10 +184,12 @@ tasks. Do not expose `DATABASE_URL` or `WORLD_TOKEN_SECRET` to Unity.
 
 This is an initial authoritative kinematic simulation, not a full game-physics
 engine. It supports optional server-side axis-aligned collision boxes configured through `WORLD_COLLISION_BOXES`. This is a basic static-blocker system, not imported Unity mesh collision or terrain. It has no collision meshes, terrain/obstacle queries, vehicles,
-prediction/reconciliation, lag compensation, durable distributed simulation,
-sharding, anti-cheat heuristics beyond input validation/rate limits, or
-cross-instance migration. All players on one instance share one in-memory
-simulation process. Multiple replicas must not use the same instance ID.
+prediction/reconciliation, lag compensation, durable distributed player simulation,
+sharding, or anti-cheat heuristics beyond input validation/rate limits. Activity
+sessions have separate durable persistence, host-generation fencing and stale-host
+takeover; this does not migrate the live movement simulation or its connected
+players. All players on one instance share one in-memory movement simulation
+process. Multiple replicas must not use the same instance ID.
 
 The Unity client now connects to this WebSocket protocol, sends sequenced input
 at 20 Hz and applies server snapshots to the local and remote avatars. HTTP
