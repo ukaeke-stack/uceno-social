@@ -1013,65 +1013,79 @@ server.on("upgrade", async (req, socket, head) => {
     await ensureObjectStatesLoaded(identity.worldId);
     if (players.size >= MAX_CLIENTS && !players.has(identity.userId)) throw new Error("instance_full");
     const sessionId = randomUUID();
-    const claimed = isTransfer ? await sql.begin(async tx => {
-      // Consume the ticket and claim the new player-session generation in one
-      // transaction. If the fence claim fails, the ticket consumption rolls back.
-      const consumed = await tx`UPDATE virtual_world_activity_transfer_tickets ticket
-        SET consumed_at = NOW()
-        WHERE ticket.id = ${String(payload.jti)}::uuid
-          AND ticket.world_id = ${identity.worldId}::uuid
-          AND ticket.user_id = ${identity.userId}::uuid
-          AND ticket.target_instance_id = ${INSTANCE_ID}::uuid
-          AND ticket.activity_session_id = ${String(payload.transfer_session_id)}::uuid
-          AND ticket.host_generation = ${Number(payload.transfer_host_generation)}
-          AND ticket.consumed_at IS NULL AND ticket.expires_at > NOW()
-          AND EXISTS (
-            SELECT 1 FROM virtual_world_activity_sessions activity
-            WHERE activity.id = ticket.activity_session_id
-              AND activity.world_id = ticket.world_id
-              AND activity.instance_id = ticket.target_instance_id
-              AND activity.host_generation = ticket.host_generation
-              AND (
-                activity.phase = 'lobby'
-                OR (activity.phase = 'active' AND EXISTS (
-                  SELECT 1 FROM jsonb_array_elements(activity.state->'participants') participant
-                  WHERE participant->>'userId' = ticket.user_id::text
-                    AND participant->>'status' = 'joined'
-                ))
-              )
-          )
-        RETURNING ticket.id`;
-      if (!consumed[0]) return null;
-      const fenced = await tx`INSERT INTO virtual_world_player_sessions
-        (world_id, user_id, instance_id, session_id, generation, updated_at)
-        SELECT ${identity.worldId}::uuid, ${identity.userId}::uuid,
-          ${INSTANCE_ID}::uuid, ${sessionId}::uuid, 1, NOW()
-        WHERE EXISTS (
-          SELECT 1 FROM virtual_world_activity_transfer_tickets ticket
+    const claimed = await sql.begin(async tx => {
+      // Hold the logical instance ownership row while claiming the player
+      // generation. A process takeover cannot race a stale upgrade handler.
+      const owner = await tx`SELECT id FROM virtual_world_instances
+        WHERE id = ${INSTANCE_ID}::uuid
+          AND owner_process_id = ${PROCESS_ID}::uuid
+          AND owner_generation = ${processGeneration}
+          AND owner_lease_expires_at > clock_timestamp()
+        FOR SHARE`;
+      if (!owner.length) return null;
+      if (isTransfer) {
+        // Consume the ticket and claim the new player-session generation in
+        // one transaction. A failed fence claim rolls ticket consumption back.
+        const consumed = await tx`UPDATE virtual_world_activity_transfer_tickets ticket
+          SET consumed_at = NOW()
           WHERE ticket.id = ${String(payload.jti)}::uuid
-            AND ticket.consumed_at IS NOT NULL
+            AND ticket.world_id = ${identity.worldId}::uuid
             AND ticket.user_id = ${identity.userId}::uuid
             AND ticket.target_instance_id = ${INSTANCE_ID}::uuid
+            AND ticket.activity_session_id = ${String(payload.transfer_session_id)}::uuid
             AND ticket.host_generation = ${Number(payload.transfer_host_generation)}
-        )
+            AND ticket.consumed_at IS NULL AND ticket.expires_at > NOW()
+            AND EXISTS (
+              SELECT 1 FROM virtual_world_activity_sessions activity
+              WHERE activity.id = ticket.activity_session_id
+                AND activity.world_id = ticket.world_id
+                AND activity.instance_id = ticket.target_instance_id
+                AND activity.host_generation = ticket.host_generation
+                AND (
+                  activity.phase = 'lobby'
+                  OR (activity.phase = 'active' AND EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(activity.state->'participants') participant
+                    WHERE participant->>'userId' = ticket.user_id::text
+                      AND participant->>'status' = 'joined'
+                  ))
+                )
+            )
+          RETURNING ticket.id`;
+        if (!consumed[0]) return null;
+        const fenced = await tx`INSERT INTO virtual_world_player_sessions
+          (world_id, user_id, instance_id, session_id, generation, updated_at)
+          SELECT ${identity.worldId}::uuid, ${identity.userId}::uuid,
+            ${INSTANCE_ID}::uuid, ${sessionId}::uuid, 1, NOW()
+          WHERE EXISTS (
+            SELECT 1 FROM virtual_world_activity_transfer_tickets ticket
+            WHERE ticket.id = ${String(payload.jti)}::uuid
+              AND ticket.consumed_at IS NOT NULL
+              AND ticket.user_id = ${identity.userId}::uuid
+              AND ticket.target_instance_id = ${INSTANCE_ID}::uuid
+              AND ticket.host_generation = ${Number(payload.transfer_host_generation)}
+          )
+          ON CONFLICT (world_id, user_id) DO UPDATE
+            SET instance_id = EXCLUDED.instance_id,
+                session_id = EXCLUDED.session_id,
+                generation = virtual_world_player_sessions.generation + 1,
+                updated_at = NOW()
+          RETURNING generation`;
+        return fenced[0] ? fenced : null;
+      }
+      const normal = await tx`
+        INSERT INTO virtual_world_player_sessions
+          (world_id, user_id, instance_id, session_id, generation, updated_at)
+        SELECT s.world_id, s.user_id, s.instance_id, ${sessionId}::uuid, 1, NOW()
+        FROM virtual_world_instance_sessions s
+        WHERE s.world_id = ${identity.worldId}::uuid AND s.user_id = ${identity.userId}::uuid
+          AND s.instance_id = ${INSTANCE_ID}::uuid AND s.lease_expires_at > NOW()
         ON CONFLICT (world_id, user_id) DO UPDATE
-          SET instance_id = EXCLUDED.instance_id,
-              session_id = EXCLUDED.session_id,
-              generation = virtual_world_player_sessions.generation + 1,
-              updated_at = NOW()
-        RETURNING generation`;
-      if (!fenced[0]) throw new Error("transfer_session_claim_failed");
-      return fenced;
-    }) : await sql`
-      INSERT INTO virtual_world_player_sessions
-        (world_id, user_id, instance_id, session_id, generation, updated_at)
-      SELECT s.world_id, s.user_id, s.instance_id, ${sessionId}::uuid, 1, NOW()
-      FROM virtual_world_instance_sessions s
-      WHERE s.world_id = ${identity.worldId}::uuid AND s.user_id = ${identity.userId}::uuid
-        AND s.instance_id = ${INSTANCE_ID}::uuid AND s.lease_expires_at > NOW()
-      ON CONFLICT (world_id, user_id) DO UPDATE SET instance_id = EXCLUDED.instance_id, session_id = EXCLUDED.session_id,
-        generation = virtual_world_player_sessions.generation + 1, updated_at = NOW() RETURNING generation
-    `;
+          SET instance_id = EXCLUDED.instance_id, session_id = EXCLUDED.session_id,
+              generation = virtual_world_player_sessions.generation + 1, updated_at = NOW()
+        RETURNING generation
+      `;
+      return normal[0] ? normal : null;
+    });
     if (!claimed || !claimed[0]) throw new Error(isTransfer ? "transfer_ticket_invalid_or_used" : "session_lease_unavailable");
     const sessionGeneration = Number(claimed[0].generation);
     assertProcessAuthority();
