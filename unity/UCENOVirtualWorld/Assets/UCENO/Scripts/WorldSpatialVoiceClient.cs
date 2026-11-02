@@ -274,12 +274,12 @@ namespace UCENO.VirtualWorld
         {
             Transform avatar = null;
             float deadline = Time.unscaledTime + 8f;
-            while (Time.unscaledTime < deadline && peer != null && voiceEnabled && !appPaused)
+            while (Time.unscaledTime < deadline && peer != null && peers.ContainsKey(peer.userId) && voiceEnabled && !appPaused)
             {
                 if (gateway != null && gateway.TryGetRemotePlayerTransform(peer.userId, out avatar)) break;
                 yield return null;
             }
-            if (avatar == null || peer == null || !peer.connected || !voiceEnabled) yield break;
+            if (avatar == null || peer == null || !peers.ContainsKey(peer.userId) || !peer.connected || !voiceEnabled) yield break;
             var output = new GameObject("UCENO Spatial Audio " + peer.userId);
             output.transform.SetParent(avatar, false);
             output.transform.localPosition = new Vector3(0f, 1.55f, 0f);
@@ -301,6 +301,7 @@ namespace UCENO.VirtualWorld
         {
             if (!peers.TryGetValue(userId, out PeerAudio peer)) return;
             peers.Remove(userId);
+            peer.connected = false;
             if (peer.microphone != null) StopMicrophone(peer.microphone);
             if (peer.room != null)
             {
