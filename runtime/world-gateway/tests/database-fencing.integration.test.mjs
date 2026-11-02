@@ -121,6 +121,37 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
       assert.equal(Number(current[0].generation), 2);
       assert.ok([sessionA, sessionB].includes(current[0].sessionId));
       assert.notEqual(Number(current[0].generation), 1);
+      await withSchema(tx => tx`INSERT INTO virtual_world_player_state
+        (world_id, user_id, position, rotation, session_generation, state_version, updated_by_session)
+        VALUES (${ids.world}::uuid, ${ids.host}::uuid, '{"x":2,"y":1.15,"z":2}'::jsonb,
+          '{}'::jsonb, 2, 2, ${current[0].sessionId}::uuid)`);
+      const staleCheckpoint = await withSchema(tx => tx`INSERT INTO virtual_world_player_state
+        (world_id, user_id, position, rotation, session_generation, state_version, updated_by_session)
+        VALUES (${ids.world}::uuid, ${ids.host}::uuid, '{"x":99,"y":1.15,"z":99}'::jsonb,
+          '{}'::jsonb, 1, 999, ${sessionA}::uuid)
+        ON CONFLICT (world_id, user_id) DO UPDATE SET
+          position = EXCLUDED.position, session_generation = EXCLUDED.session_generation,
+          state_version = EXCLUDED.state_version, updated_by_session = EXCLUDED.updated_by_session
+        WHERE virtual_world_player_state.session_generation < EXCLUDED.session_generation
+          OR (virtual_world_player_state.session_generation = EXCLUDED.session_generation
+            AND virtual_world_player_state.state_version < EXCLUDED.state_version)
+        RETURNING user_id`);
+      assert.equal(staleCheckpoint.length, 0);
+      const acceptedCheckpoint = await withSchema(tx => tx`INSERT INTO virtual_world_player_state
+        (world_id, user_id, position, rotation, session_generation, state_version, updated_by_session)
+        VALUES (${ids.world}::uuid, ${ids.host}::uuid, '{"x":3,"y":1.15,"z":3}'::jsonb,
+          '{}'::jsonb, 2, 3, ${current[0].sessionId}::uuid)
+        ON CONFLICT (world_id, user_id) DO UPDATE SET
+          position = EXCLUDED.position, session_generation = EXCLUDED.session_generation,
+          state_version = EXCLUDED.state_version, updated_by_session = EXCLUDED.updated_by_session
+        WHERE virtual_world_player_state.session_generation < EXCLUDED.session_generation
+          OR (virtual_world_player_state.session_generation = EXCLUDED.session_generation
+            AND virtual_world_player_state.state_version < EXCLUDED.state_version)
+        RETURNING state_version`);
+      assert.equal(Number(acceptedCheckpoint[0].state_version), 3);
+      const checkpoint = await withSchema(tx => tx`SELECT position FROM virtual_world_player_state
+        WHERE world_id = ${ids.world}::uuid AND user_id = ${ids.host}::uuid`);
+      assert.equal(checkpoint[0].position.x, 3);
     });
 
     await t.test("concurrent stale-host takeovers have exactly one winner", async () => {
