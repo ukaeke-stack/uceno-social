@@ -1218,7 +1218,9 @@ setInterval(async () => {
           nonce: p.pendingDistrict.nonce });
       }
       if (targetDistrict && p.activeDistrictId !== targetDistrict.id) {
-        p.vx = 0; p.vz = 0; p.moveX = 0; p.moveZ = 0; p.sprint = false;
+        // Preserve the latest input intent while holding position. This lets
+        // the next tick distinguish continued forward movement from turning back.
+        p.vx = 0; p.vz = 0;
         p.y += p.vy * dt;
         const pendingGroundY = p.homeAnchor ? p.homeAnchor.y : GROUND_Y;
         if (p.y <= pendingGroundY) { p.y = pendingGroundY; p.vy = 0; p.grounded = true; }
