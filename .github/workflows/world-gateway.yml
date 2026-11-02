@@ -81,8 +81,9 @@ jobs:
             if (!gateway.includes(marker)) throw new Error('Missing interaction rollback on persistence failure: ' + marker);
           for (const marker of ['WORLD_COLLISION_BOXES_FILE', 'readFileSync', 'loadCollisionBoxes', 'PLAYER_RADIUS', 'PLAYER_HEIGHT', 'resolveHorizontalMovement', 'overlapsBox'])
             if (!gateway.includes(marker)) throw new Error('Missing server collision behavior: ' + marker);
-          if (!gateway.includes('COLLISION_BOXES.some'))
-            throw new Error('Server movement is not checked against configured collision boxes');
+          if (!gateway.includes('collisionBoxes.some(box => overlapsBox(candidateX, player.y, player.z, box))') ||
+              !gateway.includes('DISTRICT_COLLISION_BOXES.get(player.activeDistrictId)'))
+            throw new Error('Server movement is not checked against the active district collision map');
           for (const marker of ['loadInteractables', 'type === "interact"', 'isInteractionAllowed(distance, now - player.lastInteractionAt)', 'resolveInteraction(target, player.id, msg.action)', 'object_state', 'releaseSeats', 'item.occupantId === player.id'])
             if (!gateway.includes(marker)) throw new Error('Missing authoritative interaction validation: ' + marker);
           const interactionPolicy = fs.readFileSync('./runtime/world-gateway/src/interaction-policy.ts', 'utf8');
