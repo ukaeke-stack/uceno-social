@@ -81,7 +81,9 @@ namespace UCENO.VirtualWorld
                 ? (currentTarget.CurrentState == "open" ? "CLOSE" : "OPEN")
                 : currentTarget.Kind == "seat"
                     ? (currentTarget.OccupantId == "" ? "SIT" : currentTarget.OccupantId == GetLocalUserId() ? "STAND" : "OCCUPIED")
-                    : "INTERACT";
+                    : currentTarget.Kind == "vehicle"
+                        ? (currentTarget.IsVehicleEngineOn ? "STOP ENGINE" : "START ENGINE")
+                        : currentTarget.Kind == "furniture" ? "USE" : "INTERACT";
             float width = Mathf.Clamp(Screen.width * 0.30f, 130f, 220f);
             float height = ButtonHeight;
             Rect rect = new Rect((Screen.width - width) * 0.5f,
