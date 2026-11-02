@@ -71,12 +71,12 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
         ${JSON.stringify({ participants: [{ userId: ids.guest, status: "joined" }] })}::jsonb,
         NOW())
     `;
-    const resetActivity = () => withSchema(async tx => {
+    const resetActivity = (instanceId = ids.old) => withSchema(async tx => {
       await tx`DELETE FROM virtual_world_activity_transfer_tickets WHERE activity_session_id = ${ids.activity}::uuid`;
       await tx`DELETE FROM virtual_world_realtime_events WHERE world_id = ${ids.world}::uuid`;
       await tx`DELETE FROM virtual_world_activity_results WHERE session_id = ${ids.activity}::uuid`;
       await tx`DELETE FROM virtual_world_activity_sessions WHERE id = ${ids.activity}::uuid`;
-      await seedActivity(tx);
+      await seedActivity(tx, instanceId);
     });
     const takeover = (instanceId, hostId) => withSchema(tx => tx`
       UPDATE virtual_world_activity_sessions AS activity
