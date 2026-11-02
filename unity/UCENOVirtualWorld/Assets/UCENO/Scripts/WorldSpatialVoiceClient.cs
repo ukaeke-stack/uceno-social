@@ -157,6 +157,20 @@ namespace UCENO.VirtualWorld
             ApplyMicrophoneGate();
         }
 
+        public string[] GetConnectedPeerIds()
+        {
+            List<string> ids = new List<string>();
+            foreach (PeerAudio peer in peers.Values)
+                if (peer.connected) ids.Add(peer.userId);
+            ids.Sort(StringComparer.Ordinal);
+            return ids.ToArray();
+        }
+
+        public bool IsPeerMuted(string userId)
+        {
+            return peers.TryGetValue(userId, out PeerAudio peer) && peer.remoteMuted;
+        }
+
         public void SetPeerMuted(string userId, bool muted)
         {
             if (!peers.TryGetValue(userId, out PeerAudio peer)) return;
