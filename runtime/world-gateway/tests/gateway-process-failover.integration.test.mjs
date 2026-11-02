@@ -400,13 +400,13 @@ test("two real gateway processes: primary loss leaves the replacement process re
       const processRaceActivityId = randomUUID();
       const processRaceState = { ...persistedActivity, id: processRaceActivityId,
         instanceId: instanceA, version: 3, hostGeneration: 1 };
-      await admin.unsafe("INSERT INTO \"${schema}\".virtual_world_activity_sessions " +
+      await admin.unsafe("INSERT INTO \"" + schema + "\".virtual_world_activity_sessions " +
         "(id, world_id, instance_id, host_user_id, host_generation, activity_kind, phase, version, state, created_at, updated_at) " +
         "VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race', 'active', 3, $5::jsonb, NOW(), NOW())",
         [processRaceActivityId, worldId, instanceA, userId, processRaceState]);
-      await admin.unsafe("UPDATE \"${schema}\".virtual_world_instances SET heartbeat_at = NOW() WHERE id IN ($1::uuid, $2::uuid)",
+      await admin.unsafe("UPDATE \"" + schema + "\".virtual_world_instances SET heartbeat_at = NOW() WHERE id IN ($1::uuid, $2::uuid)",
         [instanceB, instanceC]);
-      await admin.unsafe("UPDATE \"${schema}\".virtual_world_instance_sessions SET instance_id = $3::uuid WHERE world_id = $1::uuid AND user_id = $2::uuid",
+      await admin.unsafe("UPDATE \"" + schema + "\".virtual_world_instance_sessions SET instance_id = $3::uuid WHERE world_id = $1::uuid AND user_id = $2::uuid",
         [worldId, userId, instanceB]);
       const contenderB = await connectAuthenticated(portB, instanceB, worldId, userId);
       await admin.unsafe("UPDATE \"${schema}\".virtual_world_instance_sessions SET instance_id = $3::uuid WHERE world_id = $1::uuid AND user_id = $2::uuid",
@@ -420,7 +420,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
       const raceDeadline = Date.now() + 5000;
       let processAuthority = [];
       while (Date.now() < raceDeadline) {
-        processAuthority = await admin.unsafe("SELECT instance_id, host_generation FROM \"${schema}\".virtual_world_activity_sessions WHERE id = $1::uuid",
+        processAuthority = await admin.unsafe("SELECT instance_id, host_generation FROM \"" + schema + "\".virtual_world_activity_sessions WHERE id = $1::uuid",
           [processRaceActivityId]);
         if (Number(processAuthority[0]?.host_generation) === 2) break;
         await delay(100);
