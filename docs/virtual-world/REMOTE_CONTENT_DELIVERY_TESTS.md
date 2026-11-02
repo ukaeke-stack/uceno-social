@@ -23,4 +23,13 @@
 - [ ] A new catalog version updates content without requiring a full APK reinstall.
 - [ ] Android and WebGL use separately built platform bundles.
 - [ ] Measure initial APK size against the same build with world bundles included; record actual reduction rather than assuming a target.
+- [ ] Configure two non-overlapping server districts and matching Addressables labels; gateway startup accepts the configuration.
+- [ ] Verify malformed, duplicate, overlapping, out-of-bounds and unsafe-label district configurations prevent gateway startup.
+- [ ] Walk toward a district boundary; confirm the server pauses horizontal movement and sends the server-authored district ID/label/nonce.
+- [ ] Confirm Unity downloads the required district label and acknowledges with the matching nonce before the server allows movement across the boundary.
+- [ ] Interrupt district download; confirm the player remains at the boundary and can retry without entering an incomplete district.
+- [ ] Turn back while district content is downloading; confirm the gateway cancels the pending transition and the client clears stale download state.
+- [ ] Attempt to acknowledge with a wrong district ID or nonce; confirm the gateway does not release the movement gate.
+- [ ] Re-enter a previously visited district; confirm Addressables cache avoids downloading the same bundles again.
+- [ ] Confirm district geometry and content labels match between every deployed gateway instance and its platform-specific Addressables catalog.
 - [ ] Verify asset quality and frame time in the same Android device profile; size reduction must not silently downgrade world visuals.
