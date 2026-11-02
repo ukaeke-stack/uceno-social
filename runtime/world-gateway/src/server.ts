@@ -6,6 +6,7 @@ import { createActivitySession, joinActivity, startActivity, recordCheckpoint, l
 import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./district-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
+import { isPersistentObjectState, defaultPersistentObjectState } from "./district-object-policy.js";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
@@ -35,7 +36,7 @@ type CollisionBox = {
   minX: number; maxX: number; minY: number; maxY: number;
   minZ: number; maxZ: number;
 };
-type Interactable = { id: string; kind: "door" | "seat" | "object"; x: number; y: number; z: number; yaw: number; state: string; actorId: string | null; occupantId: string | null };
+type Interactable = { id: string; districtId: string; kind: "door" | "seat" | "object" | "furniture" | "vehicle"; x: number; y: number; z: number; yaw: number; state: string; version: number; actorId: string | null; occupantId: string | null };
 type EquippedWardrobeItem = { slot: string; itemId: string };
 
 function loadWorldDistricts(): WorldDistrict[] {
@@ -76,16 +77,18 @@ function loadInteractables(): Map<string, Interactable> {
     if (!value || typeof value !== "object") throw new Error(`Interactable ${index} is invalid`);
     const item = value as Record<string, unknown>;
     if (typeof item.id !== "string" || !/^[a-zA-Z0-9._:-]{1,80}$/.test(item.id) ||
-        (item.kind !== "door" && item.kind !== "seat" && item.kind !== "object") ||
+        (item.kind !== "door" && item.kind !== "seat" && item.kind !== "object" && item.kind !== "furniture" && item.kind !== "vehicle") ||
         !finiteNumber(item.x, -WORLD_BOUNDS, WORLD_BOUNDS) ||
         !finiteNumber(item.y, -WORLD_BOUNDS, WORLD_BOUNDS) ||
         !finiteNumber(item.z, -WORLD_BOUNDS, WORLD_BOUNDS) ||
         (item.yaw !== undefined && !finiteNumber(item.yaw, -Math.PI * 4, Math.PI * 4)) || result.has(item.id))
       throw new Error(`Interactable ${index} has invalid or duplicate fields`);
     result.set(item.id, {
-      id: item.id, kind: item.kind, x: item.x, y: item.y, z: item.z,
+      id: item.id, districtId: findWorldDistrict(WORLD_DISTRICTS, item.x, item.z)?.id ?? "unassigned",
+      kind: item.kind, x: item.x, y: item.y, z: item.z,
       yaw: typeof item.yaw === "number" ? item.yaw : 0,
-      state: item.kind === "door" ? "closed" : item.kind === "seat" ? "available" : "idle", actorId: null, occupantId: null
+      state: item.kind === "seat" ? "available" : defaultPersistentObjectState(item.kind),
+      version: 0, actorId: null, occupantId: null
     });
   }
   return result;
@@ -261,6 +264,42 @@ if (!/^[0-9a-f-]{36}$/i.test(INSTANCE_ID) || !DATABASE_URL || TOKEN_SECRET.lengt
   throw new Error("WORLD_INSTANCE_ID, DATABASE_URL and a 32+ character WORLD_TOKEN_SECRET are required");
 
 const sql = postgres(DATABASE_URL, { max: 8, idle_timeout: 20, connect_timeout: 10 });
+
+const loadedObjectWorlds = new Set<string>();
+async function ensureObjectStatesLoaded(worldId: string): Promise<void> {
+  if (loadedObjectWorlds.has(worldId)) return;
+  const rows = await sql`
+    SELECT district_id AS "districtId", object_id AS "objectId",
+      object_kind AS "objectKind", object_state AS "objectState", version
+    FROM virtual_world_object_states WHERE world_id = ${worldId}::uuid
+  `;
+  for (const row of rows) {
+    const target = INTERACTABLES.get(row.objectId);
+    if (!target || target.kind === "seat" || target.districtId !== row.districtId ||
+        target.kind !== row.objectKind || !isPersistentObjectState(target.kind, row.objectState)) continue;
+    target.state = row.objectState;
+    target.version = Number(row.version);
+  }
+  loadedObjectWorlds.add(worldId);
+}
+
+async function persistDatabaseObjectState(worldId: string, actorId: string, target: Interactable): Promise<boolean> {
+  const rows = await sql`
+    INSERT INTO virtual_world_object_states
+      (world_id, district_id, object_id, object_kind, object_state, updated_by, version, updated_at)
+    VALUES (${worldId}::uuid, ${target.districtId}, ${target.id}, ${target.kind}, ${target.state}, ${actorId}::uuid, 1, NOW())
+    ON CONFLICT (world_id, district_id, object_id) DO UPDATE SET
+      object_kind = EXCLUDED.object_kind, object_state = EXCLUDED.object_state,
+      updated_by = EXCLUDED.updated_by, version = virtual_world_object_states.version + 1,
+      updated_at = NOW()
+    WHERE virtual_world_object_states.version = ${target.version}
+      AND virtual_world_object_states.object_kind = EXCLUDED.object_kind
+    RETURNING version
+  `;
+  if (!rows[0]) return false;
+  target.version = Number(rows[0].version);
+  return true;
+}
 const secret = new TextEncoder().encode(TOKEN_SECRET);
 type Player = {
   id: string; worldId: string; token: string; socket: WebSocket; x: number; y: number; z: number;
@@ -609,6 +648,7 @@ server.on("upgrade", async (req, socket, head) => {
       throw new Error("unauthorized");
     const token = req.headers.authorization.slice(7);
     const identity = await authenticate(token);
+    await ensureObjectStatesLoaded(identity.worldId);
     if (players.size >= MAX_CLIENTS && !players.has(identity.userId)) throw new Error("instance_full");
     wss.handleUpgrade(req, socket, head, (ws) => {
       upgradeIdentity.set(ws, { ...identity, token });
@@ -638,7 +678,9 @@ wss.on("connection", async (socket: WebSocket) => {
     // A joining or reconnecting client must receive the current authoritative
     // state of every scene interactable. Broadcasting only future changes
     // leaves late joiners with stale door/object visuals and unknown seat use.
+    const joiningDistrictId = findWorldDistrict(WORLD_DISTRICTS, player.x, player.z)?.id ?? "unassigned";
     for (const target of INTERACTABLES.values()) {
+      if (target.districtId !== joiningDistrictId) continue;
       send(socket, {
         type: "object_state",
         objectId: target.id,
@@ -909,6 +951,10 @@ wss.on("connection", async (socket: WebSocket) => {
         if (!target) {
           send(socket, { type: "interaction_rejected", code: "unknown_or_invalid_object" }); return;
         }
+        const playerDistrictId = findWorldDistrict(WORLD_DISTRICTS, player.x, player.z)?.id ?? "unassigned";
+        if (player.homeId || player.eventId || playerDistrictId !== target.districtId) {
+          send(socket, { type: "interaction_rejected", code: "object_in_different_district" }); return;
+        }
         const distance = Math.hypot(player.x - target.x, player.y - target.y, player.z - target.z);
         const now = Date.now();
         if (!isInteractionAllowed(distance, now - player.lastInteractionAt)) {
@@ -935,7 +981,10 @@ wss.on("connection", async (socket: WebSocket) => {
         }
         target.actorId = player.id;
         if (target.kind !== "seat") {
-          try { persistObjectStates(); }
+          try {
+            const persisted = await persistDatabaseObjectState(player.worldId, player.id, target);
+            if (!persisted) throw new Error("object_state_version_conflict");
+          }
           catch (error) {
             target.state = previousState;
             target.actorId = previousActorId;
@@ -948,9 +997,13 @@ wss.on("connection", async (socket: WebSocket) => {
         player.lastInteractionAt = now;
         const packet = {
           type: "object_state", objectId: target.id, objectState: target.state,
-          actorId: player.id, occupantId: target.occupantId
+          actorId: player.id, occupantId: target.occupantId, version: target.version
         };
-        for (const peer of players.values()) send(peer.socket, packet);
+        for (const peer of players.values()) {
+          const peerDistrictId = findWorldDistrict(WORLD_DISTRICTS, peer.x, peer.z)?.id ?? "unassigned";
+          if (peer.worldId === player.worldId && !peer.homeId && !peer.eventId && peerDistrictId === target.districtId)
+            send(peer.socket, packet);
+        }
         return;
       }
       if (msg && msg.type === "voice_join") {
@@ -1317,6 +1370,40 @@ const heartbeat = async () => {
 };
 void heartbeat();
 setInterval(heartbeat, 10000);
+
+let objectRefreshInProgress = false;
+setInterval(async () => {
+  if (objectRefreshInProgress) return;
+  objectRefreshInProgress = true;
+  try {
+    const worldIds = new Set([...players.values()].map(player => player.worldId));
+    for (const worldId of worldIds) {
+      await ensureObjectStatesLoaded(worldId);
+      const rows = await sql`
+        SELECT district_id AS "districtId", object_id AS "objectId",
+          object_kind AS "objectKind", object_state AS "objectState", version,
+          updated_by AS "updatedBy"
+        FROM virtual_world_object_states WHERE world_id = ${worldId}::uuid
+      `;
+      for (const row of rows) {
+        const target = INTERACTABLES.get(row.objectId);
+        if (!target || target.kind === "seat" || target.districtId !== row.districtId ||
+            target.kind !== row.objectKind || !isPersistentObjectState(target.kind, row.objectState) ||
+            Number(row.version) <= target.version) continue;
+        target.state = row.objectState;
+        target.version = Number(row.version);
+        const packet = { type: "object_state", objectId: target.id, objectState: target.state,
+          actorId: row.updatedBy, occupantId: null, version: target.version };
+        for (const peer of players.values()) {
+          const peerDistrictId = findWorldDistrict(WORLD_DISTRICTS, peer.x, peer.z)?.id ?? "unassigned";
+          if (peer.worldId === worldId && !peer.homeId && !peer.eventId && peerDistrictId === target.districtId)
+            send(peer.socket, packet);
+        }
+      }
+    }
+  } catch (error) { console.error("district_object_state_refresh_failed", error); }
+  finally { objectRefreshInProgress = false; }
+}, 2500);
 
 server.listen(PORT, () => console.log(`UCENO world gateway listening on ${PORT} for instance ${INSTANCE_ID}`));
 process.on("SIGTERM", async () => {
