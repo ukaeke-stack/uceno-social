@@ -8,6 +8,8 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const read = (path) => readFileSync(resolve(repoRoot, path), "utf8");
 
 const sceneBuilder = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs");
+const buildCommand = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/BuildCommand.cs");
+const starterBuilder = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/StarterSceneBuilder.cs");
 const exporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableRegistryExporter.cs");
 const authoring = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableAuthoring.cs");
 const validator = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldDistrictSceneValidator.cs");
@@ -69,4 +71,12 @@ test("imported prop authoring requires a real hinge child and creates raycastabl
   assert.match(authoring, /Add Targeting Collider From Renderers/);
   assert.match(authoring, /renderers\[0\]\.bounds/);
   assert.match(authoring, /box\.isTrigger = false/);
+});
+
+
+test("Unity Build Automation pre-export generates the scene and gateway interactable registry", () => {
+  assert.match(buildCommand, /public\s+static\s+void\s+PrepareAndroidBuild\s*\(\)\s*\{[\s\S]*?StarterSceneBuilder\.CreateStarterScene\(\)/);
+  assert.match(starterBuilder, /FreeAssetWorldSceneBuilder\.CreateStarterScene\(\)/);
+  assert.match(sceneBuilder, /WorldInteractableRegistryExporter\.Export\(false\)/);
+  assert.match(exporter, /Path\.Combine\(config,\s*\"world-interactables\.json\"\)/);
 });
