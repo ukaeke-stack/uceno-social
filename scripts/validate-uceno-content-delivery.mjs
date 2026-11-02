@@ -33,6 +33,7 @@ const checks = [
   ["District scenes are separately packed remote Addressables entries", /PackSeparately/.test(sceneBuilder) && /CreateOrMoveEntry/.test(sceneBuilder) && /kRemoteLoadPath/.test(sceneBuilder)],
   ["Collision geometry is exported before district partitioning", /WorldCollisionGeometryExporter\.Export\(scene\)[\s\S]*?BuildDistrictScenes\(worldRoot\)/.test(sceneBuilder)],
   ["District transitions retain the new area and release the previous area", /activeDistrictLabel/.test(gateway) && /ReleaseContent\(activeDistrictLabel\)/.test(gateway)],
+  ["District acknowledgement retries reuse the existing scene lease", /pendingDistrictResidentLabel == label/.test(gateway) && /SendDistrictContentReadyAsync\(expectedDistrict, expectedNonce\)/.test(gateway)],
   ["Home and event interiors release their content after exit", /ReleaseContent\(activeLabel\)/.test(areaBinding) && /HandleLocationExited/.test(areaBinding)],
   ["World-area binding auto-installs beside the gateway", /RuntimeInitializeOnLoadMethod/.test(areaBinding) && /WorldGatewayClient/.test(areaBinding)],
   ["Home transitions request interior content", /case "home": return "home-interiors"/.test(areaBinding)],
