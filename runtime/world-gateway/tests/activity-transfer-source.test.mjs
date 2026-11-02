@@ -56,22 +56,27 @@ test("stale activity host takeover preserves an active participant checkpoint an
 });
 
 
-test("stale activity host loses local authority before any state broadcast", () => {
+test("stale activity host cannot persist or relay after generation takeover", () => {
   const persistStart = source.indexOf("async function persistActivity");
   const persistEnd = source.indexOf("async function broadcastActivity", persistStart);
   const persist = source.slice(persistStart, persistEnd);
-  assert.match(persist, /if \(savedRows\.length === 0\)/);
-  assert.match(persist, /SELECT instance_id AS "instanceId"[\s\S]*host_generation AS "hostGeneration"/);
-  assert.match(persist, /Number\(row\.hostGeneration\) === hostGeneration/);
+  assert.match(persist, /await sql\.begin\(async tx/);
+  assert.match(persist, /instance_id = EXCLUDED\.instance_id/);
+  assert.match(persist, /host_generation = EXCLUDED\.host_generation/);
+  assert.match(persist, /if \(!saved\)/);
   assert.match(persist, /fencedActivitySessions\.add\(session\.id\)/);
   assert.match(persist, /activitySessions\.delete\(session\.id\)/);
   assert.match(persist, /activityHosts\.delete\(session\.id\)/);
   assert.match(persist, /type: "activity_host_fenced"/);
+  assert.match(persist, /INSERT INTO virtual_world_realtime_events/);
+  assert.match(persist, /tx\x60INSERT INTO virtual_world_realtime_events/);
   const broadcastStart = source.indexOf("async function broadcastActivity");
   const broadcastEnd = source.indexOf("async function restorePersistedActivities", broadcastStart);
   const broadcast = source.slice(broadcastStart, broadcastEnd);
-  assert.match(broadcast, /if \(!await persistActivity\(session\)\) return/);
-  const lookupStart = source.indexOf("function findAccessibleActivity");
-  const lookupEnd = source.indexOf("function leaveVoiceRoom", lookupStart);
-  assert.match(source.slice(lookupStart, lookupEnd), /fencedActivitySessions\.has\(sessionId\)/);
+  assert.match(broadcast, /await persistActivity\(session\)/);
+  assert.doesNotMatch(broadcast, /send\(peer\.socket, packet\)/);
+  const relayStart = source.indexOf("let worldRelayPollInProgress");
+  const relay = source.slice(relayStart);
+  assert.match(relay, /host_generation = \$\{payload\.session\.hostGeneration\}/);
+  assert.match(relay, /if \(!authority\[0\]\) continue/);
 });
