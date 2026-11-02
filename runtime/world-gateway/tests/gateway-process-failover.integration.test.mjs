@@ -324,8 +324,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
       const recoverySocket = await connectAuthenticated(portB, instanceB, worldId, userId);
       await admin.unsafe(`
         INSERT INTO "${schema}".virtual_world_realtime_events
-          (world_id, instance_id, event_type, payload)
-        VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb)
+          (world_id, instance_id, event_type, payload, created_at)
+        VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb, NOW() - INTERVAL '1 minute')
       `, [worldId, instanceA, {
         serverTime: Date.now(),
         players: [{ userId, x: 4, y: 1.15, z: 4, yaw: 0 }]
@@ -333,6 +333,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
       const recoveredSnapshot = await receiveSocketMessage(recoverySocket.socket, "snapshot", 8000);
       assert.equal(recoveredSnapshot.players[0].userId, userId,
         "the recovered relay poller must resume consuming durable events after reconnecting");
+      assert.equal(recoveredSnapshot.players[0].x, 4,
+        "recovery must drain durable backlog older than the former 30-second cutoff");
       recoverySocket.socket.close();
     });
 
