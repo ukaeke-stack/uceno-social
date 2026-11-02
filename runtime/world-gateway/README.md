@@ -29,6 +29,7 @@ Standalone WebSocket runtime for an already-provisioned UCENO world instance.
 - `WORLD_INSTANCE_CAPACITY` (optional, default 64; keep consistent with DB capacity)
 - `WORLD_BOUNDS` (optional, default 10000 world units)
 - `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (optional until spatial voice is provisioned; server-only credentials for pair-scoped audio rooms)
+- `WORLD_INTERACTABLES_FILE` (optional path to the Unity-exported `world-interactables.json` registry; entries are real, explicitly marked scene objects with stable IDs, kind and world transform; mount the file into the gateway container)
 - `WORLD_COLLISION_BOXES` (optional JSON array of up to 500 static axis-aligned boxes; each box has numeric `minX`, `maxX`, `minY`, `maxY`, `minZ`, `maxZ` world coordinates)\n- `WORLD_DISTRICT_MAP_MANIFEST_FILE` (optional path to the Unity-generated district collision manifest; requires `WORLD_DISTRICTS` / `WORLD_DISTRICTS_FILE` to match exactly)\n- `WORLD_DISTRICTS` or `WORLD_DISTRICTS_FILE` (optional operator-authored district rectangles; each district has a unique `id`, display `name`, Addressables `contentLabel`, and `minX`, `maxX`, `minZ`, `maxZ`)
 
 Build with `npm install && npm run build`; run with `npm start`. The Dockerfile
