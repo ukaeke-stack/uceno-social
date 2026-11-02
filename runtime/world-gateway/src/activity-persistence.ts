@@ -26,19 +26,36 @@ export function restoreActivitySession(value: unknown): { session: ActivitySessi
   const v = value as Partial<PersistedActivitySession>;
   const kinds: ActivityKind[] = ["checkpoint_race", "dance", "sports", "adventure"];
   const phases: ActivityPhase[] = ["lobby", "active", "completed", "cancelled"];
-  if (typeof v.id !== "string" || typeof v.worldId !== "string" || typeof v.instanceId !== "string" ||
-      typeof v.hostUserId !== "string" || !Number.isSafeInteger(v.hostGeneration) || (v.hostGeneration ?? 0) < 1 ||
-      (v.raceId !== null && typeof v.raceId !== "string") || !kinds.includes(v.kind as ActivityKind) ||
-      !phases.includes(v.phase as ActivityPhase) || !Number.isSafeInteger(v.version) || (v.version ?? 0) < 1 ||
-      !Number.isFinite(v.createdAt) || !Number.isInteger(v.maxParticipants) ||
-      !Number.isInteger(v.checkpointCount) || !Array.isArray(v.participants) ||
-      v.participants.length > 64) return null;
+  if (typeof v.id !== "string" || !v.id || v.id.length > 128 ||
+      typeof v.worldId !== "string" || !/^[0-9a-f-]{36}$/i.test(v.worldId) ||
+      typeof v.instanceId !== "string" || !v.instanceId || v.instanceId.length > 128 ||
+      typeof v.hostUserId !== "string" || !v.hostUserId || v.hostUserId.length > 128 ||
+      !Number.isSafeInteger(v.hostGeneration) || (v.hostGeneration ?? 0) < 1 ||
+      !(v.raceId === null || (typeof v.raceId === "string" && v.raceId.length <= 128)) ||
+      !kinds.includes(v.kind as ActivityKind) || !phases.includes(v.phase as ActivityPhase) ||
+      !Number.isSafeInteger(v.version) || (v.version ?? 0) < 1 ||
+      !Number.isFinite(v.createdAt) || (v.createdAt ?? -1) < 0 ||
+      !(v.startedAt === null || (Number.isFinite(v.startedAt) && v.startedAt >= v.createdAt)) ||
+      !(v.completedAt === null || (Number.isFinite(v.completedAt) && v.completedAt >= v.createdAt)) ||
+      !Number.isInteger(v.maxParticipants) || (v.maxParticipants ?? 0) < 2 ||
+      (v.maxParticipants ?? 65) > 64 || !Number.isInteger(v.checkpointCount) ||
+      (v.checkpointCount ?? 0) < 2 || (v.checkpointCount ?? 101) > 100 ||
+      !Array.isArray(v.participants) || v.participants.length > v.maxParticipants!) return null;
+  if (v.phase === "lobby" && (v.startedAt !== null || v.completedAt !== null)) return null;
+  if (v.phase === "active" && (v.startedAt === null || v.completedAt !== null)) return null;
+  if ((v.phase === "completed" || v.phase === "cancelled") && v.completedAt === null) return null;
   const participants = new Map<string, ActivityParticipant>();
   for (const p of v.participants) {
-    if (!p || typeof p.userId !== "string" || !Number.isFinite(p.joinedAt) ||
-        !Number.isFinite(p.lastActionAt) || !Number.isInteger(p.checkpointIndex) ||
-        !(p.finishTime === null || Number.isFinite(p.finishTime)) ||
-        !["joined", "finished", "dnf", "left"].includes(p.status) || participants.has(p.userId)) return null;
+    if (!p || typeof p.userId !== "string" || !p.userId || p.userId.length > 128 ||
+        !Number.isFinite(p.joinedAt) || p.joinedAt < v.createdAt! ||
+        !Number.isFinite(p.lastActionAt) || p.lastActionAt < 0 ||
+        !Number.isInteger(p.checkpointIndex) || p.checkpointIndex < 0 ||
+        p.checkpointIndex > v.checkpointCount! ||
+        !(p.finishTime === null || (Number.isFinite(p.finishTime) && p.finishTime >= v.startedAt!)) ||
+        !["joined", "finished", "dnf", "left"].includes(p.status) ||
+        (p.status === "finished" && p.finishTime === null) ||
+        (p.status !== "finished" && p.finishTime !== null) ||
+        participants.has(p.userId)) return null;
     participants.set(p.userId, { ...p });
   }
   return { session: { id: v.id, worldId: v.worldId, instanceId: v.instanceId,
