@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, selectNextActivityHost, type ActivitySession } from "./activity-session.js";
+import { serializeActivitySession, restoreActivitySession } from "./activity-persistence.js";
 import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./district-policy.js";
 import { matchesDistrictTransition, planDistrictTransition } from "./district-transition-policy.js";
 import { parseDistrictCollisionManifest } from "./district-collision-policy.js";
@@ -350,6 +351,7 @@ void sql`SELECT COALESCE(MAX(id), 0)::bigint AS cursor FROM virtual_world_realti
   .then(rows => { worldRelayCursor = Number(rows[0]?.cursor ?? 0); worldRelayCursorReady = true; })
   .catch(error => console.error("world_relay_cursor_init_failed", error));
 const activityHosts = new Map<string, string>();
+const activityHostGenerations = new Map<string, number>();
 const activityRaceIds = new Map<string, string>();
 const MAX_ACTIVITY_SESSIONS = 256;
 const MAX_NONTERMINAL_ACTIVITIES_PER_WORLD = 32;
@@ -385,10 +387,72 @@ function activityPayload(session: ActivitySession) {
   };
 }
 
+function persistActivity(session: ActivitySession): void {
+  const hostUserId = activityHosts.get(session.id);
+  if (!hostUserId) return;
+  const hostGeneration = activityHostGenerations.get(session.id) ?? 1;
+  const raceId = activityRaceIds.get(session.id) ?? null;
+  const state = serializeActivitySession(session, hostUserId, hostGeneration, raceId);
+  void sql\`INSERT INTO virtual_world_activity_sessions
+    (id, world_id, instance_id, host_user_id, host_generation, race_id, activity_kind,
+     phase, version, state, created_at, started_at, completed_at)
+    VALUES (\${session.id}::uuid, \${session.worldId}::uuid, \${session.instanceId}::uuid,
+      \${hostUserId}::uuid, \${hostGeneration}, \${raceId}, \${session.kind}, \${session.phase},
+      \${session.version}, \${JSON.stringify(state)}::jsonb,
+      to_timestamp(\${session.createdAt / 1000}),
+      \${session.startedAt === null ? null : new Date(session.startedAt)},
+      \${session.completedAt === null ? null : new Date(session.completedAt)})
+    ON CONFLICT (id) DO UPDATE SET host_user_id = EXCLUDED.host_user_id,
+      host_generation = EXCLUDED.host_generation, race_id = EXCLUDED.race_id,
+      phase = EXCLUDED.phase, version = EXCLUDED.version, state = EXCLUDED.state,
+      started_at = EXCLUDED.started_at, completed_at = EXCLUDED.completed_at, updated_at = NOW()
+    WHERE virtual_world_activity_sessions.host_generation < EXCLUDED.host_generation
+       OR (virtual_world_activity_sessions.host_generation = EXCLUDED.host_generation
+           AND virtual_world_activity_sessions.version < EXCLUDED.version)\`
+    .then(async () => {
+      if (session.phase !== "completed" && session.phase !== "cancelled") return;
+      const ordered = [...session.participants.values()]
+        .filter(p => p.status === "finished" || p.status === "dnf" || p.status === "left")
+        .sort((a, b) => a.status === "finished" && b.status === "finished"
+          ? (a.finishTime ?? Number.MAX_SAFE_INTEGER) - (b.finishTime ?? Number.MAX_SAFE_INTEGER)
+          : a.status === "finished" ? -1 : b.status === "finished" ? 1 : a.joinedAt - b.joinedAt);
+      for (const [index, participant] of ordered.entries()) {
+        await sql\`INSERT INTO virtual_world_activity_results
+          (session_id, world_id, user_id, placement, status, checkpoint_index, finish_time)
+          VALUES (\${session.id}::uuid, \${session.worldId}::uuid, \${participant.userId}::uuid,
+            \${participant.status === "finished" ? index + 1 : null}, \${participant.status},
+            \${participant.checkpointIndex}, \${participant.finishTime})
+          ON CONFLICT (session_id, user_id) DO UPDATE SET
+            placement = EXCLUDED.placement, status = EXCLUDED.status,
+            checkpoint_index = EXCLUDED.checkpoint_index, finish_time = EXCLUDED.finish_time\`;
+      }
+    })
+    .catch(error => console.error("activity_persistence_failed", session.id, error));
+}
+
 function broadcastActivity(session: ActivitySession) {
+  persistActivity(session);
   const packet = activityPayload(session);
   for (const peer of players.values()) {
     if (peer.worldId === session.worldId) send(peer.socket, packet);
+  }
+}
+
+async function restorePersistedActivities(): Promise<void> {
+  const rows = await sql\`SELECT state FROM virtual_world_activity_sessions
+    WHERE instance_id = \${INSTANCE_ID}::uuid
+      AND (phase IN ('lobby', 'active') OR completed_at > NOW() - INTERVAL '30 minutes')
+    ORDER BY updated_at DESC LIMIT \${MAX_ACTIVITY_SESSIONS}\`;
+  for (const row of rows) {
+    const restored = restoreActivitySession(row.state);
+    if (!restored || restored.session.instanceId !== INSTANCE_ID) {
+      console.warn("activity_restore_skipped_invalid_state");
+      continue;
+    }
+    activitySessions.set(restored.session.id, restored.session);
+    activityHosts.set(restored.session.id, restored.hostUserId);
+    activityHostGenerations.set(restored.session.id, restored.hostGeneration);
+    if (restored.raceId) activityRaceIds.set(restored.session.id, restored.raceId);
   }
 }
 
@@ -800,6 +864,7 @@ wss.on("connection", async (socket: WebSocket) => {
         }
         activitySessions.set(id, created.session);
         activityHosts.set(id, player.id);
+        activityHostGenerations.set(id, 1);
         if (msg.kind === "checkpoint_race") activityRaceIds.set(id, msg.raceId);
         broadcastActivity(created.session);
         return;
@@ -839,7 +904,10 @@ wss.on("connection", async (socket: WebSocket) => {
         }
         if (activityHosts.get(session.id) === player.id) {
           const replacementHost = selectNextActivityHost(session, player.id);
-          if (replacementHost) activityHosts.set(session.id, replacementHost);
+          if (replacementHost) {
+            activityHosts.set(session.id, replacementHost);
+            activityHostGenerations.set(session.id, (activityHostGenerations.get(session.id) ?? 1) + 1);
+          }
           else if (session.phase !== "completed" && session.phase !== "cancelled") {
             const cancelled = cancelActivity(session, true, Date.now());
             if (!cancelled.ok) console.warn("activity_host_departure_cancel_failed", session.id, cancelled.code);
@@ -1419,6 +1487,7 @@ setInterval(async () => {
       if (session.completedAt !== null && now - session.completedAt > ACTIVITY_TERMINAL_RETENTION_MS) {
         activitySessions.delete(session.id);
         activityHosts.delete(session.id);
+        activityHostGenerations.delete(session.id);
         activityRaceIds.delete(session.id);
       }
       continue;
@@ -1546,7 +1615,9 @@ setInterval(async () => {
   finally { objectRefreshInProgress = false; }
 }, 2500);
 
-server.listen(PORT, () => console.log(`UCENO world gateway listening on ${PORT} for instance ${INSTANCE_ID}`));
+void restorePersistedActivities()
+  .then(() => server.listen(PORT, () => console.log("UCENO world gateway listening on " + PORT + " for instance " + INSTANCE_ID + "; restored " + activitySessions.size + " activities")))
+  .catch(error => { console.error("activity_restore_failed_gateway_start_aborted", error); process.exitCode = 1; });
 process.on("SIGTERM", async () => {
   for (const p of players.values()) p.socket.close(1001, "server_shutdown");
   await sql.end({ timeout: 5 });
