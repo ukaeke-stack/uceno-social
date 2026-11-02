@@ -35,7 +35,7 @@ const checks = [
   ["Server district boundaries are validated and non-overlapping", /parseWorldDistricts/.test(gatewayServer) && /overlap/.test(districtPolicy)],
   ["Server pauses movement pending district content acknowledgement without discarding direction input", /district_content_required/.test(gatewayServer) && /district_content_ready/.test(gatewayServer) && /Preserve the latest input intent/.test(gatewayServer)],
   ["District acknowledgement requires matching nonce and district", /msg\.districtId === pending\.id && msg\.nonce === pending\.nonce/.test(gatewayServer)],
-  ["Client downloads server-selected district labels before acknowledgement", /district_content_required/.test(gateway) && /EnsureContent\(label/.test(gateway) && /district_content_ready/.test(gateway)),
+  ["Client downloads server-selected district labels before acknowledgement", /district_content_required/.test(gateway) && /EnsureContent\(label/.test(gateway) && /district_content_ready/.test(gateway)],
   ["Client can retry and clears cancelled district transitions", /RetryPendingDistrictContent/.test(gateway) && /district_content_cancelled/.test(gateway)),
   ["District policy tests cover bounds and overlaps", /rejects overlapping district rectangles/.test(districtTests) && /rejects malformed JSON/.test(districtTests)),
   ["Architecture documents automatic loading and persistent cache", /automatically|on demand|preflight/i.test(architecture) && /persistent.*cache/i.test(architecture)],
