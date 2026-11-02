@@ -71,7 +71,15 @@ namespace UCENO.VirtualWorld
         public string AudioRoute => audioRoute;
         public bool PushToTalkMode => pushToTalkMode;
         public bool SpeakerEnabled => speakerEnabled;
-        public int ConnectedPeerCount => peers.Count;
+        public int ConnectedPeerCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (PeerAudio peer in peers.Values) if (peer.connected) count++;
+                return count;
+            }
+        }
 
         private void Start()
         {
