@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sameSpatialVoiceRoom, isWithinVoiceRange, isValidVoiceSignal } from "../dist/voice-policy.js";
+import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "../dist/voice-policy.js";
 const base = { worldId: "world-a", homeId: null, eventId: null, x: 0, y: 0, z: 0 };
 test("voice room scope requires the same world and spatial destination", () => {
   assert.equal(sameSpatialVoiceRoom(base, { ...base, x: 10 }), true);
@@ -51,4 +51,15 @@ test("voice signal validation rejects wrong payload types and overlong boundary 
   assert.equal(isValidVoiceSignal("offer", "x".repeat(12001), null), false);
   assert.equal(isValidVoiceSignal("candidate", null, "x".repeat(2048)), true);
   assert.equal(isValidVoiceSignal("candidate", null, "x".repeat(2049)), false);
+});
+
+test("voice proximity hysteresis stabilizes room membership at the edge", () => {
+  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 21.9 }, false), true);
+  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 22.1 }, false), false);
+  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 24.5 }, true), true);
+  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 26.1 }, true), false);
+  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 24 }, false), false);
+  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 24 }, true), true);
+  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 23 }, false, 24, 22), false);
+  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 23 }, false, NaN, 26), false);
 });
