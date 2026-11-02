@@ -1,6 +1,8 @@
 #if UNITY_EDITOR
 using System;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 
@@ -62,13 +64,15 @@ namespace UCENO.VirtualWorld.Editor
             string slug = new string(selected.name.ToLowerInvariant().Select(character =>
                 char.IsLetterOrDigit(character) || "._:-".IndexOf(character) >= 0 ? character : '-').ToArray());
             SerializedProperty id = data.FindProperty("objectId");
-            if (string.IsNullOrWhiteSpace(id.stringValue))
+            string globalId = GlobalObjectId.GetGlobalObjectIdSlow(selected).ToString();
+            if (string.IsNullOrWhiteSpace(selected.scene.path) || string.IsNullOrWhiteSpace(globalId) ||
+                globalId == GlobalObjectId.Null.ToString())
+                throw new InvalidOperationException("Save the scene and prefab instance before assigning a stable UCENO object ID.");
+            using (SHA256 hash = SHA256.Create())
             {
-                string stableId = GlobalObjectId.GetGlobalObjectIdSlow(selected).ToString();
-                if (stableId.Length > 80 || stableId.Any(character =>
-                    !char.IsLetterOrDigit(character) && "._:-".IndexOf(character) < 0))
-                    throw new InvalidOperationException("Save the scene before assigning a stable UCENO object ID.");
-                id.stringValue = stableId;
+                byte[] digest = hash.ComputeHash(Encoding.UTF8.GetBytes(globalId));
+                id.stringValue = "scene:" + BitConverter.ToString(digest, 0, 16)
+                    .Replace("-", "").ToLowerInvariant();
             }
             if (kind == WorldInteractableKind.Door)
                 data.FindProperty("doorPivot").objectReferenceValue = selected.transform;
