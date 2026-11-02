@@ -396,11 +396,16 @@ test("two real gateway processes: primary loss leaves the replacement process re
       // A delayed durable relay event from the fenced host must not reach
       // clients after the replacement has committed generation 2.
       const staleRelayPackets = [];
+      const staleSnapshotPackets = [];
       const captureStaleRelay = raw => {
         try {
           const packet = JSON.parse(raw.toString());
           if (packet.type === "activity_state" && packet.session?.id === activityId)
             staleRelayPackets.push(packet);
+          if (packet.type === "snapshot" &&
+              Array.isArray(packet.players) &&
+              packet.players.some(player => player.userId === userId))
+            staleSnapshotPackets.push(packet);
         } catch { /* Ignore unrelated or malformed packets. */ }
       };
       replacementSocket.socket.on("message", captureStaleRelay);
@@ -412,10 +417,20 @@ test("two real gateway processes: primary loss leaves the replacement process re
         type: "activity_state",
         session: { id: activityId, worldId, instanceId: instanceA, hostGeneration: 1 }
       }]);
+      await admin.unsafe(`
+        INSERT INTO "${schema}".virtual_world_realtime_events
+          (world_id, instance_id, event_type, payload)
+        VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb)
+      `, [worldId, instanceA, {
+        serverTime: Date.now(),
+        players: [{ userId, x: 999, y: 1.15, z: 999, yaw: 0 }]
+      }]);
       await delay(1800);
       replacementSocket.socket.off("message", captureStaleRelay);
       assert.equal(staleRelayPackets.length, 0,
         "stale generation-1 activity relay must not be broadcast by generation-2 gateway");
+      assert.equal(staleSnapshotPackets.length, 0,
+        "snapshots from an instance with an expired heartbeat must not reach replacement clients");
 
       // Race two independent database claims against a second stale activity.
       // PostgreSQL must serialize the row update so exactly one candidate wins.
