@@ -56,23 +56,23 @@ Do not use Unity's deprecated `com.unity.webrtc` package for this feature.
 
 ## Server work still required
 
-- The current `/api/worlds/[worldId]/voice-token` endpoint is deliberately
-  fail-closed. It authenticates the UCENO session but returns HTTP 503 instead
-  of issuing a broad world-room token.
-- The previous token implementation accepted a client-selected zone and issued
-  world-wide publish/subscribe grants. That was not a safe proximity boundary:
-  every room member could potentially subscribe to every microphone track.
-  It has been disabled rather than treating signaling eligibility as media ACL.
-- Implement pair-scoped media authorization using server-derived active gateway
-  participants, current 3D positions, home/event context, explicit voice opt-in
-  and block checks. Never trust a client-supplied room or zone as authorization.
-- On movement/context/block/disconnect changes, revoke existing media access
-  and remove stale participants from the corresponding LiveKit room. Token TTL
-  alone does not disconnect already-connected participants.
-- Keep API key/secret in server environment only; configure the LiveKit endpoint.
-- Add rate limits, short token TTL, audit-safe failure logging and health checks.
-- Decide whether to use LiveKit Cloud or self-hosted LiveKit before provisioning.
-  No provider account, endpoint, secret or deployment has been configured.
+- The Next.js `POST /api/worlds/[worldId]/voice-token` route now proxies to the
+  assigned healthy gateway. It forwards the authenticated UCENO bearer token
+  and a requested peer UUID; it does not mint LiveKit tokens itself.
+- The gateway validates both live participants, voice opt-in, same spatial
+  context, current 24 m range and block state before issuing a 30-second token.
+- Each eligible pair receives a private LiveKit room with a server-generated
+  room name and participant identity. A new room generation is used after a
+  pair has been torn down, preventing reuse of the prior room name.
+- The gateway requests pair-room deletion when the pair becomes ineligible,
+  either participant leaves, or a block is detected.
+- Configure `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` only
+  on the gateway server. These are optional for ordinary gateway startup but
+  required for voice token issuance. Do not add them to Unity or the APK.
+- LiveKit's exact token revocation and room-deletion behavior must be tested
+  against the chosen Cloud or self-hosted deployment. A 30-second token TTL is
+  a fallback bound; it is not proof of instantaneous revocation of an already
+  issued token or a connected participant.
 
 ## Verification gates
 
@@ -88,11 +88,9 @@ Do not use Unity's deprecated `com.unity.webrtc` package for this feature.
 
 ## Current status
 
-The SDK dependency has been added to the Unity manifest. Existing gateway
-WebSocket signaling enforces opt-in, same world/home/event context, 24 m range
-and block checks, but this is signaling only. The UCENO LiveKit token endpoint
-now fails closed until pair-scoped media authorization is implemented. The
-Unity audio client, microphone/track lifecycle, UI, service provisioning,
-Unity compilation and physical-device audio tests are not implemented or
-verified. Do not describe spatial voice as operational until all verification
-gates pass.
+The SDK dependency has been added to the Unity manifest. Gateway signaling and
+pair-scoped token issuance are implemented in source, with 30-second tokens
+and pair-room teardown requests. LiveKit service provisioning, exact revocation
+verification, the Unity audio client, microphone/track lifecycle, UI, Unity
+compilation and physical-device audio tests are not implemented or verified.
+Do not describe spatial voice as operational until all verification gates pass.
