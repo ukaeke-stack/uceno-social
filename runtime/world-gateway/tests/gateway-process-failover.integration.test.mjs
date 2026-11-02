@@ -93,25 +93,24 @@ test("two real gateway processes: primary loss leaves the replacement process re
 
   try {
     await admin`CREATE SCHEMA ${schemaIdent}`;
-    await admin.unsafe(`SET search_path TO "${schema}", public`);
-    await admin.unsafe(`CREATE TABLE virtual_world_instances (
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_instances (
       id UUID PRIMARY KEY, status TEXT NOT NULL, heartbeat_at TIMESTAMPTZ,
       endpoint TEXT, current_players INTEGER NOT NULL DEFAULT 0
     )`);
-    await admin.unsafe(`CREATE TABLE virtual_world_realtime_events (
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_realtime_events (
       id BIGSERIAL PRIMARY KEY, world_id UUID, instance_id UUID,
       event_type TEXT NOT NULL, payload JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
-    await admin.unsafe(`CREATE TABLE virtual_world_activity_sessions (
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_activity_sessions (
       id UUID PRIMARY KEY, instance_id UUID NOT NULL, phase TEXT NOT NULL,
       state JSONB NOT NULL DEFAULT '{}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       completed_at TIMESTAMPTZ
     )`);
-    await admin.unsafe(`CREATE TABLE virtual_world_activity_transfer_tickets (
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_activity_transfer_tickets (
       expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ
     )`);
-    await admin`INSERT INTO virtual_world_instances (id, status, endpoint)
+    await admin`INSERT INTO "${schema}".virtual_world_instances (id, status, endpoint)
       VALUES (${instanceA}::uuid, 'ready', ${`http://127.0.0.1:${portA}`}),
              (${instanceB}::uuid, 'ready', ${`http://127.0.0.1:${portB}`})`;
 
