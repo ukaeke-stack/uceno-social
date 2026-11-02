@@ -61,6 +61,7 @@ namespace UCENO.VirtualWorld
         private bool voicePresenceRequested;
         private float nextPresenceRetryAt;
         private readonly HashSet<string> peerConnectInProgress = new HashSet<string>();
+        private readonly HashSet<string> ineligiblePeers = new HashSet<string>();
         private int voiceGeneration;
         private string status = "VOICE OFF";
 
@@ -122,6 +123,9 @@ namespace UCENO.VirtualWorld
         public void DisableVoice()
         {
             voiceGeneration++;
+            StopAllCoroutines();
+            peerConnectInProgress.Clear();
+            ineligiblePeers.Clear();
             voiceEnabled = false;
             pushToTalkHeld = false;
             localMuted = true;
@@ -248,9 +252,14 @@ namespace UCENO.VirtualWorld
             if (!voiceEnabled || appPaused || string.IsNullOrWhiteSpace(userId)) return;
             if (active)
             {
+                ineligiblePeers.Remove(userId);
                 if (!peers.ContainsKey(userId)) StartCoroutine(ConnectPeerWithRetry(userId));
             }
-            else RemovePeer(userId);
+            else
+            {
+                ineligiblePeers.Add(userId);
+                RemovePeer(userId);
+            }
         }
 
         private IEnumerator ConnectPeerWithRetry(string userId)
@@ -259,7 +268,7 @@ namespace UCENO.VirtualWorld
             int generation = voiceGeneration;
             int attempts = 0;
             while (generation == voiceGeneration && voiceEnabled && !appPaused && gateway != null &&
-                gateway.ConnectionStatus == "ONLINE" && !peers.ContainsKey(userId) && attempts < 5)
+                gateway.ConnectionStatus == "ONLINE" && !ineligiblePeers.Contains(userId) && !peers.ContainsKey(userId) && attempts < 5)
             {
                 attempts++;
                 yield return StartCoroutine(ConnectPeer(userId, generation));
@@ -288,7 +297,7 @@ namespace UCENO.VirtualWorld
                 request.SetRequestHeader("Authorization", "Bearer " + session.AccessToken);
                 request.timeout = 8;
                 yield return request.SendWebRequest();
-                if (generationInvalidForConnect(generation))
+                if (generationInvalidForConnect(userId, generation))
                 {
                     RemovePeer(userId);
                     yield break;
@@ -334,7 +343,7 @@ namespace UCENO.VirtualWorld
             }
         }
 
-        private bool generationInvalidForConnect(int generation) => generation != voiceGeneration || !voiceEnabled || appPaused;
+        private bool generationInvalidForConnect(string userId, int generation) => generation != voiceGeneration || !voiceEnabled || appPaused || ineligiblePeers.Contains(userId) || !peers.ContainsKey(userId);
 
         private void CreateMicrophone(PeerAudio peer)
         {
@@ -478,6 +487,8 @@ namespace UCENO.VirtualWorld
             if (paused)
             {
                 voiceGeneration++;
+                StopAllCoroutines();
+                peerConnectInProgress.Clear();
                 pushToTalkHeld = false;
                 StopAllPeerRooms();
                 ClearAudioRoute();
