@@ -349,7 +349,8 @@ namespace UCENO.VirtualWorld
             float width = Mathf.Min(Screen.width - 32f, 520f * scale);
             GUI.Box(new Rect(16f, 16f, width, 54f * scale), spatialTransitionStatus);
             if (!string.IsNullOrEmpty(pendingDistrictId) && !districtDownloadRunning &&
-                spatialTransitionStatus.StartsWith("Could not load", StringComparison.Ordinal))
+                (spatialTransitionStatus.StartsWith("Could not load", StringComparison.Ordinal) ||
+                 spatialTransitionStatus.StartsWith("District content is ready but", StringComparison.Ordinal)))
             {
                 if (GUI.Button(new Rect(24f, 48f * scale, 92f * scale, 24f * scale), "RETRY"))
                     RetryPendingDistrictContent();
