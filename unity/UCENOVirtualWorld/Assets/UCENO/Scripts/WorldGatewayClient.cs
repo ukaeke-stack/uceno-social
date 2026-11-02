@@ -154,6 +154,7 @@ namespace UCENO.VirtualWorld
         public string objectState;
         public string actorId;
         public string occupantId;
+        public long version;
         public GatewayVectorState state;
         public GatewaySnapshotPlayer[] players;
         public GatewayActivitySessionState session;
