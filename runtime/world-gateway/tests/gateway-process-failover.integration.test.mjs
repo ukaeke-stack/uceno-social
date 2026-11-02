@@ -76,7 +76,6 @@ test("two real gateway processes: primary loss leaves the replacement process re
 }, async t => {
   const admin = postgres(databaseUrl, { max: 6, idle_timeout: 5 });
   const schema = `uceno_gateway_process_${randomUUID().replace(/-/g, "")}`;
-  const schemaIdent = admin(schema);
   const scoped = new URL(databaseUrl);
   scoped.searchParams.set("options", `-csearch_path=${schema},public`);
   const instanceA = randomUUID();
@@ -87,7 +86,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
   let gatewayB;
 
   try {
-    await admin`CREATE SCHEMA ${schemaIdent}`;
+    await admin.unsafe(`CREATE SCHEMA "${schema}"`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_instances (
       id UUID PRIMARY KEY, status TEXT NOT NULL, heartbeat_at TIMESTAMPTZ,
       endpoint TEXT, current_players INTEGER NOT NULL DEFAULT 0
@@ -105,9 +104,9 @@ test("two real gateway processes: primary loss leaves the replacement process re
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_activity_transfer_tickets (
       expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ
     )`);
-    await admin`INSERT INTO ${schemaIdent}.virtual_world_instances (id, status, endpoint)
-      VALUES (${instanceA}::uuid, 'ready', ${`http://127.0.0.1:${portA}`}),
-             (${instanceB}::uuid, 'ready', ${`http://127.0.0.1:${portB}`})`;
+    await admin.unsafe(`INSERT INTO "${schema}".virtual_world_instances (id, status, endpoint)
+      VALUES ($1::uuid, 'ready', $2), ($3::uuid, 'ready', $4)`,
+      [instanceA, `http://127.0.0.1:${portA}`, instanceB, `http://127.0.0.1:${portB}`]);
 
     gatewayA = startGateway(portA, instanceA, scoped.toString());
     gatewayB = startGateway(portB, instanceB, scoped.toString());
@@ -117,8 +116,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.equal(readyB.instanceId, instanceB);
 
     await t.test("both independent processes publish their own database heartbeat", async () => {
-      const rows = await admin`SELECT id, heartbeat_at FROM ${schemaIdent}.virtual_world_instances
-        WHERE id IN (${instanceA}::uuid, ${instanceB}::uuid)`;
+      const rows = await admin.unsafe(`SELECT id, heartbeat_at FROM "${schema}".virtual_world_instances
+        WHERE id IN ($1::uuid, $2::uuid)`, [instanceA, instanceB]);
       assert.equal(rows.length, 2);
       assert.ok(rows.every(row => row.heartbeat_at instanceof Date));
     });
@@ -131,9 +130,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
       const primary = await admin`SELECT heartbeat_at FROM "${schema}".virtual_world_instances
         WHERE id = ${instanceA}::uuid`;
       assert.equal(primary.length, 1);
-      await admin`UPDATE ${schemaIdent}.virtual_world_instances
-        SET heartbeat_at = NOW() - INTERVAL '1 minute'
-        WHERE id = ${instanceA}::uuid`;
+      await admin.unsafe(`UPDATE "${schema}".virtual_world_instances
+        SET heartbeat_at = NOW() - INTERVAL '1 minute' WHERE id = $1::uuid`, [instanceA]);
       const stale = await admin`SELECT heartbeat_at < NOW() - INTERVAL '30 seconds' AS stale
         FROM "${schema}".virtual_world_instances WHERE id = ${instanceA}::uuid`;
       assert.equal(stale[0].stale, true);
@@ -145,7 +143,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
     throw error;
   } finally {
     await Promise.all([gatewayA && stopGateway(gatewayA), gatewayB && stopGateway(gatewayB)].filter(Boolean));
-    await admin`DROP SCHEMA IF EXISTS ${schemaIdent} CASCADE`.catch(() => {});
+    await admin.unsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {});
     await admin.end({ timeout: 5 });
   }
 });
