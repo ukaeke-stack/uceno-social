@@ -352,6 +352,18 @@ async function revokeVoicePairRoom(key: string): Promise<void> {
   const room = voicePairRooms.get(key);
   voicePairRooms.delete(key);
   if (!room || !livekitRooms) return;
+
+  // Evict both known identities before deleting the room. Room deletion alone
+  // can fail transiently while connected participants remain attached.
+  const [a, b] = key.split(":");
+  const evictions = await Promise.allSettled([
+    livekitRooms.removeParticipant(room, a),
+    livekitRooms.removeParticipant(room, b)
+  ]);
+  for (const result of evictions) {
+    if (result.status === "rejected")
+      console.warn("livekit_pair_participant_eviction_failed", result.reason);
+  }
   try { await livekitRooms.deleteRoom(room); }
   catch (error) { console.error("livekit_pair_room_cleanup_failed", error); }
 }
@@ -517,13 +529,13 @@ const server = createServer(async (req, res) => {
       voicePairRooms.set(key, room);
       const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
         identity: identity.userId,
-        ttl: "30s",
+        ttl: "15s",
         metadata: JSON.stringify({ worldId: identity.worldId, instanceId: INSTANCE_ID, scope: "uceno-spatial-pair" })
       });
       token.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: false });
       const jwt = await token.toJwt();
       res.writeHead(200, headers);
-      res.end(JSON.stringify({ token: jwt, url: LIVEKIT_URL, room, identity: identity.userId, peerUserId: peerId, expiresIn: 30 }));
+      res.end(JSON.stringify({ token: jwt, url: LIVEKIT_URL, room, identity: identity.userId, peerUserId: peerId, expiresIn: 15 }));
     } catch (error) {
       const unauthorized = error instanceof Error && error.message === "unauthorized";
       res.writeHead(unauthorized ? 401 : 503, headers);
