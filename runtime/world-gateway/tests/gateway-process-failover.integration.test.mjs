@@ -217,7 +217,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_player_state (
       world_id UUID NOT NULL, user_id UUID NOT NULL, position JSONB, rotation JSONB,
       session_generation BIGINT NOT NULL DEFAULT 0, state_version BIGINT NOT NULL DEFAULT 0,
-      updated_by_session UUID,
+      updated_by_session UUID, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (world_id, user_id)
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".user_avatar_wardrobe_equipped (
@@ -376,7 +376,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
            phase, version, state, created_at)
         VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race',
           'active', 3, $5::jsonb, NOW())
-      `, [concurrentActivityId, worldId, instanceA, userId, JSON.stringify(concurrentState)]);
+      `, [concurrentActivityId, worldId, instanceA, userId, concurrentState]);
       await admin.unsafe(`UPDATE "${schema}".virtual_world_instances
         SET heartbeat_at = NOW() WHERE id IN ($1::uuid, $2::uuid)`, [instanceB, instanceC]);
       const claim = candidateId => admin.unsafe(`
