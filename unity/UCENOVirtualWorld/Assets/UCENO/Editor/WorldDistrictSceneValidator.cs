@@ -22,7 +22,7 @@ namespace UCENO.VirtualWorld.Editor
         public float minX, maxX, minZ, maxZ;
     }
 
-    /// <summary>Validates stable object identity and district placement across every loaded scene.</summary>
+    /// <summary>Validates gateway-ready identity, targeting geometry and district placement across every loaded scene.</summary>
     public static class WorldDistrictSceneValidator
     {
         [MenuItem("UCENO/World/Validate Loaded District Scenes", false, 90)]
@@ -53,10 +53,13 @@ namespace UCENO.VirtualWorld.Editor
                     {
                         if (item == null || !item.gameObject.activeInHierarchy) continue;
                         string id = item.ObjectId;
-                        if (string.IsNullOrWhiteSpace(id) || id.Length > 80 ||
-                            !id.All(ch => char.IsLetterOrDigit(ch) || "._:-".IndexOf(ch) >= 0) ||
-                            !ids.Add(id))
-                            throw new InvalidOperationException("Invalid or duplicate object ID across loaded scenes: " + id);
+                        if (!IsGatewayObjectId(id) || !ids.Add(id))
+                            throw new InvalidOperationException("Invalid or duplicate gateway object ID across loaded scenes: " + id);
+
+                        if (item.GetComponentsInChildren<Collider>(true).Length == 0)
+                            throw new InvalidOperationException("Interactable has no collider for player targeting: " + id);
+                        if (item.Kind == "door" && !item.HasDoorPivot)
+                            throw new InvalidOperationException("Door marker must reference the actual hinged door mesh/pivot: " + id);
 
                         Vector3 position = item.transform.position;
                         int matches = manifest.districts.Count(d =>
@@ -71,7 +74,7 @@ namespace UCENO.VirtualWorld.Editor
                 }
 
                 EditorUtility.DisplayDialog("UCENO district validation",
-                    "Validated " + checkedObjects + " interactables across loaded scenes. IDs are unique and every object belongs to exactly one configured district.",
+                    "Validated " + checkedObjects + " gateway-ready interactables across loaded scenes. IDs are unique, every object has a targeting collider, doors have a real pivot, and every object belongs to exactly one configured district.",
                     "OK");
             }
             catch (Exception error)
@@ -79,6 +82,15 @@ namespace UCENO.VirtualWorld.Editor
                 EditorUtility.DisplayDialog("UCENO district validation failed", error.Message, "OK");
                 Debug.LogException(error);
             }
+        }
+
+        private static bool IsGatewayObjectId(string id)
+        {
+            return !string.IsNullOrWhiteSpace(id) &&
+                id.StartsWith("scene:", StringComparison.Ordinal) &&
+                id.Length == 38 &&
+                id.Substring(6).All(ch =>
+                    (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'));
         }
     }
 }
