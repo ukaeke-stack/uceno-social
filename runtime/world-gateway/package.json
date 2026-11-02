@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "test:activity": "npm run build && node --test tests/activity-session.test.mjs tests/voice-policy.test.mjs"
+    "test:activity": "npm run build && node --test tests/activity-session.test.mjs tests/voice-policy.test.mjs tests/interaction-policy.test.mjs"
   },
   "dependencies": {
     "jose": "^6.0.8",
