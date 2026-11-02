@@ -10,6 +10,7 @@ const areaBinding = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldArea
 const gateway = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs");
 const gatewayServer = read("runtime/world-gateway/src/server.ts");
 const districtPolicy = read("runtime/world-gateway/src/district-policy.ts");
+const districtConfig = JSON.parse(read("runtime/world-gateway/config/world-districts.json"));
 const districtTests = read("runtime/world-gateway/tests/district-policy.test.mjs");
 const architecture = read("docs/virtual-world/REMOTE_CONTENT_DELIVERY.md");
 const tests = read("docs/virtual-world/REMOTE_CONTENT_DELIVERY_TESTS.md");
@@ -52,6 +53,8 @@ const checks = [
   ["Client loads server-selected district labels before acknowledgement", /district_content_required/.test(gateway) && /AcquireContent\(label/.test(gateway) && /district_content_ready/.test(gateway)],
   ["Client can retry and clears cancelled district transitions", /RetryPendingDistrictContent/.test(gateway) && /district_content_cancelled/.test(gateway)],
   ["District policy tests cover bounds and overlaps", /rejects overlapping district rectangles/.test(districtTests) && /rejects malformed JSON/.test(districtTests)],
+  ["Canonical gateway district config has four matching Unity scene labels", districtConfig.districts?.length === 4 && ["south", "central-south", "central-north", "north"].every(id => districtConfig.districts.some(d => d.id === id && d.contentLabel === "world-city-district-" + id))],
+  ["Gateway tests exercise canonical district geometry fixture", /canonical gateway config matches the four generated Unity district scenes/.test(districtTests)],
   ["Architecture documents automatic loading and persistent cache", /automatically|on demand|preflight/i.test(architecture) && /persistent.*cache/i.test(architecture)],
   ["Acceptance tests cover interrupted downloads and district boundary gates", /Interrupt the connection mid-download/.test(tests) && /district boundary/.test(tests)]
 ];
