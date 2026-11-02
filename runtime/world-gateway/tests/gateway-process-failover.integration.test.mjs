@@ -450,7 +450,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
       await admin.unsafe("UPDATE \"" + schema + "\".virtual_world_instance_sessions SET instance_id = $3::uuid WHERE world_id = $1::uuid AND user_id = $2::uuid",
         [worldId, userId, instanceB]);
       const contenderB = await connectAuthenticated(portB, instanceB, worldId, userId);
-      await admin.unsafe("UPDATE \"${schema}\".virtual_world_instance_sessions SET instance_id = $3::uuid WHERE world_id = $1::uuid AND user_id = $2::uuid",
+      await admin.unsafe("UPDATE \"" + schema + "\".virtual_world_instance_sessions SET instance_id = $3::uuid WHERE world_id = $1::uuid AND user_id = $2::uuid",
         [worldId, userId, instanceC]);
       const contenderC = await connectAuthenticated(portC, instanceC, worldId, userId);
       const packetsB = [], packetsC = [];
@@ -520,7 +520,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
       replacementSocket.socket.close();
     });
   } catch (error) {
-    const logs = [gatewayA?.testOutput?.(), gatewayB?.testOutput?.()].filter(Boolean).join("\n--- gateway ---\n");
+    const logs = [gatewayA?.testOutput?.(), gatewayB?.testOutput?.(), gatewayC?.testOutput?.()].filter(Boolean).join("\n--- gateway ---\n");
     if (logs) error.message += `\nGateway process output:\n${logs}`;
     throw error;
   } finally {
