@@ -692,7 +692,13 @@ const server = createServer(async (req, res) => {
     try {
       const authorization = req.headers.authorization || "";
       if (!authorization.startsWith("Bearer ")) throw new Error("unauthorized");
-      const identity = await authenticate(authorization.slice(7));
+      const sourceToken = authorization.slice(7);
+      const identity = await authenticate(sourceToken);
+      const sourceClaims = await jwtVerify(sourceToken, secret, {
+        algorithms: ["HS256"], issuer: "uceno-social", audience: "uceno-world-gateway"
+      });
+      const clientType = String(sourceClaims.payload.client_type);
+      if (clientType !== "unity-android" && clientType !== "unity-desktop") throw new Error("invalid_request");
       const chunks: Buffer[] = [];
       let bodySize = 0;
       for await (const chunk of req) {
@@ -709,7 +715,7 @@ const server = createServer(async (req, res) => {
       if (!target[0] || typeof target[0].endpoint !== "string") throw new Error("activity_target_unavailable");
       const jti = randomUUID();
       await sql`INSERT INTO virtual_world_activity_transfer_tickets (id, world_id, user_id, activity_session_id, source_instance_id, target_instance_id, expires_at, created_at) VALUES (${jti}::uuid, ${identity.worldId}::uuid, ${identity.userId}::uuid, ${body.sessionId}::uuid, ${INSTANCE_ID}::uuid, ${target[0].instanceId}::uuid, NOW() + INTERVAL '30 seconds', NOW())`;
-      const ticket = await new SignJWT({ world_id: identity.worldId, instance_id: target[0].instanceId, target_instance_id: target[0].instanceId, client_type: "unity-android", scope: "activity-transfer", transfer_session_id: body.sessionId }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setIssuer("uceno-social").setAudience("uceno-world-gateway").setSubject(identity.userId).setJti(jti).setIssuedAt().setExpirationTime("30s").sign(secret);
+      const ticket = await new SignJWT({ world_id: identity.worldId, instance_id: target[0].instanceId, target_instance_id: target[0].instanceId, client_type: clientType, scope: "activity-transfer", transfer_session_id: body.sessionId }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setIssuer("uceno-social").setAudience("uceno-world-gateway").setSubject(identity.userId).setJti(jti).setIssuedAt().setExpirationTime("30s").sign(secret);
       res.writeHead(200, headers);
       res.end(JSON.stringify({ ticket, endpoint: target[0].endpoint, instanceId: target[0].instanceId, sessionId: body.sessionId, expiresInSeconds: 30 }));
     } catch (error) {
