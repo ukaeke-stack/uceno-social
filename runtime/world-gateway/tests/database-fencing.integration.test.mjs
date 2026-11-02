@@ -95,6 +95,34 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
       RETURNING activity.instance_id AS "instanceId", activity.host_generation AS "hostGeneration"
     `);
 
+    await t.test("concurrent player reconnects advance one authoritative session generation", async () => {
+      await withSchema(tx => tx`DELETE FROM virtual_world_player_sessions
+        WHERE world_id = ${ids.world}::uuid AND user_id = ${ids.host}::uuid`);
+      const sessionA = "123e4567-e89b-12d3-a456-426614174050";
+      const sessionB = "123e4567-e89b-12d3-a456-426614174051";
+      const claim = (instanceId, sessionId) => withSchema(tx => tx`
+        INSERT INTO virtual_world_player_sessions
+          (world_id, user_id, instance_id, session_id, generation, updated_at)
+        VALUES (${ids.world}::uuid, ${ids.host}::uuid, ${instanceId}::uuid,
+          ${sessionId}::uuid, 1, NOW())
+        ON CONFLICT (world_id, user_id) DO UPDATE SET
+          instance_id = EXCLUDED.instance_id, session_id = EXCLUDED.session_id,
+          generation = virtual_world_player_sessions.generation + 1, updated_at = NOW()
+        RETURNING generation, session_id AS "sessionId"`);
+      const claims = await Promise.all([
+        claim(ids.newA, sessionA),
+        claim(ids.newB, sessionB)
+      ]);
+      assert.deepEqual(claims.map(rows => Number(rows[0].generation)).sort(), [1, 2]);
+      const current = await withSchema(tx => tx`SELECT generation, session_id AS "sessionId"
+        FROM virtual_world_player_sessions WHERE world_id = ${ids.world}::uuid
+          AND user_id = ${ids.host}::uuid`);
+      assert.equal(current.length, 1);
+      assert.equal(Number(current[0].generation), 2);
+      assert.ok([sessionA, sessionB].includes(current[0].sessionId));
+      assert.notEqual(Number(current[0].generation), 1);
+    });
+
     await t.test("concurrent stale-host takeovers have exactly one winner", async () => {
       await resetActivity();
       const results = await Promise.all([
