@@ -5,9 +5,9 @@ import { readFileSync } from "node:fs";
 const source = readFileSync(new URL("../src/server.ts", import.meta.url), "utf8");
 
 test("activity transfer consumes its ticket and advances the player fence atomically", () => {
-  const transactionStart = source.indexOf("const claimed = isTransfer ? await sql.begin(async tx =>");
+  const transactionStart = source.indexOf("const claimed = await sql.begin(async tx =>");
   assert.notEqual(transactionStart, -1, "transfer path must use a database transaction");
-  const transactionEnd = source.indexOf("}) : await sql", transactionStart);
+  const transactionEnd = source.indexOf("});\n    if (!claimed", transactionStart);
   assert.ok(transactionEnd > transactionStart, "transfer transaction must close before ordinary session claims");
   const transaction = source.slice(transactionStart, transactionEnd);
   assert.match(transaction, /await tx\x60UPDATE virtual_world_activity_transfer_tickets/);
