@@ -232,6 +232,44 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
       assert.equal((await authorized(ids.guest, ids.world, ids.newA, 2)).length, 0);
     });
 
+    await t.test("takeover waits while an authorized relay holds the activity row lock", async () => {
+      await resetActivity();
+      let announceLocked;
+      const locked = new Promise(resolve => { announceLocked = resolve; });
+      let releaseRelay;
+      const relayRelease = new Promise(resolve => { releaseRelay = resolve; });
+      const relay = db.begin(async tx => {
+        await tx.unsafe(`SET LOCAL search_path TO "${schema}", public`);
+        const authority = await tx`SELECT id FROM virtual_world_activity_sessions
+          WHERE id = ${ids.activity}::uuid AND instance_id = ${ids.old}::uuid
+            AND host_generation = 1 FOR UPDATE`;
+        assert.equal(authority.length, 1);
+        announceLocked();
+        await relayRelease;
+      });
+
+      await locked;
+      let takeoverFinished = false;
+      const moving = takeover(ids.newA, ids.guest).then(rows => {
+        takeoverFinished = true;
+        return rows;
+      });
+      // Give PostgreSQL time to schedule the competing UPDATE; it must wait
+      // for the relay transaction's row lock rather than revoke authority
+      // halfway through an already-authorized fan-out.
+      await new Promise(resolve => setTimeout(resolve, 75));
+      assert.equal(takeoverFinished, false);
+      releaseRelay();
+      await relay;
+      const moved = await moving;
+      assert.equal(moved.length, 1);
+      const current = await withSchema(tx => tx`SELECT instance_id AS "instanceId",
+        host_generation AS generation FROM virtual_world_activity_sessions
+        WHERE id = ${ids.activity}::uuid`);
+      assert.equal(current[0].instanceId, ids.newA);
+      assert.equal(Number(current[0].generation), 2);
+    });
+
     await t.test("old gateway queued activity events are suppressed after takeover", async () => {
       await resetActivity();
       // Model an event committed by the old host immediately before takeover.
