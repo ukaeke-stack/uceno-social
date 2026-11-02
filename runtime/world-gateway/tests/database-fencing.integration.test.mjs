@@ -385,7 +385,7 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
           await tx`INSERT INTO virtual_world_realtime_events
             (world_id, instance_id, event_type, payload)
             VALUES (${ids.world}::uuid, ${instanceId}::uuid, 'activity_state',
-              ${JSON.stringify({ sessionId: ids.activity, hostGeneration: generation, version, state: payload })}::jsonb)`;
+              ${JSON.stringify({ type: "activity_state", session: { id: ids.activity, worldId: ids.world, instanceId, hostGeneration: generation, version, state: payload } })}::jsonb)`;
           return true;
         });
       try {
@@ -445,7 +445,8 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
         `);
         assert.equal(events.length, 1);
         assert.equal(events[0].instanceId, ids.newA);
-        assert.equal(events[0].payload.version, 3);
+        assert.equal(events[0].payload.session.hostGeneration, 2);
+        assert.equal(events[0].payload.session.version, 3);
       } finally {
         await gatewayA.end({ timeout: 5 });
         await gatewayB.end({ timeout: 5 });
