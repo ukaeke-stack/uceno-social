@@ -73,7 +73,7 @@ namespace UCENO.VirtualWorld.Editor
                 // Save first so GlobalObjectId values are based on final additive
                 // district scene GUIDs, not the temporary boot scene.
                 foreach (Scene scene in loadedScenes)
-                    if (EditorSceneManager.GetSceneByPath(scene.path).isDirty &&
+                    if (scene.isDirty &&
                         !EditorSceneManager.SaveScene(scene))
                         throw new InvalidOperationException("Could not save scene before assigning interactable IDs: " + scene.path);
 
