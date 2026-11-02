@@ -10,7 +10,7 @@ import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHystere
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { isPersistentObjectState, defaultPersistentObjectState } from "./district-object-policy.js";
 import { readFileSync } from "node:fs";
-import { dirname, resolve, isAbsolute } from "node:path";
+import { dirname, resolve } from "node:path";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
 import { WebSocketServer, WebSocket } from "ws";
