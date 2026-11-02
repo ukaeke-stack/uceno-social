@@ -95,7 +95,7 @@ jobs:
           const client = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs', 'utf8');
           for (const marker of ['ApplyServerState', 'doorPivot', 'OccupantId']) if (!objectScript.includes(marker)) throw new Error('Missing interactable state behavior: ' + marker);
           for (const marker of ['Physics.Raycast', 'KeyCode.E', 'RequestInteraction', '"SIT"', '"STAND"']) if (!interactor.includes(marker)) throw new Error('Missing interaction targeting: ' + marker);
-          for (const marker of ['RequestInteraction', 'object_state', 'objectState', 'occupantId', 'SetSeated', 'LocalUserId']) if (!client.includes(marker)) throw new Error('Missing client interaction transport: ' + marker);
+          for (const marker of ['RequestInteraction', 'object_state', 'objectState', 'occupantId', 'SetSeated', 'LocalUserId', 'objectStateVersions', 'packet.version']) if (!client.includes(marker)) throw new Error('Missing client interaction transport: ' + marker);
           if (!gateway.includes('Array.isArray((parsed as { boxes?: unknown }).boxes)'))
             throw new Error('Gateway does not accept the Unity-exported collision map format');
           const authoring = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableAuthoring.cs', 'utf8');
