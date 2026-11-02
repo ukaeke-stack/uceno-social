@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, type ActivitySession } from "./activity-session.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
+import { resolveInteraction } from "./interaction-policy.js";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
@@ -868,12 +869,7 @@ wss.on("connection", async (socket: WebSocket) => {
           fail(socket, "invalid_interaction"); return;
         }
         const target = INTERACTABLES.get(msg.objectId);
-        const actionMatches = target && (
-          (target.kind === "door" && msg.action === "toggle") ||
-          (target.kind === "object" && msg.action === "use") ||
-          (target.kind === "seat" && (msg.action === "sit" || msg.action === "stand"))
-        );
-        if (!actionMatches) {
+        if (!target) {
           send(socket, { type: "interaction_rejected", code: "unknown_or_invalid_object" }); return;
         }
         const distance = Math.hypot(player.x - target.x, player.y - target.y, player.z - target.z);
@@ -883,31 +879,22 @@ wss.on("connection", async (socket: WebSocket) => {
         }
         const previousState = target.state;
         const previousActorId = target.actorId;
+        const previousOccupantId = target.occupantId;
+        const transition = resolveInteraction(target, player.id, msg.action);
+        if (!transition.ok) {
+          send(socket, { type: "interaction_rejected", code: transition.code }); return;
+        }
+        target.state = transition.state;
+        target.occupantId = transition.occupantId;
         if (target.kind === "seat") {
-          if (msg.action === "sit" && target.occupantId && target.occupantId !== player.id) {
-            send(socket, { type: "interaction_rejected", code: "seat_occupied" }); return;
-          }
-          if (msg.action === "stand" && target.occupantId !== player.id) {
-            send(socket, { type: "interaction_rejected", code: "seat_not_occupied_by_player" }); return;
-          }
-          if (msg.action === "sit") {
-            target.occupantId = player.id;
-            target.state = "occupied";
+          if (transition.seated) {
             // Seat markers are authored at the avatar's feet/root anchor.
             player.x = target.x; player.y = target.y; player.z = target.z;
             player.yaw = target.yaw;
             player.vx = 0; player.vy = 0; player.vz = 0;
             player.grounded = true; player.jumpQueued = false;
-            player.seated = true;
-          } else {
-            target.occupantId = null;
-            target.state = "available";
-            player.seated = false;
           }
-        } else {
-          target.state = target.kind === "door"
-            ? (target.state === "open" ? "closed" : "open")
-            : (target.state === "active" ? "idle" : "active");
+          player.seated = transition.seated;
         }
         target.actorId = player.id;
         if (target.kind !== "seat") {
@@ -915,6 +902,7 @@ wss.on("connection", async (socket: WebSocket) => {
           catch (error) {
             target.state = previousState;
             target.actorId = previousActorId;
+            target.occupantId = previousOccupantId;
             console.error("Could not persist world object state:", error);
             send(socket, { type: "interaction_rejected", code: "state_persistence_failed" });
             return;
