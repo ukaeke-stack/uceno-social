@@ -1861,39 +1861,51 @@ setInterval(async () => {
       FROM virtual_world_realtime_events WHERE id > ${worldRelayCursor} AND created_at > NOW() - INTERVAL '30 seconds' ORDER BY id ASC LIMIT ${WORLD_RELAY_BATCH_SIZE}`;
     for (const row of rows) {
       const eventId = Number(row.id);
-      if (Number.isSafeInteger(eventId) && eventId > worldRelayCursor) worldRelayCursor = eventId;
-      if (row.instanceId === INSTANCE_ID && row.eventType === 'player_snapshot') continue;
-      if (row.eventType === 'player_snapshot') {
-        const payload = row.payload as { serverTime?: number; players?: unknown };
-        if (!payload || !Array.isArray(payload.players) || !Number.isFinite(payload.serverTime)) continue;
-        const packet = JSON.stringify({ type: 'snapshot', serverTime: payload.serverTime, players: payload.players });
-        for (const peer of players.values()) {
-          if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
-        }
-      } else if (row.eventType === 'activity_state') {
-        const payload = row.payload as { type?: string; session?: { id?: string; worldId?: string; instanceId?: string; hostGeneration?: number } };
-        const session = payload?.session;
-        if (payload?.type !== 'activity_state' || !session ||
-            session.worldId !== row.worldId || session.instanceId !== row.instanceId ||
-            typeof session.id !== 'string' || !Number.isSafeInteger(session.hostGeneration) ||
-            (session.hostGeneration ?? 0) < 1) continue;
-        const sessionId = session.id;
-        const hostGeneration = session.hostGeneration as number;
-        await sql.begin(async tx => {
-          // Hold the activity row lock through fan-out. A takeover must either
-          // commit before this check (and suppress the stale event) or wait
-          // until this already-authorized broadcast has completed.
-          const authority = await tx`SELECT 1 FROM virtual_world_activity_sessions
-            WHERE id = ${sessionId}::uuid AND world_id = ${row.worldId}::uuid
-              AND instance_id = ${row.instanceId}::uuid
-              AND host_generation = ${hostGeneration}
-            FOR UPDATE`;
-          if (!authority[0]) return;
-          const packet = JSON.stringify(payload);
-          for (const peer of players.values()) {
-            if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
+      if (!Number.isSafeInteger(eventId) || eventId <= worldRelayCursor) continue;
+      try {
+        if (!(row.instanceId === INSTANCE_ID && row.eventType === 'player_snapshot')) {
+          if (row.eventType === 'player_snapshot') {
+            const payload = row.payload as { serverTime?: number; players?: unknown };
+            if (payload && Array.isArray(payload.players) && Number.isFinite(payload.serverTime)) {
+              const packet = JSON.stringify({ type: 'snapshot', serverTime: payload.serverTime, players: payload.players });
+              for (const peer of players.values()) {
+                if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
+              }
+            }
+          } else if (row.eventType === 'activity_state') {
+            const payload = row.payload as { type?: string; session?: { id?: string; worldId?: string; instanceId?: string; hostGeneration?: number } };
+            const session = payload?.session;
+            if (payload?.type === 'activity_state' && session &&
+                session.worldId === row.worldId && session.instanceId === row.instanceId &&
+                typeof session.id === 'string' && Number.isSafeInteger(session.hostGeneration) &&
+                (session.hostGeneration ?? 0) >= 1) {
+              const sessionId = session.id;
+              const hostGeneration = session.hostGeneration as number;
+              await sql.begin(async tx => {
+                // Hold the activity row lock through fan-out. A takeover must either
+                // commit before this check (and suppress the stale event) or wait
+                // until this already-authorized broadcast has completed.
+                const authority = await tx`SELECT 1 FROM virtual_world_activity_sessions
+                  WHERE id = ${sessionId}::uuid AND world_id = ${row.worldId}::uuid
+                    AND instance_id = ${row.instanceId}::uuid
+                    AND host_generation = ${hostGeneration}
+                  FOR UPDATE`;
+                if (!authority[0]) return;
+                const packet = JSON.stringify(payload);
+                for (const peer of players.values()) {
+                  if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
+                }
+              });
+            }
           }
-        });
+        }
+        // Advance only after this event was safely handled (or deliberately ignored).
+        // A transient database failure must leave the cursor before this row so the
+        // next poll retries it instead of silently dropping the relay event.
+        worldRelayCursor = eventId;
+      } catch (error) {
+        console.error('world_relay_event_processing_failed', eventId, error);
+        break;
       }
     }
   } catch (error) { console.error('world_snapshot_relay_poll_failed', error); }
