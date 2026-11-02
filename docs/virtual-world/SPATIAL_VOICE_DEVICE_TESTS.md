@@ -25,6 +25,7 @@ Status: test plan only. No physical-device run is claimed. Native Android audio 
 | Push-to-talk | Hold then release PTT | Audio transmits only while held; release mutes the live microphone track without restarting capture |
 | Local mute | Mute during transmission | Remote side stops receiving speech; unmute restores only according to PTT state |
 | Output mute | Toggle remote output mute off/on | Remote audio is silenced/restored without enabling microphone or muting world audio |
+| Per-player mute | Mute one connected peer while another peer speaks | Only the selected peer is silenced locally; other peers and world audio remain audible |
 | Speaker route | Select Speaker while voice is active | Android communication output switches to loudspeaker; world audio and microphone remain independently controlled |
 | Earpiece route | Select Earpiece while voice is active | Remote voice routes to the phone earpiece when the device exposes it |
 | Bluetooth route | Connect a headset, grant BLUETOOTH_CONNECT, select Bluetooth | Remote voice routes to the selected BLE/classic communication headset; denied permission or absent device reports unavailable |
