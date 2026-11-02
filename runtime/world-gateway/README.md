@@ -43,24 +43,10 @@ Example:
 ```json
 {
   "districts": [
-    {
-      "id": "central",
-      "name": "Central District",
-      "contentLabel": "world-city-district-central",
-      "minX": -100,
-      "maxX": 100,
-      "minZ": -100,
-      "maxZ": 100
-    },
-    {
-      "id": "waterfront",
-      "name": "Waterfront",
-      "contentLabel": "world-city-district-waterfront",
-      "minX": 100,
-      "maxX": 220,
-      "minZ": -100,
-      "maxZ": 100
-    }
+    {"id":"south","name":"South District","contentLabel":"world-city-district-south","minX":-40,"maxX":60,"minZ":-120,"maxZ":-60},
+    {"id":"central-south","name":"Central South","contentLabel":"world-city-district-central-south","minX":-40,"maxX":60,"minZ":-60,"maxZ":0},
+    {"id":"central-north","name":"Central North","contentLabel":"world-city-district-central-north","minX":-40,"maxX":60,"minZ":0,"maxZ":60},
+    {"id":"north","name":"North District","contentLabel":"world-city-district-north","minX":-40,"maxX":60,"minZ":60,"maxZ":120}
   ]
 }
 ```
@@ -71,18 +57,28 @@ stay within `WORLD_BOUNDS`, and content labels must use the
 `world-city-district-<name>` namespace. The gateway rejects invalid configuration
 at startup. Gaps between rectangles are valid and represent the base/shared area.
 
+The Unity scene builder partitions generated city objects into four
+additive scenes (south, central-south, central-north and north), registers each
+scene in the `UCENO Remote District Scenes` Addressables group, uses the
+content label as the scene address, and packs each district separately. The
+example rectangles above match those generated scene partitions. The base
+boot scene retains shared road/terrain, player, camera and session systems.
+
 At a district boundary, the authoritative simulation pauses the player's
 horizontal movement and sends `district_content_required` with the server-chosen
-district ID, label and one-time nonce. Unity downloads the label through
-Addressables and replies with `district_content_ready`. The gateway validates
-the pending district and nonce before allowing movement into that district.
-If the player turns back while downloading, the gateway cancels the pending
-transition. Clients cannot choose district geometry, labels or destination IDs.
+district ID, label and one-time nonce. Unity downloads the label, then loads
+its matching additive Addressables scene and replies with
+`district_content_ready` only after scene activation succeeds. The gateway
+validates the pending district and nonce before allowing movement into that
+district. If the player turns back while downloading, the gateway cancels the
+pending transition. Clients cannot choose district geometry, labels or IDs.
 
-This is source-level behavior. Each configured label must exist in the matching
-platform Addressables catalog, and gateway deployment must include the same
-district geometry as the Unity scene. No production district geometry or CDN
-catalog is provisioned by this code change.
+This is source-level behavior. The scene builder requires Addressables Settings
+and assigns generated scenes to remote build/load path variables. Operators
+must configure a real HTTPS remote profile, build and publish the catalog and
+bundles, and deploy matching gateway rectangles. Browser builds need their own
+WebGL-compatible scene bundles and catalog. No CDN or production catalog is
+provisioned by this code change.
 
 
 ## Activity sessions and checkpoint races
