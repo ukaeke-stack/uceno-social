@@ -21,7 +21,10 @@ public final class UCENOAudioRoute {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 int wanted = routeType(route);
                 for (AudioDeviceInfo device : audio.getAvailableCommunicationDevices()) {
-                    if (device.getType() == wanted) return audio.setCommunicationDevice(device);
+                    int actual = device.getType();
+                    boolean match = actual == wanted ||
+                        ("bluetooth".equals(route) && actual == AudioDeviceInfo.TYPE_BLUETOOTH_SCO);
+                    if (match) return audio.setCommunicationDevice(device);
                 }
                 return false;
             }
