@@ -135,7 +135,7 @@ jobs:
           const interactableMarker = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldInteractable.cs', 'utf8');
           if (interactableMarker.includes('gameObject.name.ToLowerInvariant()') || !interactableMarker.includes('HasDoorPivot'))
             throw new Error('World object IDs must not depend on display names and door pivot validation must be available.');
-          if (!gateway.includes('WORLD_INTERACTABLES_FILE') || !gateway.includes('World interactables must contain an interactables array'))
+          if (!gateway.includes('WORLD_INTERACTABLES_FILE') || !registryPolicy.includes('World interactables must contain an interactables array'))
             throw new Error('Gateway must load and validate the exported scene object registry.');
           const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
           for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes.json'])
