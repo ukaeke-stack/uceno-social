@@ -54,7 +54,10 @@ function startGateway(port, instanceId, scopedDatabaseUrl) {
       WORLD_INSTANCE_ID: instanceId,
       DATABASE_URL: processDatabaseUrl.toString(),
       WORLD_TOKEN_SECRET: tokenSecret,
-      WORLD_INSTANCE_CAPACITY: "8"
+      WORLD_INSTANCE_CAPACITY: "8",
+      WORLD_INTERACTABLES: JSON.stringify({ interactables: [
+        { id: "scene:test-door", kind: "door", x: 37.5, y: 1.15, z: -22.25, yaw: 0 }
+      ] })
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -281,7 +284,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_object_states (
       world_id UUID NOT NULL, district_id TEXT NOT NULL, object_id TEXT NOT NULL,
       object_kind TEXT NOT NULL, object_state TEXT NOT NULL, version BIGINT NOT NULL DEFAULT 1,
-      updated_by UUID
+      updated_by UUID, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (world_id, district_id, object_id)
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_player_sessions (
       world_id UUID NOT NULL, user_id UUID NOT NULL, instance_id UUID NOT NULL,
@@ -345,6 +349,26 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.equal(authenticated.welcome.state.z, -22.25);
     assert.ok(Math.abs(authenticated.welcome.state.yaw - Math.PI / 4) < 0.00001,
       "replacement process must restore the persisted player rotation");
+
+    // Exercise the real WebSocket gateway against a Unity-export-shaped
+    // registry entry and PostgreSQL-backed object-state persistence.
+    const initialDoorState = await receiveSocketMessage(authenticated.socket, "object_state", 5000,
+      packet => packet.objectId === "scene:test-door");
+    assert.equal(initialDoorState.objectState, "closed");
+    authenticated.socket.send(JSON.stringify({
+      type: "interact", objectId: "scene:test-door", action: "toggle"
+    }));
+    const openedDoorState = await receiveSocketMessage(authenticated.socket, "object_state", 5000,
+      packet => packet.objectId === "scene:test-door" && packet.objectState === "open");
+    assert.equal(openedDoorState.version, 1);
+    const persistedDoor = await admin.unsafe(`SELECT object_kind, object_state, version
+      FROM "${schema}".virtual_world_object_states
+      WHERE world_id = $1::uuid AND district_id = 'unassigned' AND object_id = 'scene:test-door'`,
+      [worldId]);
+    assert.equal(persistedDoor.length, 1);
+    assert.equal(persistedDoor[0].object_kind, "door");
+    assert.equal(persistedDoor[0].object_state, "open");
+    assert.equal(Number(persistedDoor[0].version), 1);
     authenticated.socket.close();
     const heartbeatDeadline = Date.now() + 5000;
     let liveHeartbeats = [];
