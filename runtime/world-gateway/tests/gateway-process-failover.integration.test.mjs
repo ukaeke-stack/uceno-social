@@ -120,6 +120,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
         WHERE id IN ($1::uuid, $2::uuid)`, [instanceA, instanceB]);
       assert.equal(rows.length, 2);
       assert.ok(rows.every(row => row.heartbeat_at instanceof Date));
+      assert.deepEqual(new Set(rows.map(row => row.id)), new Set([instanceA, instanceB]));
     });
 
     await t.test("replacement remains ready after the primary process is terminated", async () => {
@@ -127,13 +128,13 @@ test("two real gateway processes: primary loss leaves the replacement process re
       const replacement = await waitForReady(portB, gatewayB);
       assert.equal(replacement.instanceId, instanceB);
       assert.equal(replacement.status, "ready");
-      const primary = await admin`SELECT heartbeat_at FROM "${schema}".virtual_world_instances
-        WHERE id = ${instanceA}::uuid`;
+      const primary = await admin.unsafe(`SELECT heartbeat_at FROM "${schema}".virtual_world_instances
+        WHERE id = $1::uuid`, [instanceA]);
       assert.equal(primary.length, 1);
       await admin.unsafe(`UPDATE "${schema}".virtual_world_instances
         SET heartbeat_at = NOW() - INTERVAL '1 minute' WHERE id = $1::uuid`, [instanceA]);
-      const stale = await admin`SELECT heartbeat_at < NOW() - INTERVAL '30 seconds' AS stale
-        FROM "${schema}".virtual_world_instances WHERE id = ${instanceA}::uuid`;
+      const stale = await admin.unsafe(`SELECT heartbeat_at < NOW() - INTERVAL '30 seconds' AS stale
+        FROM "${schema}".virtual_world_instances WHERE id = $1::uuid`, [instanceA]);
       assert.equal(stale[0].stale, true);
       assert.equal((await waitForReady(portB, gatewayB)).instanceId, instanceB);
     });
