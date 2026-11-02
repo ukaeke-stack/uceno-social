@@ -13,7 +13,25 @@ test("activity transfer consumes its ticket and advances the player fence atomic
   assert.match(transaction, /await tx\x60UPDATE virtual_world_activity_transfer_tickets/);
   assert.match(transaction, /await tx\x60INSERT INTO virtual_world_player_sessions/);
   assert.match(transaction, /if \(!fenced\[0\]\) throw new Error\("transfer_session_claim_failed"\)/);
+  assert.match(source, /if \(!claimed \|\| !claimed\[0\]\)/);
   assert.doesNotMatch(transaction, /await sql\x60UPDATE virtual_world_activity_transfer_tickets/);
+});
+
+test("active competition transfer is limited to an already-joined participant", () => {
+  const issueStart = source.indexOf('const target = await sql', source.indexOf('/activity/transfer-ticket'));
+  const issueEnd = source.indexOf('res.writeHead(200, headers)', issueStart);
+  const issue = source.slice(issueStart, issueEnd);
+  assert.match(issue, /activity\.phase IN \('lobby', 'active'\)/);
+  assert.match(issue, /persisted\.session\.participants\.get\(identity\.userId\)/);
+  assert.match(issue, /target\[0\]\.phase === "active" && \(!participant \|\| participant\.status !== "joined"\)/);
+  assert.match(issue, /host_generation/);
+  assert.match(issue, /transfer_host_generation/);
+  const consumeStart = source.indexOf("const consumed = await tx");
+  const consumeEnd = source.indexOf("RETURNING ticket.id", consumeStart);
+  const consume = source.slice(consumeStart, consumeEnd);
+  assert.match(consume, /ticket\.host_generation = \$\{Number\(payload\.transfer_host_generation\)\}/);
+  assert.match(consume, /activity\.host_generation = ticket\.host_generation/);
+  assert.match(consume, /participant->>'status' = 'joined'/);
 });
 
 test("transfer-ticket cleanup is bounded and does not delete recent audit rows", () => {
