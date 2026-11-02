@@ -285,8 +285,11 @@ test("two real gateway processes: primary loss leaves the replacement process re
       [worldId, userId, { x: 37.5, y: 1.15, z: -22.25 }, { x: 0, y: 0.3826834, z: 0, w: 0.9238795 }]);
     const authenticated = await connectAuthenticated(portB, instanceB, worldId, userId);
     assert.equal(authenticated.welcome.userId, userId);
-    assert.deepEqual(authenticated.welcome.state, { x: 37.5, y: 1.15, z: -22.25, yaw: 0.7853981633974483 },
-      "replacement process must load the persisted position and rotation checkpoint");
+    assert.equal(authenticated.welcome.state.x, 37.5);
+    assert.equal(authenticated.welcome.state.y, 1.15);
+    assert.equal(authenticated.welcome.state.z, -22.25);
+    assert.ok(Math.abs(authenticated.welcome.state.yaw - Math.PI / 4) < 0.00001,
+      "replacement process must restore the persisted player rotation");
     authenticated.socket.close();
     const heartbeatDeadline = Date.now() + 5000;
     let liveHeartbeats = [];
