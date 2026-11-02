@@ -3,9 +3,11 @@
 - [ ] Unity Package Manager resolves the pinned Addressables package in Unity 6000.3.27f1.
 - [ ] The bootstrap initializes Addressables without a configured remote catalog for local Editor tests.
 - [ ] A configured versioned HTTPS remote catalog loads successfully.
-- [ ] Entering an uncached labeled area automatically requests its dependencies and reports progress.
+- [ ] After an authoritative home-entry transition, `WorldAreaContentBinding` automatically requests `home-interiors` and reports progress.
+- [ ] After an authoritative event-venue transition, `WorldAreaContentBinding` automatically requests `world-event-venues` and reports progress.
 - [ ] Successful downloads are cached and revisiting the same area does not download the same bundles again.
-- [ ] Interrupt the connection mid-download; the area remains inaccessible and safe, an actionable error appears, and retry succeeds after connectivity returns.
+- [ ] Interrupt the connection mid-download; the current implementation reports a failure while the server-authorized area remains active. Verify that a subsequent visit retries and succeeds after connectivity returns.
+- [ ] Verify the known limitation: downloads currently begin after server admission; do not treat this as a pre-transition loading gate.
 - [ ] A missing label/catalog produces a clear error rather than a blank world or crash.
 - [ ] Low-storage and HTTP errors are surfaced without marking the label ready.
 - [ ] Developer preload downloads configured labels in sequence and is unavailable in release UI.
