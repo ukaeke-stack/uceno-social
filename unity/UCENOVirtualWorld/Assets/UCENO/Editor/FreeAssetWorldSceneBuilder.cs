@@ -5,6 +5,9 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEditor.Build;
+using UnityEditor.AddressableAssets;
+using UnityEditor.AddressableAssets.Settings;
+using UnityEditor.AddressableAssets.Settings.GroupSchemas;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -127,15 +130,19 @@ namespace UCENO.VirtualWorld.Editor
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
                 throw new BuildFailedException("UCENO city scene could not be saved.");
 
+            // Export before moving district geometry into additive scenes so the
+            // gateway collision map still covers every generated city collider.
+            string collisionMapPath = WorldCollisionGeometryExporter.Export(scene);
+            BuildDistrictScenes(worldRoot);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            if (!EditorSceneManager.SaveScene(scene, ScenePath))
+                throw new BuildFailedException("UCENO boot scene could not be saved after district extraction.");
+
             RegisterSceneInBuildSettings(ScenePath);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-
-            // Export the exact world-space bounds of the colliders just built
-            // from imported scene geometry. The gateway consumes this generated
-            // map at deployment; no hand-entered placeholder collision boxes.
-            string collisionMapPath = WorldCollisionGeometryExporter.Export(scene);
-            Debug.Log("UCENO realistic city scene generated. Authoritative collision map: " + collisionMapPath);
+            Debug.Log("UCENO boot scene and four additive district scenes generated. Authoritative collision map: " + collisionMapPath);
         }
 
         private static void ValidateSourceAssets()
@@ -724,6 +731,113 @@ namespace UCENO.VirtualWorld.Editor
             EditorBuildSettings.scenes = scenes
                 .Concat(new[] { new EditorBuildSettingsScene(scenePath, true) })
                 .ToArray();
+        }
+
+        private static void BuildDistrictScenes(Transform worldRoot)
+        {
+            const string districtFolder = "Assets/UCENO/Scenes/Districts";
+            EnsureFolder(districtFolder);
+
+            string[] districtNames = { "south", "central-south", "central-north", "north" };
+            Dictionary<string, Scene> districtScenes = new Dictionary<string, Scene>(StringComparer.Ordinal);
+            Dictionary<string, Transform> districtRoots = new Dictionary<string, Transform>(StringComparer.Ordinal);
+
+            foreach (string districtName in districtNames)
+            {
+                Scene districtScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+                string sceneObjectName = "UCENO District " + ToTitle(districtName);
+                GameObject districtRoot = new GameObject(sceneObjectName);
+                SceneManager.MoveGameObjectToScene(districtRoot, districtScene);
+                districtScenes.Add(districtName, districtScene);
+                districtRoots.Add(districtName, districtRoot.transform);
+            }
+
+            List<Transform> streamedRoots = worldRoot.Cast<Transform>()
+                .Where(child => !IsBootSceneObject(child.name))
+                .ToList();
+
+            foreach (Transform child in streamedRoots)
+            {
+                string districtName = ResolveDistrictName(child.position.z);
+                Scene districtScene = districtScenes[districtName];
+                Transform districtRoot = districtRoots[districtName];
+                SceneManager.MoveGameObjectToScene(child.gameObject, districtScene);
+                child.SetParent(districtRoot, true);
+            }
+
+            foreach (string districtName in districtNames)
+            {
+                Scene districtScene = districtScenes[districtName];
+                string scenePath = districtFolder + "/UCENO_District_" + ToTitle(districtName).Replace(" ", "_") + ".unity";
+                if (!EditorSceneManager.SaveScene(districtScene, scenePath))
+                    throw new BuildFailedException("Could not save additive district scene: " + scenePath);
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            AddressableAssetSettings settings = AddressableAssetSettingsDefaultObject.GetSettings(true);
+            if (settings == null)
+                throw new BuildFailedException("Addressables settings could not be created. Create Addressables Settings and rerun the UCENO scene builder.");
+
+            const string groupName = "UCENO Remote District Scenes";
+            AddressableAssetGroup group = settings.FindGroup(groupName);
+            if (group == null)
+            {
+                group = settings.CreateGroup(groupName, false, false, true, null,
+                    typeof(BundledAssetGroupSchema), typeof(ContentUpdateGroupSchema));
+            }
+
+            BundledAssetGroupSchema bundledSchema = group.GetSchema<BundledAssetGroupSchema>();
+            if (bundledSchema == null) bundledSchema = group.AddSchema<BundledAssetGroupSchema>();
+            bundledSchema.BundleMode = BundledAssetGroupSchema.BundlePackingMode.PackSeparately;
+            bundledSchema.BuildPath.SetVariableByName(settings, AddressableAssetSettings.kRemoteBuildPath);
+            bundledSchema.LoadPath.SetVariableByName(settings, AddressableAssetSettings.kRemoteLoadPath);
+            EditorUtility.SetDirty(bundledSchema);
+
+            foreach (string districtName in districtNames)
+            {
+                string scenePath = districtFolder + "/UCENO_District_" + ToTitle(districtName).Replace(" ", "_") + ".unity";
+                string guid = AssetDatabase.AssetPathToGUID(scenePath);
+                if (string.IsNullOrEmpty(guid))
+                    throw new BuildFailedException("Addressables could not resolve generated district scene: " + scenePath);
+
+                string label = "world-city-district-" + districtName;
+                AddressableAssetEntry entry = settings.CreateOrMoveEntry(guid, group, false, false);
+                entry.address = label;
+                entry.SetLabel(label, true, true);
+                EditorUtility.SetDirty(entry);
+            }
+
+            EditorUtility.SetDirty(settings);
+            AssetDatabase.SaveAssets();
+        }
+
+        private static bool IsBootSceneObject(string objectName)
+        {
+            return objectName == "UCENO Local Player" ||
+                objectName == "Grass Terrain" ||
+                objectName == "Main Asphalt Road" ||
+                objectName == "Left Concrete Walkway" ||
+                objectName == "Right Concrete Walkway" ||
+                objectName == "Left Grass Verge" ||
+                objectName == "Right Grass Verge" ||
+                objectName == "Road Marking" ||
+                objectName == "City Sun";
+        }
+
+        private static string ResolveDistrictName(float worldZ)
+        {
+            if (worldZ < -60f) return "south";
+            if (worldZ < 0f) return "central-south";
+            if (worldZ < 60f) return "central-north";
+            return "north";
+        }
+
+        private static string ToTitle(string value)
+        {
+            return string.Join(" ", value.Split('-')
+                .Select(part => char.ToUpperInvariant(part[0]) + part.Substring(1)));
         }
 
         private static Shader RequireShader(string shaderName)
