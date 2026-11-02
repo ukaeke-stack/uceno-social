@@ -10,6 +10,7 @@ import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHystere
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { isPersistentObjectState, defaultPersistentObjectState } from "./district-object-policy.js";
 import { checkpointVersionForSession } from "./session-fence-policy.js";
+import { shouldPublishWorldSnapshot, WORLD_RELAY_BATCH_SIZE, WORLD_RELAY_POLL_INTERVAL_MS } from "./world-relay-policy.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { jwtVerify } from "jose";
@@ -342,6 +343,12 @@ function voicePairKey(a: string, b: string): string {
 // Activity sessions are scoped to this live gateway instance. They are deliberately
 // not advertised as persistent: process restarts currently clear sessions/results.
 const activitySessions = new Map<string, ActivitySession>();
+let lastWorldSnapshotRelayAt = 0;
+let worldRelayCursor = 0;
+let worldRelayCursorReady = false;
+void sql`SELECT COALESCE(MAX(id), 0)::bigint AS cursor FROM virtual_world_realtime_events`
+  .then(rows => { worldRelayCursor = Number(rows[0]?.cursor ?? 0); worldRelayCursorReady = true; })
+  .catch(error => console.error("world_relay_cursor_init_failed", error));
 const activityHosts = new Map<string, string>();
 const activityRaceIds = new Map<string, string>();
 const MAX_ACTIVITY_SESSIONS = 256;
@@ -1446,10 +1453,49 @@ setInterval(async () => {
     if (changed) broadcastActivity(session);
   }
   if (snapshots.length) {
-    const packet = JSON.stringify({ type: "snapshot", serverTime: now, players: snapshots });
+    const packet = JSON.stringify({ type: 'snapshot', serverTime: now, players: snapshots });
     for (const p of players.values()) if (p.socket.readyState === WebSocket.OPEN) p.socket.send(packet);
+    if (shouldPublishWorldSnapshot(lastWorldSnapshotRelayAt, now)) {
+      lastWorldSnapshotRelayAt = now;
+      const byWorld = new Map<string, typeof snapshots>();
+      for (const snapshot of snapshots) {
+        const owner = players.get(snapshot.userId);
+        if (!owner) continue;
+        const batch = byWorld.get(owner.worldId) ?? [];
+        batch.push(snapshot);
+        byWorld.set(owner.worldId, batch);
+      }
+      for (const [worldId, worldPlayers] of byWorld) {
+        void sql`INSERT INTO virtual_world_realtime_events (world_id, instance_id, event_type, payload)
+          VALUES (\${worldId}::uuid, \${INSTANCE_ID}::uuid, 'player_snapshot',
+            \${JSON.stringify({ serverTime: now, players: worldPlayers })}::jsonb)`
+          .catch(error => console.error('world_snapshot_relay_publish_failed', error));
+      }
+    }
   }
 }, TICK_MS);
+
+let worldRelayPollInProgress = false;
+setInterval(async () => {
+  if (!worldRelayCursorReady || worldRelayPollInProgress) return;
+  worldRelayPollInProgress = true;
+  try {
+    const rows = await sql`SELECT id, world_id AS \"worldId\", instance_id AS \"instanceId\", event_type AS \"eventType\", payload
+      FROM virtual_world_realtime_events WHERE id > \${worldRelayCursor} ORDER BY id ASC LIMIT \${WORLD_RELAY_BATCH_SIZE}`;
+    for (const row of rows) {
+      const eventId = Number(row.id);
+      if (Number.isSafeInteger(eventId) && eventId > worldRelayCursor) worldRelayCursor = eventId;
+      if (row.instanceId === INSTANCE_ID || row.eventType !== 'player_snapshot') continue;
+      const payload = row.payload as { serverTime?: number; players?: unknown };
+      if (!payload || !Array.isArray(payload.players) || !Number.isFinite(payload.serverTime)) continue;
+      const packet = JSON.stringify({ type: 'snapshot', serverTime: payload.serverTime, players: payload.players });
+      for (const peer of players.values()) {
+        if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
+      }
+    }
+  } catch (error) { console.error('world_snapshot_relay_poll_failed', error); }
+  finally { worldRelayPollInProgress = false; }
+}, WORLD_RELAY_POLL_INTERVAL_MS);
 
 const heartbeat = async () => {
   try {
