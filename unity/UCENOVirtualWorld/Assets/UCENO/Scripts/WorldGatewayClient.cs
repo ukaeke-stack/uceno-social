@@ -764,6 +764,14 @@ namespace UCENO.VirtualWorld
                 return;
             }
 
+            if (packet.type == "district_content_exited")
+            {
+                if (!string.IsNullOrEmpty(activeDistrictLabel))
+                    contentDelivery?.ReleaseContent(activeDistrictLabel);
+                activeDistrictLabel = "";
+                return;
+            }
+
             if (packet.type == "district_content_cancelled")
             {
                 if (packet.districtId == pendingDistrictId)
