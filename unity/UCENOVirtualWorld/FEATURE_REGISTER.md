@@ -106,3 +106,13 @@ gateway file; seat occupancy remains transient and is released on disconnect.
 - In workflow run 41365478460, gateway build and Unity source-contract validation passed. The web-app production build was still running at the last status check; its result is not confirmed.
 - These tests exercise policy helpers only. They do not test actual WebRTC connections, microphone access, audio delivery, audio attenuation, TURN relay, or mobile background behavior.
 - The project uses Unity Editor 6000.3.27f1 and currently has no Unity WebRTC package in `Packages/manifest.json`. Actual voice media implementation is still blocked on selecting and validating a Unity-6-compatible WebRTC package and its Android support. Do not claim end-to-end spatial voice is implemented.
+
+
+## 2026-11-02 spatial voice presence reconciliation
+
+- Updated the gateway so voice opt-in is reconciled against the live player positions and spatial contexts every second.
+- When a voice peer pair moves out of the 24-metre range or into different world/home/event contexts, the gateway sends inactive presence to both clients and removes the pair from its active peer set.
+- When two opted-in players become eligible peers, the gateway checks mutual blocks server-side before announcing active presence. A post-query state check avoids announcing a peer that disconnected, left voice, or moved away while the database query was pending.
+- Explicit voice leave, home/event context changes, and disconnect cleanup remove known visible peer pairs.
+- Commit: 02b88de9fc710db67e09882722e5d9cb4ba45661.
+- Workflow status for this exact commit was not yet available at the last check. This is not evidence of runtime voice audio: WebRTC media, microphone capture, audio playback, STUN/TURN, attenuation, and physical-device validation remain outstanding.
