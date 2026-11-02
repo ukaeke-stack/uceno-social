@@ -264,7 +264,7 @@ let processAuthority = false;
 let processLeaseUntil = 0;
 
 async function acquireProcessOwnership(): Promise<void> {
-  const rows = await sql`SELECT claim_virtual_world_instance_process(
+  const rows = await sql`SELECT claim_world_instance_process(
     ${INSTANCE_ID}::uuid, ${PROCESS_ID}::uuid, 12
   ) AS generation`;
   const generation = Number(rows[0]?.generation);
