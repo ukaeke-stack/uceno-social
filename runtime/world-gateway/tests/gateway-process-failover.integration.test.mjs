@@ -425,6 +425,19 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal(priorOffset.length, 1, "running gateway must persist its relay consumer offset");
       await stopGateway(gatewayB);
       gatewayB = null;
+      // SIGKILL cannot release the database lease. A replacement must wait
+      // until the last confirmed lease expires; starting earlier is correctly
+      // rejected as a duplicate owner, not evidence of failed recovery.
+      const leaseDeadline = Date.now() + 20000;
+      let leaseExpired = false;
+      while (Date.now() < leaseDeadline) {
+        const leaseRows = await admin.unsafe(`SELECT owner_lease_expires_at <= NOW() AS expired
+          FROM "${schema}".virtual_world_instances WHERE id = $1::uuid`, [instanceB]);
+        leaseExpired = leaseRows[0]?.expired === true;
+        if (leaseExpired) break;
+        await delay(150);
+      }
+      assert.equal(leaseExpired, true, "replacement must wait for the crashed process lease to expire");
       const inserted = await admin.unsafe(`INSERT INTO "${schema}".virtual_world_realtime_events
         (world_id, instance_id, event_type, payload, created_at)
         VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb, NOW() - INTERVAL '1 minute')
