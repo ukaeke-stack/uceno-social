@@ -561,7 +561,7 @@ namespace UCENO.VirtualWorld.Editor
             // destination rather than leaving it as a single repeated road.
             Transform square = new GameObject("Civic Garden Square").transform;
             square.SetParent(parent, false);
-            square.localPosition = new Vector3(37f, 0f, 0f);
+            square.localPosition = new Vector3(37f, 0f, 20f);
 
             CreatePlane("Garden Square Paving", square, new Vector3(0f, 0.025f, 0f), 27f, 34f, concrete);
             CreatePlane("Garden Lawn", square, new Vector3(0f, 0.045f, 0f), 15f, 22f, grass);
