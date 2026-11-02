@@ -1,0 +1,33 @@
+name: UCENO Voice HUD Source Checks
+
+on:
+  pull_request:
+    paths:
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldSpatialVoiceClient.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldStatusHud.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/PlayerMotor.cs"
+      - "scripts/validate-uceno-voice-hud.mjs"
+      - ".github/workflows/uceno-voice-hud-source.yml"
+  push:
+    branches:
+      - "feature/uceno-unity-foundation"
+    paths:
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldSpatialVoiceClient.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldStatusHud.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/PlayerMotor.cs"
+      - "scripts/validate-uceno-voice-hud.mjs"
+      - ".github/workflows/uceno-voice-hud-source.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate voice HUD integration contracts
+        run: node scripts/validate-uceno-voice-hud.mjs
