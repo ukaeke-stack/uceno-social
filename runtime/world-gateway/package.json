@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "test:activity": "npm run build && node --test tests/database-fencing.integration.test.mjs tests/gateway-process-failover.integration.test.mjs tests/activity-session.test.mjs tests/activity-persistence.test.mjs tests/activity-transfer-source.test.mjs tests/voice-policy.test.mjs tests/interaction-policy.test.mjs tests/district-policy.test.mjs tests/district-object-policy.test.mjs tests/district-transition-policy.test.mjs tests/session-fence-policy.test.mjs tests/world-relay-policy.test.mjs tests/district-collision-policy.test.mjs"
+    "test:activity": "npm run build && node --test tests/database-fencing.integration.test.mjs tests/gateway-process-failover.integration.test.mjs tests/activity-session.test.mjs tests/activity-persistence.test.mjs tests/activity-transfer-source.test.mjs tests/voice-policy.test.mjs tests/interaction-policy.test.mjs tests/district-policy.test.mjs tests/district-object-policy.test.mjs tests/district-transition-policy.test.mjs tests/session-fence-policy.test.mjs tests/world-relay-policy.test.mjs tests/district-collision-policy.test.mjs tests/interactable-registry-policy.test.mjs"
   },
   "dependencies": {
     "jose": "^6.0.8",
