@@ -232,6 +232,38 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
       assert.equal((await authorized(ids.guest, ids.world, ids.newA, 2)).length, 0);
     });
 
+    await t.test("takeover invalidates an issued transfer ticket before it can be consumed", async () => {
+      await resetActivity();
+      await withSchema(tx => tx`INSERT INTO virtual_world_activity_transfer_tickets
+        (id, world_id, user_id, activity_session_id, source_instance_id, target_instance_id,
+         host_generation, expires_at)
+        VALUES (${ids.ticket}::uuid, ${ids.world}::uuid, ${ids.guest}::uuid,
+          ${ids.activity}::uuid, ${ids.old}::uuid, ${ids.newA}::uuid, 1, NOW() + INTERVAL '30 seconds')`);
+      const moved = await takeover(ids.newB, ids.host);
+      assert.equal(moved.length, 1);
+      const consumed = await withSchema(tx => tx`
+        UPDATE virtual_world_activity_transfer_tickets ticket
+        SET consumed_at = NOW()
+        WHERE ticket.id = ${ids.ticket}::uuid
+          AND ticket.world_id = ${ids.world}::uuid
+          AND ticket.user_id = ${ids.guest}::uuid
+          AND ticket.target_instance_id = ${ids.newA}::uuid
+          AND ticket.host_generation = 1
+          AND ticket.consumed_at IS NULL AND ticket.expires_at > NOW()
+          AND EXISTS (SELECT 1 FROM virtual_world_activity_sessions activity
+            WHERE activity.id = ticket.activity_session_id
+              AND activity.world_id = ticket.world_id
+              AND activity.instance_id = ticket.target_instance_id
+              AND activity.host_generation = ticket.host_generation
+              AND activity.phase = 'lobby')
+        RETURNING ticket.id`);
+      assert.equal(consumed.length, 0);
+      const ticket = await withSchema(tx => tx`SELECT consumed_at
+        FROM virtual_world_activity_transfer_tickets WHERE id = ${ids.ticket}::uuid`);
+      assert.equal(ticket.length, 1);
+      assert.equal(ticket[0].consumed_at, null);
+    });
+
     await t.test("takeover waits while an authorized relay holds the activity row lock", async () => {
       await resetActivity();
       let announceLocked;
