@@ -379,8 +379,11 @@ namespace UCENO.VirtualWorld
 
             // A successful scene load may be waiting for a gateway acknowledgement.
             // Retry the acknowledgement without acquiring a second residency lease.
-            if (pendingDistrictResidentLabel == label)
+            if (pendingDistrictResidentLabel == label || activeDistrictLabel == label)
             {
+                if (string.IsNullOrEmpty(pendingDistrictResidentLabel))
+                    pendingDistrictResidentLabel = activeDistrictLabel;
+                districtDownloadRunning = false;
                 _ = SendDistrictContentReadyAsync(expectedDistrict, expectedNonce);
                 return;
             }
@@ -763,7 +766,7 @@ namespace UCENO.VirtualWorld
 
             if (packet.type == "district_content_accepted")
             {
-                if (packet.districtId == pendingDistrictId)
+                if (packet.districtId == pendingDistrictId && packet.nonce == pendingDistrictNonce)
                 {
                     if (!string.IsNullOrEmpty(activeDistrictLabel) &&
                         activeDistrictLabel != pendingDistrictResidentLabel)
@@ -790,7 +793,7 @@ namespace UCENO.VirtualWorld
 
             if (packet.type == "district_content_cancelled")
             {
-                if (packet.districtId == pendingDistrictId)
+                if (packet.districtId == pendingDistrictId && packet.nonce == pendingDistrictNonce)
                 {
                     if (!string.IsNullOrEmpty(pendingDistrictResidentLabel))
                         contentDelivery?.ReleaseContent(pendingDistrictResidentLabel);
