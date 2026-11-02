@@ -1,0 +1,34 @@
+name: UCENO World Gateway Tests
+
+on:
+  pull_request:
+    paths:
+      - "runtime/world-gateway/**"
+      - ".github/workflows/world-gateway-tests.yml"
+  push:
+    branches:
+      - "feature/uceno-unity-foundation"
+    paths:
+      - "runtime/world-gateway/**"
+      - ".github/workflows/world-gateway-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  gateway-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: runtime/world-gateway
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install gateway dependencies
+        run: npm install --no-package-lock
+      - name: Compile gateway and run policy/session tests
+        run: npm run test:activity
