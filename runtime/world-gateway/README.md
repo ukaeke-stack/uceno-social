@@ -120,6 +120,8 @@ devices tested against the same ready instance.
 
 ## Proximity voice signaling status
 
-The gateway now provides an authenticated, proximity- and spatial-context-scoped WebSocket signaling relay for WebRTC offers, answers and ICE candidates. Both users must opt in; the server enforces same-world/same-home-or-event scope, 24-metre range, block checks, bounded payloads and rate limits. Moving between spatial contexts or disconnecting ends the active voice session.
+The gateway provides an authenticated, proximity- and spatial-context-scoped WebSocket signaling relay for WebRTC offers, answers and ICE candidates. Both users must opt in; the server enforces same-world/same-home-or-event scope, 24-metre range, block checks, bounded payloads and rate limits.
+
+The gateway now reconciles active voice peers once per second. When either player moves out of range or changes spatial context, both clients receive inactive presence; when two opted-in players become eligible peers again, presence is re-announced after a server-side block check. This prevents the server's peer-presence list from remaining stale after movement. Reconciliation is source-implemented; runtime behavior and database load have not been tested.
 
 This is only the signaling plane. A WebRTC media implementation, microphone permissions, STUN/TURN service configuration, audio playback, spatial attenuation and physical-device testing are still required before voice chat works end to end.
