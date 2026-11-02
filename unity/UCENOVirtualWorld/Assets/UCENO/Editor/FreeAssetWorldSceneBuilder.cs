@@ -121,6 +121,7 @@ namespace UCENO.VirtualWorld.Editor
             BuildDistrictFeatures(
                 worldRoot, asphalt, concrete, grass, laneMarking,
                 pachiraPrefab, shrub03Prefab, lampPrefab, carPrefab);
+            BuildConfiguredInteractionObjects(worldRoot, homeFurniturePrefabs);
             ConfigureLighting(skybox);
 
             WorldSessionClient worldSession = world.AddComponent<WorldSessionClient>();
@@ -629,6 +630,80 @@ namespace UCENO.VirtualWorld.Editor
             QualitySettings.vSyncCount = 0;
             QualitySettings.lodBias = 0.9f;
             QualitySettings.streamingMipmapsActive = true;
+        }
+
+        private static void BuildConfiguredInteractionObjects(Transform parent, GameObject[] furniturePrefabs)
+        {
+            if (furniturePrefabs == null || furniturePrefabs.Length < 3)
+                throw new BuildFailedException("UCENO interactive furniture prefabs are incomplete.");
+
+            GameObject leftSeat = (GameObject)PrefabUtility.InstantiatePrefab(furniturePrefabs[1], parent);
+            leftSeat.name = "UCENO Plaza Seat A";
+            leftSeat.transform.SetPositionAndRotation(new Vector3(11f, 0f, -34f), Quaternion.Euler(0f, 90f, 0f));
+            AddSceneInteractable(leftSeat, WorldInteractableKind.Seat);
+
+            GameObject rightSeat = (GameObject)PrefabUtility.InstantiatePrefab(furniturePrefabs[1], parent);
+            rightSeat.name = "UCENO Plaza Seat B";
+            rightSeat.transform.SetPositionAndRotation(new Vector3(13f, 0f, -34f), Quaternion.Euler(0f, -90f, 0f));
+            AddSceneInteractable(rightSeat, WorldInteractableKind.Seat);
+
+            GameObject table = (GameObject)PrefabUtility.InstantiatePrefab(furniturePrefabs[2], parent);
+            table.name = "UCENO Plaza Table";
+            table.transform.SetPositionAndRotation(new Vector3(12f, 0f, -31.5f), Quaternion.identity);
+            AddSceneInteractable(table, WorldInteractableKind.Furniture);
+
+            GameObject doorway = new GameObject("UCENO Plaza Service Door");
+            doorway.transform.SetParent(parent, false);
+            doorway.transform.position = new Vector3(18f, 0f, -35f);
+            GameObject frameLeft = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            frameLeft.name = "Door Frame Left";
+            frameLeft.transform.SetParent(doorway.transform, false);
+            frameLeft.transform.localPosition = new Vector3(-0.08f, 1.1f, 0f);
+            frameLeft.transform.localScale = new Vector3(0.16f, 2.2f, 0.24f);
+            GameObject frameRight = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            frameRight.name = "Door Frame Right";
+            frameRight.transform.SetParent(doorway.transform, false);
+            frameRight.transform.localPosition = new Vector3(1.08f, 1.1f, 0f);
+            frameRight.transform.localScale = new Vector3(0.16f, 2.2f, 0.24f);
+            GameObject frameTop = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            frameTop.name = "Door Frame Header";
+            frameTop.transform.SetParent(doorway.transform, false);
+            frameTop.transform.localPosition = new Vector3(0.5f, 2.18f, 0f);
+            frameTop.transform.localScale = new Vector3(1.16f, 0.16f, 0.24f);
+
+            GameObject hinge = new GameObject("Door Hinge Pivot");
+            hinge.transform.SetParent(doorway.transform, false);
+            GameObject leaf = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            leaf.name = "Door Leaf";
+            leaf.transform.SetParent(hinge.transform, false);
+            leaf.transform.localPosition = new Vector3(0.5f, 1.05f, 0f);
+            leaf.transform.localScale = new Vector3(1f, 2.1f, 0.12f);
+            leaf.GetComponent<Renderer>().sharedMaterial =
+                CreateSimpleMaterial("UCENO_Interactive_Door", new Color(0.24f, 0.19f, 0.14f));
+            GameObject handle = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            handle.name = "Door Handle";
+            handle.transform.SetParent(leaf.transform, false);
+            handle.transform.localPosition = new Vector3(0.38f, 0f, -0.58f);
+            handle.transform.localScale = new Vector3(0.07f, 0.07f, 0.07f);
+            handle.GetComponent<Renderer>().sharedMaterial =
+                CreateSimpleMaterial("UCENO_Interactive_Door_Handle", new Color(0.78f, 0.62f, 0.25f));
+
+            WorldInteractable doorMarker = AddSceneInteractable(doorway, WorldInteractableKind.Door);
+            SerializedObject doorData = new SerializedObject(doorMarker);
+            doorData.FindProperty("doorPivot").objectReferenceValue = hinge.transform;
+            doorData.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static WorldInteractable AddSceneInteractable(GameObject target, WorldInteractableKind kind)
+        {
+            WorldInteractable marker = target.GetComponent<WorldInteractable>();
+            if (marker == null) marker = target.AddComponent<WorldInteractable>();
+            SerializedObject data = new SerializedObject(marker);
+            data.FindProperty("kind").enumValueIndex = (int)kind;
+            data.FindProperty("objectId").stringValue = "";
+            data.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(marker);
+            return marker;
         }
 
         private static GameObject BuildPlayer(Transform parent, GameObject avatarPrefab, WorldSessionClient worldSession, GameObject[] homeFurniturePrefabs)
