@@ -721,6 +721,7 @@ namespace UCENO.VirtualWorld
             {
                 { "Authorization", "Bearer " + selectedToken }
             });
+            WebSocket connectionSocket = socket;
             socket.OnOpen += () =>
             {
                 connecting = false;
@@ -737,6 +738,7 @@ namespace UCENO.VirtualWorld
             };
             socket.OnClose += code =>
             {
+                if (socket != connectionSocket) return;
                 connecting = false;
                 connected = false;
                 sendPending = false;
@@ -745,9 +747,17 @@ namespace UCENO.VirtualWorld
                     localPlayer.SetServerAuthority(false);
                     localPlayer.SetSeated(false);
                 }
-                if (!destroying && !transferringGateway)
+                if (!destroying)
                 {
-                    ConnectionStatus = "DISCONNECTED";
+                    if (transferringGateway)
+                    {
+                        transferringGateway = false;
+                        pendingTransferActivityId = "";
+                        transferEndpointOverride = "";
+                        transferTokenOverride = "";
+                        ConnectionStatus = "TRANSFER FAILED - RETRYING";
+                    }
+                    else ConnectionStatus = "DISCONNECTED";
                     ScheduleReconnect();
                 }
                 Debug.LogWarning("UCENO gateway closed: " + code);
