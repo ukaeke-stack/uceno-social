@@ -1,5 +1,7 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
+import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, type ActivitySession } from "./activity-session.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isValidVoiceSignal } from "./voice-policy.js";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
@@ -11,6 +13,9 @@ const PORT = Number(process.env.PORT || 8080);
 const INSTANCE_ID = process.env.WORLD_INSTANCE_ID || "";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const TOKEN_SECRET = process.env.WORLD_TOKEN_SECRET || "";
+const LIVEKIT_URL = process.env.LIVEKIT_URL || "";
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "";
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "";
 const TICK_RATE = 20;
 const TICK_MS = 1000 / TICK_RATE;
 const MAX_CLIENTS = Number(process.env.WORLD_INSTANCE_CAPACITY || 64);
@@ -261,6 +266,8 @@ type Player = {
 const players = new Map<string, Player>();
 const voiceVisiblePairs = new Set<string>();
 const voiceBlockCheckAt = new Map<string, number>();
+const voicePairRooms = new Map<string, string>();
+const livekitRooms = LIVEKIT_URL && LIVEKIT_API_KEY && LIVEKIT_API_SECRET ? new RoomServiceClient(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET) : null;
 
 function voicePairKey(a: string, b: string): string {
   return a < b ? `${a}:${b}` : `${b}:${a}`;
@@ -332,7 +339,21 @@ function leaveVoiceRoom(player: Player): void {
     }
     voiceVisiblePairs.delete(key);
     voiceBlockCheckAt.delete(key);
+    void revokeVoicePairRoom(key);
   }
+}
+
+function voiceRoomName(key: string): string {
+  const digest = createHash("sha256").update(`${INSTANCE_ID}:${key}`).digest("hex").slice(0, 32);
+  return `uceno-pair-${digest}`;
+}
+
+async function revokeVoicePairRoom(key: string): Promise<void> {
+  const room = voicePairRooms.get(key);
+  voicePairRooms.delete(key);
+  if (!room || !livekitRooms) return;
+  try { await livekitRooms.deleteRoom(room); }
+  catch (error) { console.error("livekit_pair_room_cleanup_failed", error); }
 }
 
 async function isBlockedPair(a: string, b: string): Promise<boolean> {
@@ -463,6 +484,53 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
 
 const server = createServer(async (req, res) => {
   const headers = { "content-type": "application/json", "cache-control": "no-store" };
+  if (req.url?.startsWith("/voice/token?")) {
+    try {
+      if (!livekitRooms || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+        res.writeHead(503, headers);
+        res.end(JSON.stringify({ error: "voice_service_not_configured" }));
+        return;
+      }
+      const authorization = req.headers.authorization || "";
+      if (!authorization.startsWith("Bearer ")) throw new Error("unauthorized");
+      const identity = await authenticate(authorization.slice(7));
+      const requestUrl = new URL(req.url, "http://gateway.local");
+      const peerId = requestUrl.searchParams.get("peerUserId") || "";
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(peerId) || peerId === identity.userId) {
+        res.writeHead(400, headers);
+        res.end(JSON.stringify({ error: "invalid_peer" }));
+        return;
+      }
+      const caller = players.get(identity.userId);
+      const peer = players.get(peerId);
+      const key = voicePairKey(identity.userId, peerId);
+      if (!caller || !peer || caller.worldId !== identity.worldId || peer.worldId !== identity.worldId ||
+          !caller.voiceActive || !peer.voiceActive || !voiceVisiblePairs.has(key) ||
+          !sameSpatialVoiceRoom(caller, peer) || !isWithinVoiceRange(caller, peer) ||
+          caller.socket.readyState !== WebSocket.OPEN || peer.socket.readyState !== WebSocket.OPEN ||
+          await isBlockedPair(identity.userId, peerId)) {
+        res.writeHead(403, headers);
+        res.end(JSON.stringify({ error: "voice_peer_not_eligible" }));
+        return;
+      }
+      const room = voicePairRooms.get(key) || voiceRoomName(key);
+      voicePairRooms.set(key, room);
+      const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+        identity: identity.userId,
+        ttl: "30s",
+        metadata: JSON.stringify({ worldId: identity.worldId, instanceId: INSTANCE_ID, scope: "uceno-spatial-pair" })
+      });
+      token.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: false });
+      const jwt = await token.toJwt();
+      res.writeHead(200, headers);
+      res.end(JSON.stringify({ token: jwt, url: LIVEKIT_URL, room, identity: identity.userId, peerUserId: peerId, expiresIn: 30 }));
+    } catch (error) {
+      const unauthorized = error instanceof Error && error.message === "unauthorized";
+      res.writeHead(unauthorized ? 401 : 503, headers);
+      res.end(JSON.stringify({ error: unauthorized ? "unauthorized" : "voice_token_unavailable" }));
+    }
+    return;
+  }
   if (req.url === "/health") {
     // Liveness only: the process can answer even while PostgreSQL is unavailable.
     res.writeHead(200, headers);
@@ -1056,6 +1124,7 @@ setInterval(async () => {
       else if (b) send(b.socket, { type: "voice_presence", userId: aId, active: false });
       voiceVisiblePairs.delete(key);
       voiceBlockCheckAt.delete(key);
+      void revokeVoicePairRoom(key);
     }
   } finally {
     voiceReconciliationInProgress = false;
