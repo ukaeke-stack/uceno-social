@@ -1031,6 +1031,7 @@ server.on("upgrade", async (req, socket, head) => {
     `;
     if (!claimed || !claimed[0]) throw new Error(isTransfer ? "transfer_ticket_invalid_or_used" : "session_lease_unavailable");
     const sessionGeneration = Number(claimed[0].generation);
+    assertProcessAuthority();
     wss.handleUpgrade(req, socket, head, (ws) => {
       upgradeIdentity.set(ws, { ...identity, token, sessionId, sessionGeneration, clientType: String(payload.client_type), isTransfer });
       wss.emit("connection", ws, req);
