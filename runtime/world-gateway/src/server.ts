@@ -1867,9 +1867,18 @@ setInterval(async () => {
           if (row.eventType === 'player_snapshot') {
             const payload = row.payload as { serverTime?: number; players?: unknown };
             if (payload && Array.isArray(payload.players) && Number.isFinite(payload.serverTime)) {
-              const packet = JSON.stringify({ type: 'snapshot', serverTime: payload.serverTime, players: payload.players });
-              for (const peer of players.values()) {
-                if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
+              // A process whose instance lease/heartbeat has expired is no longer
+              // authoritative, even if it managed to append a delayed snapshot row.
+              const sourceAuthority = await sql`SELECT 1 FROM virtual_world_instances
+                WHERE id = ${row.instanceId}::uuid
+                  AND status IN ('ready', 'draining')
+                  AND heartbeat_at > NOW() - INTERVAL '30 seconds'
+                LIMIT 1`;
+              if (sourceAuthority[0]) {
+                const packet = JSON.stringify({ type: 'snapshot', serverTime: payload.serverTime, players: payload.players });
+                for (const peer of players.values()) {
+                  if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
+                }
               }
             }
           } else if (row.eventType === 'activity_state') {
