@@ -4,6 +4,7 @@ import { checkpointVersionForSession } from "../dist/session-fence-policy.js";
 
 test("resumes a checkpoint sequence only within the same fenced session", () => {
   assert.equal(checkpointVersionForSession(7, 12, 7), 12);
+  assert.equal(checkpointVersionForSession("7", "12", 7), 12);
   assert.equal(checkpointVersionForSession(6, 900, 7), 0);
   assert.equal(checkpointVersionForSession(null, 12, 7), 0);
 });
