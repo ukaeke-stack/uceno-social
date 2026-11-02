@@ -7,7 +7,7 @@ import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./di
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { isPersistentObjectState, defaultPersistentObjectState } from "./district-object-policy.js";
-import { readFileSync, writeFileSync, renameSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
 import { WebSocketServer, WebSocket } from "ws";
@@ -135,7 +135,6 @@ function loadCollisionBoxes(): CollisionBox[] {
 
 const COLLISION_BOXES = loadCollisionBoxes();
 const INTERACTABLES = loadInteractables();
-const OBJECT_STATE_FILE = process.env.WORLD_OBJECT_STATE_FILE || "";
 
 type RaceCheckpoint = { x: number; y: number; z: number; radius: number };
 type RaceDefinition = { id: string; checkpoints: RaceCheckpoint[] };
@@ -187,46 +186,6 @@ function loadActivityRaces(): Map<string, RaceDefinition> {
 }
 
 const ACTIVITY_RACES = loadActivityRaces();
-
-function restorePersistentObjectStates(): void {
-  if (!OBJECT_STATE_FILE) return;
-  let raw: string;
-  try { raw = readFileSync(OBJECT_STATE_FILE, "utf8"); }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-    throw new Error("Could not read WORLD_OBJECT_STATE_FILE: " +
-      (error instanceof Error ? error.message : "unknown file error"));
-  }
-  let parsed: unknown;
-  try { parsed = JSON.parse(raw); }
-  catch { throw new Error("WORLD_OBJECT_STATE_FILE must contain valid JSON"); }
-  if (!parsed || typeof parsed !== "object" ||
-      !Array.isArray((parsed as { objects?: unknown }).objects))
-    throw new Error("WORLD_OBJECT_STATE_FILE must contain an objects array");
-  for (const value of (parsed as { objects: unknown[] }).objects) {
-    if (!value || typeof value !== "object") continue;
-    const saved = value as Record<string, unknown>;
-    if (typeof saved.id !== "string" || typeof saved.state !== "string") continue;
-    const target = INTERACTABLES.get(saved.id);
-    if (!target || target.kind === "seat") continue;
-    const validState = target.kind === "door"
-      ? saved.state === "open" || saved.state === "closed"
-      : saved.state === "active" || saved.state === "idle";
-    if (validState) target.state = saved.state;
-  }
-}
-
-function persistObjectStates(): void {
-  if (!OBJECT_STATE_FILE) return;
-  const objects = Array.from(INTERACTABLES.values())
-    .filter(item => item.kind !== "seat")
-    .map(item => ({ id: item.id, state: item.state }));
-  const temporaryPath = OBJECT_STATE_FILE + ".tmp";
-  writeFileSync(temporaryPath, JSON.stringify({ version: 1, objects }), { encoding: "utf8", mode: 0o600 });
-  renameSync(temporaryPath, OBJECT_STATE_FILE);
-}
-
-restorePersistentObjectStates();
 
 function overlapsBox(x: number, y: number, z: number, box: CollisionBox): boolean {
   const horizontal = x + PLAYER_RADIUS > box.minX && x - PLAYER_RADIUS < box.maxX &&
@@ -686,7 +645,8 @@ wss.on("connection", async (socket: WebSocket) => {
         objectId: target.id,
         objectState: target.state,
         actorId: target.actorId,
-        occupantId: target.occupantId
+        occupantId: target.occupantId,
+        version: target.version
       });
     }
 
