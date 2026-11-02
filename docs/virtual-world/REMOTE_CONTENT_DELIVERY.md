@@ -20,22 +20,26 @@ services; it does not reuse an Android APK.
 - Mark content groups with stable labels such as `world-city-core`,
   `world-city-district-west`, `home-interiors`, `activity-sports`,
   `activity-racing`, and `avatar-cosmetics`.
-- Confirmed home/event location changes from the authoritative gateway now trigger
-  `EnsureContent` for `home-interiors` or `world-event-venues`. The binding shows
-  download progress and status and Addressables caches the downloaded bundles.
-  This first integration is post-admission: the gateway currently confirms the
-  spatial transition before the download starts. It does not yet hold the player
-  in the previous area while content downloads; a later transition-gate change
-  must add a preflight step before sending `home_enter` / `event_join`.
+- Home and event entry now run a client-side content preflight before the gateway
+  sends `home_enter` or `event_join`. The player remains in the current area
+  while Addressables resolves and downloads the required label. Only after a
+  successful preload does the client send the admission request; the server
+  remains authoritative and may still reject it.
+- A failed download cancels the travel request and leaves the player in the
+  current area. The transition overlay reports the failure. Reattempting travel
+  invokes the Addressables size/cache check again.
+- The post-admission binding remains as a safety net for confirmed location
+  changes and cached-content verification. It should not cause another network
+  download when the label is already cached.
 - Addressables uses Unity's persistent bundle cache. Keep bundle/catalog versions
   immutable and publish a new catalog for content updates; do not overwrite
   already-published bundle files at the same URL.
 - Configure a developer-only preload list for selected labels or all test
   labels. Expose that control only in development builds and preferably prompt
   for Wi-Fi; never make manual pre-download a requirement for ordinary players.
-- The current automatic transition binding covers home interiors and event venues.
-  District streaming and activity-specific bundles still need explicit area/label
-  metadata and their own preflight transition integration.
+- Preflight currently covers home interiors and event venues. District streaming
+  and activity-specific bundles still need explicit area/label metadata and
+  their own preflight transition integration.
 - Keep content delivery separate from gameplay authorization. The server still
   decides whether a user may enter a world, home, event, or activity.
 
