@@ -812,6 +812,7 @@ namespace UCENO.VirtualWorld.Editor
 
             EditorUtility.SetDirty(settings);
             AssetDatabase.SaveAssets();
+            SceneManager.SetActiveScene(worldRoot.gameObject.scene);
         }
 
         private static bool IsBootSceneObject(string objectName)
