@@ -154,6 +154,9 @@ namespace UCENO.VirtualWorld
     {
         public string type;
         public string userId;
+        public string accessToken;
+        public string instanceId;
+        public int expiresInSeconds;
         public long sessionGeneration;
         public long stateVersion;
         public string fromUserId;
@@ -784,6 +787,10 @@ namespace UCENO.VirtualWorld
                     string activityId = pendingTransferActivityId;
                     pendingTransferActivityId = "";
                     transferringGateway = false;
+                    if (!string.IsNullOrEmpty(packet.accessToken) && !string.IsNullOrEmpty(transferEndpointOverride))
+                        session.SetGatewayRoute(packet.accessToken, transferEndpointOverride, packet.instanceId, packet.expiresInSeconds);
+                    transferEndpointOverride = "";
+                    transferTokenOverride = "";
                     _ = SendActivityRequestAsync(new GatewayActivityRequest { type = "activity_join", id = activityId });
                 }
                 if (packet.state != null)
@@ -1171,7 +1178,7 @@ namespace UCENO.VirtualWorld
                 GatewayActivityTransferResponse response =
                     JsonUtility.FromJson<GatewayActivityTransferResponse>(request.downloadHandler.text);
                 if (response == null || string.IsNullOrWhiteSpace(response.ticket) ||
-                    string.IsNullOrWhiteSpace(response.endpoint) || response.sessionId != activityId)
+                    string.IsNullOrWhiteSpace(response.endpoint) || response.sessionId != activityId || response.endpoint.TrimEnd('/') != targetEndpoint.TrimEnd('/'))
                 {
                     spatialTransitionStatus = "The activity gateway returned an invalid transfer ticket.";
                     yield break;
@@ -1181,8 +1188,8 @@ namespace UCENO.VirtualWorld
                 transferEndpointOverride = response.endpoint;
                 transferTokenOverride = response.ticket;
                 spatialTransitionStatus = "Moving to the activity instance...";
-                await CloseSocket();
-                if (!destroying) Connect();
+                _ = CloseSocketAndReconnectAsync();
+                yield break;
             }
         }
 
