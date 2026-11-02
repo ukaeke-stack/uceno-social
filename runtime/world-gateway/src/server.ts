@@ -403,11 +403,20 @@ async function initializeWorldRelayCursor(): Promise<void> {
 void initializeWorldRelayCursor();
 
 async function persistWorldRelayCursor(eventId: number): Promise<void> {
-  const rows = await sql`UPDATE virtual_world_realtime_consumers
-    SET last_event_id = GREATEST(last_event_id, ${eventId}), updated_at = NOW()
-    WHERE instance_id = ${INSTANCE_ID}::uuid
-    RETURNING last_event_id`;
-  if (!rows[0]) throw new Error("world_relay_consumer_cursor_missing");
+  const rows = await sql.begin(async tx => {
+    const owner = await tx`SELECT id FROM virtual_world_instances
+      WHERE id = ${INSTANCE_ID}::uuid
+        AND owner_process_id = ${PROCESS_ID}::uuid
+        AND owner_generation = ${processGeneration}
+        AND owner_lease_expires_at > clock_timestamp()
+      FOR SHARE`;
+    if (!owner.length) return [];
+    return tx`UPDATE virtual_world_realtime_consumers
+      SET last_event_id = GREATEST(last_event_id, ${eventId}), updated_at = NOW()
+      WHERE instance_id = ${INSTANCE_ID}::uuid
+      RETURNING last_event_id`;
+  });
+  if (!rows[0]) throw new Error("world_relay_consumer_cursor_missing_or_process_fenced");
   worldRelayCursor = Number(rows[0].last_event_id);
   if (!Number.isSafeInteger(worldRelayCursor) || worldRelayCursor < eventId)
     throw new Error("invalid_world_relay_cursor_update");
@@ -463,6 +472,16 @@ async function persistActivity(session: ActivitySession): Promise<boolean> {
   let saved = false;
   try {
     saved = await sql.begin(async tx => {
+      // Lock the logical instance ownership row for the duration of this
+      // authoritative write. A takeover UPDATE must wait until this
+      // transaction commits; an expired or replaced process cannot begin it.
+      const owner = await tx`SELECT id FROM virtual_world_instances
+        WHERE id = ${INSTANCE_ID}::uuid
+          AND owner_process_id = ${PROCESS_ID}::uuid
+          AND owner_generation = ${processGeneration}
+          AND owner_lease_expires_at > clock_timestamp()
+        FOR SHARE`;
+      if (!owner.length) return false;
       const rows = await tx`INSERT INTO virtual_world_activity_sessions
         (id, world_id, instance_id, host_user_id, host_generation, race_id, activity_kind,
          phase, version, state, created_at, started_at, completed_at)
