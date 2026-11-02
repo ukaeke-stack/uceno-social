@@ -97,3 +97,12 @@ gateway file; seat occupancy remains transient and is released on disconnect.
 - Voice sessions are ended when a player changes spatial context or disconnects. Signaling payload sizes and types are bounded; WebSocket message maximum was raised to 16 KB to accommodate SDP.
 - Unity gateway client now exposes voice join/leave, signal-send methods and presence/signal/rejection events for a future media transport integration.
 - **Not full spatial voice:** no WebRTC peer connection/media capture/playback, microphone permission flow, audio track routing, STUN/TURN configuration, spatial attenuation, mute controls or device tests have been implemented. The new code is the signaling/control plane only; do not claim users can hear one another yet.
+
+## 2026-11-02 voice-safety test hardening and CI status
+
+- Expanded `runtime/world-gateway/tests/voice-policy.test.mjs` to cover public/home/event scope separation, exact 24-metre range boundaries, invalid/non-finite coordinates and range limits, and SDP/ICE type and length boundaries.
+- Commit: `1365d345f8bfb9dcf783b100b4f62f47d2165b51`.
+- GitHub Actions run 41365478453 completed successfully for gateway compilation and activity/voice policy tests.
+- In workflow run 41365478460, gateway build and Unity source-contract validation passed. The web-app production build was still running at the last status check; its result is not confirmed.
+- These tests exercise policy helpers only. They do not test actual WebRTC connections, microphone access, audio delivery, audio attenuation, TURN relay, or mobile background behavior.
+- The project uses Unity Editor 6000.3.27f1 and currently has no Unity WebRTC package in `Packages/manifest.json`. Actual voice media implementation is still blocked on selecting and validating a Unity-6-compatible WebRTC package and its Android support. Do not claim end-to-end spatial voice is implemented.
