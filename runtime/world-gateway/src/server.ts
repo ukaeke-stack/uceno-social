@@ -988,7 +988,8 @@ const server = createServer(async (req, res) => {
         status: ready ? "ready" : "not_ready",
         instanceId: INSTANCE_ID,
         players: players.size,
-        capacity: MAX_CLIENTS
+        capacity: MAX_CLIENTS,
+        registeredInteractables: INTERACTABLES.size
       }));
     } catch {
       res.writeHead(503, headers);
