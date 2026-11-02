@@ -111,7 +111,12 @@ namespace UCENO.VirtualWorld
                 AsyncOperationHandle<SceneInstance> sceneLoad =
                     Addressables.LoadSceneAsync(label, LoadSceneMode.Additive, true);
                 pendingSceneHandles[label] = sceneLoad;
-                yield return sceneLoad;
+                StatusChanged?.Invoke("Loading district scene " + label + "...");
+                while (!sceneLoad.IsDone)
+                {
+                    ProgressChanged?.Invoke(label, sceneLoad.PercentComplete);
+                    yield return null;
+                }
                 pendingSceneHandles.Remove(label);
                 residencyLoads.Remove(label);
                 if (sceneLoad.Status != AsyncOperationStatus.Succeeded)
@@ -122,6 +127,7 @@ namespace UCENO.VirtualWorld
                     yield break;
                 }
 
+                ProgressChanged?.Invoke(label, 1f);
                 residentSceneHandles[label] = sceneLoad;
                 residencyReferences[label] = 1;
                 StatusChanged?.Invoke(label + " scene loaded additively.");
