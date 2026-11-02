@@ -920,7 +920,7 @@ const server = createServer(async (req, res) => {
           (id, world_id, user_id, activity_session_id, source_instance_id,
            target_instance_id, host_generation, expires_at, created_at)
           VALUES (${jti}::uuid, ${identity.worldId}::uuid, ${identity.userId}::uuid,
-            ${body.sessionId}::uuid, ${INSTANCE_ID}::uuid, ${target[0].instanceId}::uuid,
+            ${String(body.sessionId)}::uuid, ${INSTANCE_ID}::uuid, ${target[0].instanceId}::uuid,
             ${persisted.hostGeneration}, NOW() + INTERVAL '30 seconds', NOW())`;
       });
       const ticket = await new SignJWT({
