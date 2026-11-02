@@ -277,8 +277,16 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.equal(readyB.instanceId, instanceB);
     await assertWebSocketRejectsWrongInstance(portA, instanceA);
     await assertWebSocketRejectsWrongInstance(portB, instanceB);
+    // A replacement process must restore the last durable player checkpoint,
+    // not silently spawn the player at the world origin after a process loss.
+    await admin.unsafe(`INSERT INTO "${schema}".virtual_world_player_state
+      (world_id, user_id, position, rotation, session_generation, state_version, updated_by_session, updated_at)
+      VALUES ($1::uuid, $2::uuid, $3::jsonb, $4::jsonb, 0, 12, NULL, NOW())`,
+      [worldId, userId, { x: 37.5, y: 1.15, z: -22.25 }, { x: 0, y: 0.3826834, z: 0, w: 0.9238795 }]);
     const authenticated = await connectAuthenticated(portB, instanceB, worldId, userId);
     assert.equal(authenticated.welcome.userId, userId);
+    assert.deepEqual(authenticated.welcome.state, { x: 37.5, y: 1.15, z: -22.25, yaw: 0.7853981633974483 },
+      "replacement process must load the persisted position and rotation checkpoint");
     authenticated.socket.close();
     const heartbeatDeadline = Date.now() + 5000;
     let liveHeartbeats = [];
