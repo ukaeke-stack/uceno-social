@@ -186,6 +186,10 @@ test("two real gateway processes: primary loss leaves the replacement process re
       event_type TEXT NOT NULL, payload JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_realtime_consumers (
+      instance_id UUID PRIMARY KEY, last_event_id BIGINT NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_activity_sessions (
       id UUID PRIMARY KEY, world_id UUID NOT NULL, instance_id UUID NOT NULL,
       host_user_id UUID, host_generation BIGINT NOT NULL DEFAULT 1,
@@ -347,6 +351,27 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal(recoveredSnapshot.players[0].x, 4,
         "recovery must drain durable backlog older than the former 30-second cutoff");
       recoverySocket.socket.close();
+    });
+
+    await t.test("replacement process resumes the persisted relay offset after a full process restart", async () => {
+      const priorOffset = await admin.unsafe(`SELECT last_event_id FROM "${schema}".virtual_world_realtime_consumers
+        WHERE instance_id = $1::uuid`, [instanceB]);
+      assert.equal(priorOffset.length, 1, "running gateway must persist its relay consumer offset");
+      await stopGateway(gatewayB);
+      gatewayB = null;
+      await admin.unsafe(`INSERT INTO "${schema}".virtual_world_realtime_events
+        (world_id, instance_id, event_type, payload, created_at)
+        VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb, NOW() - INTERVAL '1 minute')`,
+        [worldId, instanceA, { serverTime: Date.now(), players: [{ userId, x: 19, y: 1.15, z: -7, yaw: 0 }] }]);
+      gatewayB = startGateway(portB, instanceB, scoped.toString());
+      const restarted = await waitForReady(portB, gatewayB);
+      assert.equal(restarted.instanceId, instanceB);
+      const restartedSocket = await connectAuthenticated(portB, instanceB, worldId, userId);
+      const replayed = await receiveSocketMessage(restartedSocket.socket, "snapshot", 8000);
+      assert.equal(replayed.players[0].x, 19,
+        "same instance replacement must replay events appended while its previous process was down");
+      assert.equal(replayed.players[0].z, -7);
+      restartedSocket.socket.close();
     });
 
     await t.test("replacement remains ready after the primary process is terminated", async () => {
