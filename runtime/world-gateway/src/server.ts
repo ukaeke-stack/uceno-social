@@ -393,38 +393,38 @@ function persistActivity(session: ActivitySession): void {
   const hostGeneration = activityHostGenerations.get(session.id) ?? 1;
   const raceId = activityRaceIds.get(session.id) ?? null;
   const state = serializeActivitySession(session, hostUserId, hostGeneration, raceId);
-  void sql\`INSERT INTO virtual_world_activity_sessions
+  void sql`INSERT INTO virtual_world_activity_sessions
     (id, world_id, instance_id, host_user_id, host_generation, race_id, activity_kind,
      phase, version, state, created_at, started_at, completed_at)
-    VALUES (\${session.id}::uuid, \${session.worldId}::uuid, \${session.instanceId}::uuid,
-      \${hostUserId}::uuid, \${hostGeneration}, \${raceId}, \${session.kind}, \${session.phase},
-      \${session.version}, \${JSON.stringify(state)}::jsonb,
-      to_timestamp(\${session.createdAt / 1000}),
-      \${session.startedAt === null ? null : new Date(session.startedAt)},
-      \${session.completedAt === null ? null : new Date(session.completedAt)})
+    VALUES (${session.id}::uuid, ${session.worldId}::uuid, ${session.instanceId}::uuid,
+      ${hostUserId}::uuid, ${hostGeneration}, ${raceId}, ${session.kind}, ${session.phase},
+      ${session.version}, ${JSON.stringify(state)}::jsonb,
+      to_timestamp(${session.createdAt / 1000}),
+      ${session.startedAt === null ? null : new Date(session.startedAt)},
+      ${session.completedAt === null ? null : new Date(session.completedAt)})
     ON CONFLICT (id) DO UPDATE SET host_user_id = EXCLUDED.host_user_id,
       host_generation = EXCLUDED.host_generation, race_id = EXCLUDED.race_id,
       phase = EXCLUDED.phase, version = EXCLUDED.version, state = EXCLUDED.state,
       started_at = EXCLUDED.started_at, completed_at = EXCLUDED.completed_at, updated_at = NOW()
     WHERE virtual_world_activity_sessions.host_generation < EXCLUDED.host_generation
        OR (virtual_world_activity_sessions.host_generation = EXCLUDED.host_generation
-           AND virtual_world_activity_sessions.version < EXCLUDED.version)\`
-    .then(async () => {
-      if (session.phase !== "completed" && session.phase !== "cancelled") return;
+           AND virtual_world_activity_sessions.version < EXCLUDED.version)`
+    .then(async savedRows => {
+      if (savedRows.length === 0 || (session.phase !== "completed" && session.phase !== "cancelled")) return;
       const ordered = [...session.participants.values()]
         .filter(p => p.status === "finished" || p.status === "dnf" || p.status === "left")
         .sort((a, b) => a.status === "finished" && b.status === "finished"
           ? (a.finishTime ?? Number.MAX_SAFE_INTEGER) - (b.finishTime ?? Number.MAX_SAFE_INTEGER)
           : a.status === "finished" ? -1 : b.status === "finished" ? 1 : a.joinedAt - b.joinedAt);
       for (const [index, participant] of ordered.entries()) {
-        await sql\`INSERT INTO virtual_world_activity_results
+        await sql`INSERT INTO virtual_world_activity_results
           (session_id, world_id, user_id, placement, status, checkpoint_index, finish_time)
-          VALUES (\${session.id}::uuid, \${session.worldId}::uuid, \${participant.userId}::uuid,
-            \${participant.status === "finished" ? index + 1 : null}, \${participant.status},
-            \${participant.checkpointIndex}, \${participant.finishTime})
+          VALUES (${session.id}::uuid, ${session.worldId}::uuid, ${participant.userId}::uuid,
+            ${participant.status === "finished" ? index + 1 : null}, ${participant.status},
+            ${participant.checkpointIndex}, ${participant.finishTime})
           ON CONFLICT (session_id, user_id) DO UPDATE SET
             placement = EXCLUDED.placement, status = EXCLUDED.status,
-            checkpoint_index = EXCLUDED.checkpoint_index, finish_time = EXCLUDED.finish_time\`;
+            checkpoint_index = EXCLUDED.checkpoint_index, finish_time = EXCLUDED.finish_time`;
       }
     })
     .catch(error => console.error("activity_persistence_failed", session.id, error));
@@ -439,10 +439,10 @@ function broadcastActivity(session: ActivitySession) {
 }
 
 async function restorePersistedActivities(): Promise<void> {
-  const rows = await sql\`SELECT state FROM virtual_world_activity_sessions
-    WHERE instance_id = \${INSTANCE_ID}::uuid
+  const rows = await sql`SELECT state FROM virtual_world_activity_sessions
+    WHERE instance_id = ${INSTANCE_ID}::uuid
       AND (phase IN ('lobby', 'active') OR completed_at > NOW() - INTERVAL '30 minutes')
-    ORDER BY updated_at DESC LIMIT \${MAX_ACTIVITY_SESSIONS}\`;
+    ORDER BY updated_at DESC LIMIT ${MAX_ACTIVITY_SESSIONS}`;
   for (const row of rows) {
     const restored = restoreActivitySession(row.state);
     if (!restored || restored.session.instanceId !== INSTANCE_ID) {
