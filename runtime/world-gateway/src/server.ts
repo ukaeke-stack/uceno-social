@@ -343,6 +343,7 @@ function voicePairKey(a: string, b: string): string {
 }
 // Activity sessions are persisted in PostgreSQL; each instance owns its local authoritative copy.
 const activitySessions = new Map<string, ActivitySession>();
+const fencedActivitySessions = new Set<string>();
 let lastWorldSnapshotRelayAt = 0;
 let worldRelayCursor = 0;
 let worldRelayCursorReady = false;
@@ -409,7 +410,28 @@ function persistActivity(session: ActivitySession): void {
        OR (virtual_world_activity_sessions.host_generation = EXCLUDED.host_generation
            AND virtual_world_activity_sessions.version < EXCLUDED.version)`
     .then(async savedRows => {
-      if (savedRows.length === 0) return;
+      if (savedRows.length === 0) {
+        const current = await sql`SELECT instance_id AS "instanceId",
+            host_generation AS "hostGeneration"
+          FROM virtual_world_activity_sessions WHERE id = ${session.id}::uuid LIMIT 1`;
+        const row = current[0];
+        const stillOwned = row && row.instanceId === INSTANCE_ID &&
+          Number(row.hostGeneration) === hostGeneration;
+        if (!stillOwned) {
+          fencedActivitySessions.add(session.id);
+          activitySessions.delete(session.id);
+          activityHosts.delete(session.id);
+          activityHostGenerations.delete(session.id);
+          activityRaceIds.delete(session.id);
+          for (const peer of players.values()) {
+            if (peer.worldId === session.worldId) send(peer.socket, {
+              type: "activity_host_fenced", sessionId: session.id
+            });
+          }
+          console.warn("activity_host_authority_revoked", session.id, hostGeneration);
+        }
+        return;
+      }
       void sql`INSERT INTO virtual_world_realtime_events (world_id, instance_id, event_type, payload)
         VALUES (${session.worldId}::uuid, ${INSTANCE_ID}::uuid, 'activity_state',
           ${JSON.stringify(activityPayload(session))}::jsonb)`
@@ -434,8 +456,8 @@ function persistActivity(session: ActivitySession): void {
     .catch(error => console.error("activity_persistence_failed", session.id, error));
 }
 
-function broadcastActivity(session: ActivitySession) {
-  persistActivity(session);
+async function broadcastActivity(session: ActivitySession) {
+  if (!await persistActivity(session)) return;
   const packet = activityPayload(session);
   for (const peer of players.values()) {
     if (peer.worldId === session.worldId) send(peer.socket, packet);
@@ -509,7 +531,7 @@ async function tryTakeoverStaleActivity(sessionId: string, player: Player): Prom
 }
 
 function findAccessibleActivity(sessionId: unknown, player: Player): ActivitySession | null {
-  if (typeof sessionId !== "string") return null;
+  if (typeof sessionId !== "string" || fencedActivitySessions.has(sessionId)) return null;
   const session = activitySessions.get(sessionId);
   return session && session.worldId === player.worldId &&
     session.instanceId === INSTANCE_ID ? session : null;
