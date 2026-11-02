@@ -38,18 +38,12 @@ builds and runs the service as a non-root user.
 
 District metadata is operator-authored per world-gateway instance. Configure
 `WORLD_DISTRICTS` as JSON or `WORLD_DISTRICTS_FILE` as a path to a JSON file.
-Example:
-
-```json
-{
-  "districts": [
-    {"id":"south","name":"South District","contentLabel":"world-city-district-south","minX":-40,"maxX":60,"minZ":-120,"maxZ":-60},
-    {"id":"central-south","name":"Central South","contentLabel":"world-city-district-central-south","minX":-40,"maxX":60,"minZ":-60,"maxZ":0},
-    {"id":"central-north","name":"Central North","contentLabel":"world-city-district-central-north","minX":-40,"maxX":60,"minZ":0,"maxZ":60},
-    {"id":"north","name":"North District","contentLabel":"world-city-district-north","minX":-40,"maxX":60,"minZ":60,"maxZ":120}
-  ]
-}
-```
+Use the canonical configuration file
+`runtime/world-gateway/config/world-districts.json` as
+`WORLD_DISTRICTS_FILE`. It is covered by a gateway test that verifies its
+IDs, labels, and X/Z boundaries against the four generated Unity district
+scenes. If deployment injects `WORLD_DISTRICTS` directly instead, keep it
+byte-for-byte aligned with that file.
 
 Districts are axis-aligned X/Z rectangles in the same coordinate system as the
 Unity scene. IDs must be unique, rectangles may not overlap, coordinates must
