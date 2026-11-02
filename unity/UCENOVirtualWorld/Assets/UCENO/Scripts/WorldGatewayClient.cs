@@ -207,6 +207,8 @@ namespace UCENO.VirtualWorld
         private string pendingDistrictNonce = "";
         private string pendingDistrictLabel = "";
         private string pendingDistrictName = "";
+        private string pendingDistrictResidentLabel = "";
+        private string activeDistrictLabel = "";
         private bool districtDownloadRunning;
 
         public string ConnectionStatus { get; private set; } = "WAITING";
@@ -371,11 +373,14 @@ namespace UCENO.VirtualWorld
             string expectedDistrict = pendingDistrictId;
             string expectedNonce = pendingDistrictNonce;
             string label = pendingDistrictLabel;
-            contentDelivery.EnsureContent(label, (ok, error) =>
+            contentDelivery.AcquireContent(label, (ok, error) =>
             {
                 districtDownloadRunning = false;
                 if (pendingDistrictId != expectedDistrict || pendingDistrictNonce != expectedNonce)
+                {
+                    if (ok) contentDelivery.ReleaseContent(label);
                     return;
+                }
                 if (!ok)
                 {
                     spatialTransitionStatus = "Could not load " + pendingDistrictName +
@@ -383,7 +388,8 @@ namespace UCENO.VirtualWorld
                         (string.IsNullOrEmpty(error) ? "" : error);
                     return;
                 }
-                spatialTransitionStatus = pendingDistrictName + " ready. Entering district...";
+                pendingDistrictResidentLabel = label;
+                spatialTransitionStatus = pendingDistrictName + " loaded. Entering district...";
                 _ = SendDistrictContentReadyAsync(expectedDistrict, expectedNonce);
             });
         }
@@ -743,6 +749,11 @@ namespace UCENO.VirtualWorld
             {
                 if (packet.districtId == pendingDistrictId)
                 {
+                    if (!string.IsNullOrEmpty(activeDistrictLabel) &&
+                        activeDistrictLabel != pendingDistrictResidentLabel)
+                        contentDelivery?.ReleaseContent(activeDistrictLabel);
+                    activeDistrictLabel = pendingDistrictResidentLabel;
+                    pendingDistrictResidentLabel = "";
                     spatialTransitionStatus = "";
                     pendingDistrictId = "";
                     pendingDistrictNonce = "";
@@ -757,6 +768,9 @@ namespace UCENO.VirtualWorld
             {
                 if (packet.districtId == pendingDistrictId)
                 {
+                    if (!string.IsNullOrEmpty(pendingDistrictResidentLabel))
+                        contentDelivery?.ReleaseContent(pendingDistrictResidentLabel);
+                    pendingDistrictResidentLabel = "";
                     pendingDistrictId = "";
                     pendingDistrictNonce = "";
                     pendingDistrictLabel = "";
@@ -1045,6 +1059,10 @@ namespace UCENO.VirtualWorld
 
         private void OnDestroy()
         {
+            if (!string.IsNullOrEmpty(activeDistrictLabel)) contentDelivery?.ReleaseContent(activeDistrictLabel);
+            if (!string.IsNullOrEmpty(pendingDistrictResidentLabel)) contentDelivery?.ReleaseContent(pendingDistrictResidentLabel);
+            activeDistrictLabel = "";
+            pendingDistrictResidentLabel = "";
             destroying = true;
             _ = CloseSocket();
             foreach (RemotePlayer remote in remotePlayers.Values)
