@@ -232,28 +232,47 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
       assert.equal((await authorized(ids.guest, ids.world, ids.newA, 2)).length, 0);
     });
 
-    await t.test("old gateway cannot mutate or enqueue a broadcast after takeover", async () => {
+    await t.test("old gateway queued activity events are suppressed after takeover", async () => {
       await resetActivity();
+      // Model an event committed by the old host immediately before takeover.
+      await withSchema(tx => tx`INSERT INTO virtual_world_realtime_events
+        (world_id, instance_id, event_type, payload)
+        VALUES (${ids.world}::uuid, ${ids.old}::uuid, 'activity_state',
+          ${JSON.stringify({ type: "activity_state", session: {
+            id: ids.activity, worldId: ids.world, instanceId: ids.old, hostGeneration: 1
+          } })}::jsonb)`);
       const moved = await takeover(ids.newA, ids.guest);
       assert.equal(moved.length, 1);
-      const staleWrite = await withSchema(async tx => {
-        const rows = await tx`INSERT INTO virtual_world_activity_sessions
-          (id, world_id, instance_id, host_user_id, host_generation, activity_kind,
-           phase, version, state, created_at)
-          VALUES (${ids.activity}::uuid, ${ids.world}::uuid, ${ids.old}::uuid,
-            ${ids.host}::uuid, 1, 'sports', 'lobby', 99,
-            '{"participants":[],"staleMutation":true}'::jsonb, NOW())
-          ON CONFLICT (id) DO UPDATE SET state = EXCLUDED.state, version = EXCLUDED.version
-          WHERE virtual_world_activity_sessions.instance_id = EXCLUDED.instance_id
-            AND virtual_world_activity_sessions.host_generation = EXCLUDED.host_generation
-            AND virtual_world_activity_sessions.version < EXCLUDED.version
-          RETURNING id`;
-        if (rows[0]) await tx`INSERT INTO virtual_world_realtime_events
-          (world_id, instance_id, event_type, payload)
-          VALUES (${ids.world}::uuid, ${ids.old}::uuid, 'activity_state',
-            ${JSON.stringify({ type: "activity_state", session: { id: ids.activity, hostGeneration: 1 } })}::jsonb)`;
-        return rows;
-      });
+
+      // The relay may still read the queued row, but its authority check must
+      // reject it against the now-current activity owner/generation.
+      const queued = await withSchema(tx => tx`SELECT id, world_id AS "worldId",
+        instance_id AS "instanceId", payload FROM virtual_world_realtime_events
+        WHERE world_id = ${ids.world}::uuid AND event_type = 'activity_state'`);
+      assert.equal(queued.length, 1);
+      const payload = queued[0].payload;
+      assert.equal(payload.session.hostGeneration, 1);
+      assert.equal(queued[0].instanceId, ids.old);
+      const authority = await withSchema(tx => tx`SELECT 1
+        FROM virtual_world_activity_sessions
+        WHERE id = ${payload.session.id}::uuid
+          AND world_id = ${queued[0].worldId}::uuid
+          AND instance_id = ${queued[0].instanceId}::uuid
+          AND host_generation = ${payload.session.hostGeneration}
+        FOR UPDATE`);
+      assert.equal(authority.length, 0);
+
+      const staleWrite = await withSchema(tx => tx`INSERT INTO virtual_world_activity_sessions
+        (id, world_id, instance_id, host_user_id, host_generation, activity_kind,
+         phase, version, state, created_at)
+        VALUES (${ids.activity}::uuid, ${ids.world}::uuid, ${ids.old}::uuid,
+          ${ids.host}::uuid, 1, 'sports', 'lobby', 99,
+          '{"participants":[],"staleMutation":true}'::jsonb, NOW())
+        ON CONFLICT (id) DO UPDATE SET state = EXCLUDED.state, version = EXCLUDED.version
+        WHERE virtual_world_activity_sessions.instance_id = EXCLUDED.instance_id
+          AND virtual_world_activity_sessions.host_generation = EXCLUDED.host_generation
+          AND virtual_world_activity_sessions.version < EXCLUDED.version
+        RETURNING id`);
       assert.equal(staleWrite.length, 0);
       const persisted = await withSchema(tx => tx`SELECT instance_id AS "instanceId",
         host_generation AS generation, version, state FROM virtual_world_activity_sessions
@@ -264,7 +283,7 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
       assert.equal(persisted[0].state.staleMutation, undefined);
       const events = await withSchema(tx => tx`SELECT count(*)::int AS count
         FROM virtual_world_realtime_events WHERE world_id = ${ids.world}::uuid`);
-      assert.equal(events[0].count, 0);
+      assert.equal(events[0].count, 1);
     });
   } finally {
     await db.end({ timeout: 5 });
