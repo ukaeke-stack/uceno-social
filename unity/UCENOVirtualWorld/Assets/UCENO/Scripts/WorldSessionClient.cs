@@ -61,6 +61,16 @@ namespace UCENO.VirtualWorld
             ExpiresInSeconds = expiresInSeconds;
         }
 
+        public void SetGatewayRoute(string token, string endpoint, string instanceId, int expiresInSeconds)
+        {
+            if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(endpoint) ||
+                string.IsNullOrWhiteSpace(instanceId) || expiresInSeconds <= 0) return;
+            AccessToken = token;
+            InstanceEndpoint = endpoint;
+            InstanceId = instanceId;
+            ExpiresInSeconds = expiresInSeconds;
+        }
+
         public void ClearSession()
         {
             AccessToken = null;
