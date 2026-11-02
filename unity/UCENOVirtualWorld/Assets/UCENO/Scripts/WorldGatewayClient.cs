@@ -394,6 +394,11 @@ namespace UCENO.VirtualWorld
                 if (pendingDistrictId != expectedDistrict || pendingDistrictNonce != expectedNonce)
                 {
                     if (ok) contentDelivery.ReleaseContent(label);
+                    // A newer transition may have arrived while this acquisition
+                    // was in flight. Start it now rather than leaving the client
+                    // stuck with districtDownloadRunning cleared and no retry.
+                    if (!string.IsNullOrEmpty(pendingDistrictId))
+                        BeginDistrictContentDownload();
                     return;
                 }
                 if (!ok)
