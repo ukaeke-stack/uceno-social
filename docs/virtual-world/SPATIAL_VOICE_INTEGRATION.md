@@ -156,3 +156,11 @@ Do not describe spatial voice as operational until all verification gates pass.
 These are source changes. CI results, Unity compilation, Android behavior and
 two-device revocation tests still need to be observed; do not treat them as
 passed merely because the workflow has been added.
+
+
+- Revocation now attempts to remove both authorized participant identities from
+  the pair room before deleting it. Newly issued voice tokens have a 15-second
+  lifetime; they remain room-scoped and cannot join a replacement room after
+  the pair is re-authorized. A transient LiveKit API failure is logged and
+  still requires operational monitoring; it is not a proof of immediate
+  revocation under every provider outage.
