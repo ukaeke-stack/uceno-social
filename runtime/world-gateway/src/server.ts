@@ -259,6 +259,11 @@ type Player = {
   returnState: { x: number; y: number; z: number; yaw: number } | null;
 };
 const players = new Map<string, Player>();
+const voiceVisiblePairs = new Set<string>();
+
+function voicePairKey(a: string, b: string): string {
+  return a < b ? `${a}:${b}` : `${b}:${a}`;
+}
 // Activity sessions are scoped to this live gateway instance. They are deliberately
 // not advertised as persistent: process restarts currently clear sessions/results.
 const activitySessions = new Map<string, ActivitySession>();
@@ -315,9 +320,16 @@ function findAccessibleActivity(sessionId: unknown, player: Player): ActivitySes
 function leaveVoiceRoom(player: Player): void {
   if (!player.voiceActive) return;
   player.voiceActive = false;
-  for (const peer of players.values()) {
-    if (peer.id !== player.id && sameSpatialVoiceRoom(player, peer) && isWithinVoiceRange(player, peer))
+  for (const key of [...voiceVisiblePairs]) {
+    const [a, b] = key.split(":");
+    if (a !== player.id && b !== player.id) continue;
+    const peerId = a === player.id ? b : a;
+    const peer = players.get(peerId);
+    if (peer) {
       send(peer.socket, { type: "voice_presence", userId: player.id, active: false });
+      send(player.socket, { type: "voice_presence", userId: peer.id, active: false });
+    }
+    voiceVisiblePairs.delete(key);
   }
 }
 
@@ -838,17 +850,9 @@ wss.on("connection", async (socket: WebSocket) => {
         const joinNow = Date.now();
         if (joinNow - player.lastVoiceSignalAt < 1000) return;
         player.lastVoiceSignalAt = joinNow;
-        if (player.voiceActive) return;
         player.voiceActive = true;
-        for (const peer of players.values()) {
-          if (peer.id === player.id || !peer.voiceActive || !sameSpatialVoiceRoom(player, peer) ||
-              !isWithinVoiceRange(player, peer) || peer.socket.readyState !== WebSocket.OPEN) continue;
-          try {
-            if (await isBlockedPair(player.id, peer.id)) continue;
-            send(player.socket, { type: "voice_presence", userId: peer.id, active: true });
-            send(peer.socket, { type: "voice_presence", userId: player.id, active: true });
-          } catch (error) { console.error("voice_presence_check_failed", error); }
-        }
+        // The reconciliation loop announces only peers that are currently
+        // nearby, in the same spatial context, and not blocked.
         return;
       }
       if (msg && msg.type === "voice_leave") {
@@ -994,6 +998,51 @@ setInterval(() => {
     }).finally(() => { player.authorizationCheckInProgress = false; });
   }
 }, 5000);
+
+let voiceReconciliationInProgress = false;
+setInterval(async () => {
+  if (voiceReconciliationInProgress) return;
+  voiceReconciliationInProgress = true;
+  try {
+    const desired = new Map<string, [Player, Player]>();
+    const active = [...players.values()].filter(p => p.voiceActive && p.socket.readyState === WebSocket.OPEN);
+    for (let i = 0; i < active.length; i++) {
+      for (let j = i + 1; j < active.length; j++) {
+        const a = active[i], b = active[j];
+        if (!sameSpatialVoiceRoom(a, b) || !isWithinVoiceRange(a, b)) continue;
+        desired.set(voicePairKey(a.id, b.id), [a, b]);
+      }
+    }
+    for (const [key, [a, b]] of desired) {
+      if (voiceVisiblePairs.has(key)) continue;
+      try {
+        if (await isBlockedPair(a.id, b.id)) continue;
+        // Re-check after the database await; either peer may have left voice
+        // or changed spatial context while the block query was in flight.
+        if (!players.has(a.id) || !players.has(b.id) || !a.voiceActive || !b.voiceActive ||
+            !sameSpatialVoiceRoom(a, b) || !isWithinVoiceRange(a, b)) continue;
+        voiceVisiblePairs.add(key);
+        send(a.socket, { type: "voice_presence", userId: b.id, active: true });
+        send(b.socket, { type: "voice_presence", userId: a.id, active: true });
+      } catch (error) {
+        console.error("voice_presence_check_failed", error);
+      }
+    }
+    for (const key of [...voiceVisiblePairs]) {
+      if (desired.has(key)) continue;
+      const [aId, bId] = key.split(":");
+      const a = players.get(aId), b = players.get(bId);
+      if (a && b) {
+        send(a.socket, { type: "voice_presence", userId: bId, active: false });
+        send(b.socket, { type: "voice_presence", userId: aId, active: false });
+      } else if (a) send(a.socket, { type: "voice_presence", userId: bId, active: false });
+      else if (b) send(b.socket, { type: "voice_presence", userId: aId, active: false });
+      voiceVisiblePairs.delete(key);
+    }
+  } finally {
+    voiceReconciliationInProgress = false;
+  }
+}, 1000);
 
 let lastTick = Date.now();
 setInterval(async () => {
