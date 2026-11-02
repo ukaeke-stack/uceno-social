@@ -194,7 +194,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
   const registryDirectory = mkdtempSync(join(tmpdir(), "uceno-world-registry-"));
   const registryFile = join(registryDirectory, "world-interactables.json");
   writeFileSync(registryFile, JSON.stringify({ interactables: [
-    { id: "scene:test-door", kind: "door", x: 37.5, y: 1.15, z: -22.25, yaw: 0 }
+    { id: "scene:test-door", kind: "door", x: 37.5, y: 1.15, z: -22.25, yaw: 0 },
+    { id: "scene:test-furniture", kind: "furniture", x: 38.0, y: 1.15, z: -22.25, yaw: 0 }
   ] }));
 
   try {
@@ -375,6 +376,23 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.equal(persistedDoor[0].object_kind, "door");
     assert.equal(persistedDoor[0].object_state, "open");
     assert.equal(Number(persistedDoor[0].version), 1);
+    const initialFurnitureState = await receiveSocketMessage(authenticated.socket, "object_state", 5000,
+      packet => packet.objectId === "scene:test-furniture");
+    assert.equal(initialFurnitureState.objectState, "idle");
+    authenticated.socket.send(JSON.stringify({
+      type: "interact", objectId: "scene:test-furniture", action: "use"
+    }));
+    const activeFurnitureState = await receiveSocketMessage(authenticated.socket, "object_state", 5000,
+      packet => packet.objectId === "scene:test-furniture" && packet.objectState === "active");
+    assert.equal(activeFurnitureState.version, 1);
+    const persistedFurniture = await admin.unsafe(`SELECT object_kind, object_state, version
+      FROM "${schema}".virtual_world_object_states
+      WHERE world_id = $1::uuid AND district_id = 'unassigned' AND object_id = 'scene:test-furniture'`,
+      [worldId]);
+    assert.equal(persistedFurniture.length, 1);
+    assert.equal(persistedFurniture[0].object_kind, "furniture");
+    assert.equal(persistedFurniture[0].object_state, "active");
+    assert.equal(Number(persistedFurniture[0].version), 1);
     authenticated.socket.close();
     const heartbeatDeadline = Date.now() + 5000;
     let liveHeartbeats = [];
@@ -438,6 +456,11 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal(restoredDoorAfterReconnect.objectState, "open",
         "a reconnecting client must receive the persisted scene object state, not the registry default");
       assert.equal(restoredDoorAfterReconnect.version, 1);
+      const restoredFurnitureAfterReconnect = await receiveSocketMessage(recoverySocket.socket, "object_state", 5000,
+        packet => packet.objectId === "scene:test-furniture");
+      assert.equal(restoredFurnitureAfterReconnect.objectState, "active",
+        "a reconnecting client must receive the persisted furniture state");
+      assert.equal(restoredFurnitureAfterReconnect.version, 1);
       await admin.unsafe(`
         INSERT INTO "${schema}".virtual_world_realtime_events
           (world_id, instance_id, event_type, payload, created_at)
