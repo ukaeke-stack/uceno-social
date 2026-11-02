@@ -61,7 +61,15 @@ namespace UCENO.VirtualWorld.Editor
             data.FindProperty("kind").enumValueIndex = (int)kind;
             string slug = new string(selected.name.ToLowerInvariant().Select(character =>
                 char.IsLetterOrDigit(character) || "._:-".IndexOf(character) >= 0 ? character : '-').ToArray());
-            data.FindProperty("objectId").stringValue = slug + "-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            SerializedProperty id = data.FindProperty("objectId");
+            if (string.IsNullOrWhiteSpace(id.stringValue))
+            {
+                string stableId = GlobalObjectId.GetGlobalObjectIdSlow(selected).ToString();
+                if (stableId.Length > 80 || stableId.Any(character =>
+                    !char.IsLetterOrDigit(character) && "._:-".IndexOf(character) < 0))
+                    throw new InvalidOperationException("Save the scene before assigning a stable UCENO object ID.");
+                id.stringValue = stableId;
+            }
             if (kind == WorldInteractableKind.Door)
                 data.FindProperty("doorPivot").objectReferenceValue = selected.transform;
             data.ApplyModifiedProperties();
