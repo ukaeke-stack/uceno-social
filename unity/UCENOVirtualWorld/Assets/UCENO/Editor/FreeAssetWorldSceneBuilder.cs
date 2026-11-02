@@ -793,6 +793,8 @@ namespace UCENO.VirtualWorld.Editor
             BundledAssetGroupSchema bundledSchema = group.GetSchema<BundledAssetGroupSchema>();
             if (bundledSchema == null) bundledSchema = group.AddSchema<BundledAssetGroupSchema>();
             bundledSchema.BundleMode = BundledAssetGroupSchema.BundlePackingMode.PackSeparately;
+            bundledSchema.IncludeAddressInCatalog = true;
+            bundledSchema.IncludeLabelsInCatalog = true;
             bundledSchema.BuildPath.SetVariableByName(settings, AddressableAssetSettings.kRemoteBuildPath);
             bundledSchema.LoadPath.SetVariableByName(settings, AddressableAssetSettings.kRemoteLoadPath);
             EditorUtility.SetDirty(bundledSchema);
