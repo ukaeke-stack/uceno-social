@@ -350,8 +350,13 @@ let worldRelayCursorReady = false;
 async function initializeWorldRelayCursor(): Promise<void> {
   if (worldRelayCursorReady) return;
   try {
-    const rows = await sql`SELECT COALESCE(MAX(id), 0)::bigint AS cursor FROM virtual_world_realtime_events`;
-    const cursor = Number(rows[0]?.cursor ?? 0);
+    // The consumer key is the stable world-instance UUID, not the OS process.
+    // Replacements for the same instance resume from the last acknowledged row.
+    await sql`INSERT INTO virtual_world_realtime_consumers (instance_id, last_event_id, updated_at)
+      VALUES (${INSTANCE_ID}::uuid, 0, NOW()) ON CONFLICT (instance_id) DO NOTHING`;
+    const rows = await sql`SELECT last_event_id AS cursor FROM virtual_world_realtime_consumers
+      WHERE instance_id = ${INSTANCE_ID}::uuid`;
+    const cursor = Number(rows[0]?.cursor ?? -1);
     if (!Number.isSafeInteger(cursor) || cursor < 0) throw new Error("invalid_world_relay_cursor");
     worldRelayCursor = cursor;
     worldRelayCursorReady = true;
@@ -362,6 +367,17 @@ async function initializeWorldRelayCursor(): Promise<void> {
   }
 }
 void initializeWorldRelayCursor();
+
+async function persistWorldRelayCursor(eventId: number): Promise<void> {
+  const rows = await sql`UPDATE virtual_world_realtime_consumers
+    SET last_event_id = GREATEST(last_event_id, ${eventId}), updated_at = NOW()
+    WHERE instance_id = ${INSTANCE_ID}::uuid
+    RETURNING last_event_id`;
+  if (!rows[0]) throw new Error("world_relay_consumer_cursor_missing");
+  worldRelayCursor = Number(rows[0].last_event_id);
+  if (!Number.isSafeInteger(worldRelayCursor) || worldRelayCursor < eventId)
+    throw new Error("invalid_world_relay_cursor_update");
+}
 const activityHosts = new Map<string, string>();
 const activityHostGenerations = new Map<string, number>();
 const activityRaceIds = new Map<string, string>();
@@ -1923,7 +1939,7 @@ setInterval(async () => {
         // Advance only after this event was safely handled (or deliberately ignored).
         // A transient database failure must leave the cursor before this row so the
         // next poll retries it instead of silently dropping the relay event.
-        worldRelayCursor = eventId;
+        await persistWorldRelayCursor(eventId);
       } catch (error) {
         console.error('world_relay_event_processing_failed', eventId, error);
         break;
