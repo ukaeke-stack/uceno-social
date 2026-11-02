@@ -72,7 +72,8 @@ namespace UCENO.VirtualWorld.Editor
                         if (marker == null || !marker.gameObject.activeInHierarchy) continue;
                         string id = marker.ObjectId;
                         if (string.IsNullOrWhiteSpace(scene.path) || string.IsNullOrWhiteSpace(id) ||
-                            id.Length > 80 || !id.All(ch => char.IsLetterOrDigit(ch) || "._:-".IndexOf(ch) >= 0) ||
+                            !id.StartsWith("scene:", StringComparison.Ordinal) || id.Length != 38 ||
+                            !id.Substring(6).All(ch => (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f')) ||
                             !ids.Add(id))
                             throw new InvalidOperationException("Every interactable must have a saved scene and unique stable ID: " + id);
 
