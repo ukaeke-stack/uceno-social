@@ -132,6 +132,8 @@ namespace UCENO.VirtualWorld
     {
         public string type;
         public string userId;
+        public long sessionGeneration;
+        public long stateVersion;
         public string fromUserId;
         public string code;
         public bool active;
@@ -911,7 +913,8 @@ namespace UCENO.VirtualWorld
 
             if (packet.type == "error")
             {
-                ConnectionStatus = packet.code == "access_revoked" ? "ACCESS REVOKED" : "GATEWAY ERROR";
+                ConnectionStatus = packet.code == "access_revoked" ? "ACCESS REVOKED" :
+                    packet.code == "session_superseded" ? "RECONNECTING" : "GATEWAY ERROR";
                 Debug.LogWarning("UCENO gateway rejected the session: " + packet.code);
                 if (packet.code == "access_revoked" && session != null) session.ClearSession();
                 return;
