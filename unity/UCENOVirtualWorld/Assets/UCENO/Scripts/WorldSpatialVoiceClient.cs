@@ -328,7 +328,7 @@ namespace UCENO.VirtualWorld
                 string payload = parts[1].Replace('-', '+').Replace('_', '/');
                 payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
                 string json = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
-                var match = System.Text.RegularExpressions.Regex.Match(json, "\"sub\"\s*:\s*\"([0-9a-fA-F-]{36})\"");
+                var match = System.Text.RegularExpressions.Regex.Match(json, "\"sub\"\\s*:\\s*\"([0-9a-fA-F-]{36})\"");
                 return match.Success ? match.Groups[1].Value : "";
             }
             catch { return ""; }
