@@ -101,7 +101,7 @@ function trackSocketMessages(socket) {
   return queue;
 }
 
-async function receiveSocketMessage(socket, expectedType, timeoutMs = 5000, predicate = () => true) {
+async function receiveSocketMessage(socket, expectedType, timeoutMs = 5000, predicate = () => true, label = "") {
   const queue = trackSocketMessages(socket);
   const index = queue.packets.findIndex(packet =>
     packet.type === expectedType && predicate(packet));
@@ -112,7 +112,9 @@ async function receiveSocketMessage(socket, expectedType, timeoutMs = 5000, pred
       const index = queue.waiters.indexOf(waiter);
       if (index >= 0) queue.waiters.splice(index, 1);
       reject(new Error("timed out waiting for matching " + expectedType +
-        "; received: " + JSON.stringify(queue.packets.slice(-12))));
+        (label ? " (" + label + ")" : "") +
+        "; object states: " + JSON.stringify(queue.packets.filter(packet => packet.type === "object_state")) +
+        "; recent packets: " + JSON.stringify(queue.packets.slice(-12))));
     }, timeoutMs);
     queue.waiters.push(waiter);
   });
@@ -383,13 +385,13 @@ test("two real gateway processes: primary loss leaves the replacement process re
     // Exercise the real WebSocket gateway against a Unity-export-shaped
     // registry entry and PostgreSQL-backed object-state persistence.
     const initialDoorState = await receiveSocketMessage(authenticated.socket, "object_state", 5000,
-      packet => packet.objectId === "scene:test-door");
+      packet => packet.objectId === "scene:test-door", "initial door snapshot");
     assert.equal(initialDoorState.objectState, "closed");
     authenticated.socket.send(JSON.stringify({
       type: "interact", objectId: "scene:test-door", action: "toggle"
     }));
     const openedDoorState = await receiveSocketMessage(authenticated.socket, "object_state", 5000,
-      packet => packet.objectId === "scene:test-door" && packet.objectState === "open");
+      packet => packet.objectId === "scene:test-door" && packet.objectState === "open", "door opened broadcast");
     assert.equal(openedDoorState.version, 1);
     const persistedDoor = await admin.unsafe(`SELECT object_kind, object_state, version
       FROM "${schema}".virtual_world_object_states
@@ -400,13 +402,13 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.equal(persistedDoor[0].object_state, "open");
     assert.equal(Number(persistedDoor[0].version), 1);
     const initialFurnitureState = await receiveSocketMessage(authenticated.socket, "object_state", 5000,
-      packet => packet.objectId === "scene:test-furniture");
+      packet => packet.objectId === "scene:test-furniture", "initial furniture snapshot");
     assert.equal(initialFurnitureState.objectState, "idle");
     authenticated.socket.send(JSON.stringify({
       type: "interact", objectId: "scene:test-furniture", action: "use"
     }));
     const activeFurnitureState = await receiveSocketMessage(authenticated.socket, "object_state", 5000,
-      packet => packet.objectId === "scene:test-furniture" && packet.objectState === "active");
+      packet => packet.objectId === "scene:test-furniture" && packet.objectState === "active", "furniture active broadcast");
     assert.equal(activeFurnitureState.version, 1);
     const persistedFurniture = await admin.unsafe(`SELECT object_kind, object_state, version
       FROM "${schema}".virtual_world_object_states
@@ -475,12 +477,12 @@ test("two real gateway processes: primary loss leaves the replacement process re
       }
       assert.ok(recoverySocket, `gateway WebSocket authorization did not recover: ${lastAuthError?.message ?? "unknown error"}`);
       const restoredDoorAfterReconnect = await receiveSocketMessage(recoverySocket.socket, "object_state", 5000,
-        packet => packet.objectId === "scene:test-door");
+        packet => packet.objectId === "scene:test-door", "door state after reconnect");
       assert.equal(restoredDoorAfterReconnect.objectState, "open",
         "a reconnecting client must receive the persisted scene object state, not the registry default");
       assert.equal(restoredDoorAfterReconnect.version, 1);
       const restoredFurnitureAfterReconnect = await receiveSocketMessage(recoverySocket.socket, "object_state", 5000,
-        packet => packet.objectId === "scene:test-furniture");
+        packet => packet.objectId === "scene:test-furniture", "furniture state after reconnect");
       assert.equal(restoredFurnitureAfterReconnect.objectState, "active",
         "a reconnecting client must receive the persisted furniture state");
       assert.equal(restoredFurnitureAfterReconnect.version, 1);
