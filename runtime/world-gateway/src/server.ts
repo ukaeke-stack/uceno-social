@@ -372,7 +372,7 @@ type Player = {
   wardrobe: EquippedWardrobeItem[];
   returnState: { x: number; y: number; z: number; yaw: number } | null;
   activeDistrictId: string | null;
-  pendingDistrict: { id: string; contentLabel: string; nonce: string } | null;
+  pendingDistrict: { id: string; contentLabel: string; nonce: string; createdAt: number } | null;
 };
 const players = new Map<string, Player>();
 const voiceVisiblePairs = new Set<string>();
@@ -752,6 +752,12 @@ wss.on("connection", async (socket: WebSocket) => {
         if (pending && typeof msg.districtId === "string" && typeof msg.nonce === "string" &&
             msg.districtId === pending.id && msg.nonce === pending.nonce) {
           await refreshDistrictObjectStates(player.worldId, pending.id);
+          // The refresh yields to the event loop; reject an acknowledgement if
+          // this exact transition was cancelled or superseded while it ran.
+          if (players.get(player.id) !== player || player.socket !== socket ||
+              player.pendingDistrict?.id !== pending.id ||
+              player.pendingDistrict.nonce !== pending.nonce ||
+              socket.readyState !== WebSocket.OPEN) return;
           player.activeDistrictId = pending.id;
           player.pendingDistrict = null;
           // Fetch the latest durable district version before sending the scene
@@ -762,7 +768,7 @@ wss.on("connection", async (socket: WebSocket) => {
               objectState: target.state, actorId: target.actorId,
               occupantId: target.occupantId, version: target.version });
           }
-          send(socket, { type: "district_content_accepted", districtId: msg.districtId });
+          send(socket, { type: "district_content_accepted", districtId: msg.districtId, nonce: pending.nonce });
         }
         return;
       }
@@ -1322,15 +1328,23 @@ setInterval(async () => {
     const proposedZ = p.z + p.vz * dt;
     const targetDistrict = p.homeId || p.eventId ? null : findWorldDistrict(WORLD_DISTRICTS, proposedX, proposedZ);
     const targetDistrictId = targetDistrict?.id ?? null;
+    if (p.pendingDistrict && now - p.pendingDistrict.createdAt > 45000) {
+      send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id,
+        nonce: p.pendingDistrict.nonce, reason: "transition_timeout" });
+      p.pendingDistrict = null;
+    }
     if (targetDistrictId !== p.activeDistrictId) {
       if (!targetDistrict) {
-        if (p.pendingDistrict) send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id });
+        if (p.pendingDistrict) send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id,
+          nonce: p.pendingDistrict.nonce, reason: "left_boundary" });
         if (p.activeDistrictId) send(p.socket, { type: "district_content_exited", districtId: p.activeDistrictId });
         p.activeDistrictId = null;
         p.pendingDistrict = null;
       } else if (p.pendingDistrict?.id !== targetDistrict.id) {
-        if (p.pendingDistrict) send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id });
-        p.pendingDistrict = { id: targetDistrict.id, contentLabel: targetDistrict.contentLabel, nonce: randomUUID() };
+        if (p.pendingDistrict) send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id,
+          nonce: p.pendingDistrict.nonce, reason: "superseded" });
+        p.pendingDistrict = { id: targetDistrict.id, contentLabel: targetDistrict.contentLabel,
+          nonce: randomUUID(), createdAt: now };
         send(p.socket, { type: "district_content_required", districtId: targetDistrict.id,
           districtName: targetDistrict.name, contentLabel: targetDistrict.contentLabel,
           nonce: p.pendingDistrict.nonce });
@@ -1347,7 +1361,8 @@ setInterval(async () => {
         continue;
       }
     } else if (p.pendingDistrict) {
-      send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id });
+      send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id,
+        nonce: p.pendingDistrict.nonce, reason: "returned_to_active_district" });
       p.pendingDistrict = null;
     }
     resolveHorizontalMovement(p, proposedX, proposedZ);
