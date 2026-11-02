@@ -42,7 +42,7 @@ export function restoreActivitySession(value: unknown): { session: ActivitySessi
     participants.set(p.userId, { ...p });
   }
   return { session: { id: v.id, worldId: v.worldId, instanceId: v.instanceId,
-    kind: v.kind as ActivityKind, phase: v.phase as ActivityPhase, createdAt: v.createdAt,
+    kind: v.kind as ActivityKind, phase: v.phase as ActivityPhase, createdAt: v.createdAt!,
     startedAt: v.startedAt ?? null, completedAt: v.completedAt ?? null,
     version: v.version!, maxParticipants: v.maxParticipants!, checkpointCount: v.checkpointCount!,
     participants }, hostUserId: v.hostUserId, hostGeneration: v.hostGeneration!,
