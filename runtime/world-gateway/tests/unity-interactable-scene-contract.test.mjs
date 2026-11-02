@@ -14,6 +14,7 @@ const exporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteract
 const authoring = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableAuthoring.cs");
 const validator = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldDistrictSceneValidator.cs");
 const gateway = read("runtime/world-gateway/src/server.ts");
+const registryPolicy = read("runtime/world-gateway/src/interactable-registry-policy.ts");
 const client = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldObjectInteractor.cs");
 const stateComponent = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldInteractable.cs");
 const gatewayClient = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs");
@@ -45,7 +46,11 @@ test("scene export creates the exact file and schema loaded by the authoritative
   assert.match(exporter, /marker\.Kind == "door" && !marker\.HasDoorPivot/);
   assert.match(exporter, /GlobalObjectId\.GetGlobalObjectIdSlow/);
   assert.match(gateway, /process\.env\.WORLD_INTERACTABLES_FILE/);
-  assert.match(gateway, /parseInteractableRegistry\(raw, WORLD_DISTRICTS, WORLD_BOUNDS\)/);
+  assert.match(gateway, /loadInteractableRegistry\(\s*raw, WORLD_DISTRICTS, WORLD_BOUNDS,/);
+  assert.match(gateway, /WORLD_REQUIRE_INTERACTABLE_REGISTRY === "true"/);
+  assert.match(registryPolicy, /function loadInteractableRegistry/);
+  assert.match(registryPolicy, /parseInteractableRegistry\(raw, districts, worldBounds\)/);
+  assert.match(registryPolicy, /WORLD_REQUIRE_INTERACTABLE_REGISTRY is enabled/);
 });
 
 test("editor preflight enforces the same stable ID, collider, hinge and district contract", () => {
@@ -63,7 +68,6 @@ test("player targeting submits object IDs and applies only server-broadcast stat
   assert.match(gateway, /type: "object_state", objectId: target\.id/);
 });
 
-
 test("imported prop authoring requires a real hinge child and creates raycastable colliders", () => {
   assert.match(authoring, /Use Selected Child as Parent Door Pivot/);
   assert.match(authoring, /selected != marker\.transform/);
@@ -73,10 +77,9 @@ test("imported prop authoring requires a real hinge child and creates raycastabl
   assert.match(authoring, /box\.isTrigger = false/);
 });
 
-
 test("Unity Build Automation pre-export generates the scene and gateway interactable registry", () => {
   assert.match(buildCommand, /public\s+static\s+void\s+PrepareAndroidBuild\s*\(\)\s*\{[\s\S]*?StarterSceneBuilder\.CreateStarterScene\(\)/);
   assert.match(starterBuilder, /FreeAssetWorldSceneBuilder\.CreateStarterScene\(\)/);
   assert.match(sceneBuilder, /WorldInteractableRegistryExporter\.Export\(false\)/);
-  assert.match(exporter, /Path\.Combine\(config,\s*\"world-interactables\.json\"\)/);
+  assert.match(exporter, /Path\.Combine\(config,\s*"world-interactables\.json"\)/);
 });
