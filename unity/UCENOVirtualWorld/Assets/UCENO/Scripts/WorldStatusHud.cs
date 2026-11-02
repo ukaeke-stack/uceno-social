@@ -171,8 +171,8 @@ namespace UCENO.VirtualWorld
 
             float half = (innerWidth - 6f * scale) * 0.5f;
             if (GUI.Button(new Rect(left, currentY, half, rowHeight),
-                spatialVoice.IsMuted ? "MIC MUTED" : "MIC LIVE"))
-                spatialVoice.SetLocalMuted(!spatialVoice.IsMuted);
+                spatialVoice.LocalMicMuted ? "MIC MUTED" : "MIC ENABLED"))
+                spatialVoice.SetLocalMuted(!spatialVoice.LocalMicMuted);
             if (GUI.Button(new Rect(left + half + 6f * scale, currentY, half, rowHeight),
                 spatialVoice.PushToTalkMode ? "PTT: ON" : "OPEN MIC"))
                 spatialVoice.SetPushToTalkMode(!spatialVoice.PushToTalkMode);
@@ -188,7 +188,7 @@ namespace UCENO.VirtualWorld
                     spatialVoice.SetPushToTalkHeld(true);
                     e.Use();
                 }
-                else if (e.type == EventType.MouseUp)
+                else if (e.type == EventType.MouseUp && spatialVoice.PushToTalkHeld)
                 {
                     spatialVoice.SetPushToTalkHeld(false);
                     e.Use();
