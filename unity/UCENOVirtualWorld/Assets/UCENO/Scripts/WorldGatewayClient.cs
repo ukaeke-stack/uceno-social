@@ -373,6 +373,15 @@ namespace UCENO.VirtualWorld
             string expectedDistrict = pendingDistrictId;
             string expectedNonce = pendingDistrictNonce;
             string label = pendingDistrictLabel;
+
+            // A successful scene load may be waiting for a gateway acknowledgement.
+            // Retry the acknowledgement without acquiring a second residency lease.
+            if (pendingDistrictResidentLabel == label)
+            {
+                _ = SendDistrictContentReadyAsync(expectedDistrict, expectedNonce);
+                return;
+            }
+
             contentDelivery.AcquireContent(label, (ok, error) =>
             {
                 districtDownloadRunning = false;
@@ -406,7 +415,11 @@ namespace UCENO.VirtualWorld
         {
             try
             {
-                if (!connected || socket == null) return;
+                if (!connected || socket == null)
+                {
+                    spatialTransitionStatus = "District content is loaded, but the gateway is disconnected. Reconnect and retry entry.";
+                    return;
+                }
                 await socket.SendText(JsonUtility.ToJson(new GatewayDistrictContentReadyRequest
                 {
                     districtId = districtId,
