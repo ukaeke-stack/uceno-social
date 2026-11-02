@@ -35,6 +35,65 @@ type CollisionBox = {
   minZ: number; maxZ: number;
 };
 type Interactable = { id: string; kind: "door" | "seat" | "object"; x: number; y: number; z: number; yaw: number; state: string; actorId: string | null; occupantId: string | null };
+
+type WorldDistrict = {
+  id: string; name: string; contentLabel: string;
+  minX: number; maxX: number; minZ: number; maxZ: number;
+};
+
+function loadWorldDistricts(): WorldDistrict[] {
+  const filePath = process.env.WORLD_DISTRICTS_FILE;
+  let raw = process.env.WORLD_DISTRICTS;
+  if (!raw && filePath) {
+    try { raw = readFileSync(filePath, "utf8"); }
+    catch (error) {
+      throw new Error("Could not read WORLD_DISTRICTS_FILE: " +
+        (error instanceof Error ? error.message : "unknown file error"));
+    }
+  }
+  if (!raw) return [];
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); }
+  catch { throw new Error("WORLD_DISTRICTS must be valid JSON"); }
+  const values = parsed && typeof parsed === "object" &&
+    Array.isArray((parsed as { districts?: unknown }).districts)
+      ? (parsed as { districts: unknown[] }).districts : null;
+  if (!values || values.length > 100)
+    throw new Error("WORLD_DISTRICTS must contain a districts array with at most 100 entries");
+  const ids = new Set<string>();
+  const districts = values.map((value, index): WorldDistrict => {
+    if (!value || typeof value !== "object") throw new Error(`District ${index} is invalid`);
+    const item = value as Record<string, unknown>;
+    if (typeof item.id !== "string" || !/^[a-zA-Z0-9_-]{1,64}$/.test(item.id) ||
+        ids.has(item.id) || typeof item.name !== "string" || !item.name.trim() || item.name.length > 80 ||
+        typeof item.contentLabel !== "string" || !/^world-city-district-[a-z0-9-]{1,48}$/.test(item.contentLabel) ||
+        !finiteNumber(item.minX, -WORLD_BOUNDS, WORLD_BOUNDS) ||
+        !finiteNumber(item.maxX, -WORLD_BOUNDS, WORLD_BOUNDS) ||
+        !finiteNumber(item.minZ, -WORLD_BOUNDS, WORLD_BOUNDS) ||
+        !finiteNumber(item.maxZ, -WORLD_BOUNDS, WORLD_BOUNDS) ||
+        item.minX >= item.maxX || item.minZ >= item.maxZ)
+      throw new Error(`District ${index} has invalid or duplicate fields`);
+    ids.add(item.id);
+    return { id: item.id, name: item.name.trim(), contentLabel: item.contentLabel,
+      minX: item.minX, maxX: item.maxX, minZ: item.minZ, maxZ: item.maxZ };
+  });
+  for (let i = 0; i < districts.length; i++) {
+    for (let j = i + 1; j < districts.length; j++) {
+      const a = districts[i], b = districts[j];
+      const overlaps = a.minX < b.maxX && a.maxX > b.minX &&
+        a.minZ < b.maxZ && a.maxZ > b.minZ;
+      if (overlaps) throw new Error(`Districts ${a.id} and ${b.id} overlap`);
+    }
+  }
+  return districts;
+}
+
+const WORLD_DISTRICTS = loadWorldDistricts();
+function findWorldDistrict(x: number, z: number): WorldDistrict | null {
+  return WORLD_DISTRICTS.find(district =>
+    x >= district.minX && x < district.maxX &&
+    z >= district.minZ && z < district.maxZ) || null;
+}
 type EquippedWardrobeItem = { slot: string; itemId: string };
 
 function loadInteractables(): Map<string, Interactable> {
@@ -263,6 +322,8 @@ type Player = {
   eventId: string | null;
   wardrobe: EquippedWardrobeItem[];
   returnState: { x: number; y: number; z: number; yaw: number } | null;
+  activeDistrictId: string | null;
+  pendingDistrict: { id: string; contentLabel: string; nonce: string } | null;
 };
 const players = new Map<string, Player>();
 const voiceVisiblePairs = new Set<string>();
@@ -491,7 +552,8 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
-    lastInteractionAt: 0, lastWardrobeRefreshAt: 0, voiceActive: false, lastVoiceSignalAt: 0, voiceSignalWindowAt: Date.now(), voiceSignalCount: 0, homeId: null, homeAnchor: null, eventId: null, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null
+    lastInteractionAt: 0, lastWardrobeRefreshAt: 0, voiceActive: false, lastVoiceSignalAt: 0, voiceSignalWindowAt: Date.now(), voiceSignalCount: 0, homeId: null, homeAnchor: null, eventId: null, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null,
+    activeDistrictId: null, pendingDistrict: null
   };
 }
 
@@ -632,6 +694,16 @@ wss.on("connection", async (socket: WebSocket) => {
     socket.on("message", async (raw) => {
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
+      if (msg && msg.type === "district_content_ready") {
+        const pending = player.pendingDistrict;
+        if (pending && typeof msg.districtId === "string" && typeof msg.nonce === "string" &&
+            msg.districtId === pending.id && msg.nonce === pending.nonce) {
+          player.activeDistrictId = pending.id;
+          player.pendingDistrict = null;
+          send(socket, { type: "district_content_accepted", districtId: msg.districtId });
+        }
+        return;
+      }
       if (msg && msg.type === "activity_create") {
         if (player.homeId || player.eventId || player.returnState ||
             !["checkpoint_race", "dance", "sports", "adventure"].includes(msg.kind) ||
@@ -1173,7 +1245,31 @@ setInterval(async () => {
     if (p.jumpQueued && p.grounded) { p.vy = JUMP_SPEED; p.grounded = false; }
     p.jumpQueued = false;
     p.vy -= GRAVITY * dt;
-    resolveHorizontalMovement(p, p.x + p.vx * dt, p.z + p.vz * dt);
+    const proposedX = p.x + p.vx * dt;
+    const proposedZ = p.z + p.vz * dt;
+    const targetDistrict = p.homeId || p.eventId ? null : findWorldDistrict(proposedX, proposedZ);
+    const targetDistrictId = targetDistrict?.id ?? null;
+    if (targetDistrictId !== p.activeDistrictId) {
+      if (!targetDistrict) {
+        p.activeDistrictId = null;
+        p.pendingDistrict = null;
+      } else if (p.pendingDistrict?.id !== targetDistrict.id) {
+        p.pendingDistrict = { id: targetDistrict.id, contentLabel: targetDistrict.contentLabel, nonce: randomUUID() };
+        send(p.socket, { type: "district_content_required", districtId: targetDistrict.id,
+          districtName: targetDistrict.name, contentLabel: targetDistrict.contentLabel,
+          nonce: p.pendingDistrict.nonce });
+      }
+      if (targetDistrict && p.activeDistrictId !== targetDistrict.id) {
+        p.vx = 0; p.vz = 0; p.moveX = 0; p.moveZ = 0; p.sprint = false;
+        p.y += p.vy * dt;
+        const pendingGroundY = p.homeAnchor ? p.homeAnchor.y : GROUND_Y;
+        if (p.y <= pendingGroundY) { p.y = pendingGroundY; p.vy = 0; p.grounded = true; }
+        snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
+          seated: p.seated, sprint: false, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe });
+        continue;
+      }
+    }
+    resolveHorizontalMovement(p, proposedX, proposedZ);
     p.y += p.vy * dt;
     const groundY = p.homeAnchor ? p.homeAnchor.y : GROUND_Y;
     if (p.homeAnchor && p.y > p.homeAnchor.y + 3.05) {
