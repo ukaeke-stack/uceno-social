@@ -711,13 +711,42 @@ const server = createServer(async (req, res) => {
       if (typeof body.sessionId !== "string" || !/^[0-9a-f-]{36}$/i.test(body.sessionId)) throw new Error("invalid_request");
       const player = players.get(identity.userId);
       if (!player || player.worldId !== identity.worldId || player.socket.readyState !== WebSocket.OPEN || player.homeId || player.eventId || player.returnState) throw new Error("player_not_transferable");
-      const target = await sql`SELECT activity.instance_id AS "instanceId", instance.endpoint FROM virtual_world_activity_sessions activity JOIN virtual_world_instances instance ON instance.id = activity.instance_id WHERE activity.id = ${body.sessionId}::uuid AND activity.world_id = ${identity.worldId}::uuid AND activity.phase = 'lobby' AND instance.status = 'ready' AND instance.endpoint IS NOT NULL AND instance.heartbeat_at > NOW() - INTERVAL '30 seconds' AND activity.instance_id <> ${INSTANCE_ID}::uuid LIMIT 1`;
+      const target = await sql`SELECT activity.instance_id AS "instanceId", instance.endpoint,
+          activity.phase, activity.host_generation AS "hostGeneration", activity.state
+        FROM virtual_world_activity_sessions activity
+        JOIN virtual_world_instances instance ON instance.id = activity.instance_id
+        WHERE activity.id = ${body.sessionId}::uuid
+          AND activity.world_id = ${identity.worldId}::uuid
+          AND activity.phase IN ('lobby', 'active')
+          AND instance.status = 'ready' AND instance.endpoint IS NOT NULL
+          AND instance.heartbeat_at > NOW() - INTERVAL '30 seconds'
+          AND activity.instance_id <> ${INSTANCE_ID}::uuid
+        LIMIT 1`;
       if (!target[0] || typeof target[0].endpoint !== "string") throw new Error("activity_target_unavailable");
+      const persisted = restoreActivitySession(target[0].state);
+      const participant = persisted?.session.participants.get(identity.userId);
+      if (!persisted || persisted.hostGeneration !== Number(target[0].hostGeneration) ||
+          (target[0].phase === "active" && (!participant || participant.status !== "joined"))) {
+        throw new Error("activity_transfer_not_allowed");
+      }
       const jti = randomUUID();
-      await sql`INSERT INTO virtual_world_activity_transfer_tickets (id, world_id, user_id, activity_session_id, source_instance_id, target_instance_id, expires_at, created_at) VALUES (${jti}::uuid, ${identity.worldId}::uuid, ${identity.userId}::uuid, ${body.sessionId}::uuid, ${INSTANCE_ID}::uuid, ${target[0].instanceId}::uuid, NOW() + INTERVAL '30 seconds', NOW())`;
-      const ticket = await new SignJWT({ world_id: identity.worldId, instance_id: target[0].instanceId, target_instance_id: target[0].instanceId, client_type: clientType, scope: "activity-transfer", transfer_session_id: body.sessionId }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setIssuer("uceno-social").setAudience("uceno-world-gateway").setSubject(identity.userId).setJti(jti).setIssuedAt().setExpirationTime("30s").sign(secret);
+      await sql`INSERT INTO virtual_world_activity_transfer_tickets
+        (id, world_id, user_id, activity_session_id, source_instance_id,
+         target_instance_id, host_generation, expires_at, created_at)
+        VALUES (${jti}::uuid, ${identity.worldId}::uuid, ${identity.userId}::uuid,
+          ${body.sessionId}::uuid, ${INSTANCE_ID}::uuid, ${target[0].instanceId}::uuid,
+          ${persisted.hostGeneration}, NOW() + INTERVAL '30 seconds', NOW())`;
+      const ticket = await new SignJWT({
+        world_id: identity.worldId, instance_id: target[0].instanceId,
+        target_instance_id: target[0].instanceId, client_type: clientType,
+        scope: "activity-transfer", transfer_session_id: body.sessionId,
+        transfer_host_generation: persisted.hostGeneration
+      }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setIssuer("uceno-social")
+        .setAudience("uceno-world-gateway").setSubject(identity.userId)
+        .setJti(jti).setIssuedAt().setExpirationTime("30s").sign(secret);
       res.writeHead(200, headers);
-      res.end(JSON.stringify({ ticket, endpoint: target[0].endpoint, instanceId: target[0].instanceId, sessionId: body.sessionId, expiresInSeconds: 30 }));
+      res.end(JSON.stringify({ ticket, endpoint: target[0].endpoint,
+        instanceId: target[0].instanceId, sessionId: body.sessionId, expiresInSeconds: 30 }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       const status = message === "unauthorized" ? 401 : message === "invalid_request" ? 400 : message === "player_not_transferable" ? 403 : message === "activity_target_unavailable" ? 409 : 503;
@@ -835,13 +864,22 @@ server.on("upgrade", async (req, socket, head) => {
           AND ticket.user_id = ${identity.userId}::uuid
           AND ticket.target_instance_id = ${INSTANCE_ID}::uuid
           AND ticket.activity_session_id = ${String(payload.transfer_session_id)}::uuid
+          AND ticket.host_generation = ${Number(payload.transfer_host_generation)}
           AND ticket.consumed_at IS NULL AND ticket.expires_at > NOW()
           AND EXISTS (
             SELECT 1 FROM virtual_world_activity_sessions activity
             WHERE activity.id = ticket.activity_session_id
               AND activity.world_id = ticket.world_id
               AND activity.instance_id = ticket.target_instance_id
-              AND activity.phase = 'lobby'
+              AND activity.host_generation = ticket.host_generation
+              AND (
+                activity.phase = 'lobby'
+                OR (activity.phase = 'active' AND EXISTS (
+                  SELECT 1 FROM jsonb_array_elements(activity.state->'participants') participant
+                  WHERE participant->>'userId' = ticket.user_id::text
+                    AND participant->>'status' = 'joined'
+                ))
+              )
           )
         RETURNING ticket.id`;
       if (!consumed[0]) return null;
@@ -855,6 +893,7 @@ server.on("upgrade", async (req, socket, head) => {
             AND ticket.consumed_at IS NOT NULL
             AND ticket.user_id = ${identity.userId}::uuid
             AND ticket.target_instance_id = ${INSTANCE_ID}::uuid
+            AND ticket.host_generation = ${Number(payload.transfer_host_generation)}
         )
         ON CONFLICT (world_id, user_id) DO UPDATE
           SET instance_id = EXCLUDED.instance_id,
@@ -1060,7 +1099,13 @@ wss.on("connection", async (socket: WebSocket) => {
               FROM virtual_world_activity_sessions s
               JOIN virtual_world_instances i ON i.id = s.instance_id
               WHERE s.id = ${msg.id}::uuid AND s.world_id = ${player.worldId}::uuid
-                AND s.phase = 'lobby' AND i.status = 'ready'
+                AND s.phase IN ('lobby', 'active')
+                AND (s.phase = 'lobby' OR EXISTS (
+                  SELECT 1 FROM jsonb_array_elements(s.state->'participants') participant
+                  WHERE participant->>'userId' = ${player.id}
+                    AND participant->>'status' = 'joined'
+                ))
+                AND i.status = 'ready'
                 AND i.heartbeat_at > NOW() - INTERVAL '30 seconds' LIMIT 1`;
             if (route[0]) send(socket, { type: "activity_route_required",
               sessionId: msg.id, instanceId: route[0].instanceId, endpoint: route[0].endpoint });
