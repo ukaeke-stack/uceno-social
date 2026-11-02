@@ -11,8 +11,7 @@ const migrations = [
   "031_durable_activity_sessions.sql",
   "032_activity_cross_instance_discovery.sql",
   "033_activity_gateway_transfer_tickets.sql",
-  "034_activity_transfer_host_fencing.sql",
-  "035_activity_realtime_event_type.sql"
+  "034_activity_transfer_host_fencing.sql"
 ];
 
 test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl }, async t => {
