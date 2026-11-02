@@ -908,12 +908,21 @@ const server = createServer(async (req, res) => {
         throw new Error("activity_transfer_not_allowed");
       }
       const jti = randomUUID();
-      await sql`INSERT INTO virtual_world_activity_transfer_tickets
-        (id, world_id, user_id, activity_session_id, source_instance_id,
-         target_instance_id, host_generation, expires_at, created_at)
-        VALUES (${jti}::uuid, ${identity.worldId}::uuid, ${identity.userId}::uuid,
-          ${body.sessionId}::uuid, ${INSTANCE_ID}::uuid, ${target[0].instanceId}::uuid,
-          ${persisted.hostGeneration}, NOW() + INTERVAL '30 seconds', NOW())`;
+      await sql.begin(async tx => {
+        const authority = await tx`SELECT id FROM virtual_world_instances
+          WHERE id = ${INSTANCE_ID}::uuid
+            AND owner_process_id = ${PROCESS_ID}::uuid
+            AND owner_generation = ${processGeneration}
+            AND owner_lease_expires_at > clock_timestamp()
+          FOR SHARE`;
+        if (!authority[0]) throw new Error("gateway_process_fenced");
+        await tx`INSERT INTO virtual_world_activity_transfer_tickets
+          (id, world_id, user_id, activity_session_id, source_instance_id,
+           target_instance_id, host_generation, expires_at, created_at)
+          VALUES (${jti}::uuid, ${identity.worldId}::uuid, ${identity.userId}::uuid,
+            ${body.sessionId}::uuid, ${INSTANCE_ID}::uuid, ${target[0].instanceId}::uuid,
+            ${persisted.hostGeneration}, NOW() + INTERVAL '30 seconds', NOW())`;
+      });
       const ticket = await new SignJWT({
         world_id: identity.worldId, instance_id: target[0].instanceId,
         target_instance_id: target[0].instanceId, client_type: clientType,
