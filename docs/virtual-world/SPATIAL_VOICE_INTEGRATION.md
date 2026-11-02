@@ -88,12 +88,12 @@ Do not use Unity's deprecated `com.unity.webrtc` package for this feature.
 
 ## Current status
 
-The SDK dependency has been added to the Unity manifest. Gateway signaling and
-pair-scoped token issuance are implemented in source, with 30-second tokens
-and pair-room teardown requests. LiveKit service provisioning, exact revocation
-verification, the Unity audio client, microphone/track lifecycle, UI, Unity
-compilation and physical-device audio tests are not implemented or verified.
-Do not describe spatial voice as operational until all verification gates pass.
+The SDK dependency has been added to the Unity manifest. Gateway signaling,
+pair-scoped token issuance, room teardown, the Unity audio client, microphone/
+track lifecycle and basic controls are implemented in source. LiveKit service
+provisioning, exact revocation verification, polished Canvas UI, Unity
+compilation and physical-device audio tests remain unverified. Do not describe
+spatial voice as operational until all verification gates pass.
 
 
 ## Unity client implementation update — 2026-11-02
