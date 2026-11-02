@@ -40,6 +40,10 @@ namespace UCENO.VirtualWorld
 
         private void Awake()
         {
+            if (kind == WorldInteractableKind.Door) CurrentState = "closed";
+            else if (kind == WorldInteractableKind.Vehicle) CurrentState = "engine_off";
+            else if (kind == WorldInteractableKind.Seat) CurrentState = "available";
+            else CurrentState = "idle";
             closedRotation = doorPivot != null ? doorPivot.localRotation : Quaternion.identity;
             targetRotation = closedRotation;
             initialized = true;
