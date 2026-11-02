@@ -255,7 +255,19 @@ namespace UCENO.VirtualWorld
         private void OnTrackSubscribed(PeerAudio peer, IRemoteTrack track, RemoteParticipant participant)
         {
             if (!(track is RemoteAudioTrack audioTrack) || participant.Identity != peer.userId) return;
-            if (gateway == null || !gateway.TryGetRemotePlayerTransform(peer.userId, out Transform avatar)) return;
+            StartCoroutine(AttachRemoteAudioWhenAvatarExists(peer, audioTrack));
+        }
+
+        private IEnumerator AttachRemoteAudioWhenAvatarExists(PeerAudio peer, RemoteAudioTrack audioTrack)
+        {
+            Transform avatar = null;
+            float deadline = Time.unscaledTime + 8f;
+            while (Time.unscaledTime < deadline && peer != null && voiceEnabled && !appPaused)
+            {
+                if (gateway != null && gateway.TryGetRemotePlayerTransform(peer.userId, out avatar)) break;
+                yield return null;
+            }
+            if (avatar == null || peer == null || !peer.connected || !voiceEnabled) yield break;
             var output = new GameObject("UCENO Spatial Audio " + peer.userId);
             output.transform.SetParent(avatar, false);
             output.transform.localPosition = new Vector3(0f, 1.55f, 0f);
