@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseInteractableRegistry } from "../dist/interactable-registry-policy.js";
+import { loadInteractableRegistry, parseInteractableRegistry } from "../dist/interactable-registry-policy.js";
 
 const districts = [{
   id: "central", name: "Central", contentLabel: "world-city-district-central",
@@ -59,4 +59,18 @@ test("seat registry entries start available and persistent furniture starts idle
   ] }), districts, 100);
   assert.equal(registry.get("seat-1").state, "available");
   assert.equal(registry.get("table-1").state, "idle");
+});
+
+
+test("required registry mode fails startup instead of silently disabling all world objects", () => {
+  assert.equal(loadInteractableRegistry(undefined, districts, 100, false).size, 0);
+  assert.equal(loadInteractableRegistry("  ", districts, 100, false).size, 0);
+  assert.throws(() => loadInteractableRegistry(undefined, districts, 100, true),
+    /WORLD_REQUIRE_INTERACTABLE_REGISTRY.*no world interactable registry/);
+  assert.throws(() => loadInteractableRegistry("  ", districts, 100, true),
+    /WORLD_REQUIRE_INTERACTABLE_REGISTRY.*no world interactable registry/);
+  const loaded = loadInteractableRegistry(JSON.stringify({ interactables: [
+    { id: "scene:door-required", kind: "door", x: 0, y: 0, z: 0 }
+  ] }), districts, 100, true);
+  assert.equal(loaded.size, 1);
 });
