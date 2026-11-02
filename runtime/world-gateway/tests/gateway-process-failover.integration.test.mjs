@@ -109,6 +109,13 @@ async function connectAuthenticated(port, instanceId, worldId, userId) {
   const socket = new WebSocket(`ws://127.0.0.1:${port}/world`, {
     headers: { Authorization: `Bearer ${token}` }
   });
+  const earlyObjectStates = [];
+  socket.on("message", raw => {
+    try {
+      const packet = JSON.parse(raw.toString());
+      if (packet.type === "object_state") earlyObjectStates.push(packet);
+    } catch { /* malformed test packet is handled by the main receiver */ }
+  });
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("authenticated WebSocket upgrade timed out")), 5000);
     socket.once("open", () => { clearTimeout(timeout); resolve(); });
@@ -121,7 +128,7 @@ async function connectAuthenticated(port, instanceId, worldId, userId) {
   });
   const welcome = await receiveSocketMessage(socket, "welcome");
   assert.equal(welcome.instanceId, instanceId);
-  return { socket, welcome };
+  return { socket, welcome, earlyObjectStates };
 }
 
 async function assertWebSocketRejectsWrongInstance(port, instanceId) {
@@ -352,8 +359,9 @@ test("two real gateway processes: primary loss leaves the replacement process re
 
     // Exercise the real WebSocket gateway against a Unity-export-shaped
     // registry entry and PostgreSQL-backed object-state persistence.
-    const initialDoorState = await receiveSocketMessage(authenticated.socket, "object_state", 5000,
+    const initialDoorState = authenticated.earlyObjectStates.find(
       packet => packet.objectId === "scene:test-door");
+    assert.ok(initialDoorState, "joining client must receive the registered door state");
     assert.equal(initialDoorState.objectState, "closed");
     authenticated.socket.send(JSON.stringify({
       type: "interact", objectId: "scene:test-door", action: "toggle"
