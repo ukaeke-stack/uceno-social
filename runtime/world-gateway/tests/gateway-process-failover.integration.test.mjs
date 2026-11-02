@@ -197,7 +197,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
     )`);
     await admin.unsafe(`CREATE FUNCTION "${schema}".claim_world_instance_process(
       p_instance_id UUID, p_process_id UUID, p_lease_seconds INTEGER DEFAULT 12
-    ) RETURNS BIGINT LANGUAGE SQL AS 'UPDATE virtual_world_instances
+    ) RETURNS BIGINT LANGUAGE SQL AS 'UPDATE "${schema}".virtual_world_instances
       SET owner_process_id = p_process_id, owner_generation = owner_generation + 1,
           owner_lease_expires_at = NOW() + make_interval(secs => p_lease_seconds),
           heartbeat_at = NOW(), current_players = 0
@@ -208,7 +208,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
       p_instance_id UUID, p_process_id UUID, p_generation BIGINT,
       p_current_players INTEGER, p_lease_seconds INTEGER DEFAULT 12
     ) RETURNS BOOLEAN LANGUAGE SQL AS 'WITH updated AS (
-      UPDATE virtual_world_instances SET heartbeat_at = NOW(), current_players = p_current_players,
+      UPDATE "${schema}".virtual_world_instances SET heartbeat_at = NOW(), current_players = p_current_players,
         owner_lease_expires_at = NOW() + make_interval(secs => p_lease_seconds)
       WHERE id = p_instance_id AND status IN (''ready'',''draining'')
         AND owner_process_id = p_process_id AND owner_generation = p_generation
