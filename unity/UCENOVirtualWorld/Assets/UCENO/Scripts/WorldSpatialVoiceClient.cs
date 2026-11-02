@@ -300,6 +300,8 @@ namespace UCENO.VirtualWorld
             // SDK revisions that expose capture stop on the source implementation.
             MethodInfo stop = source.GetType().GetMethod("Stop", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             if (stop != null) stop.Invoke(source, null);
+            else if (Microphone.devices != null && Microphone.devices.Length > 0)
+                Microphone.End(Microphone.devices[0]);
         }
 
         private string ReadWorldId()
@@ -368,7 +370,8 @@ namespace UCENO.VirtualWorld
             {
                 if (GUILayout.Button(localMuted ? "Unmute microphone" : "Mute microphone", GUILayout.Height(34)))
                     SetLocalMuted(!localMuted);
-                pushToTalkMode = GUILayout.Toggle(pushToTalkMode, "Push-to-talk mode");
+                bool selectedPushToTalk = GUILayout.Toggle(pushToTalkMode, "Push-to-talk mode");
+                if (selectedPushToTalk != pushToTalkMode) SetPushToTalkMode(selectedPushToTalk);
                 if (pushToTalkMode)
                 {
                     var e = Event.current;
