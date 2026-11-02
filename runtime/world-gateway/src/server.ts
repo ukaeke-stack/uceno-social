@@ -83,8 +83,11 @@ function loadInteractables(): Map<string, Interactable> {
         !finiteNumber(item.z, -WORLD_BOUNDS, WORLD_BOUNDS) ||
         (item.yaw !== undefined && !finiteNumber(item.yaw, -Math.PI * 4, Math.PI * 4)) || result.has(item.id))
       throw new Error(`Interactable ${index} has invalid or duplicate fields`);
+    const owningDistrict = findWorldDistrict(WORLD_DISTRICTS, item.x, item.z);
+    if (WORLD_DISTRICTS.length > 0 && !owningDistrict)
+      throw new Error(`Interactable ${item.id} is outside every configured world district`);
     result.set(item.id, {
-      id: item.id, districtId: findWorldDistrict(WORLD_DISTRICTS, item.x, item.z)?.id ?? "unassigned",
+      id: item.id, districtId: owningDistrict?.id ?? "unassigned",
       kind: item.kind, x: item.x, y: item.y, z: item.z,
       yaw: typeof item.yaw === "number" ? item.yaw : 0,
       state: item.kind === "seat" ? "available" : defaultPersistentObjectState(item.kind),
