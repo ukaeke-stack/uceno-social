@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, selectNextActivityHost, type ActivitySession } from "./activity-session.js";
 import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./district-policy.js";
-import { isDistrictTransitionExpired, matchesDistrictTransition } from "./district-transition-policy.js";
+import { isDistrictTransitionExpired, matchesDistrictTransition, planDistrictTransition } from "./district-transition-policy.js";
 import { parseDistrictCollisionManifest } from "./district-collision-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
@@ -1281,42 +1281,34 @@ setInterval(async () => {
     const proposedZ = p.z + p.vz * dt;
     const targetDistrict = p.homeId || p.eventId ? null : findWorldDistrict(WORLD_DISTRICTS, proposedX, proposedZ);
     const targetDistrictId = targetDistrict?.id ?? null;
-    if (isDistrictTransitionExpired(p.pendingDistrict, now)) {
-      send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id,
-        nonce: p.pendingDistrict.nonce, reason: "transition_timeout" });
-      p.pendingDistrict = null;
+    const transitionPlan = planDistrictTransition(
+      p.activeDistrictId, p.pendingDistrict, targetDistrict, now, randomUUID
+    );
+    if (transitionPlan.cancellation) {
+      const cancelled = transitionPlan.cancellation.transition;
+      send(p.socket, { type: "district_content_cancelled", districtId: cancelled.id,
+        nonce: cancelled.nonce, reason: transitionPlan.cancellation.reason });
     }
-    if (targetDistrictId !== p.activeDistrictId) {
-      if (!targetDistrict) {
-        if (p.pendingDistrict) send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id,
-          nonce: p.pendingDistrict.nonce, reason: "left_boundary" });
-        if (p.activeDistrictId) send(p.socket, { type: "district_content_exited", districtId: p.activeDistrictId });
-        p.activeDistrictId = null;
-        p.pendingDistrict = null;
-      } else if (p.pendingDistrict?.id !== targetDistrict.id) {
-        if (p.pendingDistrict) send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id,
-          nonce: p.pendingDistrict.nonce, reason: "superseded" });
-        p.pendingDistrict = { id: targetDistrict.id, contentLabel: targetDistrict.contentLabel,
-          nonce: randomUUID(), createdAt: now };
-        send(p.socket, { type: "district_content_required", districtId: targetDistrict.id,
-          districtName: targetDistrict.name, contentLabel: targetDistrict.contentLabel,
-          nonce: p.pendingDistrict.nonce });
-      }
-      if (targetDistrict && p.activeDistrictId !== targetDistrict.id) {
-        // Preserve the latest input intent while holding position. This lets
-        // the next tick distinguish continued forward movement from turning back.
-        p.vx = 0; p.vz = 0;
-        p.y += p.vy * dt;
-        const pendingGroundY = p.homeAnchor ? p.homeAnchor.y : GROUND_Y;
-        if (p.y <= pendingGroundY) { p.y = pendingGroundY; p.vy = 0; p.grounded = true; }
-        snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
-          seated: p.seated, sprint: false, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe });
-        continue;
-      }
-    } else if (p.pendingDistrict) {
-      send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id,
-        nonce: p.pendingDistrict.nonce, reason: "returned_to_active_district" });
-      p.pendingDistrict = null;
+    if (transitionPlan.exitedDistrictId) {
+      send(p.socket, { type: "district_content_exited", districtId: transitionPlan.exitedDistrictId });
+      p.activeDistrictId = null;
+    }
+    p.pendingDistrict = transitionPlan.pending;
+    if (transitionPlan.request) {
+      send(p.socket, { type: "district_content_required", districtId: targetDistrict!.id,
+        districtName: targetDistrict!.name, contentLabel: targetDistrict!.contentLabel,
+        nonce: transitionPlan.request.nonce });
+    }
+    if (targetDistrict && p.activeDistrictId !== targetDistrict.id) {
+      // Preserve the latest input intent while holding position until the
+      // matching content-ready acknowledgement has refreshed durable state.
+      p.vx = 0; p.vz = 0;
+      p.y += p.vy * dt;
+      const pendingGroundY = p.homeAnchor ? p.homeAnchor.y : GROUND_Y;
+      if (p.y <= pendingGroundY) { p.y = pendingGroundY; p.vy = 0; p.grounded = true; }
+      snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
+        seated: p.seated, sprint: false, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe });
+      continue;
     }
     resolveHorizontalMovement(p, proposedX, proposedZ);
     p.y += p.vy * dt;
