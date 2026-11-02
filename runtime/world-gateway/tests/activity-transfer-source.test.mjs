@@ -84,3 +84,21 @@ test("stale activity host cannot persist or relay after generation takeover", ()
   assert.ok(relay.includes("host_generation = ${hostGeneration}"));
   assert.match(relay, /FOR UPDATE/);
 });
+
+
+test("activity result writes are fenced by the current process and host generation", () => {
+  const persistStart = source.indexOf("async function persistActivity");
+  const persistEnd = source.indexOf("async function broadcastActivity", persistStart);
+  const persist = source.slice(persistStart, persistEnd);
+  const resultsStart = persist.indexOf("const resultsSaved = await sql.begin");
+  assert.notEqual(resultsStart, -1);
+  const results = persist.slice(resultsStart);
+  assert.match(results, /owner_process_id = \$\{PROCESS_ID\}::uuid/);
+  assert.match(results, /owner_generation = \$\{processGeneration\}/);
+  assert.match(results, /owner_lease_expires_at > clock_timestamp\(\)/);
+  assert.match(results, /host_generation = \$\{hostGeneration\}/);
+  assert.match(results, /phase IN \('completed', 'cancelled'\)/);
+  assert.match(results, /FOR UPDATE/);
+  assert.match(results, /await tx\x60INSERT INTO virtual_world_activity_results/);
+  assert.doesNotMatch(results, /await sql\x60INSERT INTO virtual_world_activity_results/);
+});
