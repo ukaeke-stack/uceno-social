@@ -65,6 +65,9 @@ namespace UCENO.VirtualWorld
         public bool IsMuted => localMuted || (pushToTalkMode && !pushToTalkHeld);
         public string Status => status;
         public string AudioRoute => audioRoute;
+        public bool PushToTalkMode => pushToTalkMode;
+        public bool SpeakerEnabled => speakerEnabled;
+        public int ConnectedPeerCount => peers.Count;
 
         private void Start()
         {
@@ -436,48 +439,5 @@ namespace UCENO.VirtualWorld
 
         private void OnApplicationQuit() => DisableVoice();
 
-        private void OnGUI()
-        {
-            const int width = 250;
-            const int height = 42;
-            GUILayout.BeginArea(new Rect(12, Screen.height - 210, width, 198), GUI.skin.box);
-            GUILayout.Label("UCENO SPATIAL VOICE — " + status);
-            if (!voiceEnabled)
-            {
-                if (GUILayout.Button("Enable voice", GUILayout.Height(height))) EnableVoice();
-            }
-            else
-            {
-                if (GUILayout.Button(localMuted ? "Unmute microphone" : "Mute microphone", GUILayout.Height(34)))
-                    SetLocalMuted(!localMuted);
-                bool selectedPushToTalk = GUILayout.Toggle(pushToTalkMode, "Push-to-talk mode");
-                if (selectedPushToTalk != pushToTalkMode) SetPushToTalkMode(selectedPushToTalk);
-                if (pushToTalkMode)
-                {
-                    var e = Event.current;
-                    Rect talkRect = GUILayoutUtility.GetRect(width - 16, height);
-                    GUI.Box(talkRect, "HOLD TO TALK");
-                    if (e.type == EventType.MouseDown && talkRect.Contains(e.mousePosition))
-                    { SetPushToTalkHeld(true); e.Use(); }
-                    if (e.type == EventType.MouseUp)
-                    { SetPushToTalkHeld(false); e.Use(); }
-                }
-                GUILayout.Label("Output route: " + audioRoute);
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button("Speaker")) SetAudioRoute("speaker");
-                if (GUILayout.Button("Earpiece")) SetAudioRoute("earpiece");
-                if (GUILayout.Button("Bluetooth")) SetAudioRoute("bluetooth");
-                GUILayout.EndHorizontal();
-                if (GUILayout.Button(speakerEnabled ? "Remote audio: On" : "Remote audio: Muted", GUILayout.Height(30)))
-                    SetSpeakerEnabled(!speakerEnabled);
-                foreach (PeerAudio peer in peers.Values)
-                {
-                    bool muted = GUILayout.Toggle(peer.remoteMuted, "Mute " + peer.userId.Substring(0, Mathf.Min(8, peer.userId.Length)));
-                    if (muted != peer.remoteMuted) SetPeerMuted(peer.userId, muted);
-                }
-                if (GUILayout.Button("Leave voice", GUILayout.Height(30))) DisableVoice();
-            }
-            GUILayout.EndArea();
-        }
     }
 }
