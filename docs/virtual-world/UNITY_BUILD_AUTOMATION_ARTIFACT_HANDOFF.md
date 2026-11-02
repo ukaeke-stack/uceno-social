@@ -28,7 +28,7 @@ In Unity Dashboard → Build Automation → Configurations → edit the Android 
 
 Create a Unity service account and grant it the least privilege needed to create and upload Build Automation artifacts. The uploader encodes `keyId:secret` as HTTP Basic credentials for the current v2 API. A legacy Build Automation API key is not accepted by v2. Do not log either credential.
 
-The script uses UBA's built-in `ORG_ID`, `PROJECT_ID`, `BUILD_TARGET`, and `UCB_BUILD_NUMBER` values. Do not copy these into source control. The API key is never logged.
+The script uses UBA's built-in `ORG_ID`, `PROJECT_ID`, `BUILD_TARGET`, and `UCB_BUILD_NUMBER` values. Do not copy these into source control. Neither credential is logged.
 
 The post-build script deliberately fails if the registry is absent, empty, malformed, has duplicate IDs, or contains unsupported object kinds. It does not invent markers or silently upload a stale/empty file.
 
