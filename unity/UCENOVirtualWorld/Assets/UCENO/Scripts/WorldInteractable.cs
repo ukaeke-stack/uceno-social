@@ -1,4 +1,3 @@
-using System.Linq;
 using UnityEngine;
 
 namespace UCENO.VirtualWorld
@@ -71,10 +70,9 @@ namespace UCENO.VirtualWorld
 #if UNITY_EDITOR
         private void OnValidate()
         {
-            if (string.IsNullOrWhiteSpace(objectId))
-                objectId = new string(gameObject.name.ToLowerInvariant()
-                    .Select(character => char.IsLetterOrDigit(character) || "._:-".IndexOf(character) >= 0
-                        ? character : '-').ToArray());
+            // Identity is assigned explicitly by WorldInteractableAuthoring from
+            // the saved scene object's GlobalObjectId. Never derive it from a
+            // display name: duplicate prop names are common in imported assets.
             openAngle = Mathf.Clamp(openAngle, 15f, 150f);
             animationSpeed = Mathf.Clamp(animationSpeed, 30f, 720f);
         }
