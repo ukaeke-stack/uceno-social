@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using NativeWebSocket;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace UCENO.VirtualWorld
 {
@@ -146,6 +147,9 @@ namespace UCENO.VirtualWorld
         public GatewayActivityParticipantState[] participants;
     }
 
+    [Serializable] internal sealed class GatewayActivityTransferRequest { public string sessionId; }
+    [Serializable] internal sealed class GatewayActivityTransferResponse { public string ticket; public string endpoint; public string instanceId; public string sessionId; public string error; }
+
     [Serializable] internal sealed class GatewayPacket
     {
         public string type;
@@ -237,6 +241,10 @@ namespace UCENO.VirtualWorld
         private string pendingDistrictResidentLabel = "";
         private string activeDistrictLabel = "";
         private bool districtDownloadRunning;
+        private string transferEndpointOverride = "";
+        private string transferTokenOverride = "";
+        private string pendingTransferActivityId = "";
+        private bool transferringGateway;
 
         public string ConnectionStatus { get; private set; } = "WAITING";
         public bool SetVoiceActive(bool active)
@@ -693,7 +701,9 @@ namespace UCENO.VirtualWorld
             }
 
             string endpoint;
-            try { endpoint = BuildWebSocketUrl(session.InstanceEndpoint); }
+            string selectedEndpoint = string.IsNullOrEmpty(transferEndpointOverride) ? session.InstanceEndpoint : transferEndpointOverride;
+            string selectedToken = string.IsNullOrEmpty(transferTokenOverride) ? session.AccessToken : transferTokenOverride;
+            try { endpoint = BuildWebSocketUrl(selectedEndpoint); }
             catch (Exception error)
             {
                 ConnectionStatus = "BAD ENDPOINT";
@@ -706,7 +716,7 @@ namespace UCENO.VirtualWorld
             ConnectionStatus = "CONNECTING";
             socket = new WebSocket(endpoint, new Dictionary<string, string>
             {
-                { "Authorization", "Bearer " + session.AccessToken }
+                { "Authorization", "Bearer " + selectedToken }
             });
             socket.OnOpen += () =>
             {
@@ -732,7 +742,7 @@ namespace UCENO.VirtualWorld
                     localPlayer.SetServerAuthority(false);
                     localPlayer.SetSeated(false);
                 }
-                if (!destroying)
+                if (!destroying && !transferringGateway)
                 {
                     ConnectionStatus = "DISCONNECTED";
                     ScheduleReconnect();
@@ -769,6 +779,13 @@ namespace UCENO.VirtualWorld
             if (packet.type == "welcome")
             {
                 localUserId = packet.userId;
+                if (!string.IsNullOrEmpty(pendingTransferActivityId))
+                {
+                    string activityId = pendingTransferActivityId;
+                    pendingTransferActivityId = "";
+                    transferringGateway = false;
+                    _ = SendActivityRequestAsync(new GatewayActivityRequest { type = "activity_join", id = activityId });
+                }
                 if (packet.state != null)
                 {
                     localPlayer.ApplyServerState(
@@ -915,6 +932,8 @@ namespace UCENO.VirtualWorld
             if (packet.type == "activity_route_required")
             {
                 ActivityRouteRequired?.Invoke(packet.endpoint ?? "", packet.sessionId ?? "");
+                if (!transferringGateway && !string.IsNullOrWhiteSpace(packet.endpoint) && !string.IsNullOrWhiteSpace(packet.sessionId))
+                    StartCoroutine(RequestActivityGatewayTransfer(packet.endpoint, packet.sessionId));
                 return;
             }
 
@@ -1118,6 +1137,53 @@ namespace UCENO.VirtualWorld
             if (!remotePlayers.TryGetValue(id, out RemotePlayer remote)) return;
             if (remote.root != null) Destroy(remote.root.gameObject);
             remotePlayers.Remove(id);
+        }
+
+        private IEnumerator RequestActivityGatewayTransfer(string targetEndpoint, string activityId)
+        {
+            if (!session.IsAuthenticated || string.IsNullOrWhiteSpace(session.InstanceEndpoint) ||
+                string.IsNullOrWhiteSpace(targetEndpoint) || string.IsNullOrWhiteSpace(activityId)) yield break;
+            Uri sourceUri;
+            if (!Uri.TryCreate(session.InstanceEndpoint, UriKind.Absolute, out sourceUri) ||
+                (sourceUri.Scheme != "https" && sourceUri.Scheme != "http"))
+            {
+                spatialTransitionStatus = "Cannot securely contact the current gateway for activity transfer.";
+                yield break;
+            }
+            string sourceBase = new UriBuilder(sourceUri.Scheme, sourceUri.Host,
+                sourceUri.IsDefaultPort ? -1 : sourceUri.Port).Uri.ToString().TrimEnd('/');
+            byte[] body = Encoding.UTF8.GetBytes(JsonUtility.ToJson(
+                new GatewayActivityTransferRequest { sessionId = activityId }));
+            using (UnityWebRequest request = new UnityWebRequest(sourceBase + "/activity/transfer-ticket", "POST"))
+            {
+                request.uploadHandler = new UploadHandlerRaw(body);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+                request.SetRequestHeader("Authorization", "Bearer " + session.AccessToken);
+                request.timeout = 12;
+                yield return request.SendWebRequest();
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    spatialTransitionStatus = "Activity gateway transfer failed. Your current world connection remains available.";
+                    Debug.LogWarning("UCENO activity transfer ticket request failed: " + request.responseCode);
+                    yield break;
+                }
+                GatewayActivityTransferResponse response =
+                    JsonUtility.FromJson<GatewayActivityTransferResponse>(request.downloadHandler.text);
+                if (response == null || string.IsNullOrWhiteSpace(response.ticket) ||
+                    string.IsNullOrWhiteSpace(response.endpoint) || response.sessionId != activityId)
+                {
+                    spatialTransitionStatus = "The activity gateway returned an invalid transfer ticket.";
+                    yield break;
+                }
+                transferringGateway = true;
+                pendingTransferActivityId = activityId;
+                transferEndpointOverride = response.endpoint;
+                transferTokenOverride = response.ticket;
+                spatialTransitionStatus = "Moving to the activity instance...";
+                await CloseSocket();
+                if (!destroying) Connect();
+            }
         }
 
         private static string BuildWebSocketUrl(string endpoint)
