@@ -64,6 +64,47 @@ function startGateway(port, instanceId, scopedDatabaseUrl) {
   return child;
 }
 
+async function receiveSocketMessage(socket, expectedType, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`timed out waiting for ${expectedType}`)), timeoutMs);
+    const onMessage = raw => {
+      let packet;
+      try { packet = JSON.parse(raw.toString()); } catch { return; }
+      if (packet.type !== expectedType) return;
+      clearTimeout(timeout);
+      socket.off("message", onMessage);
+      resolve(packet);
+    };
+    socket.on("message", onMessage);
+    socket.once("error", error => { clearTimeout(timeout); reject(error); });
+  });
+}
+
+async function connectAuthenticated(port, instanceId, worldId, userId) {
+  const token = await new SignJWT({
+    world_id: worldId, instance_id: instanceId, client_type: "unity-android"
+  }).setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setIssuer("uceno-social").setAudience("uceno-world-gateway")
+    .setSubject(userId).setIssuedAt().setExpirationTime("1h")
+    .sign(new TextEncoder().encode(tokenSecret));
+  const socket = new WebSocket(`ws://127.0.0.1:${port}/world`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("authenticated WebSocket upgrade timed out")), 5000);
+    socket.once("open", () => { clearTimeout(timeout); resolve(); });
+    socket.once("unexpected-response", (_request, response) => {
+      clearTimeout(timeout);
+      response.resume();
+      reject(new Error(`authenticated WebSocket upgrade rejected: ${response.statusCode}`));
+    });
+    socket.once("error", error => { clearTimeout(timeout); reject(error); });
+  });
+  const welcome = await receiveSocketMessage(socket, "welcome");
+  assert.equal(welcome.instanceId, instanceId);
+  return { socket, welcome };
+}
+
 async function assertWebSocketRejectsWrongInstance(port, instanceId) {
   const token = await new SignJWT({
     world_id: randomUUID(),
@@ -120,6 +161,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
   const instanceB = randomUUID();
   const portA = await freePort();
   const portB = await freePort();
+  const worldId = randomUUID();
+  const userId = randomUUID();
   let gatewayA;
   let gatewayB;
 
@@ -143,12 +186,64 @@ test("two real gateway processes: primary loss leaves the replacement process re
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_activity_transfer_tickets (
-      expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ
+      id UUID PRIMARY KEY, world_id UUID NOT NULL, user_id UUID NOT NULL,
+      target_instance_id UUID NOT NULL, activity_session_id UUID NOT NULL,
+      host_generation BIGINT NOT NULL, expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".users (
+      id UUID PRIMARY KEY, moderation_status TEXT NOT NULL DEFAULT 'active',
+      suspended_until TIMESTAMPTZ
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_worlds (
+      id UUID PRIMARY KEY, status TEXT NOT NULL, visibility TEXT NOT NULL,
+      owner_user_id UUID NOT NULL
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_memberships (
+      world_id UUID NOT NULL, user_id UUID NOT NULL, status TEXT NOT NULL,
+      PRIMARY KEY (world_id, user_id)
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".user_blocks (
+      blocker_id UUID NOT NULL, blocked_id UUID NOT NULL
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_instance_sessions (
+      world_id UUID NOT NULL, user_id UUID NOT NULL, instance_id UUID NOT NULL,
+      lease_expires_at TIMESTAMPTZ NOT NULL, PRIMARY KEY (world_id, user_id)
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_player_state (
+      world_id UUID NOT NULL, user_id UUID NOT NULL, position JSONB, rotation JSONB,
+      session_generation BIGINT NOT NULL DEFAULT 0, state_version BIGINT NOT NULL DEFAULT 0,
+      PRIMARY KEY (world_id, user_id)
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".user_avatar_wardrobe_equipped (
+      user_id UUID NOT NULL, slot TEXT NOT NULL, item_id TEXT NOT NULL
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".user_avatar_wardrobe_inventory (
+      user_id UUID NOT NULL, item_id TEXT NOT NULL
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".avatar_wardrobe_items (
+      item_id TEXT NOT NULL, slot TEXT NOT NULL, enabled BOOLEAN NOT NULL
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_object_states (
+      world_id UUID NOT NULL, district_id TEXT NOT NULL, object_id TEXT NOT NULL,
+      object_kind TEXT NOT NULL, object_state TEXT NOT NULL, version BIGINT NOT NULL DEFAULT 1,
+      updated_by UUID
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_player_sessions (
+      world_id UUID NOT NULL, user_id UUID NOT NULL, instance_id UUID NOT NULL,
+      session_id UUID NOT NULL, generation BIGINT NOT NULL, updated_at TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY (world_id, user_id)
     )`);
     await admin.unsafe(`INSERT INTO "${schema}".virtual_world_instances (id, status, endpoint)
       VALUES ($1::uuid, 'ready', $2), ($3::uuid, 'ready', $4)`,
       [instanceA, `http://127.0.0.1:${portA}`, instanceB, `http://127.0.0.1:${portB}`]);
 
+    await admin.unsafe(`INSERT INTO "${schema}".users (id) VALUES ($1::uuid)`, [userId]);
+    await admin.unsafe(`INSERT INTO "${schema}".virtual_worlds (id, status, visibility, owner_user_id)
+      VALUES ($1::uuid, 'published', 'public', $2::uuid)`, [worldId, userId]);
+    await admin.unsafe(`INSERT INTO "${schema}".virtual_world_instance_sessions
+      (world_id, user_id, instance_id, lease_expires_at)
+      VALUES ($1::uuid, $2::uuid, $3::uuid, NOW() + INTERVAL '5 minutes')`,
+      [worldId, userId, instanceB]);
     gatewayA = startGateway(portA, instanceA, scoped.toString());
     gatewayB = startGateway(portB, instanceB, scoped.toString());
     const readyA = await waitForReady(portA, gatewayA);
@@ -157,6 +252,9 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.equal(readyB.instanceId, instanceB);
     await assertWebSocketRejectsWrongInstance(portA, instanceA);
     await assertWebSocketRejectsWrongInstance(portB, instanceB);
+    const authenticated = await connectAuthenticated(portB, instanceB, worldId, userId);
+    assert.equal(authenticated.welcome.userId, userId);
+    authenticated.socket.close();
     const heartbeatDeadline = Date.now() + 5000;
     let liveHeartbeats = [];
     while (Date.now() < heartbeatDeadline) {
