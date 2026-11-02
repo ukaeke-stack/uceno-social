@@ -34,7 +34,10 @@ export function loadInteractableRegistry(
       throw new Error("WORLD_REQUIRE_INTERACTABLE_REGISTRY is enabled but no world interactable registry was provided");
     return new Map();
   }
-  return parseInteractableRegistry(raw, districts, worldBounds);
+  const registry = parseInteractableRegistry(raw, districts, worldBounds);
+  if (required && registry.size === 0)
+    throw new Error("WORLD_REQUIRE_INTERACTABLE_REGISTRY is enabled but the world interactable registry contains no objects");
+  return registry;
 }
 
 export function parseInteractableRegistry(
