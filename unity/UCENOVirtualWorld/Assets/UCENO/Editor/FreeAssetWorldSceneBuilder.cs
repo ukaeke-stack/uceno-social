@@ -470,7 +470,7 @@ namespace UCENO.VirtualWorld.Editor
             SetStaticRecursive(plane);
         }
 
-        private static void CreateRoadLine(Transform parent, Material material, Vector3 start, Vector3 end, float width)
+        private static void CreateRoadLine(Transform parent, Material material, Vector3 start, Vector3 end, float width, string objectName = "Road Marking")
         {
             GameObject lineObject = new GameObject("Road Marking");
             lineObject.transform.SetParent(parent, false);
@@ -595,7 +595,7 @@ namespace UCENO.VirtualWorld.Editor
             CreatePlane("East Parking Bay", parent, new Vector3(10.4f, 0.018f, 94f), 3.1f, 27f, asphalt);
             for (int z = 82; z <= 106; z += 6)
                 CreateRoadLine(parent, laneMarking,
-                    new Vector3(8.9f, 0.045f, z), new Vector3(11.9f, 0.045f, z), 0.045f);
+                    new Vector3(8.9f, 0.045f, z), new Vector3(11.9f, 0.045f, z), 0.045f, "Parking Bay Marking");
 
             Place(carPrefab, parent, new Vector3(10.2f, 0.04f, 88f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.78f);
             Place(carPrefab, parent, new Vector3(10.2f, 0.04f, 100f), Quaternion.Euler(0f, 90f, 0f), Vector3.one * 0.78f);
@@ -808,7 +808,6 @@ namespace UCENO.VirtualWorld.Editor
                 AddressableAssetEntry entry = settings.CreateOrMoveEntry(guid, group, false, false);
                 entry.address = label;
                 entry.SetLabel(label, true, true);
-                EditorUtility.SetDirty(entry);
             }
 
             EditorUtility.SetDirty(settings);
