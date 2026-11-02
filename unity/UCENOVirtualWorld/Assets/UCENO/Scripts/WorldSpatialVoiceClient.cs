@@ -326,7 +326,7 @@ namespace UCENO.VirtualWorld
                 peer.room.Disconnected += () => RemovePeer(userId);
                 var connect = peer.room.Connect(token.url, token.token, new RoomOptions());
                 yield return connect;
-                if (generationInvalidForConnect())
+                if (generationInvalidForConnect(userId, generation))
                 {
                     RemovePeer(userId);
                     yield break;
