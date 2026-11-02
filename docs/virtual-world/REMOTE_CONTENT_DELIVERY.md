@@ -42,9 +42,19 @@ services; it does not reuse an Android APK.
   `activity-dance`, or `activity-adventure`; the join packet is not sent until
   the corresponding content is ready. Unknown activity kinds retain the
   existing server admission flow and should not be assigned a guessed bundle.
-- District streaming still needs explicit server-authored area metadata,
-  enter/exit boundaries, and a matching content-label contract before it can
-  be safely preloaded.
+- District streaming now uses operator-authored server rectangles in the same
+  X/Z coordinate system as the Unity city. The gateway validates unique IDs,
+  non-overlapping bounds, world limits and the
+  `world-city-district-<name>` content-label namespace.
+- On crossing a district boundary, the server pauses horizontal movement and
+  issues a one-time district/content nonce. Unity preloads the server-selected
+  Addressables label and acknowledges with that nonce; the gateway allows
+  movement only after the matching acknowledgement. Turning back cancels the
+  pending transition. The client cannot choose the district, geometry or label.
+- Configure matching `WORLD_DISTRICTS` or `WORLD_DISTRICTS_FILE` metadata in
+  each gateway instance and publish the matching district labels in the
+  platform-specific Addressables catalog. No production geometry, catalog or
+  CDN is configured by this source change.
 - Keep content delivery separate from gameplay authorization. The server still
   decides whether a user may enter a world, home, event, or activity.
 
