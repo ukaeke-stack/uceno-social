@@ -445,8 +445,11 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
         `);
         assert.equal(events.length, 1);
         assert.equal(events[0].instanceId, ids.newA);
-        assert.equal(events[0].payload.session.hostGeneration, 2);
-        assert.equal(events[0].payload.session.version, 3);
+        const relayPayload = typeof events[0].payload === "string"
+          ? JSON.parse(events[0].payload) : events[0].payload;
+        assert.equal(relayPayload.type, "activity_state");
+        assert.equal(relayPayload.session?.hostGeneration, 2);
+        assert.equal(relayPayload.session?.version, 3);
       } finally {
         await gatewayA.end({ timeout: 5 });
         await gatewayB.end({ timeout: 5 });
