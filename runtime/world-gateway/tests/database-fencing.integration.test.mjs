@@ -71,6 +71,13 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
         ${JSON.stringify({ participants: [{ userId: ids.guest, status: "joined" }] })}::jsonb,
         NOW())
     `;
+    const resetActivity = () => withSchema(async tx => {
+      await tx`DELETE FROM virtual_world_activity_transfer_tickets WHERE activity_session_id = ${ids.activity}::uuid`;
+      await tx`DELETE FROM virtual_world_realtime_events WHERE world_id = ${ids.world}::uuid`;
+      await tx`DELETE FROM virtual_world_activity_results WHERE session_id = ${ids.activity}::uuid`;
+      await tx`DELETE FROM virtual_world_activity_sessions WHERE id = ${ids.activity}::uuid`;
+      await seedActivity(tx);
+    });
     const takeover = (instanceId, hostId) => withSchema(tx => tx`
       UPDATE virtual_world_activity_sessions AS activity
       SET instance_id = ${instanceId}::uuid,
@@ -89,7 +96,7 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
     `);
 
     await t.test("concurrent stale-host takeovers have exactly one winner", async () => {
-      await withSchema(seedActivity);
+      await resetActivity();
       const results = await Promise.all([
         takeover(ids.newA, ids.host),
         takeover(ids.newB, ids.guest)
@@ -181,7 +188,7 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
         if (rows[0]) await tx`INSERT INTO virtual_world_realtime_events
           (world_id, instance_id, event_type, payload)
           VALUES (${ids.world}::uuid, ${ids.old}::uuid, 'activity_state',
-            '{"type":"activity_state","session":{"id":"${ids.activity}","hostGeneration":1}}'::jsonb)`;
+            ${JSON.stringify({ type: "activity_state", session: { id: ids.activity, hostGeneration: 1 } })}::jsonb)`;
         return rows;
       });
       assert.equal(staleWrite.length, 0);
