@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, selectNextActivityHost, type ActivitySession } from "./activity-session.js";
 import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./district-policy.js";
-import { isDistrictTransitionExpired, matchesDistrictTransition, planDistrictTransition } from "./district-transition-policy.js";
+import { matchesDistrictTransition, planDistrictTransition } from "./district-transition-policy.js";
 import { parseDistrictCollisionManifest } from "./district-collision-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
@@ -1280,7 +1280,6 @@ setInterval(async () => {
     const proposedX = p.x + p.vx * dt;
     const proposedZ = p.z + p.vz * dt;
     const targetDistrict = p.homeId || p.eventId ? null : findWorldDistrict(WORLD_DISTRICTS, proposedX, proposedZ);
-    const targetDistrictId = targetDistrict?.id ?? null;
     const transitionPlan = planDistrictTransition(
       p.activeDistrictId, p.pendingDistrict, targetDistrict, now, randomUUID
     );
