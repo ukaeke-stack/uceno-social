@@ -23,6 +23,7 @@ namespace UCENO.VirtualWorld.Editor
     /// </summary>
     public static class FreeAssetWorldSceneBuilder
     {
+        [MenuItem("UCENO/World/Build Realistic Starter City Scene", false, 20)]
         private const string ScenePath = "Assets/UCENO/Scenes/UCENO_Starter_World.unity";
         private const string AvatarPath = "Assets/UCENO/Characters/Imported/UCENO_Default_Avatar.fbx";
         private const string EnvironmentRoot = "Assets/UCENO/Environment/Imported";
