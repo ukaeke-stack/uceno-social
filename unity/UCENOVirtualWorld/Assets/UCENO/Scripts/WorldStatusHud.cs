@@ -24,6 +24,7 @@ namespace UCENO.VirtualWorld
         private WorldPresenceClient presence;
         private bool sprintToggle;
         private bool voicePanelOpen;
+        private static bool voicePanelVisible;
         private GUIStyle voicePanelStyle;
         private GUIStyle voiceButtonStyle;
         private GUIStyle voiceLabelStyle;
@@ -151,6 +152,7 @@ namespace UCENO.VirtualWorld
                 : "VOICE OFF  •  TAP TO JOIN";
             if (GUI.Button(toggleRect, toggleText, voiceButtonStyle))
                 voicePanelOpen = !voicePanelOpen;
+            voicePanelVisible = voicePanelOpen;
             if (!voicePanelOpen) return;
 
             float innerWidth = width - 16f * scale;
@@ -233,6 +235,27 @@ namespace UCENO.VirtualWorld
                 normal = { textColor = Color.white },
                 wordWrap = true
             };
+        }
+
+        public static bool IsPointerOnHudControl(Vector2 screenPosition)
+        {
+            if (!Application.isMobilePlatform) return false;
+            Vector2 guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
+            if (GetSprintControlRect().Contains(guiPosition)) return true;
+            float scale = Mathf.Clamp(Screen.width / 520f, 1f, 2.1f);
+            float width = Mathf.Min(Screen.width - 24f, 310f * scale);
+            float x = Screen.width - width - 12f;
+            float y = 94f * scale;
+            Rect voiceToggle = new Rect(x, y, width, 42f * scale);
+            if (voiceToggle.Contains(guiPosition)) return true;
+            if (voicePanelVisible)
+            {
+                float rowHeight = 38f * scale;
+                float panelHeight = 6f * rowHeight + 12f * scale;
+                Rect panel = new Rect(x, y + 46f * scale, width, panelHeight);
+                if (panel.Contains(guiPosition)) return true;
+            }
+            return false;
         }
 
         public static bool IsPointerOnSprintControl(Vector2 screenPosition)
