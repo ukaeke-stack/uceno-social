@@ -22,7 +22,7 @@ const checks = [
   ["Home transitions request interior content", /case "home": return "home-interiors"/.test(areaBinding)],
   ["Event transitions request venue content", /case "event": return "world-event-venues"/.test(areaBinding)],
   ["Area content binding reports progress and failures", /ProgressChanged/.test(areaBinding) && /ContentFailed/.test(areaBinding)],
-  ["Architecture documents automatic loading and persistent cache", /automatically|on demand/i.test(architecture) && /persistent.*cache/i.test(architecture)),
+  ["Architecture documents automatic loading and persistent cache", /automatically|on demand/i.test(architecture) && /persistent.*cache/i.test(architecture)],
   ["Acceptance tests cover interrupted downloads", /Interrupt the connection mid-download/.test(tests))
 ];
 
