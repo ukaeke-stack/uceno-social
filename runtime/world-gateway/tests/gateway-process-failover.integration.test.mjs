@@ -42,6 +42,8 @@ async function waitForReady(port, child, timeoutMs = 15000) {
 }
 
 function startGateway(port, instanceId, scopedDatabaseUrl) {
+  const processDatabaseUrl = new URL(scopedDatabaseUrl);
+  processDatabaseUrl.searchParams.set("application_name", "uceno-gateway-" + instanceId);
   const child = spawn(process.execPath, ["dist/server.js"], {
     cwd: new URL("../", import.meta.url),
     env: {
@@ -49,7 +51,7 @@ function startGateway(port, instanceId, scopedDatabaseUrl) {
       NODE_ENV: "test",
       PORT: String(port),
       WORLD_INSTANCE_ID: instanceId,
-      DATABASE_URL: scopedDatabaseUrl,
+      DATABASE_URL: processDatabaseUrl.toString(),
       WORLD_TOKEN_SECRET: tokenSecret,
       WORLD_INSTANCE_CAPACITY: "8"
     },
@@ -295,6 +297,30 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal(rows.length, 2);
       assert.ok(rows.every(row => row.heartbeat_at instanceof Date));
       assert.deepEqual(new Set(rows.map(row => row.id)), new Set([instanceA, instanceB]));
+    });
+
+    await t.test("live gateway processes recover after PostgreSQL terminates their pooled connections", async () => {
+      const appNames = ["uceno-gateway-" + instanceA, "uceno-gateway-" + instanceB];
+      const terminated = await admin.unsafe(
+        "SELECT pg_terminate_backend(pid) AS terminated FROM pg_stat_activity " +
+        "WHERE application_name = ANY($1::text[]) AND pid <> pg_backend_pid()",
+        [appNames]
+      );
+      assert.ok(terminated.some(row => row.terminated),
+        "the test must interrupt at least one real gateway database connection");
+      const recoveryDeadline = Date.now() + 25000;
+      let recoveredRows = [];
+      while (Date.now() < recoveryDeadline) {
+        recoveredRows = await admin.unsafe(`SELECT id, heartbeat_at FROM "${schema}".virtual_world_instances
+          WHERE id IN ($1::uuid, $2::uuid) AND heartbeat_at > NOW() - INTERVAL '30 seconds'`,
+          [instanceA, instanceB]);
+        if (recoveredRows.length === 2) break;
+        await delay(250);
+      }
+      assert.equal(recoveredRows.length, 2,
+        "both gateway processes must reconnect and resume database heartbeats without restarting");
+      assert.ok(gatewayA.exitCode === null && gatewayB.exitCode === null,
+        "database connection interruption must not terminate either gateway process");
     });
 
     await t.test("replacement remains ready after the primary process is terminated", async () => {
