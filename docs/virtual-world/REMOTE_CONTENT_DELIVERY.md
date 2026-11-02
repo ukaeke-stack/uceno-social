@@ -49,10 +49,12 @@ services; it does not reuse an Android APK.
 - ReleaseContent releases the Addressables handle and requests Unity's
   asynchronous unused-asset sweep. This does not delete downloaded bundles from
   the persistent disk cache.
-- Runtime residency labels must contain loadable Unity assets (for example,
-  prefabs, models, materials or textures), not only Addressable scenes. Scene
-  streaming needs an explicit additive scene load/unload lifecycle and is not
-  claimed by this implementation.
+- District labels use a separate additive-scene lifecycle: labels beginning
+  `world-city-district-` resolve to Addressable scene entries whose address is
+  the same as the label. The scene is activated before the gateway receives
+  `district_content_ready`; the scene handle is unloaded when its final lease is
+  released. Other labels continue to load asset collections through
+  `LoadAssetsAsync`. Scene-only labels must not be treated as ordinary asset packs.
 - Keep bundle/catalog versions immutable and publish a new catalog for content
   updates; do not overwrite already-published bundle files at the same URL.
 - Configure a developer-only preload list for selected labels or all test
@@ -72,10 +74,20 @@ services; it does not reuse an Android APK.
   Addressables label and acknowledges with that nonce; the gateway allows
   movement only after the matching acknowledgement. Turning back cancels the
   pending transition. The client cannot choose the district, geometry or label.
+- The editor scene builder partitions generated city objects into four
+  additive scenes: south (-120 to -60 Z), central-south (-60 to 0 Z),
+  central-north (0 to 60 Z), and north (60 to 120 Z). Shared terrain, road,
+  player, camera and session objects remain in the boot scene. The collision
+  map is exported before partitioning so it still covers the complete city.
+- The builder creates/updates the `UCENO Remote District Scenes` Addressables
+  group, assigns each scene an address and label matching
+  `world-city-district-<district>`, and uses Pack Separately with remote build/load
+  path variables. Gateway rectangles must match these exact scene bounds; see
+  the runtime gateway README example.
 - Configure matching `WORLD_DISTRICTS` or `WORLD_DISTRICTS_FILE` metadata in
   each gateway instance and publish the matching district labels in the
-  platform-specific Addressables catalog. No production geometry, catalog or
-  CDN is configured by this source change.
+  platform-specific Addressables catalog. No production CDN or catalog is
+  configured by this source change.
 - Keep content delivery separate from gameplay authorization. The server still
   decides whether a user may enter a world, home, event, or activity.
 
