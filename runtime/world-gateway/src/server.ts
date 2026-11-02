@@ -9,6 +9,7 @@ import { parseDistrictCollisionManifest } from "./district-collision-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { isPersistentObjectState, defaultPersistentObjectState } from "./district-object-policy.js";
+import { checkpointVersionForSession } from "./session-fence-policy.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { jwtVerify } from "jose";
@@ -555,7 +556,7 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
     ? 2 * Math.atan2(rotation.y, rotation.w) : 0;
   return {
     id: userId, worldId, token, socket, sessionId, sessionGeneration,
-    stateVersion: Number(rows[0]?.sessionGeneration) === sessionGeneration ? Number(rows[0]?.stateVersion || 0) : 0,
+    stateVersion: checkpointVersionForSession(rows[0]?.sessionGeneration, rows[0]?.stateVersion, sessionGeneration),
     x, y, z, vx: 0, vy: 0, vz: 0, yaw, grounded: y <= GROUND_Y + 0.01,
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
@@ -706,6 +707,7 @@ wss.on("connection", async (socket: WebSocket) => {
     }
     players.set(identity.userId, player);
     send(socket, { type: "welcome", userId: identity.userId, tickRate: TICK_RATE,
+      sessionGeneration: player.sessionGeneration, stateVersion: player.stateVersion,
       state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
     for (const activity of activitySessions.values()) {
       if (activity.worldId === player.worldId && activity.instanceId === INSTANCE_ID)
