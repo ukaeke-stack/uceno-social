@@ -58,6 +58,7 @@ function startGateway(port, instanceId, scopedDatabaseUrl, registryFile) {
       DATABASE_URL: processDatabaseUrl.toString(),
       WORLD_TOKEN_SECRET: tokenSecret,
       WORLD_INSTANCE_CAPACITY: "8",
+      WORLD_INTERACTABLES: "",
       WORLD_INTERACTABLES_FILE: registryFile
     },
     stdio: ["ignore", "pipe", "pipe"]
@@ -349,6 +350,10 @@ test("two real gateway processes: primary loss leaves the replacement process re
     const readyB = await waitForReady(portB, gatewayB);
     assert.equal(readyA.instanceId, instanceA);
     assert.equal(readyB.instanceId, instanceB);
+    assert.equal(readyA.registeredInteractables, 2,
+      "gateway A must load both real scene objects from WORLD_INTERACTABLES_FILE");
+    assert.equal(readyB.registeredInteractables, 2,
+      "gateway B must load both real scene objects from WORLD_INTERACTABLES_FILE");
 
     // A second real OS process using the same logical instance UUID must not
     // acquire ownership while the first process still holds its database lease.
