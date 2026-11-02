@@ -66,10 +66,12 @@ function startGateway(port, instanceId, scopedDatabaseUrl) {
 
 async function receiveSocketMessage(socket, expectedType, timeoutMs = 5000) {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`timed out waiting for ${expectedType}`)), timeoutMs);
+    const seen = [];
+    const timeout = setTimeout(() => reject(new Error(`timed out waiting for ${expectedType}; received: ${JSON.stringify(seen)}`)), timeoutMs);
     const onMessage = raw => {
       let packet;
       try { packet = JSON.parse(raw.toString()); } catch { return; }
+      seen.push(packet);
       if (packet.type !== expectedType) return;
       clearTimeout(timeout);
       socket.off("message", onMessage);
@@ -306,7 +308,13 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal((await waitForReady(portB, gatewayB)).instanceId, instanceB);
       const replacementSocket = await connectAuthenticated(portB, instanceB, worldId, userId);
       replacementSocket.socket.send(JSON.stringify({ type: "activity_join", id: activityId }));
-      const recovered = await receiveSocketMessage(replacementSocket.socket, "activity_host_recovered");
+      let recovered;
+      try {
+        recovered = await receiveSocketMessage(replacementSocket.socket, "activity_host_recovered");
+      } catch (error) {
+        error.message += `\nReplacement gateway logs:\n${gatewayB.testOutput()}\nPersisted activity:\n${JSON.stringify(await admin.unsafe(`SELECT instance_id, host_generation, phase, state FROM "${schema}".virtual_world_activity_sessions WHERE id = $1::uuid`, [activityId]))}`;
+        throw error;
+      }
       assert.equal(recovered.sessionId, activityId);
       assert.equal(recovered.hostGeneration, 2);
       const authority = await admin.unsafe(`SELECT instance_id, host_user_id, host_generation, version, state
