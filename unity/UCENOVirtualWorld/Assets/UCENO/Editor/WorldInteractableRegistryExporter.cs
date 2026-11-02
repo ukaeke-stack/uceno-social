@@ -79,6 +79,7 @@ namespace UCENO.VirtualWorld.Editor
 
                 var ids = new HashSet<string>(StringComparer.Ordinal);
                 var entries = new List<WorldInteractableRegistryEntry>();
+                var dirtyScenes = new HashSet<Scene>();
                 foreach (Scene scene in loadedScenes)
                 {
                     Scene scene = SceneManager.GetSceneAt(sceneIndex);
@@ -122,6 +123,14 @@ namespace UCENO.VirtualWorld.Editor
                     throw new InvalidOperationException(
                         "No scene interactables were found. Mark actual door/furniture objects first; refusing to overwrite the gateway registry with an empty list.");
 
+                foreach (Scene dirtyScene in dirtyScenes)
+                {
+                    EditorSceneManager.MarkSceneDirty(dirtyScene);
+                    if (!EditorSceneManager.SaveScene(dirtyScene))
+                        throw new InvalidOperationException("Could not save scene after assigning stable interactable IDs: " + dirtyScene.path);
+                }
+                AssetDatabase.SaveAssets();
+
                 string output = Path.Combine(config, "world-interactables.json");
                 string temporary = output + ".tmp";
                 string json = JsonUtility.ToJson(new WorldInteractableRegistryDocument {
@@ -140,8 +149,10 @@ namespace UCENO.VirtualWorld.Editor
             catch (Exception error)
             {
                 if (showDialog)
+                    if (showDialog)
                     EditorUtility.DisplayDialog("UCENO gateway registry export failed", error.Message, "OK");
                 Debug.LogException(error);
+                throw;
                 throw;
             }
         }
