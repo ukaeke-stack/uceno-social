@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
 using LiveKit;
 using UnityEngine;
@@ -59,7 +58,6 @@ namespace UCENO.VirtualWorld
         private bool speakerEnabled = true;
         private bool appPaused;
         private string status = "VOICE OFF";
-        private float previousListenerVolume = 1f;
 
         public bool VoiceEnabled => voiceEnabled;
         public bool IsMuted => localMuted || (pushToTalkMode && !pushToTalkHeld);
@@ -138,14 +136,19 @@ namespace UCENO.VirtualWorld
             foreach (GameObject output in peer.outputObjects)
             {
                 AudioSource source = output != null ? output.GetComponent<AudioSource>() : null;
-                if (source != null) source.mute = muted;
+                if (source != null) source.mute = !speakerEnabled || muted;
             }
         }
 
         public void SetSpeakerEnabled(bool enabled)
         {
             speakerEnabled = enabled;
-            AudioListener.volume = speakerEnabled ? previousListenerVolume : 0f;
+            foreach (PeerAudio peer in peers.Values)
+                foreach (GameObject output in peer.outputObjects)
+                {
+                    AudioSource source = output != null ? output.GetComponent<AudioSource>() : null;
+                    if (source != null) source.mute = !speakerEnabled || peer.remoteMuted;
+                }
         }
 
         private void ApplyMicrophoneGate()
@@ -155,8 +158,7 @@ namespace UCENO.VirtualWorld
             foreach (PeerAudio peer in peers.Values)
             {
                 if (peer.microphone == null) continue;
-                if (shouldTransmit) peer.microphone.Start();
-                else StopMicrophone(peer.microphone);
+                peer.microphone.SetMute(!shouldTransmit);
             }
         }
 
@@ -261,6 +263,8 @@ namespace UCENO.VirtualWorld
                 RemovePeer(peer.userId);
                 yield break;
             }
+            peer.microphone.Start();
+            peer.microphone.SetMute(IsMuted || appPaused);
             ApplyMicrophoneGate();
         }
 
@@ -290,7 +294,7 @@ namespace UCENO.VirtualWorld
             source.minDistance = Mathf.Max(0.1f, minDistance);
             source.maxDistance = Mathf.Clamp(maxDistance, 2f, 24f);
             source.playOnAwake = false;
-            source.mute = peer.remoteMuted;
+            source.mute = !speakerEnabled || peer.remoteMuted;
             var stream = new AudioStream(audioTrack, source);
             peer.outputObjects.Add(output);
             peer.streams.Add(stream);
@@ -322,12 +326,8 @@ namespace UCENO.VirtualWorld
         private static void StopMicrophone(MicrophoneSource source)
         {
             if (source == null) return;
-            // Stop is invoked reflectively to keep this component compatible with
-            // SDK revisions that expose capture stop on the source implementation.
-            MethodInfo stop = source.GetType().GetMethod("Stop", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (stop != null) stop.Invoke(source, null);
-            else if (Microphone.devices != null && Microphone.devices.Length > 0)
-                Microphone.End(Microphone.devices[0]);
+            source.Stop();
+            source.Dispose();
         }
 
         private string ReadWorldId() => session != null ? session.WorldId : "";
