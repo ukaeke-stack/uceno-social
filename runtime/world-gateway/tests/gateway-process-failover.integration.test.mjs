@@ -28,7 +28,7 @@ async function waitForReady(port, child, timeoutMs = 15000) {
   let lastError;
   while (Date.now() < deadline) {
     if (child.exitCode !== null || child.signalCode !== null)
-      throw new Error(`gateway process exited before readiness (code=${child.exitCode}, signal=${child.signalCode})`);
+      throw new Error(`gateway process exited before readiness (code=${child.exitCode}, signal=${child.signalCode})\nGateway process output:\n${child.testOutput?.() ?? ""}`);
     try {
       const response = await fetch(`http://127.0.0.1:${port}/ready`);
       if (response.status === 200) return await response.json();
