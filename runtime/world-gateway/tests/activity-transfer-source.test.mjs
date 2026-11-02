@@ -105,3 +105,15 @@ test("activity result writes are fenced by the current process and host generati
   assert.match(results, /await tx\x60INSERT INTO virtual_world_activity_results/);
   assert.doesNotMatch(results, /await sql\x60INSERT INTO virtual_world_activity_results/);
 });
+
+test("transfer-ticket issuance is fenced by the source gateway process lease", () => {
+  const start = source.indexOf('if (req.url === "/activity/transfer-ticket"');
+  const end = source.indexOf('if (req.url === "/activity/', start + 10);
+  const route = source.slice(start, end === -1 ? undefined : end);
+  assert.match(route, /await sql\.begin\(async tx/);
+  assert.match(route, /owner_process_id = \$\{PROCESS_ID\}::uuid/);
+  assert.match(route, /owner_generation = \$\{processGeneration\}/);
+  assert.match(route, /owner_lease_expires_at > clock_timestamp\(\)[\s\S]*FOR SHARE/);
+  assert.match(route, /await tx\x60INSERT INTO virtual_world_activity_transfer_tickets/);
+  assert.doesNotMatch(route, /await sql\x60INSERT INTO virtual_world_activity_transfer_tickets/);
+});
