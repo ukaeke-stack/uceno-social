@@ -48,6 +48,7 @@ namespace UCENO.VirtualWorld
             public readonly List<GameObject> outputObjects = new List<GameObject>();
             public readonly List<AudioStream> streams = new List<AudioStream>();
             public bool connected;
+            public bool remoteMuted;
         }
 
         private readonly Dictionary<string, PeerAudio> peers = new Dictionary<string, PeerAudio>();
@@ -128,6 +129,17 @@ namespace UCENO.VirtualWorld
             localMuted = muted;
             if (muted) pushToTalkHeld = false;
             ApplyMicrophoneGate();
+        }
+
+        public void SetPeerMuted(string userId, bool muted)
+        {
+            if (!peers.TryGetValue(userId, out PeerAudio peer)) return;
+            peer.remoteMuted = muted;
+            foreach (GameObject output in peer.outputObjects)
+            {
+                AudioSource source = output != null ? output.GetComponent<AudioSource>() : null;
+                if (source != null) source.mute = muted;
+            }
         }
 
         public void SetSpeakerEnabled(bool enabled)
@@ -278,6 +290,7 @@ namespace UCENO.VirtualWorld
             source.minDistance = Mathf.Max(0.1f, minDistance);
             source.maxDistance = Mathf.Clamp(maxDistance, 2f, 24f);
             source.playOnAwake = false;
+            source.mute = peer.remoteMuted;
             var stream = new AudioStream(audioTrack, source);
             peer.outputObjects.Add(output);
             peer.streams.Add(stream);
@@ -381,6 +394,11 @@ namespace UCENO.VirtualWorld
                 }
                 if (GUILayout.Button(speakerEnabled ? "Speaker: On" : "Speaker: Off", GUILayout.Height(30)))
                     SetSpeakerEnabled(!speakerEnabled);
+                foreach (PeerAudio peer in peers.Values)
+                {
+                    bool muted = GUILayout.Toggle(peer.remoteMuted, "Mute " + peer.userId.Substring(0, Mathf.Min(8, peer.userId.Length)));
+                    if (muted != peer.remoteMuted) SetPeerMuted(peer.userId, muted);
+                }
                 if (GUILayout.Button("Leave voice", GUILayout.Height(30))) DisableVoice();
             }
             GUILayout.EndArea();
