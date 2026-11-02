@@ -78,8 +78,8 @@ namespace UCENO.VirtualWorld.Editor
 
                         if (marker.GetComponentsInChildren<Collider>(true).Length == 0)
                             throw new InvalidOperationException("Interactable has no collider for player targeting: " + id);
-                        if (marker.Kind == "door" && marker.transform == null)
-                            throw new InvalidOperationException("Door marker has no transform: " + id);
+                        if (marker.Kind == "door" && !marker.HasDoorPivot)
+                            throw new InvalidOperationException("Door marker must reference the actual hinged door mesh/pivot: " + id);
 
                         Vector3 position = marker.transform.position;
                         int matches = districts.districts.Count(d =>
@@ -105,8 +105,8 @@ namespace UCENO.VirtualWorld.Editor
                     interactables = entries.ToArray()
                 }, true);
                 File.WriteAllText(temporary, json);
-                if (File.Exists(output)) File.Delete(output);
-                File.Move(temporary, output);
+                File.Copy(temporary, output, true);
+                File.Delete(temporary);
                 AssetDatabase.Refresh();
                 EditorUtility.DisplayDialog("UCENO gateway registry",
                     "Exported " + entries.Count + " scene interactables to:\n" + output +
