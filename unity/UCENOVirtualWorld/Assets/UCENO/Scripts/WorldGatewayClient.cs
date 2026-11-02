@@ -1153,6 +1153,12 @@ namespace UCENO.VirtualWorld
             remotePlayers.Remove(id);
         }
 
+        private async Task CloseSocketAndReconnectAsync()
+        {
+            await CloseSocket();
+            if (!destroying) Connect();
+        }
+
         private IEnumerator RequestActivityGatewayTransfer(string targetEndpoint, string activityId)
         {
             if (!session.IsAuthenticated || string.IsNullOrWhiteSpace(session.InstanceEndpoint) ||
