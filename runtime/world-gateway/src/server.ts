@@ -1621,7 +1621,7 @@ setInterval(async () => {
       } else if (row.eventType === 'activity_state') {
         const payload = row.payload as { type?: string; session?: { id?: string; worldId?: string; instanceId?: string } };
         if (payload?.type !== 'activity_state' || payload.session?.worldId !== row.worldId ||
-            payload.session?.instanceId !== row.instanceId || typeof payload.session.id !== 'string') continue;
+            payload.session?.instanceId !== row.instanceId || typeof payload.session?.id !== 'string') continue;
         const packet = JSON.stringify(payload);
         for (const peer of players.values()) {
           if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
