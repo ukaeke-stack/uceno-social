@@ -10,7 +10,7 @@ import { parseDistrictCollisionManifest } from "./district-collision-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { isPersistentObjectState } from "./district-object-policy.js";
-import { parseInteractableRegistry, type RegisteredInteractable } from "./interactable-registry-policy.js";
+import { loadInteractableRegistry, type RegisteredInteractable } from "./interactable-registry-policy.js";
 import { checkpointVersionForSession } from "./session-fence-policy.js";
 import { shouldPublishWorldSnapshot, WORLD_RELAY_BATCH_SIZE, WORLD_RELAY_POLL_INTERVAL_MS } from "./world-relay-policy.js";
 import { readFileSync } from "node:fs";
@@ -71,8 +71,10 @@ function loadInteractables(): Map<string, Interactable> {
         (error instanceof Error ? error.message : "unknown file error"));
     }
   }
-  if (!raw) return new Map();
-  return parseInteractableRegistry(raw, WORLD_DISTRICTS, WORLD_BOUNDS);
+  return loadInteractableRegistry(
+    raw, WORLD_DISTRICTS, WORLD_BOUNDS,
+    process.env.WORLD_REQUIRE_INTERACTABLE_REGISTRY === "true"
+  );
 }
 
 function loadCollisionBoxes(): CollisionBox[] {
