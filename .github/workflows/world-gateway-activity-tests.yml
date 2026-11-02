@@ -15,6 +15,12 @@ on:
       - "db/migrations/032_*.sql"
       - "db/migrations/033_*.sql"
       - "db/migrations/034_*.sql"
+      - "db/migrations/029_*.sql"
+      - "db/migrations/030_*.sql"
+      - "db/migrations/031_*.sql"
+      - "db/migrations/032_*.sql"
+      - "db/migrations/033_*.sql"
+      - "db/migrations/034_*.sql"
       - ".github/workflows/world-gateway-activity-tests.yml"
   pull_request:
     paths:
