@@ -7,6 +7,12 @@
 - [ ] Before an event-venue request is sent, the client preloads `world-event-venues`; confirm the player stays in the current area during download.
 - [ ] Confirm the gateway request is sent only after the required label reports success.
 - [ ] Confirm the server still controls admission and can reject a request after preload.
+- [ ] Joining a sports session preloads `activity-sports` before the join packet is sent.
+- [ ] Joining a checkpoint race preloads `activity-racing` before the join packet is sent.
+- [ ] Joining a dance session preloads `activity-dance` before the join packet is sent.
+- [ ] Joining an adventure session preloads `activity-adventure` before the join packet is sent.
+- [ ] If activity content fails to download, confirm no join packet is sent and the player stays in the current area.
+- [ ] Unknown activity kinds do not guess a content label; the server remains authoritative.
 - [ ] Successful downloads are cached and revisiting the same area does not download the same bundles again.
 - [ ] Interrupt the connection mid-download; confirm no home/event admission request is sent and the player remains in the current area.
 - [ ] Restore connectivity and retry travel; confirm the size/cache check runs again and successful download allows the gateway request.
