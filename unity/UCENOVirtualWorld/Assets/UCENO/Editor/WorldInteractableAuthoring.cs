@@ -61,8 +61,6 @@ namespace UCENO.VirtualWorld.Editor
 
             SerializedObject data = new SerializedObject(marker);
             data.FindProperty("kind").enumValueIndex = (int)kind;
-            string slug = new string(selected.name.ToLowerInvariant().Select(character =>
-                char.IsLetterOrDigit(character) || "._:-".IndexOf(character) >= 0 ? character : '-').ToArray());
             SerializedProperty id = data.FindProperty("objectId");
             string globalId = GlobalObjectId.GetGlobalObjectIdSlow(selected).ToString();
             if (string.IsNullOrWhiteSpace(selected.scene.path) || string.IsNullOrWhiteSpace(globalId) ||
