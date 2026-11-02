@@ -39,3 +39,18 @@ test("transfer-ticket cleanup is bounded and does not delete recent audit rows",
   assert.match(source, /DELETE FROM virtual_world_activity_transfer_tickets[\s\S]*expires_at < NOW\(\) - INTERVAL '1 day'[\s\S]*consumed_at < NOW\(\) - INTERVAL '1 day'/);
   assert.match(source, /\}, 60_000\)/);
 });
+
+
+test("stale activity host takeover preserves an active participant checkpoint and increments fencing", () => {
+  const start = source.indexOf("async function tryTakeoverStaleActivity");
+  const end = source.indexOf("function findAccessibleActivity", start);
+  const takeover = source.slice(start, end);
+  assert.match(takeover, /activity\.phase IN \('lobby', 'active'\)/);
+  assert.match(takeover, /activity\.host_generation = activity\.host_generation \+ 1/);
+  assert.match(takeover, /activity\.version = activity\.version \+ 1/);
+  assert.match(takeover, /previous_instance\.heartbeat_at < NOW\(\) - INTERVAL '30 seconds'/);
+  assert.match(takeover, /participant->>'userId' = \$\{player\.id\}/);
+  assert.match(takeover, /participant->>'status' = 'joined'/);
+  assert.match(takeover, /restoreActivitySession\(rows\[0\]\.state\)/);
+  assert.match(takeover, /activityHostGenerations\.set\(sessionId, restored\.hostGeneration\)/);
+});
