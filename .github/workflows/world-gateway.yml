@@ -137,6 +137,12 @@ jobs:
             throw new Error('World object IDs must not depend on display names and door pivot validation must be available.');
           if (!gateway.includes('WORLD_INTERACTABLES_FILE') || !registryPolicy.includes('World interactables must contain an interactables array'))
             throw new Error('Gateway must load and validate the exported scene object registry.');
+          for (const marker of ['BuildConfiguredInteractionObjects(worldRoot, homeFurniturePrefabs)', 'WorldInteractableKind.Seat', 'WorldInteractableKind.Furniture', 'WorldInteractableKind.Door', 'Door Hinge Pivot', 'Door Leaf', 'WorldInteractableRegistryExporter.Export(false)'])
+            if (!fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs', 'utf8').includes(marker))
+              throw new Error('Generated playable city is missing registered scene interaction objects: ' + marker);
+          for (const marker of ['StableObjectId(marker)', 'GlobalObjectId.GetGlobalObjectIdSlow', 'SaveScene(scene)', 'SHA256'])
+            if (!registryExporter.includes(marker))
+              throw new Error('Scene registry export must assign stable IDs and save final additive scenes: ' + marker);
           const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
           for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes.json'])
             if (!exporter.includes(marker)) throw new Error('Missing Unity geometry export behavior: ' + marker);
