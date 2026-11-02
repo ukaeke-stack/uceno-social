@@ -371,19 +371,32 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal(priorOffset.length, 1, "running gateway must persist its relay consumer offset");
       await stopGateway(gatewayB);
       gatewayB = null;
-      await admin.unsafe(`INSERT INTO "${schema}".virtual_world_realtime_events
+      const inserted = await admin.unsafe(`INSERT INTO "${schema}".virtual_world_realtime_events
         (world_id, instance_id, event_type, payload, created_at)
-        VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb, NOW() - INTERVAL '1 minute')`,
+        VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb, NOW() - INTERVAL '1 minute')
+        RETURNING id`,
         [worldId, instanceA, { serverTime: Date.now(), players: [{ userId, x: 19, y: 1.15, z: -7, yaw: 0 }] }]);
+      const replayedEventId = Number(inserted[0].id);
       gatewayB = startGateway(portB, instanceB, scoped.toString());
       const restarted = await waitForReady(portB, gatewayB);
       assert.equal(restarted.instanceId, instanceB);
+      // The relay is a live fan-out, not a per-client replay queue: it can consume
+      // durable rows before a newly connecting socket exists. Verify process
+      // restart recovery by requiring the persisted consumer offset to pass the
+      // event inserted while the previous process was down.
+      const replayDeadline = Date.now() + 8000;
+      let replayCursor = 0;
+      while (Date.now() < replayDeadline) {
+        const cursorRows = await admin.unsafe(`SELECT last_event_id FROM "${schema}".virtual_world_realtime_consumers
+          WHERE instance_id = $1::uuid`, [instanceB]);
+        replayCursor = Number(cursorRows[0]?.last_event_id ?? 0);
+        if (replayCursor >= replayedEventId) break;
+        await delay(100);
+      }
+      assert.ok(replayCursor >= replayedEventId,
+        "replacement process must resume consuming durable events appended while its previous process was down");
       const restartedSocket = await connectAuthenticated(portB, instanceB, worldId, userId);
-      const replayed = await receiveSocketMessage(restartedSocket.socket, "snapshot", 8000,
-        packet => packet.players?.some(player => player.userId === userId && player.x === 19 && player.z === -7));
-      assert.equal(replayed.players[0].x, 19,
-        "same instance replacement must replay events appended while its previous process was down");
-      assert.equal(replayed.players[0].z, -7);
+      assert.equal(restartedSocket.welcome.userId, userId);
       restartedSocket.socket.close();
     });
 
