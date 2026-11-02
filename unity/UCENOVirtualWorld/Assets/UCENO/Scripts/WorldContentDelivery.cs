@@ -32,6 +32,8 @@ namespace UCENO.VirtualWorld
         private readonly Dictionary<string, int> residencyReferences =
             new Dictionary<string, int>(StringComparer.Ordinal);
         private readonly HashSet<string> residencyLoads = new HashSet<string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, AsyncOperationHandle<IList<UnityEngine.Object>>> pendingLoadHandles =
+            new Dictionary<string, AsyncOperationHandle<IList<UnityEngine.Object>>>(StringComparer.Ordinal);
         private bool initialized;
         private bool initializing;
 
@@ -97,7 +99,9 @@ namespace UCENO.VirtualWorld
             residencyLoads.Add(label);
             AsyncOperationHandle<IList<UnityEngine.Object>> load =
                 Addressables.LoadAssetsAsync<UnityEngine.Object>(label, null);
+            pendingLoadHandles[label] = load;
             yield return load;
+            pendingLoadHandles.Remove(label);
             residencyLoads.Remove(label);
             if (load.Status != AsyncOperationStatus.Succeeded || load.Result == null || load.Result.Count == 0)
             {
@@ -144,6 +148,9 @@ namespace UCENO.VirtualWorld
         {
             foreach (AsyncOperationHandle<IList<UnityEngine.Object>> handle in residentHandles.Values)
                 if (handle.IsValid()) Addressables.Release(handle);
+            foreach (AsyncOperationHandle<IList<UnityEngine.Object>> handle in pendingLoadHandles.Values)
+                if (handle.IsValid()) Addressables.Release(handle);
+            pendingLoadHandles.Clear();
             residentHandles.Clear();
             residencyReferences.Clear();
             residencyLoads.Clear();
