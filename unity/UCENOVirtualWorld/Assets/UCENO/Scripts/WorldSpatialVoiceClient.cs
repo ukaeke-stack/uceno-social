@@ -262,7 +262,7 @@ namespace UCENO.VirtualWorld
                 gateway.ConnectionStatus == "ONLINE" && !peers.ContainsKey(userId) && attempts < 5)
             {
                 attempts++;
-                yield return StartCoroutine(ConnectPeer(userId));
+                yield return StartCoroutine(ConnectPeer(userId, generation));
                 if (peers.TryGetValue(userId, out PeerAudio connectedPeer) && connectedPeer.connected)
                     break;
                 if (attempts < 5)
@@ -271,7 +271,7 @@ namespace UCENO.VirtualWorld
             peerConnectInProgress.Remove(userId);
         }
 
-        private IEnumerator ConnectPeer(string userId)
+        private IEnumerator ConnectPeer(string userId, int generation)
         {
             if (peers.ContainsKey(userId) || !voiceEnabled || appPaused) yield break;
             var peer = new PeerAudio { userId = userId };
@@ -288,7 +288,7 @@ namespace UCENO.VirtualWorld
                 request.SetRequestHeader("Authorization", "Bearer " + session.AccessToken);
                 request.timeout = 8;
                 yield return request.SendWebRequest();
-                if (generationInvalidForConnect())
+                if (generationInvalidForConnect(generation))
                 {
                     RemovePeer(userId);
                     yield break;
@@ -334,7 +334,7 @@ namespace UCENO.VirtualWorld
             }
         }
 
-        private bool generationInvalidForConnect() => !voiceEnabled || appPaused;
+        private bool generationInvalidForConnect(int generation) => generation != voiceGeneration || !voiceEnabled || appPaused;
 
         private void CreateMicrophone(PeerAudio peer)
         {
