@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, type ActivitySession } from "./activity-session.js";
-import { sameSpatialVoiceRoom, isWithinVoiceRange, isValidVoiceSignal } from "./voice-policy.js";
+import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
@@ -1079,8 +1079,10 @@ setInterval(async () => {
     for (let i = 0; i < active.length; i++) {
       for (let j = i + 1; j < active.length; j++) {
         const a = active[i], b = active[j];
-        if (!sameSpatialVoiceRoom(a, b) || !isWithinVoiceRange(a, b)) continue;
-        desired.set(voicePairKey(a.id, b.id), [a, b]);
+        const key = voicePairKey(a.id, b.id);
+        if (!sameSpatialVoiceRoom(a, b) ||
+            !isWithinVoiceRangeWithHysteresis(a, b, voiceVisiblePairs.has(key))) continue;
+        desired.set(key, [a, b]);
       }
     }
     for (const [key, [a, b]] of desired) {
@@ -1105,7 +1107,8 @@ setInterval(async () => {
         // Re-check after the database await; either peer may have left voice
         // or changed spatial context while the block query was in flight.
         if (!players.has(a.id) || !players.has(b.id) || !a.voiceActive || !b.voiceActive ||
-            !sameSpatialVoiceRoom(a, b) || !isWithinVoiceRange(a, b)) continue;
+            !sameSpatialVoiceRoom(a, b) ||
+            !isWithinVoiceRangeWithHysteresis(a, b, alreadyVisible)) continue;
         if (!alreadyVisible) {
           voiceVisiblePairs.add(key);
           send(a.socket, { type: "voice_presence", userId: b.id, active: true });
