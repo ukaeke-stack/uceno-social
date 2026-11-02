@@ -40,6 +40,7 @@ namespace UCENO.VirtualWorld
             new Dictionary<string, AsyncOperationHandle<SceneInstance>>(StringComparer.Ordinal);
         private readonly Dictionary<string, AsyncOperationHandle<SceneInstance>> pendingSceneHandles =
             new Dictionary<string, AsyncOperationHandle<SceneInstance>>(StringComparer.Ordinal);
+        private readonly HashSet<string> sceneUnloads = new HashSet<string>(StringComparer.Ordinal);
         private bool initialized;
         private bool initializing;
 
@@ -87,7 +88,7 @@ namespace UCENO.VirtualWorld
 
             // Coalesce concurrent loads for the same label. A successful lease
             // keeps its Addressables handle alive until every consumer releases it.
-            while (residencyLoads.Contains(label)) yield return null;
+            while (residencyLoads.Contains(label) || sceneUnloads.Contains(label)) yield return null;
             if (residentHandles.ContainsKey(label) || residentSceneHandles.ContainsKey(label))
             {
                 residencyReferences[label] = residencyReferences[label] + 1;
@@ -162,6 +163,7 @@ namespace UCENO.VirtualWorld
             if (residentSceneHandles.TryGetValue(label, out AsyncOperationHandle<SceneInstance> sceneHandle))
             {
                 residentSceneHandles.Remove(label);
+                sceneUnloads.Add(label);
                 StartCoroutine(UnloadSceneRoutine(label, sceneHandle));
                 return;
             }
@@ -188,6 +190,7 @@ namespace UCENO.VirtualWorld
                 yield return unload;
                 if (unload.IsValid()) Addressables.Release(unload);
             }
+            sceneUnloads.Remove(label);
             StatusChanged?.Invoke(label + " additive scene unloaded.");
             yield return Resources.UnloadUnusedAssets();
         }
@@ -213,6 +216,7 @@ namespace UCENO.VirtualWorld
             residentHandles.Clear();
             residentSceneHandles.Clear();
             pendingSceneHandles.Clear();
+            sceneUnloads.Clear();
             residencyReferences.Clear();
             residencyLoads.Clear();
         }
