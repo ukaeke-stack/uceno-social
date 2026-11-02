@@ -6,6 +6,7 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 const manifest = JSON.parse(read("unity/UCENOVirtualWorld/Packages/manifest.json"));
 const delivery = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldContentDelivery.cs");
 const areaBinding = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldAreaContentBinding.cs");
+const gateway = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs");
 const architecture = read("docs/virtual-world/REMOTE_CONTENT_DELIVERY.md");
 const tests = read("docs/virtual-world/REMOTE_CONTENT_DELIVERY_TESTS.md");
 
@@ -22,7 +23,11 @@ const checks = [
   ["Home transitions request interior content", /case "home": return "home-interiors"/.test(areaBinding)],
   ["Event transitions request venue content", /case "event": return "world-event-venues"/.test(areaBinding)],
   ["Area content binding reports progress and failures", /ProgressChanged/.test(areaBinding) && /ContentFailed/.test(areaBinding)],
-  ["Architecture documents automatic loading and persistent cache", /automatically|on demand/i.test(architecture) && /persistent.*cache/i.test(architecture)],
+  ["Home and event travel preload before sending admission", /PreloadBeforeSpatialTransition/.test(gateway) && /EnsureContent\(label/.test(gateway)],
+  ["Travel request is gated on successful content download", /if \(!succeeded\)[\s\S]*?Travel cancelled/.test(gateway) && /SendSpatialContextAsync\(type, id\)/.test(gateway)],
+  ["Failed preload does not send spatial admission", /Travel cancelled:[\s\S]*?spatialTransitionPending = false;[\s\S]*?yield break;/.test(gateway)],
+  ["Transition feedback is visible", /spatialTransitionStatus/.test(gateway) && /private void OnGUI\(\)/.test(gateway)],
+  ["Architecture documents automatic loading and persistent cache", /automatically|on demand|preflight/i.test(architecture) && /persistent.*cache/i.test(architecture)],
   ["Acceptance tests cover interrupted downloads", /Interrupt the connection mid-download/.test(tests))
 ];
 
