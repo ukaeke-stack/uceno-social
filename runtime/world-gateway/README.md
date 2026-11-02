@@ -29,10 +29,60 @@ Standalone WebSocket runtime for an already-provisioned UCENO world instance.
 - `WORLD_INSTANCE_CAPACITY` (optional, default 64; keep consistent with DB capacity)
 - `WORLD_BOUNDS` (optional, default 10000 world units)
 - `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (optional until spatial voice is provisioned; server-only credentials for pair-scoped audio rooms)
-- `WORLD_COLLISION_BOXES` (optional JSON array of up to 500 static axis-aligned boxes; each box has numeric `minX`, `maxX`, `minY`, `maxY`, `minZ`, `maxZ` world coordinates)
+- `WORLD_COLLISION_BOXES` (optional JSON array of up to 500 static axis-aligned boxes; each box has numeric `minX`, `maxX`, `minY`, `maxY`, `minZ`, `maxZ` world coordinates)\n- `WORLD_DISTRICTS` or `WORLD_DISTRICTS_FILE` (optional operator-authored district rectangles; each district has a unique `id`, display `name`, Addressables `contentLabel`, and `minX`, `maxX`, `minZ`, `maxZ`)
 
 Build with `npm install && npm run build`; run with `npm start`. The Dockerfile
 builds and runs the service as a non-root user.
+
+## District streaming and server-gated boundaries
+
+District metadata is operator-authored per world-gateway instance. Configure
+`WORLD_DISTRICTS` as JSON or `WORLD_DISTRICTS_FILE` as a path to a JSON file.
+Example:
+
+```json
+{
+  "districts": [
+    {
+      "id": "central",
+      "name": "Central District",
+      "contentLabel": "world-city-district-central",
+      "minX": -100,
+      "maxX": 100,
+      "minZ": -100,
+      "maxZ": 100
+    },
+    {
+      "id": "waterfront",
+      "name": "Waterfront",
+      "contentLabel": "world-city-district-waterfront",
+      "minX": 100,
+      "maxX": 220,
+      "minZ": -100,
+      "maxZ": 100
+    }
+  ]
+}
+```
+
+Districts are axis-aligned X/Z rectangles in the same coordinate system as the
+Unity scene. IDs must be unique, rectangles may not overlap, coordinates must
+stay within `WORLD_BOUNDS`, and content labels must use the
+`world-city-district-<name>` namespace. The gateway rejects invalid configuration
+at startup. Gaps between rectangles are valid and represent the base/shared area.
+
+At a district boundary, the authoritative simulation pauses the player's
+horizontal movement and sends `district_content_required` with the server-chosen
+district ID, label and one-time nonce. Unity downloads the label through
+Addressables and replies with `district_content_ready`. The gateway validates
+the pending district and nonce before allowing movement into that district.
+If the player turns back while downloading, the gateway cancels the pending
+transition. Clients cannot choose district geometry, labels or destination IDs.
+
+This is source-level behavior. Each configured label must exist in the matching
+platform Addressables catalog, and gateway deployment must include the same
+district geometry as the Unity scene. No production district geometry or CDN
+catalog is provisioned by this code change.
 
 
 ## Activity sessions and checkpoint races
