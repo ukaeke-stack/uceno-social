@@ -410,7 +410,12 @@ function persistActivity(session: ActivitySession): void {
        OR (virtual_world_activity_sessions.host_generation = EXCLUDED.host_generation
            AND virtual_world_activity_sessions.version < EXCLUDED.version)`
     .then(async savedRows => {
-      if (savedRows.length === 0 || (session.phase !== "completed" && session.phase !== "cancelled")) return;
+      if (savedRows.length === 0) return;
+      void sql`INSERT INTO virtual_world_realtime_events (world_id, instance_id, event_type, payload)
+        VALUES (${session.worldId}::uuid, ${INSTANCE_ID}::uuid, 'activity_state',
+          ${JSON.stringify(activityPayload(session))}::jsonb)`
+        .catch(error => console.error("activity_state_relay_publish_failed", session.id, error));
+      if (session.phase !== "completed" && session.phase !== "cancelled") return;
       const ordered = [...session.participants.values()]
         .filter(p => p.status === "finished" || p.status === "dnf" || p.status === "left")
         .sort((a, b) => a.status === "finished" && b.status === "finished"
@@ -869,10 +874,57 @@ wss.on("connection", async (socket: WebSocket) => {
         broadcastActivity(created.session);
         return;
       }
+      if (msg && msg.type === "activity_discover") {
+        if (player.homeId || player.eventId || player.returnState) {
+          send(socket, { type: "activity_discovery", sessions: [] }); return;
+        }
+        try {
+          const rows = await sql`SELECT s.id, s.instance_id AS "instanceId",
+              i.endpoint, s.activity_kind AS kind, s.phase, s.created_at AS "createdAt",
+              s.updated_at AS "updatedAt", s.state
+            FROM virtual_world_activity_sessions s
+            JOIN virtual_world_instances i ON i.id = s.instance_id
+            WHERE s.world_id = ${player.worldId}::uuid
+              AND s.phase IN ('lobby', 'active')
+              AND i.status = 'ready' AND i.endpoint IS NOT NULL
+              AND i.heartbeat_at > NOW() - INTERVAL '30 seconds'
+            ORDER BY s.created_at DESC LIMIT 50`;
+          send(socket, { type: "activity_discovery", sessions: rows.map(row => {
+            const restored = restoreActivitySession(row.state);
+            return restored ? {
+              id: row.id, instanceId: row.instanceId, endpoint: row.endpoint,
+              kind: row.kind, phase: row.phase, createdAt: row.createdAt,
+              version: restored.session.version,
+              hostUserId: restored.hostUserId,
+              participants: [...restored.session.participants.values()].map(p => ({
+                userId: p.userId, status: p.status, checkpointIndex: p.checkpointIndex
+              }))
+            } : null;
+          }).filter(Boolean) });
+        } catch (error) {
+          console.error("activity_discovery_failed", error);
+          send(socket, { type: "activity_discovery", sessions: [], error: "temporarily_unavailable" });
+        }
+        return;
+      }
       if (msg && msg.type === "activity_join") {
         const session = findAccessibleActivity(msg.id, player);
-        if (!session || player.homeId || player.eventId || player.returnState) {
-          send(socket, { type: "activity_rejected", code: "activity_not_found_or_context_active" }); return;
+        if (!session) {
+          if (typeof msg.id === "string") {
+            const route = await sql`SELECT s.instance_id AS "instanceId", i.endpoint
+              FROM virtual_world_activity_sessions s
+              JOIN virtual_world_instances i ON i.id = s.instance_id
+              WHERE s.id = ${msg.id}::uuid AND s.world_id = ${player.worldId}::uuid
+                AND s.phase = 'lobby' AND i.status = 'ready'
+                AND i.heartbeat_at > NOW() - INTERVAL '30 seconds' LIMIT 1`;
+            if (route[0]) send(socket, { type: "activity_route_required",
+              sessionId: msg.id, instanceId: route[0].instanceId, endpoint: route[0].endpoint });
+            else send(socket, { type: "activity_rejected", code: "activity_not_found" });
+          } else send(socket, { type: "activity_rejected", code: "activity_not_found" });
+          return;
+        }
+        if (player.homeId || player.eventId || player.returnState) {
+          send(socket, { type: "activity_rejected", code: "activity_context_active" }); return;
         }
         const joined = joinActivity(session, player.id);
         if (!joined.ok) {
@@ -1557,12 +1609,22 @@ setInterval(async () => {
     for (const row of rows) {
       const eventId = Number(row.id);
       if (Number.isSafeInteger(eventId) && eventId > worldRelayCursor) worldRelayCursor = eventId;
-      if (row.instanceId === INSTANCE_ID || row.eventType !== 'player_snapshot') continue;
-      const payload = row.payload as { serverTime?: number; players?: unknown };
-      if (!payload || !Array.isArray(payload.players) || !Number.isFinite(payload.serverTime)) continue;
-      const packet = JSON.stringify({ type: 'snapshot', serverTime: payload.serverTime, players: payload.players });
-      for (const peer of players.values()) {
-        if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
+      if (row.instanceId === INSTANCE_ID) continue;
+      if (row.eventType === 'player_snapshot') {
+        const payload = row.payload as { serverTime?: number; players?: unknown };
+        if (!payload || !Array.isArray(payload.players) || !Number.isFinite(payload.serverTime)) continue;
+        const packet = JSON.stringify({ type: 'snapshot', serverTime: payload.serverTime, players: payload.players });
+        for (const peer of players.values()) {
+          if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
+        }
+      } else if (row.eventType === 'activity_state') {
+        const payload = row.payload as { type?: string; session?: { id?: string; worldId?: string; instanceId?: string } };
+        if (payload?.type !== 'activity_state' || payload.session?.worldId !== row.worldId ||
+            payload.session?.instanceId !== row.instanceId || typeof payload.session.id !== 'string') continue;
+        const packet = JSON.stringify(payload);
+        for (const peer of players.values()) {
+          if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
+        }
       }
     }
   } catch (error) { console.error('world_snapshot_relay_poll_failed', error); }
