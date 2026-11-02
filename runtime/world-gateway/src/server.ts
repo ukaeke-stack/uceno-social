@@ -554,17 +554,37 @@ async function persistActivity(session: ActivitySession): Promise<boolean> {
     .sort((a, b) => a.status === "finished" && b.status === "finished"
       ? (a.finishTime ?? Number.MAX_SAFE_INTEGER) - (b.finishTime ?? Number.MAX_SAFE_INTEGER)
       : a.status === "finished" ? -1 : b.status === "finished" ? 1 : a.joinedAt - b.joinedAt);
-  for (const [index, participant] of ordered.entries()) {
-    await sql`INSERT INTO virtual_world_activity_results
-      (session_id, world_id, user_id, placement, status, checkpoint_index, finish_time)
-      VALUES (${session.id}::uuid, ${session.worldId}::uuid, ${participant.userId}::uuid,
-        ${participant.status === "finished" ? index + 1 : null}, ${participant.status},
-        ${participant.checkpointIndex}, ${participant.finishTime})
-      ON CONFLICT (session_id, user_id) DO UPDATE SET
-        placement = EXCLUDED.placement, status = EXCLUDED.status,
-        checkpoint_index = EXCLUDED.checkpoint_index, finish_time = EXCLUDED.finish_time`;
+  try {
+    const resultsSaved = await sql.begin(async tx => {
+      const owner = await tx`SELECT id FROM virtual_world_instances
+        WHERE id = ${INSTANCE_ID}::uuid
+          AND owner_process_id = ${PROCESS_ID}::uuid
+          AND owner_generation = ${processGeneration}
+          AND owner_lease_expires_at > clock_timestamp()
+        FOR SHARE`;
+      if (!owner.length) return false;
+      const authority = await tx`SELECT 1 FROM virtual_world_activity_sessions
+        WHERE id = ${session.id}::uuid AND instance_id = ${INSTANCE_ID}::uuid
+          AND host_generation = ${hostGeneration} AND phase IN ('completed', 'cancelled')
+        FOR UPDATE`;
+      if (!authority[0]) return false;
+      for (const [index, participant] of ordered.entries()) {
+        await tx`INSERT INTO virtual_world_activity_results
+          (session_id, world_id, user_id, placement, status, checkpoint_index, finish_time)
+          VALUES (${session.id}::uuid, ${session.worldId}::uuid, ${participant.userId}::uuid,
+            ${participant.status === "finished" ? index + 1 : null}, ${participant.status},
+            ${participant.checkpointIndex}, ${participant.finishTime})
+          ON CONFLICT (session_id, user_id) DO UPDATE SET
+            placement = EXCLUDED.placement, status = EXCLUDED.status,
+            checkpoint_index = EXCLUDED.checkpoint_index, finish_time = EXCLUDED.finish_time`;
+      }
+      return true;
+    });
+    return resultsSaved;
+  } catch (error) {
+    console.error("activity_results_persistence_failed", session.id, error);
+    return false;
   }
-  return true;
 }
 
 async function broadcastActivity(session: ActivitySession) {
