@@ -47,7 +47,12 @@ namespace UCENO.VirtualWorld.Editor
     public static class WorldInteractableRegistryExporter
     {
         [MenuItem("UCENO/World/Export Scene Interactables to Gateway Registry", false, 105)]
-        public static void Export(bool showDialog = true)
+        private static void ExportFromMenu()
+        {
+            Export(true);
+        }
+
+        public static void Export(bool showDialog)
         {
             try
             {
