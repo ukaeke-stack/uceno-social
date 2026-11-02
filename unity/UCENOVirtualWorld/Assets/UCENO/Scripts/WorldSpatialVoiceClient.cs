@@ -94,12 +94,12 @@ namespace UCENO.VirtualWorld
                 status = "NO MICROPHONE FOUND";
                 return;
             }
-            if (!SetAudioRoute(audioRoute)) status = "AUDIO ROUTE UNAVAILABLE — USING SYSTEM DEFAULT";
+            bool routeApplied = SetAudioRoute(audioRoute);
             voiceEnabled = true;
             localMuted = false;
             pushToTalkHeld = false;
             voicePresenceRequested = gateway.SetVoiceActive(true);
-            status = "VOICE READY — HOLD TO TALK";
+            status = routeApplied ? "VOICE READY — HOLD TO TALK" : "VOICE READY — AUDIO ROUTE UNAVAILABLE";
         }
 
         public void DisableVoice()
