@@ -54,10 +54,12 @@ uploads a separate private, non-primary **UCENO World Interactables Registry**
 artifact with a SHA-256 checksum before Unity Build Automation completes its
 artifact upload.
 
-Add the Unity Build Automation target environment variable
-`UCENO_UBA_API_KEY` containing the Build Automation API key. The script reads
-UBA's built-in `ORG_ID`, `PROJECT_ID`, `BUILD_TARGET`, and
-`UCB_BUILD_NUMBER` variables. Never add the API key to GitHub or the repository.
+Add the Unity service-account credentials as private Unity Build Automation target environment variables:
+`UCENO_UBA_SERVICE_ACCOUNT_KEY_ID` and `UCENO_UBA_SERVICE_ACCOUNT_SECRET`.
+The script reads UBA's built-in `ORG_ID`, `PROJECT_ID`, `BUILD_TARGET`, and
+`UCB_BUILD_NUMBER` variables and uses the v2 service-account Basic-auth format.
+A legacy Build Automation API key is not accepted by v2. Never add either
+credential to GitHub or the repository.
 
 After a successful Dashboard build, download the registry artifact separately
 from the APK, verify its checksum, then manually mount it into the gateway and
