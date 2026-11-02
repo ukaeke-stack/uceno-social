@@ -35,8 +35,8 @@ export function restoreActivitySession(value: unknown): { session: ActivitySessi
       !kinds.includes(v.kind as ActivityKind) || !phases.includes(v.phase as ActivityPhase) ||
       !Number.isSafeInteger(v.version) || (v.version ?? 0) < 1 ||
       !Number.isFinite(v.createdAt) || (v.createdAt ?? -1) < 0 ||
-      !(v.startedAt === null || (Number.isFinite(v.startedAt) && v.startedAt >= v.createdAt)) ||
-      !(v.completedAt === null || (Number.isFinite(v.completedAt) && v.completedAt >= v.createdAt)) ||
+      !(v.startedAt === null || (typeof v.startedAt === "number" && Number.isFinite(v.startedAt) && v.startedAt >= (v.createdAt as number))) ||
+      !(v.completedAt === null || (typeof v.completedAt === "number" && Number.isFinite(v.completedAt) && v.completedAt >= (v.createdAt as number))) ||
       !Number.isInteger(v.maxParticipants) || (v.maxParticipants ?? 0) < 2 ||
       (v.maxParticipants ?? 65) > 64 || !Number.isInteger(v.checkpointCount) ||
       (v.checkpointCount ?? 0) < 2 || (v.checkpointCount ?? 101) > 100 ||
