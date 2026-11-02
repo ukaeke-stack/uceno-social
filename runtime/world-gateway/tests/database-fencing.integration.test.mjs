@@ -109,7 +109,7 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
     });
 
     await t.test("transfer ticket consumption is atomic and replay-safe", async () => {
-      await withSchema(seedActivity);
+      await resetActivity(ids.newA);
       await withSchema(tx => tx`INSERT INTO virtual_world_activity_transfer_tickets
         (id, world_id, user_id, activity_session_id, source_instance_id, target_instance_id,
          host_generation, expires_at)
