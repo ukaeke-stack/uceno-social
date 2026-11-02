@@ -89,6 +89,10 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
       WHERE activity.id = ${ids.activity}::uuid
         AND activity.world_id = ${ids.world}::uuid
         AND activity.instance_id = previous_instance.id
+        AND EXISTS (SELECT 1 FROM virtual_world_instances replacement_instance
+          WHERE replacement_instance.id = ${instanceId}::uuid
+            AND replacement_instance.status = 'ready' AND replacement_instance.endpoint IS NOT NULL
+            AND replacement_instance.heartbeat_at > NOW() - INTERVAL '30 seconds')
         AND activity.phase IN ('lobby', 'active')
         AND (previous_instance.status <> 'ready' OR previous_instance.heartbeat_at IS NULL
           OR previous_instance.heartbeat_at < NOW() - INTERVAL '30 seconds')
