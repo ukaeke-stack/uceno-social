@@ -43,3 +43,4 @@
 - [ ] Confirm releasing a lease releases the Addressables handle and triggers Unity's unused-asset sweep while preserving the persistent downloaded-bundle cache.
 - [ ] Profile actual resident memory and frame time on a low-memory Android device; the four-label cap is not a substitute for byte-level profiling.
 - [ ] Verify runtime labels contain loadable assets rather than only Addressable scenes; scene streaming requires separate additive scene lifecycle handling.
+- [ ] Leave the last configured district or enter a separate home/event context; confirm the gateway notifies Unity and the active district assets are released.
