@@ -310,7 +310,7 @@ async function refreshDistrictObjectStates(worldId: string, districtId: string):
 }
 const secret = new TextEncoder().encode(TOKEN_SECRET);
 type Player = {
-  id: string; worldId: string; token: string; socket: WebSocket; x: number; y: number; z: number;
+  id: string; worldId: string; token: string; socket: WebSocket; sessionId: string; sessionGeneration: number; stateVersion: number; x: number; y: number; z: number;
   vx: number; vy: number; vz: number; yaw: number; grounded: boolean;
   moveX: number; moveZ: number; sprint: boolean; seated: boolean; gesture: string; gestureSequence: number; jumpQueued: boolean;
   lastInputAt: number; inputCount: number; inputWindowAt: number;
@@ -528,7 +528,7 @@ async function authenticate(token: string) {
   return { userId: row.id as string, worldId: payload.world_id as string };
 }
 
-async function loadPlayer(userId: string, worldId: string, token: string, socket: WebSocket): Promise<Player> {
+async function loadPlayer(userId: string, worldId: string, token: string, socket: WebSocket, sessionId: string, sessionGeneration: number): Promise<Player> {
   const rows = await sql`
     SELECT position, rotation FROM virtual_world_player_state
     WHERE world_id = ${worldId}::uuid AND user_id = ${userId}::uuid
@@ -552,7 +552,9 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
   const yaw = finiteNumber(rotation.y, -1.01, 1.01) && finiteNumber(rotation.w, -1.01, 1.01)
     ? 2 * Math.atan2(rotation.y, rotation.w) : 0;
   return {
-    id: userId, worldId, token, socket, x, y, z, vx: 0, vy: 0, vz: 0, yaw, grounded: y <= GROUND_Y + 0.01,
+    id: userId, worldId, token, socket, sessionId, sessionGeneration,
+    stateVersion: Number(rows[0]?.sessionGeneration) === sessionGeneration ? Number(rows[0]?.stateVersion || 0) : 0,
+    x, y, z, vx: 0, vy: 0, vz: 0, yaw, grounded: y <= GROUND_Y + 0.01,
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
@@ -648,7 +650,7 @@ const server = createServer(async (req, res) => {
   res.writeHead(404); res.end();
 });
 const wss = new WebSocketServer({ noServer: true, maxPayload: 16384, perMessageDeflate: false });
-const upgradeIdentity = new WeakMap<WebSocket, { userId: string; worldId: string; token: string }>();
+const upgradeIdentity = new WeakMap<WebSocket, { userId: string; worldId: string; token: string; sessionId: string; sessionGeneration: number }>();
 
 server.on("upgrade", async (req, socket, head) => {
   try {
@@ -658,8 +660,23 @@ server.on("upgrade", async (req, socket, head) => {
     const identity = await authenticate(token);
     await ensureObjectStatesLoaded(identity.worldId);
     if (players.size >= MAX_CLIENTS && !players.has(identity.userId)) throw new Error("instance_full");
+    const sessionId = randomUUID();
+    const claimed = await sql`
+      INSERT INTO virtual_world_player_sessions
+        (world_id, user_id, instance_id, session_id, generation, updated_at)
+      SELECT s.world_id, s.user_id, s.instance_id, ${sessionId}::uuid, 1, NOW()
+      FROM virtual_world_instance_sessions s
+      WHERE s.world_id = ${identity.worldId}::uuid AND s.user_id = ${identity.userId}::uuid
+        AND s.instance_id = ${INSTANCE_ID}::uuid AND s.lease_expires_at > NOW()
+      ON CONFLICT (world_id, user_id) DO UPDATE SET
+        instance_id = EXCLUDED.instance_id, session_id = EXCLUDED.session_id,
+        generation = virtual_world_player_sessions.generation + 1, updated_at = NOW()
+      RETURNING generation
+    `;
+    if (!claimed[0]) throw new Error("session_lease_unavailable");
+    const sessionGeneration = Number(claimed[0].generation);
     wss.handleUpgrade(req, socket, head, (ws) => {
-      upgradeIdentity.set(ws, { ...identity, token });
+      upgradeIdentity.set(ws, { ...identity, token, sessionId, sessionGeneration });
       wss.emit("connection", ws, req);
     });
   } catch {
@@ -674,7 +691,17 @@ wss.on("connection", async (socket: WebSocket) => {
   try {
     const old = players.get(identity.userId);
     if (old) { old.socket.close(4001, "replaced_by_reconnect"); players.delete(identity.userId); }
-    const player = await loadPlayer(identity.userId, identity.worldId, identity.token, socket);
+    const player = await loadPlayer(identity.userId, identity.worldId, identity.token, socket, identity.sessionId, identity.sessionGeneration);
+    const currentFence = await sql`
+      SELECT session_id AS "sessionId", generation
+      FROM virtual_world_player_sessions
+      WHERE world_id = ${identity.worldId}::uuid AND user_id = ${identity.userId}::uuid
+      LIMIT 1
+    `;
+    if (!currentFence[0] || currentFence[0].sessionId !== identity.sessionId ||
+        Number(currentFence[0].generation) !== identity.sessionGeneration) {
+      fail(socket, "session_superseded"); return;
+    }
     players.set(identity.userId, player);
     send(socket, { type: "welcome", userId: identity.userId, tickRate: TICK_RATE,
       state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
@@ -700,6 +727,7 @@ wss.on("connection", async (socket: WebSocket) => {
     }
 
     socket.on("message", async (raw) => {
+      if (players.get(player.id) !== player || player.socket !== socket) return;
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
       if (msg && msg.type === "district_content_ready") {
@@ -1120,24 +1148,35 @@ wss.on("connection", async (socket: WebSocket) => {
     });
     const releaseSeats = () => {
       const current = players.get(identity.userId);
+      if (!current || current.socket !== socket || current.sessionId !== identity.sessionId) return;
       // Ignore a late close event from an older socket after this user has
       // already reconnected, but release seats if moderation removed this
       // socket from the live-player map before the close event arrived.
       if (current && current.socket !== socket) return;
       if (current?.voiceActive) leaveVoiceRoom(current);
-      if (current && current.returnState) {
+      if (current.returnState) {
         const destination = current.returnState;
+        current.stateVersion += 1;
         void sql`
-          INSERT INTO virtual_world_player_state (world_id, user_id, position, rotation, updated_at)
-          VALUES (${current.worldId}::uuid, ${current.id}::uuid,
+          INSERT INTO virtual_world_player_state
+            (world_id, user_id, position, rotation, session_generation, state_version, updated_by_session, updated_at)
+          SELECT ${current.worldId}::uuid, ${current.id}::uuid,
             ${JSON.stringify({ x: destination.x, y: destination.y, z: destination.z })}::jsonb,
             ${JSON.stringify({ x: 0, y: Math.sin(destination.yaw / 2), z: 0, w: Math.cos(destination.yaw / 2) })}::jsonb,
-            NOW())
+            ${current.sessionGeneration}, ${current.stateVersion}, ${current.sessionId}::uuid, NOW()
+          WHERE EXISTS (SELECT 1 FROM virtual_world_player_sessions ps
+            WHERE ps.world_id = ${current.worldId}::uuid AND ps.user_id = ${current.id}::uuid
+              AND ps.session_id = ${current.sessionId}::uuid AND ps.generation = ${current.sessionGeneration})
           ON CONFLICT (world_id, user_id) DO UPDATE SET
-            position = EXCLUDED.position, rotation = EXCLUDED.rotation, updated_at = NOW()
+            position = EXCLUDED.position, rotation = EXCLUDED.rotation,
+            session_generation = EXCLUDED.session_generation, state_version = EXCLUDED.state_version,
+            updated_by_session = EXCLUDED.updated_by_session, updated_at = NOW()
+          WHERE virtual_world_player_state.session_generation < EXCLUDED.session_generation
+             OR (virtual_world_player_state.session_generation = EXCLUDED.session_generation
+                 AND virtual_world_player_state.state_version < EXCLUDED.state_version)
         `.catch(error => console.error("spatial_return_checkpoint_failed", error));
       }
-      if (current?.socket === socket) players.delete(identity.userId);
+      players.delete(identity.userId);
       for (const session of activitySessions.values()) {
         const participant = session.participants.get(identity.userId);
         if (!participant || participant.status === "left" || participant.status === "dnf" || participant.status === "finished") continue;
@@ -1322,15 +1361,25 @@ setInterval(async () => {
     if (now - p.lastCheckpointAt >= 5000) {
       p.lastCheckpointAt = now;
       void sql`
-        INSERT INTO virtual_world_player_state (world_id, user_id, position, rotation, updated_at)
+        INSERT INTO virtual_world_player_state
+          (world_id, user_id, position, rotation, session_generation, state_version, updated_by_session, updated_at)
         SELECT s.world_id, ${p.id}::uuid,
           ${JSON.stringify({ x: p.x, y: p.y, z: p.z })}::jsonb,
-          ${JSON.stringify({ x: 0, y: Math.sin(p.yaw / 2), z: 0, w: Math.cos(p.yaw / 2) })}::jsonb, NOW()
+          ${JSON.stringify({ x: 0, y: Math.sin(p.yaw / 2), z: 0, w: Math.cos(p.yaw / 2) })}::jsonb,
+          ${p.sessionGeneration}, ${++p.stateVersion}, ${p.sessionId}::uuid, NOW()
         FROM virtual_world_instance_sessions s
         WHERE s.user_id = ${p.id}::uuid AND s.instance_id = ${INSTANCE_ID}::uuid
           AND s.lease_expires_at > NOW()
+          AND EXISTS (SELECT 1 FROM virtual_world_player_sessions ps
+            WHERE ps.world_id = s.world_id AND ps.user_id = s.user_id
+              AND ps.session_id = ${p.sessionId}::uuid AND ps.generation = ${p.sessionGeneration})
         ON CONFLICT (world_id, user_id) DO UPDATE SET
-          position = EXCLUDED.position, rotation = EXCLUDED.rotation, updated_at = NOW()
+          position = EXCLUDED.position, rotation = EXCLUDED.rotation,
+          session_generation = EXCLUDED.session_generation, state_version = EXCLUDED.state_version,
+          updated_by_session = EXCLUDED.updated_by_session, updated_at = NOW()
+        WHERE virtual_world_player_state.session_generation < EXCLUDED.session_generation
+           OR (virtual_world_player_state.session_generation = EXCLUDED.session_generation
+               AND virtual_world_player_state.state_version < EXCLUDED.state_version)
       `.catch((error) => console.error("checkpoint_write_failed", error));
     }
   }
