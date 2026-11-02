@@ -9,7 +9,8 @@ import { matchesDistrictTransition, planDistrictTransition } from "./district-tr
 import { parseDistrictCollisionManifest } from "./district-collision-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
-import { isPersistentObjectState, defaultPersistentObjectState } from "./district-object-policy.js";
+import { isPersistentObjectState } from "./district-object-policy.js";
+import { parseInteractableRegistry, type RegisteredInteractable } from "./interactable-registry-policy.js";
 import { checkpointVersionForSession } from "./session-fence-policy.js";
 import { shouldPublishWorldSnapshot, WORLD_RELAY_BATCH_SIZE, WORLD_RELAY_POLL_INTERVAL_MS } from "./world-relay-policy.js";
 import { readFileSync } from "node:fs";
@@ -42,7 +43,7 @@ type CollisionBox = {
   minX: number; maxX: number; minY: number; maxY: number;
   minZ: number; maxZ: number;
 };
-type Interactable = { id: string; districtId: string; kind: "door" | "seat" | "object" | "furniture" | "vehicle"; x: number; y: number; z: number; yaw: number; state: string; version: number; actorId: string | null; occupantId: string | null };
+type Interactable = RegisteredInteractable;
 type EquippedWardrobeItem = { slot: string; itemId: string };
 
 function loadWorldDistricts(): WorldDistrict[] {
@@ -71,37 +72,7 @@ function loadInteractables(): Map<string, Interactable> {
     }
   }
   if (!raw) return new Map();
-  let parsed: unknown;
-  try { parsed = JSON.parse(raw); }
-  catch { throw new Error("World interactables must be valid JSON"); }
-  if (!parsed || typeof parsed !== "object" ||
-      !Array.isArray((parsed as { interactables?: unknown }).interactables))
-    throw new Error("World interactables must contain an interactables array");
-  const values = (parsed as { interactables: unknown[] }).interactables;
-  if (values.length > 500) throw new Error("World interactables cannot exceed 500 entries");
-  const result = new Map<string, Interactable>();
-  for (const [index, value] of values.entries()) {
-    if (!value || typeof value !== "object") throw new Error(`Interactable ${index} is invalid`);
-    const item = value as Record<string, unknown>;
-    if (typeof item.id !== "string" || !/^[a-zA-Z0-9._:-]{1,80}$/.test(item.id) ||
-        (item.kind !== "door" && item.kind !== "seat" && item.kind !== "object" && item.kind !== "furniture" && item.kind !== "vehicle") ||
-        !finiteNumber(item.x, -WORLD_BOUNDS, WORLD_BOUNDS) ||
-        !finiteNumber(item.y, -WORLD_BOUNDS, WORLD_BOUNDS) ||
-        !finiteNumber(item.z, -WORLD_BOUNDS, WORLD_BOUNDS) ||
-        (item.yaw !== undefined && !finiteNumber(item.yaw, -Math.PI * 4, Math.PI * 4)) || result.has(item.id))
-      throw new Error(`Interactable ${index} has invalid or duplicate fields`);
-    const owningDistrict = findWorldDistrict(WORLD_DISTRICTS, item.x, item.z);
-    if (WORLD_DISTRICTS.length > 0 && !owningDistrict)
-      throw new Error(`Interactable ${item.id} is outside every configured world district`);
-    result.set(item.id, {
-      id: item.id, districtId: owningDistrict?.id ?? "unassigned",
-      kind: item.kind, x: item.x, y: item.y, z: item.z,
-      yaw: typeof item.yaw === "number" ? item.yaw : 0,
-      state: item.kind === "seat" ? "available" : defaultPersistentObjectState(item.kind),
-      version: 0, actorId: null, occupantId: null
-    });
-  }
-  return result;
+  return parseInteractableRegistry(raw, WORLD_DISTRICTS, WORLD_BOUNDS);
 }
 
 function loadCollisionBoxes(): CollisionBox[] {
