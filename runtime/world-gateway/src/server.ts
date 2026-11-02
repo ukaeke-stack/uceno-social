@@ -805,7 +805,7 @@ const server = createServer(async (req, res) => {
   res.writeHead(404); res.end();
 });
 const wss = new WebSocketServer({ noServer: true, maxPayload: 16384, perMessageDeflate: false });
-const upgradeIdentity = new WeakMap<WebSocket, { userId: string; worldId: string; token: string; sessionId: string; sessionGeneration: number }>();
+const upgradeIdentity = new WeakMap<WebSocket, { userId: string; worldId: string; token: string; sessionId: string; sessionGeneration: number; clientType: string; isTransfer: boolean }>();
 
 server.on("upgrade", async (req, socket, head) => {
   try {
@@ -836,7 +836,7 @@ server.on("upgrade", async (req, socket, head) => {
     if (!claimed[0]) throw new Error(isTransfer ? "transfer_ticket_invalid_or_used" : "session_lease_unavailable");
     const sessionGeneration = Number(claimed[0].generation);
     wss.handleUpgrade(req, socket, head, (ws) => {
-      upgradeIdentity.set(ws, { ...identity, token, sessionId, sessionGeneration });
+      upgradeIdentity.set(ws, { ...identity, token, sessionId, sessionGeneration, clientType: String(payload.client_type), isTransfer });
       wss.emit("connection", ws, req);
     });
   } catch {
@@ -863,8 +863,14 @@ wss.on("connection", async (socket: WebSocket) => {
       fail(socket, "session_superseded"); return;
     }
     players.set(identity.userId, player);
+    const renewedAccessToken = identity.isTransfer ? await new SignJWT({
+      world_id: identity.worldId, instance_id: INSTANCE_ID, client_type: identity.clientType
+    }).setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuer("uceno-social").setAudience("uceno-world-gateway")
+      .setSubject(identity.userId).setIssuedAt().setExpirationTime("1h").sign(secret) : "";
     send(socket, { type: "welcome", userId: identity.userId, tickRate: TICK_RATE,
       sessionGeneration: player.sessionGeneration, stateVersion: player.stateVersion,
+      accessToken: renewedAccessToken, instanceId: INSTANCE_ID, expiresInSeconds: renewedAccessToken ? 3600 : 0,
       state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
     for (const activity of activitySessions.values()) {
       if (activity.worldId === player.worldId && activity.instanceId === INSTANCE_ID)
