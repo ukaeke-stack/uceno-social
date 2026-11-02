@@ -216,6 +216,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_player_state (
       world_id UUID NOT NULL, user_id UUID NOT NULL, position JSONB, rotation JSONB,
       session_generation BIGINT NOT NULL DEFAULT 0, state_version BIGINT NOT NULL DEFAULT 0,
+      updated_by_session UUID,
       PRIMARY KEY (world_id, user_id)
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".user_avatar_wardrobe_equipped (
@@ -259,7 +260,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
        phase, version, state, created_at, updated_at)
       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race',
        'lobby', 1, $5::jsonb, NOW(), NOW())`,
-      [activityId, worldId, instanceA, userId, JSON.stringify(persistedActivity)]);
+      [activityId, worldId, instanceA, userId, persistedActivity]);
     gatewayA = startGateway(portA, instanceA, scoped.toString());
     gatewayB = startGateway(portB, instanceB, scoped.toString());
     const readyA = await waitForReady(portA, gatewayA);
