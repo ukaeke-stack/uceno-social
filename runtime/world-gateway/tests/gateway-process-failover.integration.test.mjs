@@ -332,6 +332,37 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal(authority[0].state.phase, "active");
       assert.equal(authority[0].state.participants[0].userId, userId);
       assert.equal(authority[0].state.participants[0].checkpointIndex, 2);
+
+      // Simulate a delayed write from the dead host after B has claimed generation 2.
+      // The same conditional upsert used by persistActivity must reject generation 1,
+      // even if the stale host presents a numerically newer activity version.
+      await admin.unsafe(`
+        INSERT INTO "${schema}".virtual_world_activity_sessions
+          (id, world_id, instance_id, host_user_id, host_generation, activity_kind,
+           phase, version, state, created_at)
+        VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race',
+          'active', 999, $5::jsonb, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          host_user_id = EXCLUDED.host_user_id,
+          host_generation = EXCLUDED.host_generation,
+          phase = EXCLUDED.phase, version = EXCLUDED.version, state = EXCLUDED.state
+        WHERE "${schema}".virtual_world_activity_sessions.instance_id = EXCLUDED.instance_id
+          AND "${schema}".virtual_world_activity_sessions.host_generation = EXCLUDED.host_generation
+          AND "${schema}".virtual_world_activity_sessions.version < EXCLUDED.version
+      `, [activityId, worldId, instanceA, userId, JSON.stringify({
+        id: activityId, worldId, instanceId: instanceA, hostUserId: userId,
+        hostGeneration: 1, raceId: null, kind: "checkpoint_race", phase: "active",
+        version: 999, createdAt, startedAt: createdAt + 1000, completedAt: null,
+        maxParticipants: 8, checkpointCount: 2, participants: []
+      })]);
+      const afterStaleWrite = await admin.unsafe(`
+        SELECT instance_id, host_generation, version, state
+        FROM "${schema}".virtual_world_activity_sessions WHERE id = $1::uuid
+      `, [activityId]);
+      assert.equal(afterStaleWrite[0].instance_id, instanceB);
+      assert.equal(Number(afterStaleWrite[0].host_generation), 2);
+      assert.equal(Number(afterStaleWrite[0].version), 8);
+      assert.equal(afterStaleWrite[0].state.instanceId, instanceB);
       replacementSocket.socket.close();
     });
   } catch (error) {
