@@ -22,6 +22,21 @@ function finiteCoordinate(value: unknown, bound: number): value is number {
 }
 
 /** Parse the Unity scene export; no client-supplied registry entries are accepted. */
+/** Load the authoritative scene registry, optionally refusing an empty configuration. */
+export function loadInteractableRegistry(
+  raw: string | undefined,
+  districts: WorldDistrict[],
+  worldBounds: number,
+  required = false
+): Map<string, RegisteredInteractable> {
+  if (!raw || raw.trim().length === 0) {
+    if (required)
+      throw new Error("WORLD_REQUIRE_INTERACTABLE_REGISTRY is enabled but no world interactable registry was provided");
+    return new Map();
+  }
+  return parseInteractableRegistry(raw, districts, worldBounds);
+}
+
 export function parseInteractableRegistry(
   raw: string,
   districts: WorldDistrict[],
