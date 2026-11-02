@@ -85,6 +85,12 @@ namespace UCENO.VirtualWorld
         public string type;
         public string id;
     }
+    [Serializable] internal sealed class GatewayDistrictContentReadyRequest
+    {
+        public string type = "district_content_ready";
+        public string districtId;
+        public string nonce;
+    }
 
     [Serializable] internal sealed class GatewayActivityRequest
     {
@@ -140,6 +146,10 @@ namespace UCENO.VirtualWorld
         public string locationLabel;
         public string homeId;
         public string eventId;
+        public string districtId;
+        public string districtName;
+        public string contentLabel;
+        public string nonce;
         public string objectId;
         public string objectState;
         public string actorId;
@@ -193,6 +203,11 @@ namespace UCENO.VirtualWorld
         private WorldContentDelivery contentDelivery;
         private bool spatialTransitionPending;
         private string spatialTransitionStatus = "";
+        private string pendingDistrictId = "";
+        private string pendingDistrictNonce = "";
+        private string pendingDistrictLabel = "";
+        private string pendingDistrictName = "";
+        private bool districtDownloadRunning;
 
         public string ConnectionStatus { get; private set; } = "WAITING";
         public bool SetVoiceActive(bool active)
@@ -333,11 +348,68 @@ namespace UCENO.VirtualWorld
             float scale = Mathf.Clamp(Screen.width / 900f, 0.75f, 1.25f);
             float width = Mathf.Min(Screen.width - 32f, 520f * scale);
             GUI.Box(new Rect(16f, 16f, width, 54f * scale), spatialTransitionStatus);
+            if (!string.IsNullOrEmpty(pendingDistrictId) && !districtDownloadRunning &&
+                spatialTransitionStatus.StartsWith("Could not load", StringComparison.Ordinal))
+            {
+                if (GUI.Button(new Rect(24f, 48f * scale, 92f * scale, 24f * scale), "RETRY"))
+                    RetryPendingDistrictContent();
+            }
             if (!spatialTransitionPending && (spatialTransitionStatus.StartsWith("Travel cancelled", StringComparison.Ordinal) ||
                 spatialTransitionStatus.StartsWith("Activity join cancelled", StringComparison.Ordinal)))
             {
                 if (GUI.Button(new Rect(24f, 48f * scale, 92f * scale, 24f * scale), "DISMISS"))
                     spatialTransitionStatus = "";
+            }
+        }
+
+        private void BeginDistrictContentDownload()
+        {
+            if (districtDownloadRunning || contentDelivery == null) return;
+            districtDownloadRunning = true;
+            spatialTransitionStatus = "Loading " + pendingDistrictName + " before entering...";
+            string expectedDistrict = pendingDistrictId;
+            string expectedNonce = pendingDistrictNonce;
+            string label = pendingDistrictLabel;
+            contentDelivery.EnsureContent(label, (ok, error) =>
+            {
+                districtDownloadRunning = false;
+                if (pendingDistrictId != expectedDistrict || pendingDistrictNonce != expectedNonce)
+                    return;
+                if (!ok)
+                {
+                    spatialTransitionStatus = "Could not load " + pendingDistrictName +
+                        ". You are held at the district boundary. Tap RETRY when connected. " +
+                        (string.IsNullOrEmpty(error) ? "" : error);
+                    return;
+                }
+                spatialTransitionStatus = pendingDistrictName + " ready. Entering district...";
+                _ = SendDistrictContentReadyAsync(expectedDistrict, expectedNonce);
+            });
+        }
+
+        public bool RetryPendingDistrictContent()
+        {
+            if (string.IsNullOrEmpty(pendingDistrictId) || districtDownloadRunning || !connected)
+                return false;
+            BeginDistrictContentDownload();
+            return districtDownloadRunning;
+        }
+
+        private async Task SendDistrictContentReadyAsync(string districtId, string nonce)
+        {
+            try
+            {
+                if (!connected || socket == null) return;
+                await socket.SendText(JsonUtility.ToJson(new GatewayDistrictContentReadyRequest
+                {
+                    districtId = districtId,
+                    nonce = nonce
+                }));
+            }
+            catch (Exception error)
+            {
+                Debug.LogWarning("UCENO district content acknowledgement failed: " + error.Message);
+                spatialTransitionStatus = "District content is ready but the gateway acknowledgement failed. Reconnect to retry.";
             }
         }
 
@@ -646,6 +718,37 @@ namespace UCENO.VirtualWorld
                     localPlayer.SetServerAuthority(true);
                 }
                 ConnectionStatus = "ONLINE";
+                return;
+            }
+
+            if (packet.type == "district_content_required")
+            {
+                pendingDistrictId = packet.districtId ?? "";
+                pendingDistrictNonce = packet.nonce ?? "";
+                pendingDistrictLabel = packet.contentLabel ?? "";
+                pendingDistrictName = packet.districtName ?? "new district";
+                if (string.IsNullOrWhiteSpace(pendingDistrictId) ||
+                    string.IsNullOrWhiteSpace(pendingDistrictNonce) ||
+                    string.IsNullOrWhiteSpace(pendingDistrictLabel) || contentDelivery == null)
+                {
+                    spatialTransitionStatus = "District content configuration is incomplete. Movement is paused at the district boundary.";
+                    return;
+                }
+                BeginDistrictContentDownload();
+                return;
+            }
+
+            if (packet.type == "district_content_accepted")
+            {
+                if (packet.districtId == pendingDistrictId)
+                {
+                    spatialTransitionStatus = "";
+                    pendingDistrictId = "";
+                    pendingDistrictNonce = "";
+                    pendingDistrictLabel = "";
+                    pendingDistrictName = "";
+                    districtDownloadRunning = false;
+                }
                 return;
             }
 
