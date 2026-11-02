@@ -387,13 +387,13 @@ function activityPayload(session: ActivitySession) {
   };
 }
 
-function persistActivity(session: ActivitySession): void {
+async function persistActivity(session: ActivitySession): Promise<boolean> {
   const hostUserId = activityHosts.get(session.id);
-  if (!hostUserId) return;
+  if (!hostUserId || fencedActivitySessions.has(session.id)) return false;
   const hostGeneration = activityHostGenerations.get(session.id) ?? 1;
   const raceId = activityRaceIds.get(session.id) ?? null;
   const state = serializeActivitySession(session, hostUserId, hostGeneration, raceId);
-  void sql`INSERT INTO virtual_world_activity_sessions
+  return sql`INSERT INTO virtual_world_activity_sessions
     (id, world_id, instance_id, host_user_id, host_generation, race_id, activity_kind,
      phase, version, state, created_at, started_at, completed_at)
     VALUES (${session.id}::uuid, ${session.worldId}::uuid, ${session.instanceId}::uuid,
@@ -430,7 +430,7 @@ function persistActivity(session: ActivitySession): void {
           }
           console.warn("activity_host_authority_revoked", session.id, hostGeneration);
         }
-        return;
+        return false;
       }
       void sql`INSERT INTO virtual_world_realtime_events (world_id, instance_id, event_type, payload)
         VALUES (${session.worldId}::uuid, ${INSTANCE_ID}::uuid, 'activity_state',
@@ -452,8 +452,9 @@ function persistActivity(session: ActivitySession): void {
             placement = EXCLUDED.placement, status = EXCLUDED.status,
             checkpoint_index = EXCLUDED.checkpoint_index, finish_time = EXCLUDED.finish_time`;
       }
+      return true;
     })
-    .catch(error => console.error("activity_persistence_failed", session.id, error));
+    .catch(error => { console.error("activity_persistence_failed", session.id, error); return false; });
 }
 
 async function broadcastActivity(session: ActivitySession) {
