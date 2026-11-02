@@ -322,7 +322,7 @@ namespace UCENO.VirtualWorld
             }
 
             spatialTransitionStatus = "Area content ready. Requesting server admission...";
-            yield return SendSpatialContextAsync(type, id);
+            _ = SendSpatialContextAsync(type, id);
             spatialTransitionStatus = "Travel request sent. Waiting for server admission...";
             spatialTransitionPending = false;
         }
@@ -589,6 +589,7 @@ namespace UCENO.VirtualWorld
 
             if (packet.type == "spatial_location_entered")
             {
+                spatialTransitionStatus = "";
                 if (packet.state != null && localPlayer != null)
                 {
                     Vector3 spawn = new Vector3(packet.state.x, packet.state.y, packet.state.z);
@@ -614,6 +615,7 @@ namespace UCENO.VirtualWorld
 
             if (packet.type == "spatial_location_rejected")
             {
+                spatialTransitionStatus = "The server denied travel. You remain in the current area.";
                 Debug.LogWarning("UCENO spatial location request rejected: " + packet.code);
                 SpatialLocationRejected?.Invoke(packet.code ?? "request_rejected");
                 return;
