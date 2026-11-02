@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, type ActivitySession } from "./activity-session.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
-import { resolveInteraction } from "./interaction-policy.js";
+import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
@@ -874,7 +874,7 @@ wss.on("connection", async (socket: WebSocket) => {
         }
         const distance = Math.hypot(player.x - target.x, player.y - target.y, player.z - target.z);
         const now = Date.now();
-        if (distance > 4.25 || now - player.lastInteractionAt < 250) {
+        if (!isInteractionAllowed(distance, now - player.lastInteractionAt)) {
           send(socket, { type: "interaction_rejected", code: "out_of_range_or_rate_limited" }); return;
         }
         const previousState = target.state;
