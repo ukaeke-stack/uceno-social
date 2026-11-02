@@ -46,7 +46,7 @@ test("stale activity host takeover preserves an active participant checkpoint an
   const end = source.indexOf("function findAccessibleActivity", start);
   const takeover = source.slice(start, end);
   assert.match(takeover, /activity\.phase IN \('lobby', 'active'\)/);
-  assert.match(takeover, /host_generation = activity\.host_generation \+ 1/);
+  assert.match(takeover, /(?:activity\.)?host_generation = activity\.host_generation \+ 1/);
   assert.match(takeover, /version = activity\.version \+ 1/);
   assert.match(takeover, /previous_instance\.heartbeat_at < NOW\(\) - INTERVAL '30 seconds'/);
   assert.match(takeover, /participant->>'userId' = \$\{player\.id\}/);
