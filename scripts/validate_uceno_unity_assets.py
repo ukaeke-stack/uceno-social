@@ -187,7 +187,7 @@ def main():
         fail("Generated home geometry must retain physical colliders.")
     for required in ('"Timber Floor"', '"Back Wall"', '"Left Wall"', '"Right Wall"',
                      '"Front Wall Left"', '"Front Wall Right"', '"Ceiling"',
-                     "box.GetComponent<Collider>()"):
+                     "GameObject.CreatePrimitive(PrimitiveType.Cube)"):
         if required not in interior:
             fail("Generated home interior is missing collision geometry: " + required)
 
