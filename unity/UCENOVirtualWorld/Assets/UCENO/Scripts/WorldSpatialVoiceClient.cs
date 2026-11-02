@@ -214,9 +214,10 @@ namespace UCENO.VirtualWorld
                 if (token == null || string.IsNullOrWhiteSpace(token.token) ||
                     string.IsNullOrWhiteSpace(token.url) || token.peerUserId != userId ||
                     token.identity != ReadUserId() || token.expiresIn <= 0 || token.expiresIn > 60 ||
+                    string.IsNullOrWhiteSpace(token.room) ||
                     !token.room.StartsWith("uceno-pair-", StringComparison.Ordinal) ||
                     !Uri.TryCreate(token.url, UriKind.Absolute, out Uri voiceUri) ||
-                    (voiceUri.Scheme != "wss" && voiceUri.Scheme != "https"))
+                    voiceUri.Scheme != "wss")
                 {
                     status = "VOICE TOKEN INVALID";
                     RemovePeer(userId);
