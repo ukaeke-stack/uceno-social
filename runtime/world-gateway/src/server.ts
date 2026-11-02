@@ -410,14 +410,15 @@ async function persistWorldRelayCursor(eventId: number): Promise<void> {
         AND owner_generation = ${processGeneration}
         AND owner_lease_expires_at > clock_timestamp()
       FOR SHARE`;
-    if (!owner.length) return [];
-    return tx`UPDATE virtual_world_realtime_consumers
+    if (!owner.length) return null;
+    const updated = await tx`UPDATE virtual_world_realtime_consumers
       SET last_event_id = GREATEST(last_event_id, ${eventId}), updated_at = NOW()
       WHERE instance_id = ${INSTANCE_ID}::uuid
       RETURNING last_event_id`;
+    return updated[0] ? Number(updated[0].last_event_id) : null;
   });
-  if (!rows[0]) throw new Error("world_relay_consumer_cursor_missing_or_process_fenced");
-  worldRelayCursor = Number(rows[0].last_event_id);
+  if (rows === null) throw new Error("world_relay_consumer_cursor_missing_or_process_fenced");
+  worldRelayCursor = Number(rows);
   if (!Number.isSafeInteger(worldRelayCursor) || worldRelayCursor < eventId)
     throw new Error("invalid_world_relay_cursor_update");
 }
