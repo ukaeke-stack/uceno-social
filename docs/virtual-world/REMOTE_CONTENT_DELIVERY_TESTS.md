@@ -42,7 +42,7 @@
 - [ ] Attempt to load a fifth distinct resident label with the default cap; confirm the load is rejected without evicting any active area's assets.
 - [ ] Confirm releasing a lease releases the Addressables handle and triggers Unity's unused-asset sweep while preserving the persistent downloaded-bundle cache.
 - [ ] Profile actual resident memory and frame time on a low-memory Android device; the four-label cap is not a substitute for byte-level profiling.
-- [ ] Verify runtime labels contain loadable assets rather than only Addressable scenes; scene streaming requires separate additive scene lifecycle handling.
+- [ ] Verify district labels resolve to Addressable scenes and home/event/activity labels resolve to loadable asset collections; each content type must use its matching lifecycle.
 - [ ] Leave the last configured district or enter a separate home/event context; confirm the gateway notifies Unity and the active district assets are released.
 
 - [ ] Run the Unity editor scene builder with imported source assets and Addressables Settings present; confirm it creates the boot scene plus four additive district scenes.
@@ -54,3 +54,4 @@
 - [ ] Cross district boundaries in both directions; confirm the outgoing scene remains loaded until the incoming scene is active and accepted.
 - [ ] Confirm a failed scene load does not send district_content_ready and the player remains held at the boundary with retry available.
 - [ ] Build Android and WebGL Addressables catalogs separately and verify each uses platform-compatible bundles and matching gateway labels.
+- [ ] Run the canonical `config/world-districts.json` fixture test and confirm all four gateway rectangles and labels match the Unity scene builder partitions.
