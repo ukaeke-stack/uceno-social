@@ -21,9 +21,17 @@ namespace UCENO.VirtualWorld.Editor
         [MenuItem("GameObject/UCENO/Mark Selected as Usable Object", false, 32)]
         private static void MarkObject() => Add(WorldInteractableKind.Object);
 
+        [MenuItem("GameObject/UCENO/Mark Selected as Furniture", false, 33)]
+        private static void MarkFurniture() => Add(WorldInteractableKind.Furniture);
+
+        [MenuItem("GameObject/UCENO/Mark Selected as Vehicle", false, 34)]
+        private static void MarkVehicle() => Add(WorldInteractableKind.Vehicle);
+
         [MenuItem("GameObject/UCENO/Mark Selected as Door", true)]
         [MenuItem("GameObject/UCENO/Mark Selected as Seat", true)]
         [MenuItem("GameObject/UCENO/Mark Selected as Usable Object", true)]
+        [MenuItem("GameObject/UCENO/Mark Selected as Furniture", true)]
+        [MenuItem("GameObject/UCENO/Mark Selected as Vehicle", true)]
         private static bool ValidateSelection() => Selection.activeGameObject != null;
 
         [MenuItem("UCENO/World/Export Current Scene Collision Map", false, 100)]
