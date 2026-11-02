@@ -11,6 +11,7 @@ namespace UCENO.VirtualWorld
         [SerializeField] private PlayerMotor player;
         [SerializeField] private bool showSprintControl = true;
         [SerializeField] private WorldSessionClient worldSession;
+        [SerializeField] private WorldSpatialVoiceClient spatialVoice;
         private string entryCode = "";
         private string connectionMessage = "Paste a one-time world-entry code from UCENO Social.";
 
@@ -22,6 +23,10 @@ namespace UCENO.VirtualWorld
         private AvatarLocomotionDriver avatar;
         private WorldPresenceClient presence;
         private bool sprintToggle;
+        private bool voicePanelOpen;
+        private GUIStyle voicePanelStyle;
+        private GUIStyle voiceButtonStyle;
+        private GUIStyle voiceLabelStyle;
 
         private void Awake()
         {
@@ -30,6 +35,7 @@ namespace UCENO.VirtualWorld
             avatar = GetComponentInChildren<AvatarLocomotionDriver>();
             presence = GetComponentInParent<WorldPresenceClient>();
             if (worldSession == null) worldSession = FindObjectOfType<WorldSessionClient>();
+            if (spatialVoice == null) spatialVoice = FindObjectOfType<WorldSpatialVoiceClient>();
 
             if (Application.isMobilePlatform)
                 Application.targetFrameRate = 60;
@@ -95,6 +101,8 @@ namespace UCENO.VirtualWorld
                 GUI.Label(new Rect(12f, 94f * scale, panelWidth, 28f * scale), network, labelStyle);
             }
 
+            DrawVoiceControls(scale);
+
             if (Application.isMobilePlatform && showSprintControl)
             {
                 if (avatar != null)
@@ -126,6 +134,105 @@ namespace UCENO.VirtualWorld
                 sprintToggle = false;
                 player.SetSprinting(false);
             }
+        }
+
+
+        private void DrawVoiceControls(float scale)
+        {
+            if (spatialVoice == null || worldSession == null || !worldSession.IsAuthenticated) return;
+            EnsureVoiceStyles();
+            float width = Mathf.Min(Screen.width - 24f, 310f * scale);
+            float x = Screen.width - width - 12f;
+            float y = 94f * scale;
+            float rowHeight = 38f * scale;
+            Rect toggleRect = new Rect(x, y, width, 42f * scale);
+            string toggleText = spatialVoice.VoiceEnabled
+                ? "VOICE ON  •  " + spatialVoice.ConnectedPeerCount + " nearby"
+                : "VOICE OFF  •  TAP TO JOIN";
+            if (GUI.Button(toggleRect, toggleText, voiceButtonStyle))
+                voicePanelOpen = !voicePanelOpen;
+            if (!voicePanelOpen) return;
+
+            float innerWidth = width - 16f * scale;
+            float left = x + 8f * scale;
+            float panelHeight = (spatialVoice.VoiceEnabled ? 6f : 2f) * rowHeight + 12f * scale;
+            Rect panel = new Rect(x, y + 46f * scale, width, panelHeight);
+            GUI.Box(panel, GUIContent.none, voicePanelStyle);
+            float currentY = panel.y + 6f * scale;
+            GUI.Label(new Rect(left, currentY, innerWidth, rowHeight), spatialVoice.Status, voiceLabelStyle);
+            currentY += rowHeight;
+
+            if (!spatialVoice.VoiceEnabled)
+            {
+                if (GUI.Button(new Rect(left, currentY, innerWidth, rowHeight), "ENABLE PROXIMITY VOICE"))
+                    spatialVoice.EnableVoice();
+                return;
+            }
+
+            float half = (innerWidth - 6f * scale) * 0.5f;
+            if (GUI.Button(new Rect(left, currentY, half, rowHeight),
+                spatialVoice.IsMuted ? "MIC MUTED" : "MIC LIVE"))
+                spatialVoice.SetLocalMuted(!spatialVoice.IsMuted);
+            if (GUI.Button(new Rect(left + half + 6f * scale, currentY, half, rowHeight),
+                spatialVoice.PushToTalkMode ? "PTT: ON" : "OPEN MIC"))
+                spatialVoice.SetPushToTalkMode(!spatialVoice.PushToTalkMode);
+            currentY += rowHeight + 3f * scale;
+
+            if (spatialVoice.PushToTalkMode)
+            {
+                Rect talk = new Rect(left, currentY, innerWidth, rowHeight);
+                GUI.Box(talk, "HOLD TO TALK", voiceButtonStyle);
+                Event e = Event.current;
+                if (e.type == EventType.MouseDown && talk.Contains(e.mousePosition))
+                {
+                    spatialVoice.SetPushToTalkHeld(true);
+                    e.Use();
+                }
+                else if (e.type == EventType.MouseUp)
+                {
+                    spatialVoice.SetPushToTalkHeld(false);
+                    e.Use();
+                }
+                currentY += rowHeight + 3f * scale;
+            }
+
+            string route = spatialVoice.AudioRoute.ToUpperInvariant();
+            if (GUI.Button(new Rect(left, currentY, innerWidth, rowHeight),
+                "OUTPUT: " + route + " (TAP TO CYCLE)"))
+            {
+                string next = route == "SPEAKER" ? "earpiece" :
+                    route == "EARPIECE" ? "bluetooth" : "speaker";
+                spatialVoice.SetAudioRoute(next);
+            }
+            currentY += rowHeight + 3f * scale;
+            if (GUI.Button(new Rect(left, currentY, innerWidth, rowHeight),
+                spatialVoice.SpeakerEnabled ? "REMOTE AUDIO: ON" : "REMOTE AUDIO: MUTED"))
+                spatialVoice.SetSpeakerEnabled(!spatialVoice.SpeakerEnabled);
+            currentY += rowHeight + 3f * scale;
+            if (GUI.Button(new Rect(left, currentY, innerWidth, rowHeight), "LEAVE VOICE"))
+                spatialVoice.DisableVoice();
+        }
+
+        private void EnsureVoiceStyles()
+        {
+            if (voicePanelStyle != null) return;
+            voicePanelStyle = new GUIStyle(GUI.skin.box)
+            {
+                alignment = TextAnchor.UpperLeft,
+                normal = { background = Texture2D.whiteTexture }
+            };
+            voiceButtonStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = Mathf.Max(12, Screen.width / 48),
+                fontStyle = FontStyle.Bold,
+                wordWrap = true
+            };
+            voiceLabelStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = Mathf.Max(11, Screen.width / 58),
+                normal = { textColor = Color.white },
+                wordWrap = true
+            };
         }
 
         public static bool IsPointerOnSprintControl(Vector2 screenPosition)
