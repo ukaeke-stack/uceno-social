@@ -57,6 +57,7 @@ namespace UCENO.VirtualWorld
         private bool localMuted = true;
         private bool speakerEnabled = true;
         private bool appPaused;
+        private bool voicePresenceRequested;
         private string status = "VOICE OFF";
 
         public bool VoiceEnabled => voiceEnabled;
@@ -94,7 +95,7 @@ namespace UCENO.VirtualWorld
             voiceEnabled = true;
             localMuted = false;
             pushToTalkHeld = false;
-            gateway.SetVoiceActive(true);
+            voicePresenceRequested = gateway.SetVoiceActive(true);
             status = "VOICE READY — HOLD TO TALK";
         }
 
@@ -104,6 +105,7 @@ namespace UCENO.VirtualWorld
             pushToTalkHeld = false;
             localMuted = true;
             if (gateway != null) gateway.SetVoiceActive(false);
+            voicePresenceRequested = false;
             StopAllPeerRooms();
             status = "VOICE OFF";
         }
@@ -211,7 +213,10 @@ namespace UCENO.VirtualWorld
                 SpatialVoiceTokenResponse token = JsonUtility.FromJson<SpatialVoiceTokenResponse>(request.downloadHandler.text);
                 if (token == null || string.IsNullOrWhiteSpace(token.token) ||
                     string.IsNullOrWhiteSpace(token.url) || token.peerUserId != userId ||
-                    token.identity != ReadUserId())
+                    token.identity != ReadUserId() || token.expiresIn <= 0 || token.expiresIn > 60 ||
+                    !token.room.StartsWith("uceno-pair-", StringComparison.Ordinal) ||
+                    !Uri.TryCreate(token.url, UriKind.Absolute, out Uri voiceUri) ||
+                    (voiceUri.Scheme != "wss" && voiceUri.Scheme != "https"))
                 {
                     status = "VOICE TOKEN INVALID";
                     RemovePeer(userId);
@@ -348,6 +353,18 @@ namespace UCENO.VirtualWorld
             catch { return ""; }
         }
 
+        private void Update()
+        {
+            if (!voiceEnabled || appPaused || gateway == null) return;
+            if (gateway.ConnectionStatus != "ONLINE")
+            {
+                voicePresenceRequested = false;
+                return;
+            }
+            if (!voicePresenceRequested)
+                voicePresenceRequested = gateway.SetVoiceActive(true);
+        }
+
         private void OnApplicationPause(bool paused)
         {
             appPaused = paused;
@@ -356,11 +373,12 @@ namespace UCENO.VirtualWorld
                 pushToTalkHeld = false;
                 StopAllPeerRooms();
                 if (gateway != null) gateway.SetVoiceActive(false);
+                voicePresenceRequested = false;
                 status = "VOICE PAUSED IN BACKGROUND";
             }
             else if (voiceEnabled)
             {
-                if (gateway != null) gateway.SetVoiceActive(true);
+                voicePresenceRequested = gateway != null && gateway.SetVoiceActive(true);
                 status = "VOICE RECONNECTING";
             }
         }
