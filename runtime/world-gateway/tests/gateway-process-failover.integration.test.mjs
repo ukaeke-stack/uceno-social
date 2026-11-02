@@ -163,6 +163,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
   const portB = await freePort();
   const worldId = randomUUID();
   const userId = randomUUID();
+  const activityId = randomUUID();
+  const createdAt = Date.now();
   let gatewayA;
   let gatewayB;
 
@@ -244,6 +246,18 @@ test("two real gateway processes: primary loss leaves the replacement process re
       (world_id, user_id, instance_id, lease_expires_at)
       VALUES ($1::uuid, $2::uuid, $3::uuid, NOW() + INTERVAL '5 minutes')`,
       [worldId, userId, instanceB]);
+    const persistedActivity = {
+      id: activityId, worldId, instanceId: instanceA, hostUserId: userId,
+      hostGeneration: 1, raceId: null, kind: "checkpoint_race", phase: "lobby",
+      version: 1, createdAt, startedAt: null, completedAt: null,
+      maxParticipants: 8, checkpointCount: 2, participants: []
+    };
+    await admin.unsafe(`INSERT INTO "${schema}".virtual_world_activity_sessions
+      (id, world_id, instance_id, host_user_id, host_generation, activity_kind,
+       phase, version, state, created_at, updated_at)
+      VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race',
+       'lobby', 1, $5::jsonb, NOW(), NOW())`,
+      [activityId, worldId, instanceA, userId, JSON.stringify(persistedActivity)]);
     gatewayA = startGateway(portA, instanceA, scoped.toString());
     gatewayB = startGateway(portB, instanceB, scoped.toString());
     const readyA = await waitForReady(portA, gatewayA);
@@ -290,6 +304,20 @@ test("two real gateway processes: primary loss leaves the replacement process re
         FROM "${schema}".virtual_world_instances WHERE id = $1::uuid`, [instanceA]);
       assert.equal(stale[0].stale, true);
       assert.equal((await waitForReady(portB, gatewayB)).instanceId, instanceB);
+      const replacementSocket = await connectAuthenticated(portB, instanceB, worldId, userId);
+      replacementSocket.socket.send(JSON.stringify({ type: "activity_join", id: activityId }));
+      const recovered = await receiveSocketMessage(replacementSocket.socket, "activity_host_recovered");
+      assert.equal(recovered.sessionId, activityId);
+      assert.equal(recovered.hostGeneration, 2);
+      const authority = await admin.unsafe(`SELECT instance_id, host_user_id, host_generation, version, state
+        FROM "${schema}".virtual_world_activity_sessions WHERE id = $1::uuid`, [activityId]);
+      assert.equal(authority[0].instance_id, instanceB);
+      assert.equal(authority[0].host_user_id, userId);
+      assert.equal(Number(authority[0].host_generation), 2);
+      assert.equal(Number(authority[0].version), 2);
+      assert.equal(authority[0].state.instanceId, instanceB);
+      assert.equal(Number(authority[0].state.hostGeneration), 2);
+      replacementSocket.socket.close();
     });
   } catch (error) {
     const logs = [gatewayA?.testOutput?.(), gatewayB?.testOutput?.()].filter(Boolean).join("\n--- gateway ---\n");
