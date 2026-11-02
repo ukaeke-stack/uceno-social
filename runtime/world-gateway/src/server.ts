@@ -465,7 +465,7 @@ async function restorePersistedActivities(): Promise<void> {
  * heartbeat. The row version and host generation advance together, so only
  * one healthy instance can become the replacement host.
  */
-async function tryTakeoverStaleLobby(sessionId: string, player: Player): Promise<ActivitySession | null> {
+async function tryTakeoverStaleActivity(sessionId: string, player: Player): Promise<ActivitySession | null> {
   if (activitySessions.has(sessionId) || !/^[0-9a-f-]{36}$/i.test(sessionId)) return null;
   const rows = await sql`UPDATE virtual_world_activity_sessions AS activity
     SET instance_id = ${INSTANCE_ID}::uuid,
@@ -484,7 +484,12 @@ async function tryTakeoverStaleLobby(sessionId: string, player: Player): Promise
     WHERE activity.id = ${sessionId}::uuid
       AND activity.world_id = ${player.worldId}::uuid
       AND activity.instance_id = previous_instance.id
-      AND activity.phase = 'lobby'
+      AND activity.phase IN ('lobby', 'active')
+      AND (activity.phase = 'lobby' OR EXISTS (
+        SELECT 1 FROM jsonb_array_elements(activity.state->'participants') participant
+        WHERE participant->>'userId' = ${player.id} 
+          AND participant->>'status' = 'joined'
+      ))
       AND (previous_instance.status <> 'ready'
         OR previous_instance.heartbeat_at IS NULL
         OR previous_instance.heartbeat_at < NOW() - INTERVAL '30 seconds')
@@ -1083,7 +1088,7 @@ wss.on("connection", async (socket: WebSocket) => {
         let session = findAccessibleActivity(msg.id, player);
         if (!session && typeof msg.id === "string" && /^[0-9a-f-]{36}$/i.test(msg.id)) {
           try {
-            session = await tryTakeoverStaleLobby(msg.id, player);
+            session = await tryTakeoverStaleActivity(msg.id, player);
             if (session) {
               broadcastActivity(session);
               send(socket, { type: "activity_host_recovered", sessionId: session.id,
