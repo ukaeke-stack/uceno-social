@@ -1,6 +1,6 @@
 # UCENO spatial voice — Android device verification
 
-Status: test plan only. No physical-device run is claimed.
+Status: test plan only. No physical-device run is claimed. Native Android audio routing is source-implemented but has not been compiled or exercised.
 
 ## Preconditions
 
@@ -22,9 +22,9 @@ Status: test plan only. No physical-device run is claimed.
 | Permission denied | Enable voice, deny microphone permission | World remains usable; no publication; voice reports permission required |
 | Pair authorization | Both devices opt in in same context within 24 m | Each client obtains a short-lived token for the other account's pair room |
 | Spatial audio | Speak while moving apart | Remote audio is 3D-positioned at avatar head; level falls with distance and is inaudible beyond 24 m |
-| Push-to-talk | Hold then release PTT | Audio transmits only while held; release stops publication/capture |
+| Push-to-talk | Hold then release PTT | Audio transmits only while held; release mutes the live microphone track without restarting capture |
 | Local mute | Mute during transmission | Remote side stops receiving speech; unmute restores only according to PTT state |
-| Speaker output | Toggle output off/on | Remote audio is silenced/restored without enabling microphone |
+| Output mute | Toggle remote output mute off/on | Remote audio is silenced/restored without enabling microphone or muting world audio |\n| Speaker route | Select Speaker while voice is active | Android communication output switches to loudspeaker; world audio and microphone remain independently controlled |\n| Earpiece route | Select Earpiece while voice is active | Remote voice routes to the phone earpiece when the device exposes it |\n| Bluetooth route | Connect a headset, grant BLUETOOTH_CONNECT, select Bluetooth | Remote voice routes to the selected BLE/classic communication headset; denied permission or absent device reports unavailable |\n| Route cleanup | Disable voice or background the app | Communication-device override is cleared; foreground voice rejoin restores the selected route when available |
 | Context separation | Put one participant in a different home/event context | Pair is revoked; no media is delivered across contexts |
 | Range revocation | Move one participant beyond 24 m | Gateway withdraws voice presence and deletes pair room; client disconnects pair room |
 | Block revocation | Block either participant | Gateway withdraws pair authorization; client removes peer audio and cannot rejoin |
