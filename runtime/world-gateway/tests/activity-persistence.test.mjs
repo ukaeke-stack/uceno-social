@@ -22,3 +22,32 @@ test("rejects malformed persisted state and stale versions", () => {
   assert.equal(shouldApplyPersistedActivityVersion(4, 5), true);
   assert.equal(shouldApplyPersistedActivityVersion(4, 3), false);
 });
+
+test("rejects impossible activity phase timestamps and invalid checkpoint bounds", () => {
+  const base = {
+    id: "persist-race-02", worldId: world, instanceId: "inst-a",
+    hostUserId: "host-user", hostGeneration: 1, raceId: null,
+    kind: "checkpoint_race", phase: "active", version: 3,
+    createdAt: 100, startedAt: 110, completedAt: null,
+    maxParticipants: 8, checkpointCount: 3,
+    participants: [{
+      userId: "participant-1", joinedAt: 105, lastActionAt: 110,
+      checkpointIndex: 1, finishTime: null, status: "joined"
+    }]
+  };
+  assert.ok(restoreActivitySession(base));
+  assert.equal(restoreActivitySession({ ...base, startedAt: 90 }), null);
+  assert.equal(restoreActivitySession({ ...base, phase: "lobby", startedAt: 110 }), null);
+  assert.equal(restoreActivitySession({ ...base, phase: "completed", completedAt: null }), null);
+  assert.equal(restoreActivitySession({
+    ...base, participants: [{ ...base.participants[0], checkpointIndex: 4 }]
+  }), null);
+  assert.equal(restoreActivitySession({
+    ...base, participants: [{ ...base.participants[0], status: "finished", finishTime: null }]
+  }), null);
+  assert.equal(restoreActivitySession({
+    ...base, participants: [{ ...base.participants[0], status: "left", finishTime: 120 }]
+  }), null);
+  assert.equal(restoreActivitySession({ ...base, maxParticipants: 65 }), null);
+  assert.equal(restoreActivitySession({ ...base, checkpointCount: 101 }), null);
+});
