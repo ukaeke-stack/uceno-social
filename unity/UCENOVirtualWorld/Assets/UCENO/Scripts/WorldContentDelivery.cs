@@ -19,6 +19,7 @@ namespace UCENO.VirtualWorld
         [SerializeField] private string[] preloadLabels = Array.Empty<string>();
         [SerializeField, Min(1)] private int maxAttempts = 3;
         [SerializeField, Min(0.25f)] private float retryDelaySeconds = 2f;
+        [SerializeField, Min(1)] private int maxConcurrentResidentLabels = 4;
 
         public event Action<string, float> ProgressChanged;
         public event Action<string> StatusChanged;
@@ -86,12 +87,19 @@ namespace UCENO.VirtualWorld
                 yield break;
             }
 
+            if (residentHandles.Count >= Mathf.Max(1, maxConcurrentResidentLabels))
+            {
+                completed?.Invoke(false, "The active world-content memory limit has been reached. Leave another area before loading this one.");
+                ContentFailed?.Invoke(label);
+                yield break;
+            }
+
             residencyLoads.Add(label);
             AsyncOperationHandle<IList<UnityEngine.Object>> load =
                 Addressables.LoadAssetsAsync<UnityEngine.Object>(label, null);
             yield return load;
             residencyLoads.Remove(label);
-            if (load.Status != AsyncOperationStatus.Succeeded)
+            if (load.Status != AsyncOperationStatus.Succeeded || load.Result == null || load.Result.Count == 0)
             {
                 Addressables.Release(load);
                 completed?.Invoke(false, "Downloaded content could not be loaded into memory.");
