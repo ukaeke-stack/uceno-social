@@ -176,6 +176,22 @@ def main():
     if "GUI.Button" not in hud or "Position:" not in hud or '"JUMP"' not in hud or '"RUN"' not in hud or '"WAVE"' not in hud or '"CHEER"' not in hud:
         fail("World status HUD, mobile jump control, or sprint control is missing.")
 
+    interior = read_text(ASSETS / "Scripts/WorldHomeInteriorBuilder.cs")
+    if "Object.Destroy(collider)" in interior:
+        fail("Generated home geometry must retain physical colliders.")
+    for required in ('"Timber Floor"', '"Back Wall"', '"Left Wall"', '"Right Wall"',
+                     '"Front Wall Left"', '"Front Wall Right"', '"Ceiling"',
+                     "box.GetComponent<Collider>()"):
+        if required not in interior:
+            fail("Generated home interior is missing collision geometry: " + required)
+
+    gateway_server = read_text(Path("runtime/world-gateway/src/server.ts"))
+    for required in ("Math.max(-5.45, Math.min(5.45, localX))",
+                     "Math.max(-4.45, Math.min(4.45, localZ))",
+                     "Residential interiors are a server-owned 12 x 10 metre room."):
+        if required not in gateway_server:
+            fail("Server-authoritative home collision bounds are missing: " + required)
+
     home_client = read_text(ASSETS / "Scripts/WorldHomeClient.cs")
     for required in ("RequestHomes", "CreateHomeRoutine", "LoadHomeRoutine",
                      "SaveHomeRoutine", "PlaceFurniture", "MoveSelectedFurniture", "WithinHomeBounds", "RotateSelectedFurniture", "RemoveSelectedFurniture", "CanEditSelectedHome",
