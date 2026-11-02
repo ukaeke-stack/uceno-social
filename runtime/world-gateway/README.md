@@ -29,7 +29,7 @@ Standalone WebSocket runtime for an already-provisioned UCENO world instance.
 - `WORLD_INSTANCE_CAPACITY` (optional, default 64; keep consistent with DB capacity)
 - `WORLD_BOUNDS` (optional, default 10000 world units)
 - `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (optional until spatial voice is provisioned; server-only credentials for pair-scoped audio rooms)
-- `WORLD_COLLISION_BOXES` (optional JSON array of up to 500 static axis-aligned boxes; each box has numeric `minX`, `maxX`, `minY`, `maxY`, `minZ`, `maxZ` world coordinates)\n- `WORLD_DISTRICTS` or `WORLD_DISTRICTS_FILE` (optional operator-authored district rectangles; each district has a unique `id`, display `name`, Addressables `contentLabel`, and `minX`, `maxX`, `minZ`, `maxZ`)
+- `WORLD_COLLISION_BOXES` (optional JSON array of up to 500 static axis-aligned boxes; each box has numeric `minX`, `maxX`, `minY`, `maxY`, `minZ`, `maxZ` world coordinates)\n- `WORLD_DISTRICT_MAP_MANIFEST_FILE` (optional path to the Unity-generated district collision manifest; requires `WORLD_DISTRICTS` / `WORLD_DISTRICTS_FILE` to match exactly)\n- `WORLD_DISTRICTS` or `WORLD_DISTRICTS_FILE` (optional operator-authored district rectangles; each district has a unique `id`, display `name`, Addressables `contentLabel`, and `minX`, `maxX`, `minZ`, `maxZ`)
 
 Build with `npm install && npm run build`; run with `npm start`. The Dockerfile
 builds and runs the service as a non-root user.
@@ -57,6 +57,32 @@ scene in the `UCENO Remote District Scenes` Addressables group, uses the
 content label as the scene address, and packs each district separately. The
 example rectangles above match those generated scene partitions. The base
 boot scene retains shared road/terrain, player, camera and session systems.
+
+### District-specific collision maps
+
+The Unity Editor command **UCENO → World → Export Loaded District Maps** generates
+`runtime/world-gateway/data/districts/manifest.json` and one JSON collision map
+per district. After loading and validating every district scene, export those
+files and deploy the manifest and all referenced map files together.
+
+Set `WORLD_DISTRICT_MAP_MANIFEST_FILE` to the absolute path of the deployed
+manifest. The gateway validates at startup that every configured district
+appears exactly once, labels and X/Z boundaries match `WORLD_DISTRICTS`, map
+filenames cannot escape the manifest directory, and each map contains 1–500
+valid collision boxes.
+
+When a player enters a district, the gateway switches that player's authoritative
+X/Z collision queries to that district's map only after the server accepts the
+district content handshake. On leaving all configured districts, it falls back
+to the legacy global map. Keep the global map configured for shared/base-world
+geometry and gaps between district rectangles.
+
+This setting is optional for backward compatibility. If omitted, the gateway
+continues using the legacy global collision map. Do not enable the manifest
+until all district scenes have been exported and deployed together; missing,
+stale or mismatched files intentionally prevent gateway startup. Persistent
+object state remains keyed by world, district and object ID independently of
+collision-map selection.
 
 At a district boundary, the authoritative simulation pauses the player's
 horizontal movement and sends `district_content_required` with the server-chosen
