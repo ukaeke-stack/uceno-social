@@ -605,8 +605,8 @@ async function tryTakeoverStaleActivity(sessionId: string, player: Player): Prom
         AND owner_generation = ${processGeneration}
         AND owner_lease_expires_at > clock_timestamp()
       FOR SHARE`;
-    if (!owner.length) return [];
-    return tx`UPDATE virtual_world_activity_sessions AS activity
+    if (!owner.length) return null;
+    const updated = await tx`UPDATE virtual_world_activity_sessions AS activity
     SET instance_id = ${INSTANCE_ID}::uuid,
         host_user_id = ${player.id}::uuid,
         host_generation = activity.host_generation + 1,
@@ -640,9 +640,10 @@ async function tryTakeoverStaleActivity(sessionId: string, player: Player): Prom
         OR previous_instance.heartbeat_at IS NULL
         OR previous_instance.heartbeat_at < NOW() - INTERVAL '30 seconds')
     RETURNING activity.state`;
+    return updated[0]?.state ?? null;
   });
-  if (!rows[0]) return null;
-  const restored = restoreActivitySession(rows[0].state);
+  if (!rows) return null;
+  const restored = restoreActivitySession(rows);
   if (!restored || restored.session.instanceId !== INSTANCE_ID ||
       restored.hostUserId !== player.id) {
     console.error("activity_takeover_returned_invalid_state", sessionId);
