@@ -487,7 +487,12 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
       assert.equal(restoredByReplacement[0].instanceId, ids.newA);
       assert.equal(Number(restoredByReplacement[0].hostGeneration), 2);
       assert.equal(Number(restoredByReplacement[0].version), 2);
-      assert.equal(restoredByReplacement[0].state.participants[0].userId, ids.guest);
+      const restoredState = typeof restoredByReplacement[0].state === "string"
+        ? JSON.parse(restoredByReplacement[0].state)
+        : restoredByReplacement[0].state;
+      assert.deepEqual(restoredState?.participants, [
+        { userId: ids.guest, status: "joined" }
+      ]);
       assert.equal(incorrectlyRestoredByOld.length, 0);
     });
 
