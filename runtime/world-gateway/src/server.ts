@@ -688,6 +688,38 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
 
 const server = createServer(async (req, res) => {
   const headers = { "content-type": "application/json", "cache-control": "no-store" };
+  if (req.url === "/activity/transfer-ticket" && req.method === "POST") {
+    try {
+      const authorization = req.headers.authorization || "";
+      if (!authorization.startsWith("Bearer ")) throw new Error("unauthorized");
+      const identity = await authenticate(authorization.slice(7));
+      const chunks: Buffer[] = [];
+      let bodySize = 0;
+      for await (const chunk of req) {
+        const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        bodySize += bytes.length;
+        if (bodySize > 4096) throw new Error("invalid_request");
+        chunks.push(bytes);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { sessionId?: unknown };
+      if (typeof body.sessionId !== "string" || !/^[0-9a-f-]{36}$/i.test(body.sessionId)) throw new Error("invalid_request");
+      const player = players.get(identity.userId);
+      if (!player || player.worldId !== identity.worldId || player.socket.readyState !== WebSocket.OPEN || player.homeId || player.eventId || player.returnState) throw new Error("player_not_transferable");
+      const target = await sql`SELECT activity.instance_id AS "instanceId", instance.endpoint FROM virtual_world_activity_sessions activity JOIN virtual_world_instances instance ON instance.id = activity.instance_id WHERE activity.id = ${body.sessionId}::uuid AND activity.world_id = ${identity.worldId}::uuid AND activity.phase = 'lobby' AND instance.status = 'ready' AND instance.endpoint IS NOT NULL AND instance.heartbeat_at > NOW() - INTERVAL '30 seconds' AND activity.instance_id <> ${INSTANCE_ID}::uuid LIMIT 1`;
+      if (!target[0] || typeof target[0].endpoint !== "string") throw new Error("activity_target_unavailable");
+      const jti = randomUUID();
+      await sql`INSERT INTO virtual_world_activity_transfer_tickets (id, world_id, user_id, activity_session_id, source_instance_id, target_instance_id, expires_at, created_at) VALUES (${jti}::uuid, ${identity.worldId}::uuid, ${identity.userId}::uuid, ${body.sessionId}::uuid, ${INSTANCE_ID}::uuid, ${target[0].instanceId}::uuid, NOW() + INTERVAL '30 seconds', NOW())`;
+      const ticket = await new SignJWT({ world_id: identity.worldId, instance_id: target[0].instanceId, target_instance_id: target[0].instanceId, client_type: "unity-android", scope: "activity-transfer", transfer_session_id: body.sessionId }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setIssuer("uceno-social").setAudience("uceno-world-gateway").setSubject(identity.userId).setJti(jti).setIssuedAt().setExpirationTime("30s").sign(secret);
+      res.writeHead(200, headers);
+      res.end(JSON.stringify({ ticket, endpoint: target[0].endpoint, instanceId: target[0].instanceId, sessionId: body.sessionId, expiresInSeconds: 30 }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      const status = message === "unauthorized" ? 401 : message === "invalid_request" ? 400 : message === "player_not_transferable" ? 403 : message === "activity_target_unavailable" ? 409 : 503;
+      res.writeHead(status, headers);
+      res.end(JSON.stringify({ error: ["unauthorized", "invalid_request", "player_not_transferable", "activity_target_unavailable"].includes(message) ? message : "transfer_ticket_unavailable" }));
+    }
+    return;
+  }
   if (req.url?.startsWith("/voice/token?")) {
     try {
       if (!livekitRooms || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
