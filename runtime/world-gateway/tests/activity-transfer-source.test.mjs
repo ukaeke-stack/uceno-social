@@ -78,5 +78,6 @@ test("stale activity host cannot persist or relay after generation takeover", ()
   const relayStart = source.indexOf("let worldRelayPollInProgress");
   const relay = source.slice(relayStart);
   assert.match(relay, /host_generation = \$\{payload\.session\.hostGeneration\}/);
-  assert.match(relay, /if \(!authority\[0\]\) continue/);
+  assert.match(relay, /if \(!authority\[0\]\) return/);
+  assert.match(relay, /host_generation = \\$\{payload\.session\.hostGeneration\}[\\s\\S]*FOR UPDATE/);
 });
