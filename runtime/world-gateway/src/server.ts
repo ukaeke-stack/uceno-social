@@ -521,6 +521,13 @@ async function tryTakeoverStaleActivity(sessionId: string, player: Player): Prom
     WHERE activity.id = ${sessionId}::uuid
       AND activity.world_id = ${player.worldId}::uuid
       AND activity.instance_id = previous_instance.id
+      AND EXISTS (
+        SELECT 1 FROM virtual_world_instances replacement_instance
+        WHERE replacement_instance.id = ${INSTANCE_ID}::uuid
+          AND replacement_instance.status = 'ready'
+          AND replacement_instance.endpoint IS NOT NULL
+          AND replacement_instance.heartbeat_at > NOW() - INTERVAL '30 seconds'
+      )
       AND activity.phase IN ('lobby', 'active')
       AND (activity.phase = 'lobby' OR EXISTS (
         SELECT 1 FROM jsonb_array_elements(activity.state->'participants') participant
