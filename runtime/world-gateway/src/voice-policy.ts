@@ -14,3 +14,19 @@ export function isValidVoiceSignal(kind: unknown, sdp: unknown, candidate: unkno
   if (kind === "candidate") return typeof candidate === "string" && candidate.length > 0 && candidate.length <= 2048;
   return false;
 }
+/**
+ * Pair discovery uses a smaller entry radius and a larger retention radius.
+ * This prevents a pair at the edge of coverage from repeatedly joining and
+ * destroying a LiveKit room as position samples fluctuate.
+ */
+export function isWithinVoiceRangeWithHysteresis(
+  a: VoicePeerScope,
+  b: VoicePeerScope,
+  alreadyVisible: boolean,
+  enterDistance = 22,
+  exitDistance = 26
+): boolean {
+  if (!Number.isFinite(enterDistance) || !Number.isFinite(exitDistance) ||
+      enterDistance <= 0 || exitDistance < enterDistance) return false;
+  return isWithinVoiceRange(a, b, alreadyVisible ? exitDistance : enterDistance);
+}
