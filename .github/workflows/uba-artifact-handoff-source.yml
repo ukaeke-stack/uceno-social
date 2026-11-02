@@ -33,7 +33,7 @@ jobs:
           const docs = fs.readFileSync('docs/virtual-world/UNITY_BUILD_AUTOMATION_ARTIFACT_HANDOFF.md', 'utf8');
           const required = [
             'ORG_ID', 'PROJECT_ID', 'BUILD_TARGET', 'UCB_BUILD_NUMBER',
-            'UCENO_UBA_API_KEY', 'world-interactables.json',
+            'UCENO_UBA_SERVICE_ACCOUNT_KEY_ID', 'UCENO_UBA_SERVICE_ACCOUNT_SECRET', 'world-interactables.json',
             'world-interactables.json.sha256', 'Tus-Resumable: 1.0.0',
             'application/offset+octet-stream', 'primary": false', 'public": false'
           ];
