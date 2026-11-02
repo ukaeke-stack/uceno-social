@@ -1467,8 +1467,8 @@ setInterval(async () => {
       }
       for (const [worldId, worldPlayers] of byWorld) {
         void sql`INSERT INTO virtual_world_realtime_events (world_id, instance_id, event_type, payload)
-          VALUES (\${worldId}::uuid, \${INSTANCE_ID}::uuid, 'player_snapshot',
-            \${JSON.stringify({ serverTime: now, players: worldPlayers })}::jsonb)`
+          VALUES (${worldId}::uuid, ${INSTANCE_ID}::uuid, 'player_snapshot',
+            ${JSON.stringify({ serverTime: now, players: worldPlayers })}::jsonb)`
           .catch(error => console.error('world_snapshot_relay_publish_failed', error));
       }
     }
@@ -1480,8 +1480,8 @@ setInterval(async () => {
   if (!worldRelayCursorReady || worldRelayPollInProgress) return;
   worldRelayPollInProgress = true;
   try {
-    const rows = await sql`SELECT id, world_id AS \"worldId\", instance_id AS \"instanceId\", event_type AS \"eventType\", payload
-      FROM virtual_world_realtime_events WHERE id > \${worldRelayCursor} ORDER BY id ASC LIMIT \${WORLD_RELAY_BATCH_SIZE}`;
+    const rows = await sql`SELECT id, world_id AS "worldId", instance_id AS "instanceId", event_type AS "eventType", payload
+      FROM virtual_world_realtime_events WHERE id > ${worldRelayCursor} ORDER BY id ASC LIMIT ${WORLD_RELAY_BATCH_SIZE}`;
     for (const row of rows) {
       const eventId = Number(row.id);
       if (Number.isSafeInteger(eventId) && eventId > worldRelayCursor) worldRelayCursor = eventId;
