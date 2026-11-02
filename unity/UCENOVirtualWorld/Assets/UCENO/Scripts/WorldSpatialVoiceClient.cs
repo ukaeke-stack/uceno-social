@@ -59,6 +59,8 @@ namespace UCENO.VirtualWorld
         private string audioRoute = "speaker";
         private bool appPaused;
         private bool voicePresenceRequested;
+        private float nextPresenceRetryAt;
+        private readonly HashSet<string> peerConnectInProgress = new HashSet<string>();
         private string status = "VOICE OFF";
 
         public bool VoiceEnabled => voiceEnabled;
@@ -235,9 +237,26 @@ namespace UCENO.VirtualWorld
             if (!voiceEnabled || appPaused || string.IsNullOrWhiteSpace(userId)) return;
             if (active)
             {
-                if (!peers.ContainsKey(userId)) StartCoroutine(ConnectPeer(userId));
+                if (!peers.ContainsKey(userId)) StartCoroutine(ConnectPeerWithRetry(userId));
             }
             else RemovePeer(userId);
+        }
+
+        private IEnumerator ConnectPeerWithRetry(string userId)
+        {
+            if (!peerConnectInProgress.Add(userId)) yield break;
+            int attempts = 0;
+            while (voiceEnabled && !appPaused && gateway != null &&
+                gateway.ConnectionStatus == "ONLINE" && !peers.ContainsKey(userId) && attempts < 5)
+            {
+                attempts++;
+                yield return StartCoroutine(ConnectPeer(userId));
+                if (peers.TryGetValue(userId, out PeerAudio connectedPeer) && connectedPeer.connected)
+                    break;
+                if (attempts < 5)
+                    yield return new WaitForSecondsRealtime(Mathf.Min(16f, Mathf.Pow(2f, attempts)));
+            }
+            peerConnectInProgress.Remove(userId);
         }
 
         private IEnumerator ConnectPeer(string userId)
@@ -412,11 +431,21 @@ namespace UCENO.VirtualWorld
             if (!voiceEnabled || appPaused || gateway == null) return;
             if (gateway.ConnectionStatus != "ONLINE")
             {
-                voicePresenceRequested = false;
+                if (voicePresenceRequested || peers.Count > 0)
+                {
+                    StopAllPeerRooms();
+                    voicePresenceRequested = false;
+                    status = "VOICE WAITING FOR WORLD CONNECTION";
+                }
+                nextPresenceRetryAt = Time.unscaledTime + 2f;
                 return;
             }
-            if (!voicePresenceRequested)
+            if (!voicePresenceRequested && Time.unscaledTime >= nextPresenceRetryAt)
+            {
                 voicePresenceRequested = gateway.SetVoiceActive(true);
+                nextPresenceRetryAt = Time.unscaledTime + (voicePresenceRequested ? 2f : 3f);
+                if (voicePresenceRequested) status = "VOICE RECONNECTING";
+            }
         }
 
         private void OnApplicationPause(bool paused)
