@@ -23,6 +23,10 @@ namespace UCENO.VirtualWorld
         [SerializeField] private Transform doorPivot;
         [SerializeField] private float openAngle = 90f;
         [SerializeField] private float animationSpeed = 240f;
+        [SerializeField] private Animator stateAnimator;
+        [SerializeField] private string stateBoolParameter = "Active";
+        [SerializeField] private GameObject[] activeStateVisuals;
+        [SerializeField] private GameObject[] inactiveStateVisuals;
 
         private Quaternion closedRotation;
         private Quaternion targetRotation;
@@ -47,6 +51,7 @@ namespace UCENO.VirtualWorld
             closedRotation = doorPivot != null ? doorPivot.localRotation : Quaternion.identity;
             targetRotation = closedRotation;
             initialized = true;
+            ApplyStateVisuals();
         }
 
         private void Update()
@@ -61,11 +66,34 @@ namespace UCENO.VirtualWorld
             if (string.IsNullOrWhiteSpace(state)) return;
             CurrentState = state;
             OccupantId = occupantId ?? "";
-            if (kind != WorldInteractableKind.Door || doorPivot == null) return;
             if (!initialized) Awake();
-            targetRotation = state == "open"
-                ? closedRotation * Quaternion.Euler(0f, openAngle, 0f)
-                : closedRotation;
+            if (kind == WorldInteractableKind.Door && doorPivot != null)
+                targetRotation = state == "open"
+                    ? closedRotation * Quaternion.Euler(0f, openAngle, 0f)
+                    : closedRotation;
+            ApplyStateVisuals();
+        }
+
+        private void ApplyStateVisuals()
+        {
+            bool active = CurrentState == "active" || CurrentState == "engine_on" ||
+                CurrentState == "occupied" || CurrentState == "open";
+            if (stateAnimator != null && !string.IsNullOrWhiteSpace(stateBoolParameter))
+            {
+                foreach (AnimatorControllerParameter parameter in stateAnimator.parameters)
+                    if (parameter.name == stateBoolParameter &&
+                        parameter.type == AnimatorControllerParameterType.Bool)
+                    {
+                        stateAnimator.SetBool(stateBoolParameter, active);
+                        break;
+                    }
+            }
+            if (activeStateVisuals != null)
+                foreach (GameObject visual in activeStateVisuals)
+                    if (visual != null && visual.activeSelf != active) visual.SetActive(active);
+            if (inactiveStateVisuals != null)
+                foreach (GameObject visual in inactiveStateVisuals)
+                    if (visual != null && visual.activeSelf == active) visual.SetActive(!active);
         }
 
 #if UNITY_EDITOR
