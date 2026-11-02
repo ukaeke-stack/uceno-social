@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, selectNextActivityHost, type ActivitySession } from "./activity-session.js";
 import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./district-policy.js";
+import { isDistrictTransitionExpired, matchesDistrictTransition } from "./district-transition-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { isPersistentObjectState, defaultPersistentObjectState } from "./district-object-policy.js";
@@ -749,14 +750,12 @@ wss.on("connection", async (socket: WebSocket) => {
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
       if (msg && msg.type === "district_content_ready") {
         const pending = player.pendingDistrict;
-        if (pending && typeof msg.districtId === "string" && typeof msg.nonce === "string" &&
-            msg.districtId === pending.id && msg.nonce === pending.nonce) {
+        if (matchesDistrictTransition(pending, msg.districtId, msg.nonce)) {
           await refreshDistrictObjectStates(player.worldId, pending.id);
           // The refresh yields to the event loop; reject an acknowledgement if
           // this exact transition was cancelled or superseded while it ran.
           if (players.get(player.id) !== player || player.socket !== socket ||
-              player.pendingDistrict?.id !== pending.id ||
-              player.pendingDistrict.nonce !== pending.nonce ||
+              !matchesDistrictTransition(player.pendingDistrict, pending.id, pending.nonce) ||
               socket.readyState !== WebSocket.OPEN) return;
           player.activeDistrictId = pending.id;
           player.pendingDistrict = null;
@@ -1328,7 +1327,7 @@ setInterval(async () => {
     const proposedZ = p.z + p.vz * dt;
     const targetDistrict = p.homeId || p.eventId ? null : findWorldDistrict(WORLD_DISTRICTS, proposedX, proposedZ);
     const targetDistrictId = targetDistrict?.id ?? null;
-    if (p.pendingDistrict && now - p.pendingDistrict.createdAt > 45000) {
+    if (isDistrictTransitionExpired(p.pendingDistrict, now)) {
       send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id,
         nonce: p.pendingDistrict.nonce, reason: "transition_timeout" });
       p.pendingDistrict = null;
