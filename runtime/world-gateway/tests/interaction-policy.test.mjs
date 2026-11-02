@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveInteraction } from "../dist/interaction-policy.js";
+import { resolveInteraction, isInteractionAllowed } from "../dist/interaction-policy.js";
 
 test("door interaction toggles only between open and closed", () => {
   assert.deepEqual(resolveInteraction({ kind: "door", state: "closed", occupantId: null }, "user-a", "toggle"),
@@ -40,4 +40,15 @@ test("rejects missing identity and unsupported actions", () => {
     { ok: false, code: "unknown_or_invalid_object" });
   assert.deepEqual(resolveInteraction(door, "user-a", "delete"),
     { ok: false, code: "unknown_or_invalid_object" });
+});
+
+test("interaction reach and cooldown reject impossible or spammed requests", () => {
+  assert.equal(isInteractionAllowed(4.25, 250), true);
+  assert.equal(isInteractionAllowed(4.251, 250), false);
+  assert.equal(isInteractionAllowed(1, 249), false);
+  assert.equal(isInteractionAllowed(0, 250), true);
+  assert.equal(isInteractionAllowed(-1, 250), false);
+  assert.equal(isInteractionAllowed(Infinity, 250), false);
+  assert.equal(isInteractionAllowed(1, NaN), false);
+  assert.equal(isInteractionAllowed(1, 250, 0, 250), false);
 });
