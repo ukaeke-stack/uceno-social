@@ -116,3 +116,12 @@ gateway file; seat occupancy remains transient and is released on disconnect.
 - Explicit voice leave, home/event context changes, and disconnect cleanup remove known visible peer pairs.
 - Commit: 02b88de9fc710db67e09882722e5d9cb4ba45661.
 - Workflow status for this exact commit was not yet available at the last check. This is not evidence of runtime voice audio: WebRTC media, microphone capture, audio playback, STUN/TURN, attenuation, and physical-device validation remain outstanding.
+
+
+## 2026-11-02 active voice block revalidation
+
+- The gateway now re-checks block relationships for established nearby voice peers at least every five seconds, while new eligible peer pairs are checked before their first active-presence announcement.
+- A newly blocked pair is removed from the tracked visible-peer set and both connected clients receive inactive-presence notifications.
+- This limits database block checks for already-visible pairs compared with querying every one-second position reconciliation. It remains source-level only; workflow results, runtime behavior, and database load have not yet been verified.
+- Commit: 0a29bffe07169e140e52f4dd250a90c137925a27.
+- This still does not provide WebRTC audio media. Microphone capture, peer connections, audio playback, STUN/TURN, spatial attenuation, and device tests remain outstanding.
