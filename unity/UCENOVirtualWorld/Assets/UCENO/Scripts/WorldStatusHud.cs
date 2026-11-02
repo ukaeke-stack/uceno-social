@@ -167,7 +167,7 @@ namespace UCENO.VirtualWorld
             string[] connectedPeers = spatialVoice.GetConnectedPeerIds();
             int visiblePeerRows = Mathf.Min(3, connectedPeers.Length);
             int peerExtraRows = connectedPeers.Length > 0 ? 1 + visiblePeerRows + (connectedPeers.Length > visiblePeerRows ? 1 : 0) : 0;
-            float panelHeight = (spatialVoice.VoiceEnabled ? 6f : 2f) * rowHeight + peerExtraRows * rowHeight + 12f * scale;
+            float panelHeight = (spatialVoice.VoiceEnabled ? 6f : 2f) * rowHeight + peerExtraRows * rowHeight + visiblePeerRows * 2f * scale + 12f * scale;
             voicePanelHeight = panelHeight;
             Rect panel = new Rect(x, y + 46f * scale, width, panelHeight);
             Color previousColor = GUI.color;
