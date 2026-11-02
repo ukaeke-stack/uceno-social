@@ -31,9 +31,30 @@ services; it does not reuse an Android APK.
 - The post-admission binding remains as a safety net for confirmed location
   changes and cached-content verification. It should not cause another network
   download when the label is already cached.
-- Addressables uses Unity's persistent bundle cache. Keep bundle/catalog versions
-  immutable and publish a new catalog for content updates; do not overwrite
-  already-published bundle files at the same URL.
+- Addressables uses Unity's persistent bundle cache for downloaded bundles. This
+  disk cache is distinct from runtime memory residency: the cache remains available
+  after an area is unloaded and is reused on later visits.
+- WorldContentDelivery.AcquireContent loads the assets assigned to a label into
+  memory and returns a reference-counted residency lease. Every caller must pair
+  a successful acquisition with ReleaseContent when it leaves that area. The
+  currently active district is retained while the next district loads; the
+  previous district is released only after the server accepts the transition.
+- Home interiors and event venues acquire their labels after confirmed entry and
+  release them on exit. Repeated references to the same label share one Addressables
+  handle; the handle is released only when the final caller exits.
+- The runtime allows at most four simultaneously resident labels by default.
+  This is a defensive label-count cap, not a byte-accurate RAM budget: actual
+  memory must still be profiled on low-end Android devices. If the cap is reached,
+  the new area fails closed rather than releasing assets still in use.
+- ReleaseContent releases the Addressables handle and requests Unity's
+  asynchronous unused-asset sweep. This does not delete downloaded bundles from
+  the persistent disk cache.
+- Runtime residency labels must contain loadable Unity assets (for example,
+  prefabs, models, materials or textures), not only Addressable scenes. Scene
+  streaming needs an explicit additive scene load/unload lifecycle and is not
+  claimed by this implementation.
+- Keep bundle/catalog versions immutable and publish a new catalog for content
+  updates; do not overwrite already-published bundle files at the same URL.
 - Configure a developer-only preload list for selected labels or all test
   labels. Expose that control only in development builds and preferably prompt
   for Wi-Fi; never make manual pre-download a requirement for ordinary players.
