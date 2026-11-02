@@ -94,3 +94,42 @@ and pair-room teardown requests. LiveKit service provisioning, exact revocation
 verification, the Unity audio client, microphone/track lifecycle, UI, Unity
 compilation and physical-device audio tests are not implemented or verified.
 Do not describe spatial voice as operational until all verification gates pass.
+
+
+## Unity client implementation update — 2026-11-02
+
+- Added `WorldSpatialVoiceClient.cs` using the pinned LiveKit Unity SDK.
+- Voice remains explicit opt-in. Android microphone permission is requested only
+  after the user taps Enable voice; login and world entry never start capture.
+- Added a per-eligible-peer LiveKit room flow. The client asks the authenticated
+  UCENO voice-token proxy for each gateway-announced peer and validates the
+  returned peer identity and local UCENO identity before connecting.
+- Added microphone publication at a bounded 32 kbps target with WebRTC echo
+  cancellation, noise suppression and automatic gain control.
+- Added push-to-talk gating, local microphone mute, voice leave, speaker-output
+  enable/disable and foreground/background teardown/rejoin behavior.
+- Remote audio is attached to the matching replicated avatar head anchor with
+  3D logarithmic attenuation (1.5 m near distance, 24 m maximum range). Audio
+  attachment waits briefly for the gateway's remote-avatar snapshot to arrive.
+- Exposed remote-avatar transform lookup and voice join/leave controls from
+  `WorldGatewayClient`.
+
+### Important implementation limits
+
+- This is source implementation, not a successful Unity compile or operational
+  voice service. SDK API compatibility, Android microphone permissions, plugin
+  import, audio routing and device behavior remain unverified.
+- The current speaker control gates Unity audio output; it does not yet select
+  the Android earpiece/loudspeaker/Bluetooth route. Native Android audio-route
+  selection remains outstanding.
+- Backgrounding intentionally leaves voice and releases pair rooms. Foreground
+  return requests voice presence again; the user must have enabled voice in the
+  current session. Android OS behavior and reconnection are not yet device-tested.
+- Server pair-room revocation and room deletion are implemented in source, but
+  existing token invalidation and connected-participant eviction have not been
+  proven against a provisioned LiveKit service. A 30-second token TTL alone is
+  not immediate revocation.
+- No two-device test has been run. Do not mark positional voice, push-to-talk,
+  background handling or revocation as verified until the acceptance matrix in
+  `SPATIAL_VOICE_DEVICE_TESTS.md` passes.
+- Do not start an APK build in this phase. Keep PR #38 draft and unmerged.
