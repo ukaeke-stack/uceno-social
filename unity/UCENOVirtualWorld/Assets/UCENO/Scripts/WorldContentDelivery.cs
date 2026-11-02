@@ -5,6 +5,8 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.ResourceManagement.ResourceLocations;
+using UnityEngine.ResourceManagement.ResourceProviders;
+using UnityEngine.SceneManagement;
 
 namespace UCENO.VirtualWorld
 {
@@ -34,6 +36,10 @@ namespace UCENO.VirtualWorld
         private readonly HashSet<string> residencyLoads = new HashSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<string, AsyncOperationHandle<IList<UnityEngine.Object>>> pendingLoadHandles =
             new Dictionary<string, AsyncOperationHandle<IList<UnityEngine.Object>>>(StringComparer.Ordinal);
+        private readonly Dictionary<string, AsyncOperationHandle<SceneInstance>> residentSceneHandles =
+            new Dictionary<string, AsyncOperationHandle<SceneInstance>>(StringComparer.Ordinal);
+        private readonly Dictionary<string, AsyncOperationHandle<SceneInstance>> pendingSceneHandles =
+            new Dictionary<string, AsyncOperationHandle<SceneInstance>>(StringComparer.Ordinal);
         private bool initialized;
         private bool initializing;
 
@@ -82,14 +88,15 @@ namespace UCENO.VirtualWorld
             // Coalesce concurrent loads for the same label. A successful lease
             // keeps its Addressables handle alive until every consumer releases it.
             while (residencyLoads.Contains(label)) yield return null;
-            if (residentHandles.ContainsKey(label))
+            if (residentHandles.ContainsKey(label) || residentSceneHandles.ContainsKey(label))
             {
                 residencyReferences[label] = residencyReferences[label] + 1;
                 completed?.Invoke(true, null);
                 yield break;
             }
 
-            if (residentHandles.Count + residencyLoads.Count >= Mathf.Max(1, maxConcurrentResidentLabels))
+            if (residentHandles.Count + residentSceneHandles.Count + residencyLoads.Count >=
+                Mathf.Max(1, maxConcurrentResidentLabels))
             {
                 completed?.Invoke(false, "The active resident-label limit has been reached. Leave another area before loading this one.");
                 ContentFailed?.Invoke(label);
@@ -97,6 +104,30 @@ namespace UCENO.VirtualWorld
             }
 
             residencyLoads.Add(label);
+            if (IsDistrictSceneLabel(label))
+            {
+                // District scene entries use their content label as their Addressables address.
+                AsyncOperationHandle<SceneInstance> sceneLoad =
+                    Addressables.LoadSceneAsync(label, LoadSceneMode.Additive, true);
+                pendingSceneHandles[label] = sceneLoad;
+                yield return sceneLoad;
+                pendingSceneHandles.Remove(label);
+                residencyLoads.Remove(label);
+                if (sceneLoad.Status != AsyncOperationStatus.Succeeded)
+                {
+                    if (sceneLoad.IsValid()) Addressables.Release(sceneLoad);
+                    completed?.Invoke(false, "District scene could not be loaded additively. Check its Addressables entry and remote catalog.");
+                    ContentFailed?.Invoke(label);
+                    yield break;
+                }
+
+                residentSceneHandles[label] = sceneLoad;
+                residencyReferences[label] = 1;
+                StatusChanged?.Invoke(label + " scene loaded additively.");
+                completed?.Invoke(true, null);
+                yield break;
+            }
+
             AsyncOperationHandle<IList<UnityEngine.Object>> load =
                 Addressables.LoadAssetsAsync<UnityEngine.Object>(label, null);
             pendingLoadHandles[label] = load;
@@ -128,6 +159,12 @@ namespace UCENO.VirtualWorld
             }
 
             residencyReferences.Remove(label);
+            if (residentSceneHandles.TryGetValue(label, out AsyncOperationHandle<SceneInstance> sceneHandle))
+            {
+                residentSceneHandles.Remove(label);
+                StartCoroutine(UnloadSceneRoutine(label, sceneHandle));
+                return;
+            }
             if (residentHandles.TryGetValue(label, out AsyncOperationHandle<IList<UnityEngine.Object>> handle))
             {
                 residentHandles.Remove(label);
@@ -135,6 +172,24 @@ namespace UCENO.VirtualWorld
                 StatusChanged?.Invoke(label + " released from memory.");
                 StartCoroutine(UnloadUnusedAssetsRoutine());
             }
+        }
+
+        private static bool IsDistrictSceneLabel(string label)
+        {
+            return !string.IsNullOrWhiteSpace(label) &&
+                label.StartsWith("world-city-district-", StringComparison.Ordinal);
+        }
+
+        private IEnumerator UnloadSceneRoutine(string label, AsyncOperationHandle<SceneInstance> handle)
+        {
+            if (handle.IsValid())
+            {
+                AsyncOperationHandle<SceneInstance> unload = Addressables.UnloadSceneAsync(handle, true);
+                yield return unload;
+                if (unload.IsValid()) Addressables.Release(unload);
+            }
+            StatusChanged?.Invoke(label + " additive scene unloaded.");
+            yield return Resources.UnloadUnusedAssets();
         }
 
         private IEnumerator UnloadUnusedAssetsRoutine()
@@ -150,8 +205,14 @@ namespace UCENO.VirtualWorld
                 if (handle.IsValid()) Addressables.Release(handle);
             foreach (AsyncOperationHandle<IList<UnityEngine.Object>> handle in pendingLoadHandles.Values)
                 if (handle.IsValid()) Addressables.Release(handle);
+            foreach (AsyncOperationHandle<SceneInstance> handle in residentSceneHandles.Values)
+                if (handle.IsValid()) Addressables.UnloadSceneAsync(handle, true);
+            foreach (AsyncOperationHandle<SceneInstance> handle in pendingSceneHandles.Values)
+                if (handle.IsValid()) Addressables.UnloadSceneAsync(handle, true);
             pendingLoadHandles.Clear();
             residentHandles.Clear();
+            residentSceneHandles.Clear();
+            pendingSceneHandles.Clear();
             residencyReferences.Clear();
             residencyLoads.Clear();
         }
