@@ -333,7 +333,8 @@ namespace UCENO.VirtualWorld
             float scale = Mathf.Clamp(Screen.width / 900f, 0.75f, 1.25f);
             float width = Mathf.Min(Screen.width - 32f, 520f * scale);
             GUI.Box(new Rect(16f, 16f, width, 54f * scale), spatialTransitionStatus);
-            if (!spatialTransitionPending && spatialTransitionStatus.StartsWith("Travel cancelled", StringComparison.Ordinal))
+            if (!spatialTransitionPending && (spatialTransitionStatus.StartsWith("Travel cancelled", StringComparison.Ordinal) ||
+                spatialTransitionStatus.StartsWith("Activity join cancelled", StringComparison.Ordinal)))
             {
                 if (GUI.Button(new Rect(24f, 48f * scale, 92f * scale, 24f * scale), "DISMISS"))
                     spatialTransitionStatus = "";
@@ -684,6 +685,8 @@ namespace UCENO.VirtualWorld
 
             if (packet.type == "activity_state" && packet.session != null)
             {
+                if (spatialTransitionStatus.StartsWith("Activity content ready", StringComparison.Ordinal))
+                    spatialTransitionStatus = "";
                 int existingIndex = activitySessions.FindIndex(item => item.id == packet.session.id);
                 if (existingIndex >= 0) activitySessions[existingIndex] = packet.session;
                 else activitySessions.Insert(0, packet.session);
