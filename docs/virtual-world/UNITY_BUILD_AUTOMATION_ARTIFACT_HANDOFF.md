@@ -38,7 +38,7 @@ The post-build script deliberately fails if the registry is absent, empty, malfo
 2. In that completed build's artifacts, download **UCENO World Interactables Registry** (not the APK artifact).
 3. Verify the downloaded `world-interactables.json` against the included `world-interactables.json.sha256`.
 4. Place the verified JSON on the gateway host or its mounted configuration volume.
-5. Set the gateway's server-only `WORLD_INTERACTABLES_FILE` to the mounted file path, then restart the gateway instance.
+5. Set the gateway's server-only `WORLD_INTERACTABLES_FILE` to the mounted file path and set `WORLD_REQUIRE_INTERACTABLE_REGISTRY=true`, then restart the gateway instance. The required flag makes startup fail closed if the registry is omitted or empty.
 6. Inspect startup logs and run the existing real-process PostgreSQL/WebSocket interaction test against the same registry before exposing the instance.
 
 The transfer is intentionally manual and gated. This change does not deploy a gateway, modify production environment variables, apply migrations, or make the Unity Dashboard artifact URL public. Do not put the UBA API key, database URL, JWT secret, or signed artifact URL in the repository or Unity client.
