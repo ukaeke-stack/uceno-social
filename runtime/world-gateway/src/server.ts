@@ -910,7 +910,7 @@ wss.on("connection", async (socket: WebSocket) => {
       if (msg && msg.type === "activity_join") {
         const session = findAccessibleActivity(msg.id, player);
         if (!session) {
-          if (typeof msg.id === "string") {
+          if (typeof msg.id === "string" && /^[0-9a-f-]{36}$/i.test(msg.id)) {
             const route = await sql`SELECT s.instance_id AS "instanceId", i.endpoint
               FROM virtual_world_activity_sessions s
               JOIN virtual_world_instances i ON i.id = s.instance_id
