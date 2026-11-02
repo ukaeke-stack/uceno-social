@@ -250,7 +250,8 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
         instance_id AS "instanceId", payload FROM virtual_world_realtime_events
         WHERE world_id = ${ids.world}::uuid AND event_type = 'activity_state'`);
       assert.equal(queued.length, 1);
-      const payload = queued[0].payload;
+      const payload = typeof queued[0].payload === "string"
+        ? JSON.parse(queued[0].payload) : queued[0].payload;
       assert.equal(payload.session.hostGeneration, 1);
       assert.equal(queued[0].instanceId, ids.old);
       const authority = await withSchema(tx => tx`SELECT 1
