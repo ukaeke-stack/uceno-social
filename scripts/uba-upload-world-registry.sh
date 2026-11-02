@@ -10,7 +10,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REGISTRY="$REPO_ROOT/runtime/world-gateway/config/world-interactables.json"
 API_ROOT="https://build-automation.services.api.unity.com/v2"
 
-required=(ORG_ID PROJECT_ID BUILD_TARGET UCB_BUILD_NUMBER UCENO_UBA_API_KEY)
+required=(ORG_ID PROJECT_ID BUILD_TARGET UCB_BUILD_NUMBER UCENO_UBA_SERVICE_ACCOUNT_KEY_ID UCENO_UBA_SERVICE_ACCOUNT_SECRET)
 for name in "${required[@]}"; do
   if [[ -z "${!name:-}" ]]; then
     echo "Missing required Unity Build Automation setting: $name" >&2
@@ -59,7 +59,8 @@ checksum_size="$(wc -c < "$tmp_dir/world-interactables.json.sha256" | tr -d '[:s
 checksum_md5="$(md5sum "$tmp_dir/world-interactables.json.sha256" | awk '{print $1}')"
 
 endpoint="$API_ROOT/orgs/$ORG_ID/projects/$PROJECT_ID/buildtargets/$BUILD_TARGET/builds/$UCB_BUILD_NUMBER/artifacts"
-auth_header="Authorization: Basic $UCENO_UBA_API_KEY"
+service_credentials="$(printf '%s:%s' "$UCENO_UBA_SERVICE_ACCOUNT_KEY_ID" "$UCENO_UBA_SERVICE_ACCOUNT_SECRET" | base64 | tr -d '\r\n')"
+auth_header="Authorization: Basic $service_credentials"
 artifact_body="$tmp_dir/artifact.json"
 cat > "$artifact_body" <<JSON
 {
