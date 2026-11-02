@@ -1207,9 +1207,11 @@ setInterval(async () => {
     const targetDistrictId = targetDistrict?.id ?? null;
     if (targetDistrictId !== p.activeDistrictId) {
       if (!targetDistrict) {
+        if (p.pendingDistrict) send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id });
         p.activeDistrictId = null;
         p.pendingDistrict = null;
       } else if (p.pendingDistrict?.id !== targetDistrict.id) {
+        if (p.pendingDistrict) send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id });
         p.pendingDistrict = { id: targetDistrict.id, contentLabel: targetDistrict.contentLabel, nonce: randomUUID() };
         send(p.socket, { type: "district_content_required", districtId: targetDistrict.id,
           districtName: targetDistrict.name, contentLabel: targetDistrict.contentLabel,
@@ -1224,6 +1226,9 @@ setInterval(async () => {
           seated: p.seated, sprint: false, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe });
         continue;
       }
+    } else if (p.pendingDistrict) {
+      send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id });
+      p.pendingDistrict = null;
     }
     resolveHorizontalMovement(p, proposedX, proposedZ);
     p.y += p.vy * dt;
