@@ -385,7 +385,7 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
           await tx`INSERT INTO virtual_world_realtime_events
             (world_id, instance_id, event_type, payload)
             VALUES (${ids.world}::uuid, ${instanceId}::uuid, 'activity_state',
-              ${JSON.stringify({ sessionId: ids.activity, hostGeneration: generation, version })}::jsonb)`;
+              ${JSON.stringify({ sessionId: ids.activity, hostGeneration: generation, version, state: payload })}::jsonb)`;
           return true;
         });
       try {
