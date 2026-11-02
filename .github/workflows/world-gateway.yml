@@ -78,8 +78,11 @@ jobs:
             if (!gateway.includes(marker)) throw new Error('Missing server collision behavior: ' + marker);
           if (!gateway.includes('COLLISION_BOXES.some'))
             throw new Error('Server movement is not checked against configured collision boxes');
-          for (const marker of ['loadInteractables', 'type === "interact"', 'distance > 4.25', 'object_state', 'target.kind === "seat"', 'seat_occupied', 'releaseSeats', 'item.occupantId === player.id'])
+          for (const marker of ['loadInteractables', 'type === "interact"', 'isInteractionAllowed(distance, now - player.lastInteractionAt)', 'resolveInteraction(target, player.id, msg.action)', 'object_state', 'releaseSeats', 'item.occupantId === player.id'])
             if (!gateway.includes(marker)) throw new Error('Missing authoritative interaction validation: ' + marker);
+          const interactionPolicy = fs.readFileSync('./runtime/world-gateway/src/interaction-policy.ts', 'utf8');
+          for (const marker of ['distance > maxDistance', 'elapsedSincePreviousMs < cooldownMs', 'target.kind === "seat"', 'seat_occupied', 'seat_not_occupied_by_user', 'target.kind === "door"', 'target.kind === "object"'])
+            if (!interactionPolicy.includes(marker)) throw new Error('Missing extracted interaction policy: ' + marker);
           for (const marker of ['for (const target of INTERACTABLES.values())', 'actorId: target.actorId', 'occupantId: target.occupantId'])
             if (!gateway.includes(marker)) throw new Error('Missing initial interactable-state synchronization for joining clients: ' + marker);
           const objectScript = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldInteractable.cs', 'utf8');
