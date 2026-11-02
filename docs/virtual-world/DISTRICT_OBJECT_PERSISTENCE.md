@@ -15,7 +15,7 @@ The client sends only an object ID and an allowlisted action. The gateway checks
 
 ## Durable state
 
-Migration 027_district_object_persistence.sql creates virtual_world_object_states, keyed by (world_id, district_id, object_id). PostgreSQL is the durable source of truth; the old optional local JSON file is not the cross-instance persistence mechanism.
+Migration 028_district_object_persistence.sql creates virtual_world_object_states, keyed by (world_id, district_id, object_id). PostgreSQL is the durable source of truth; the old optional local JSON file is not the cross-instance persistence mechanism.
 
 - Doors persist open / closed.
 - Furniture and generic objects persist active / idle.
@@ -27,7 +27,7 @@ Migration 027_district_object_persistence.sql creates virtual_world_object_state
 
 ## Required configuration and verification
 
-1. Review and apply migrations 015–027 to the separate UCENO database in order; migration 027 has not been applied by this source change.
+1. Review and apply migrations 015–028 to the separate UCENO database in order; migration 027 has not been applied by this source change.
 2. Provision each gateway with the matching district and interactable configuration. Object coordinates must correspond to the actual Unity scene; do not copy sample coordinates blindly.
 3. Confirm the instance is registered and healthy before attempting a world session.
 4. Run the gateway build and policy tests, then database integration tests for concurrent writes, stale-version rejection, world isolation, district re-entry and cross-instance refresh.
