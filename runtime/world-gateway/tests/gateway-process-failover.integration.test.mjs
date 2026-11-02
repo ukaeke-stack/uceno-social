@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import postgres from "postgres";
@@ -42,7 +45,7 @@ async function waitForReady(port, child, timeoutMs = 15000) {
   throw new Error(`gateway readiness timed out: ${lastError?.message ?? "unknown error"}\nGateway process output:\n${diagnostics}`);
 }
 
-function startGateway(port, instanceId, scopedDatabaseUrl) {
+function startGateway(port, instanceId, scopedDatabaseUrl, registryFile) {
   const processDatabaseUrl = new URL(scopedDatabaseUrl);
   processDatabaseUrl.searchParams.set("application_name", "uceno-gateway-" + instanceId);
   const child = spawn(process.execPath, ["dist/server.js"], {
@@ -55,9 +58,7 @@ function startGateway(port, instanceId, scopedDatabaseUrl) {
       DATABASE_URL: processDatabaseUrl.toString(),
       WORLD_TOKEN_SECRET: tokenSecret,
       WORLD_INSTANCE_CAPACITY: "8",
-      WORLD_INTERACTABLES: JSON.stringify({ interactables: [
-        { id: "scene:test-door", kind: "door", x: 37.5, y: 1.15, z: -22.25, yaw: 0 }
-      ] })
+      WORLD_INTERACTABLES_FILE: registryFile
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -190,6 +191,11 @@ test("two real gateway processes: primary loss leaves the replacement process re
   let gatewayB;
   let gatewayC;
   let duplicateGatewayA;
+  const registryDirectory = mkdtempSync(join(tmpdir(), "uceno-world-registry-"));
+  const registryFile = join(registryDirectory, "world-interactables.json");
+  writeFileSync(registryFile, JSON.stringify({ interactables: [
+    { id: "scene:test-door", kind: "door", x: 37.5, y: 1.15, z: -22.25, yaw: 0 }
+  ] }));
 
   try {
     await admin.unsafe(`CREATE SCHEMA "${schema}"`);
@@ -318,8 +324,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race',
        'active', 7, $5::jsonb, NOW(), NOW())`,
       [activityId, worldId, instanceA, userId, persistedActivity]);
-    gatewayA = startGateway(portA, instanceA, scoped.toString());
-    gatewayB = startGateway(portB, instanceB, scoped.toString());
+    gatewayA = startGateway(portA, instanceA, scoped.toString(), registryFile);
+    gatewayB = startGateway(portB, instanceB, scoped.toString(), registryFile);
     const readyA = await waitForReady(portA, gatewayA);
     const readyB = await waitForReady(portB, gatewayB);
     assert.equal(readyA.instanceId, instanceA);
@@ -327,7 +333,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
 
     // A second real OS process using the same logical instance UUID must not
     // acquire ownership while the first process still holds its database lease.
-    duplicateGatewayA = startGateway(portC, instanceA, scoped.toString());
+    duplicateGatewayA = startGateway(portC, instanceA, scoped.toString(), registryFile);
     const duplicateDeadline = Date.now() + 10000;
     while (duplicateGatewayA.exitCode === null && Date.now() < duplicateDeadline)
       await delay(100);
@@ -427,6 +433,11 @@ test("two real gateway processes: primary loss leaves the replacement process re
         }
       }
       assert.ok(recoverySocket, `gateway WebSocket authorization did not recover: ${lastAuthError?.message ?? "unknown error"}`);
+      const restoredDoorAfterReconnect = await receiveSocketMessage(recoverySocket.socket, "object_state", 5000,
+        packet => packet.objectId === "scene:test-door");
+      assert.equal(restoredDoorAfterReconnect.objectState, "open",
+        "a reconnecting client must receive the persisted scene object state, not the registry default");
+      assert.equal(restoredDoorAfterReconnect.version, 1);
       await admin.unsafe(`
         INSERT INTO "${schema}".virtual_world_realtime_events
           (world_id, instance_id, event_type, payload, created_at)
@@ -469,7 +480,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
         RETURNING id`,
         [worldId, instanceA, { serverTime: Date.now(), players: [{ userId, x: 19, y: 1.15, z: -7, yaw: 0 }] }]);
       const replayedEventId = Number(inserted[0].id);
-      gatewayB = startGateway(portB, instanceB, scoped.toString());
+      gatewayB = startGateway(portB, instanceB, scoped.toString(), registryFile);
       const restarted = await waitForReady(portB, gatewayB);
       assert.equal(restarted.instanceId, instanceB);
       // The relay is a live fan-out, not a per-client replay queue: it can consume
@@ -695,6 +706,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
   } finally {
     await Promise.all([gatewayA && stopGateway(gatewayA), gatewayB && stopGateway(gatewayB), gatewayC && stopGateway(gatewayC)].filter(Boolean));
     await admin.unsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {});
+    rmSync(registryDirectory, { recursive: true, force: true });
     await admin.end({ timeout: 5 });
   }
 });
