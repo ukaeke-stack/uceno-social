@@ -165,7 +165,10 @@ namespace UCENO.VirtualWorld
             float left = x + 8f * scale;
             float panelHeight = (spatialVoice.VoiceEnabled ? 6f : 2f) * rowHeight + 12f * scale;
             Rect panel = new Rect(x, y + 46f * scale, width, panelHeight);
+            Color previousColor = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.82f);
             GUI.Box(panel, GUIContent.none, voicePanelStyle);
+            GUI.color = previousColor;
             float currentY = panel.y + 6f * scale;
             GUI.Label(new Rect(left, currentY, innerWidth, rowHeight), spatialVoice.Status, voiceLabelStyle);
             currentY += rowHeight;
