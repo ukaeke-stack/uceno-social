@@ -22,7 +22,6 @@ namespace UCENO.VirtualWorld
         private string status = "World content ready.";
         private float progress = 1f;
         private bool downloading;
-        private readonly HashSet<string> requestedLabels = new HashSet<string>(StringComparer.Ordinal);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void InstallForLoadedWorld()
@@ -85,45 +84,58 @@ namespace UCENO.VirtualWorld
                 return;
             }
 
+            if (activeLabel == label)
+            {
+                status = FriendlyName(label) + " remains loaded.";
+                return;
+            }
+            if (!string.IsNullOrEmpty(activeLabel))
+                contentDelivery.ReleaseContent(activeLabel);
+
             activeLabel = label;
             progress = 0f;
             downloading = true;
-            status = "Preparing " + FriendlyName(label) + "...";
-            if (requestedLabels.Add(label))
+            status = "Loading " + FriendlyName(label) + "...";
+            contentDelivery.AcquireContent(label, (ok, error) =>
             {
-                contentDelivery.EnsureContent(label, (ok, error) =>
+                if (activeLabel != label)
                 {
-                    if (activeLabel != label) return;
-                    downloading = false;
-                    if (!ok)
-                    {
-                        status = "Could not load " + FriendlyName(label) +
-                            ". The area is available with its core fallback. Re-enter to retry. " +
-                            (string.IsNullOrEmpty(error) ? "" : error);
-                    }
-                });
-            }
-            else
-            {
-                // Addressables' persistent cache makes repeat visits inexpensive.
-                contentDelivery.EnsureContent(label, (ok, error) =>
+                    if (ok) contentDelivery.ReleaseContent(label);
+                    return;
+                }
+                downloading = false;
+                if (!ok)
                 {
-                    if (activeLabel != label) return;
-                    downloading = false;
-                    status = ok ? FriendlyName(label) + " ready." :
-                        "Content unavailable: " + (error ?? "retry on a stable connection.");
-                });
-            }
+                    activeLabel = "";
+                    status = "Could not load " + FriendlyName(label) +
+                        ". The area remains available with its core fallback. Re-enter to retry. " +
+                        (string.IsNullOrEmpty(error) ? "" : error);
+                }
+                else
+                {
+                    progress = 1f;
+                    status = FriendlyName(label) + " loaded.";
+                }
+            });
         }
 
         private void HandleLocationExited()
         {
+            if (!string.IsNullOrEmpty(activeLabel) && contentDelivery != null)
+                contentDelivery.ReleaseContent(activeLabel);
             activeContextType = "";
             activeContextId = "";
             activeLabel = "";
             downloading = false;
             progress = 1f;
             status = "Returned to the shared world.";
+        }
+
+        private void OnDestroy()
+        {
+            if (!string.IsNullOrEmpty(activeLabel) && contentDelivery != null)
+                contentDelivery.ReleaseContent(activeLabel);
+            activeLabel = "";
         }
 
         private static string ResolveLabel(string contextType)
