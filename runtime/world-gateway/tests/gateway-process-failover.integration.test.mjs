@@ -71,32 +71,49 @@ function startGateway(port, instanceId, scopedDatabaseUrl, registryFile) {
   return child;
 }
 
+const socketPacketQueues = new WeakMap();
+
+function trackSocketMessages(socket) {
+  if (socketPacketQueues.has(socket)) return socketPacketQueues.get(socket);
+  const queue = { packets: [], waiters: [] };
+  socketPacketQueues.set(socket, queue);
+  socket.on("message", raw => {
+    let packet;
+    try { packet = JSON.parse(raw.toString()); } catch { return; }
+    const index = queue.waiters.findIndex(waiter =>
+      packet.type === waiter.expectedType && waiter.predicate(packet));
+    if (index >= 0) {
+      const waiter = queue.waiters.splice(index, 1)[0];
+      clearTimeout(waiter.timeout);
+      waiter.resolve(packet);
+    } else {
+      queue.packets.push(packet);
+      if (queue.packets.length > 2000) queue.packets.shift();
+    }
+  });
+  socket.on("error", error => {
+    for (const waiter of queue.waiters.splice(0)) {
+      clearTimeout(waiter.timeout);
+      waiter.reject(error);
+    }
+  });
+  return queue;
+}
+
 async function receiveSocketMessage(socket, expectedType, timeoutMs = 5000, predicate = () => true) {
+  const queue = trackSocketMessages(socket);
+  const index = queue.packets.findIndex(packet =>
+    packet.type === expectedType && predicate(packet));
+  if (index >= 0) return queue.packets.splice(index, 1)[0];
   return new Promise((resolve, reject) => {
-    const seen = [];
-    const cleanup = () => {
-      clearTimeout(timeout);
-      socket.off("message", onMessage);
-      socket.off("error", onError);
-    };
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error(`timed out waiting for matching ${expectedType}; received: ${JSON.stringify(seen)}`));
+    const waiter = { expectedType, predicate, resolve, reject, timeout: null };
+    waiter.timeout = setTimeout(() => {
+      const index = queue.waiters.indexOf(waiter);
+      if (index >= 0) queue.waiters.splice(index, 1);
+      reject(new Error("timed out waiting for matching " + expectedType +
+        "; received: " + JSON.stringify(queue.packets.slice(-12))));
     }, timeoutMs);
-    const onMessage = raw => {
-      let packet;
-      try { packet = JSON.parse(raw.toString()); } catch { return; }
-      if (seen.length < 12) seen.push(packet);
-      if (packet.type !== expectedType || !predicate(packet)) return;
-      cleanup();
-      resolve(packet);
-    };
-    const onError = error => {
-      cleanup();
-      reject(error);
-    };
-    socket.on("message", onMessage);
-    socket.on("error", onError);
+    queue.waiters.push(waiter);
   });
 }
 
@@ -110,6 +127,7 @@ async function connectAuthenticated(port, instanceId, worldId, userId) {
   const socket = new WebSocket(`ws://127.0.0.1:${port}/world`, {
     headers: { Authorization: `Bearer ${token}` }
   });
+  trackSocketMessages(socket);
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("authenticated WebSocket upgrade timed out")), 5000);
     socket.once("open", () => { clearTimeout(timeout); resolve(); });
