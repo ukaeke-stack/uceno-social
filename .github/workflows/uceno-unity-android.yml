@@ -37,6 +37,19 @@ jobs:
           buildMethod: UCENO.VirtualWorld.Editor.BuildCommand.BuildAndroidDevelopment
           buildsPath: Builds
 
+      - name: Verify generated gateway scene registry
+        run: |
+          test -s runtime/world-gateway/config/world-interactables.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('runtime/world-gateway/config/world-interactables.json','utf8')); if (!Array.isArray(p.interactables) || p.interactables.length === 0) process.exit(1); console.log('Validated '+p.interactables.length+' scene interactables')"
+
+      - name: Upload gateway scene registry
+        uses: actions/upload-artifact@v4
+        with:
+          name: uceno-world-interactables-registry
+          path: runtime/world-gateway/config/world-interactables.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload development APK
         uses: actions/upload-artifact@v4
         if: always()
