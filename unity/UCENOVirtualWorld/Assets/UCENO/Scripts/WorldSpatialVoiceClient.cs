@@ -61,6 +61,7 @@ namespace UCENO.VirtualWorld
         private bool voicePresenceRequested;
         private float nextPresenceRetryAt;
         private readonly HashSet<string> peerConnectInProgress = new HashSet<string>();
+        private int voiceGeneration;
         private string status = "VOICE OFF";
 
         public bool VoiceEnabled => voiceEnabled;
@@ -109,6 +110,7 @@ namespace UCENO.VirtualWorld
                 status = "NO MICROPHONE FOUND";
                 return;
             }
+            voiceGeneration++;
             bool routeApplied = SetAudioRoute(audioRoute);
             voiceEnabled = true;
             localMuted = false;
@@ -119,6 +121,7 @@ namespace UCENO.VirtualWorld
 
         public void DisableVoice()
         {
+            voiceGeneration++;
             voiceEnabled = false;
             pushToTalkHeld = false;
             localMuted = true;
@@ -253,8 +256,9 @@ namespace UCENO.VirtualWorld
         private IEnumerator ConnectPeerWithRetry(string userId)
         {
             if (!peerConnectInProgress.Add(userId)) yield break;
+            int generation = voiceGeneration;
             int attempts = 0;
-            while (voiceEnabled && !appPaused && gateway != null &&
+            while (generation == voiceGeneration && voiceEnabled && !appPaused && gateway != null &&
                 gateway.ConnectionStatus == "ONLINE" && !peers.ContainsKey(userId) && attempts < 5)
             {
                 attempts++;
@@ -284,6 +288,11 @@ namespace UCENO.VirtualWorld
                 request.SetRequestHeader("Authorization", "Bearer " + session.AccessToken);
                 request.timeout = 8;
                 yield return request.SendWebRequest();
+                if (generationInvalidForConnect())
+                {
+                    RemovePeer(userId);
+                    yield break;
+                }
                 if (request.result != UnityWebRequest.Result.Success)
                 {
                     status = "VOICE TOKEN FAILED (" + request.responseCode + ")";
@@ -308,6 +317,11 @@ namespace UCENO.VirtualWorld
                 peer.room.Disconnected += () => RemovePeer(userId);
                 var connect = peer.room.Connect(token.url, token.token, new RoomOptions());
                 yield return connect;
+                if (generationInvalidForConnect())
+                {
+                    RemovePeer(userId);
+                    yield break;
+                }
                 if (connect.IsError)
                 {
                     status = "VOICE CONNECTION FAILED";
@@ -319,6 +333,8 @@ namespace UCENO.VirtualWorld
                 status = "SPATIAL VOICE CONNECTED";
             }
         }
+
+        private bool generationInvalidForConnect() => !voiceEnabled || appPaused;
 
         private void CreateMicrophone(PeerAudio peer)
         {
@@ -461,6 +477,7 @@ namespace UCENO.VirtualWorld
             appPaused = paused;
             if (paused)
             {
+                voiceGeneration++;
                 pushToTalkHeld = false;
                 StopAllPeerRooms();
                 ClearAudioRoute();
