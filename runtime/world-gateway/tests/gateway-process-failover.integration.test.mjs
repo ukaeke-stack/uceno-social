@@ -66,12 +66,8 @@ function startGateway(port, instanceId, scopedDatabaseUrl) {
 function stopGateway(child) {
   if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
   return new Promise(resolve => {
-    const timeout = setTimeout(() => child.kill("SIGKILL"), 5000);
-    child.once("exit", () => {
-      clearTimeout(timeout);
-      resolve();
-    });
-    child.kill("SIGTERM");
+    child.once("exit", resolve);
+    child.kill("SIGKILL");
   });
 }
 
