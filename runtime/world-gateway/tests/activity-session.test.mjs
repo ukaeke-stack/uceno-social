@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   createActivitySession, joinActivity, startActivity, recordCheckpoint,
-  leaveActivity, cancelActivity
+  leaveActivity, cancelActivity, selectNextActivityHost
 } from "../dist/activity-session.js";
 
 const WORLD = "123e4567-e89b-12d3-a456-426614174000";
@@ -82,4 +82,21 @@ test("only an authorized host can cancel a non-terminal session", () => {
   assert.equal(cancelActivity(session, true, 1_100).ok, true);
   assert.equal(session.phase, "cancelled");
   assert.equal(cancelActivity(session, true, 1_200).ok, false);
+});
+
+
+test("host departure transfers ownership to the earliest remaining active participant", () => {
+  const session = race();
+  assert.equal(joinActivity(session, "host-user", 1_100).ok, true);
+  assert.equal(joinActivity(session, "later-user", 1_200).ok, true);
+  assert.equal(joinActivity(session, "earlier-user", 1_150).ok, true);
+  assert.equal(leaveActivity(session, "host-user", 1_300).ok, true);
+  assert.equal(selectNextActivityHost(session, "host-user"), "earlier-user");
+});
+
+test("host departure returns no replacement when no active participant remains", () => {
+  const session = race();
+  assert.equal(joinActivity(session, "host-user", 1_100).ok, true);
+  assert.equal(leaveActivity(session, "host-user", 1_200).ok, true);
+  assert.equal(selectNextActivityHost(session, "host-user"), null);
 });
