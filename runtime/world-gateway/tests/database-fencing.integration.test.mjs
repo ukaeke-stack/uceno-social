@@ -356,6 +356,102 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
         FROM virtual_world_realtime_events WHERE world_id = ${ids.world}::uuid`);
       assert.equal(events[0].count, 1);
     });
+
+    await t.test("independent gateway connections revoke the old host before stale mutation or relay", async () => {
+      await resetActivity();
+      // Each gateway owns a separate PostgreSQL client/pool, mirroring two
+      // independently running gateway processes sharing the same database.
+      const gatewayA = postgres(databaseUrl, { max: 2, idle_timeout: 5 });
+      const gatewayB = postgres(databaseUrl, { max: 2, idle_timeout: 5 });
+      const gatewayTx = client => callback => client.begin(async tx => {
+        await tx.unsafe(`SET LOCAL search_path TO "${schema}", public`);
+        return callback(tx);
+      });
+      const fromA = gatewayTx(gatewayA);
+      const fromB = gatewayTx(gatewayB);
+      let gatewayAHasAuthority = true;
+      const persistAndRelay = (run, instanceId, generation, version, payload) =>
+        run(async tx => {
+          const saved = await tx`
+            UPDATE virtual_world_activity_sessions
+            SET version = ${version}, state = ${JSON.stringify(payload)}::jsonb, updated_at = NOW()
+            WHERE id = ${ids.activity}::uuid
+              AND instance_id = ${instanceId}::uuid
+              AND host_generation = ${generation}
+              AND version < ${version}
+            RETURNING id
+          `;
+          if (!saved.length) return false;
+          await tx`INSERT INTO virtual_world_realtime_events
+            (world_id, instance_id, event_type, payload)
+            VALUES (${ids.world}::uuid, ${instanceId}::uuid, 'activity_state',
+              ${JSON.stringify({ sessionId: ids.activity, hostGeneration: generation, version })}::jsonb)`;
+          return true;
+        });
+      try {
+        // Gateway B atomically takes over from stale gateway A.
+        const moved = await fromB(tx => tx`
+          UPDATE virtual_world_activity_sessions AS activity
+          SET instance_id = ${ids.newA}::uuid,
+              host_user_id = ${ids.guest}::uuid,
+              host_generation = activity.host_generation + 1,
+              version = activity.version + 1,
+              updated_at = NOW()
+          FROM virtual_world_instances AS previous_instance
+          WHERE activity.id = ${ids.activity}::uuid
+            AND activity.instance_id = previous_instance.id
+            AND (previous_instance.status <> 'ready'
+              OR previous_instance.heartbeat_at < NOW() - INTERVAL '30 seconds')
+            AND EXISTS (SELECT 1 FROM virtual_world_instances replacement
+              WHERE replacement.id = ${ids.newA}::uuid AND replacement.status = 'ready'
+                AND replacement.endpoint IS NOT NULL
+                AND replacement.heartbeat_at > NOW() - INTERVAL '30 seconds')
+          RETURNING activity.host_generation AS generation
+        `);
+        assert.equal(moved.length, 1);
+        assert.equal(Number(moved[0].generation), 2);
+
+        // The new host can persist and publish under generation 2.
+        const newHostAccepted = await persistAndRelay(fromB, ids.newA, 2, 3,
+          { participants: [{ userId: ids.guest, status: "joined" }], hostGeneration: 2 });
+        assert.equal(newHostAccepted, true);
+
+        // The old process still has a local session until it attempts a write.
+        // Its generation-1 write and relay are rejected atomically.
+        const staleAccepted = await persistAndRelay(fromA, ids.old, 1, 99,
+          { staleMutation: true, hostGeneration: 1 });
+        if (!staleAccepted) gatewayAHasAuthority = false;
+        assert.equal(staleAccepted, false);
+        assert.equal(gatewayAHasAuthority, false);
+
+        // Once fenced locally, the old process must not attempt a later relay.
+        const laterOldBroadcast = gatewayAHasAuthority
+          ? await persistAndRelay(fromA, ids.old, 1, 100, { staleBroadcast: true })
+          : false;
+        assert.equal(laterOldBroadcast, false);
+
+        const current = await withSchema(tx => tx`
+          SELECT instance_id AS "instanceId", host_generation AS generation,
+            version, state FROM virtual_world_activity_sessions
+          WHERE id = ${ids.activity}::uuid
+        `);
+        assert.equal(current[0].instanceId, ids.newA);
+        assert.equal(Number(current[0].generation), 2);
+        assert.equal(Number(current[0].version), 3);
+        assert.equal(current[0].state.staleMutation, undefined);
+        const events = await withSchema(tx => tx`
+          SELECT instance_id AS "instanceId", payload FROM virtual_world_realtime_events
+          WHERE world_id = ${ids.world}::uuid AND event_type = 'activity_state'
+        `);
+        assert.equal(events.length, 1);
+        assert.equal(events[0].instanceId, ids.newA);
+        assert.equal(events[0].payload.hostGeneration, 2);
+      } finally {
+        await gatewayA.end({ timeout: 5 });
+        await gatewayB.end({ timeout: 5 });
+      }
+    });
+
   } finally {
     await db.end({ timeout: 5 });
     await admin`DROP SCHEMA IF EXISTS ${ident} CASCADE`;
