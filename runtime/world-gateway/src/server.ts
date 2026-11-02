@@ -1225,24 +1225,28 @@ setInterval(() => {
     player.lastAuthorizationCheck = now;
     player.authorizationCheckInProgress = true;
     void (async () => {
-      try {
-        await authenticate(player.token);
-        const fence = await sql`
-          SELECT 1 FROM virtual_world_player_sessions
-          WHERE world_id = ${player.worldId}::uuid AND user_id = ${player.id}::uuid
-            AND session_id = ${player.sessionId}::uuid AND generation = ${player.sessionGeneration}
-          LIMIT 1
-        `;
-        if (!fence[0]) throw new Error("session_superseded");
-      } catch {
-        if (players.get(player.id)?.socket === player.socket) {
-          send(player.socket, { type: "error", code: "session_or_access_revoked" });
-          leaveVoiceRoom(player);
-          releasePlayerSeats(player.id);
-          players.delete(player.id);
-          player.socket.close(4003, "session_or_access_revoked");
-        }
-      } finally { player.authorizationCheckInProgress = false; }
+      let failureCode = "";
+      try { await authenticate(player.token); }
+      catch { failureCode = "access_revoked"; }
+      if (!failureCode) {
+        try {
+          const fence = await sql`
+            SELECT 1 FROM virtual_world_player_sessions
+            WHERE world_id = ${player.worldId}::uuid AND user_id = ${player.id}::uuid
+              AND session_id = ${player.sessionId}::uuid AND generation = ${player.sessionGeneration}
+            LIMIT 1
+          `;
+          if (!fence[0]) failureCode = "session_superseded";
+        } catch { failureCode = "session_check_unavailable"; }
+      }
+      if (failureCode && players.get(player.id)?.socket === player.socket) {
+        send(player.socket, { type: "error", code: failureCode });
+        leaveVoiceRoom(player);
+        releasePlayerSeats(player.id);
+        players.delete(player.id);
+        player.socket.close(4003, failureCode);
+      }
+      player.authorizationCheckInProgress = false;
     })();
   }
 }, 5000);
