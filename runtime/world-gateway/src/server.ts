@@ -1030,7 +1030,17 @@ wss.on("connection", async (socket: WebSocket) => {
         const participant = session.participants.get(identity.userId);
         if (!participant || participant.status === "left" || participant.status === "dnf" || participant.status === "finished") continue;
         const left = leaveActivity(session, identity.userId);
-        if (left.ok) broadcastActivity(session);
+        if (left.ok) {
+          if (activityHosts.get(session.id) === identity.userId) {
+            const replacementHost = selectNextActivityHost(session, identity.userId);
+            if (replacementHost) activityHosts.set(session.id, replacementHost);
+            else {
+              const cancelled = cancelActivity(session, true, Date.now());
+              if (!cancelled.ok) console.warn("activity_host_departure_cancel_failed", session.id, cancelled.code);
+            }
+          }
+          broadcastActivity(session);
+        }
       }
       for (const target of INTERACTABLES.values()) {
         if (target.kind !== "seat" || target.occupantId !== identity.userId) continue;
