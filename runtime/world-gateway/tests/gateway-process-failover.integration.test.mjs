@@ -114,6 +114,16 @@ test("two real gateway processes: primary loss leaves the replacement process re
     const readyB = await waitForReady(portB, gatewayB);
     assert.equal(readyA.instanceId, instanceA);
     assert.equal(readyB.instanceId, instanceB);
+    const heartbeatDeadline = Date.now() + 5000;
+    let liveHeartbeats = [];
+    while (Date.now() < heartbeatDeadline) {
+      liveHeartbeats = await admin.unsafe(`SELECT id FROM "${schema}".virtual_world_instances
+        WHERE id IN ($1::uuid, $2::uuid) AND heartbeat_at > NOW() - INTERVAL '30 seconds'`,
+        [instanceA, instanceB]);
+      if (liveHeartbeats.length === 2) break;
+      await delay(100);
+    }
+    assert.equal(liveHeartbeats.length, 2, "both running gateway processes must renew their database heartbeat");
 
     await t.test("both independent processes publish their own database heartbeat", async () => {
       const rows = await admin.unsafe(`SELECT id, heartbeat_at FROM "${schema}".virtual_world_instances
