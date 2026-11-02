@@ -24,10 +24,22 @@ namespace UCENO.VirtualWorld
         private bool downloading;
         private readonly HashSet<string> requestedLabels = new HashSet<string>(StringComparer.Ordinal);
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void InstallForLoadedWorld()
+        {
+            WorldGatewayClient activeGateway = FindObjectOfType<WorldGatewayClient>();
+            if (activeGateway == null || activeGateway.GetComponent<WorldAreaContentBinding>() != null)
+                return;
+            activeGateway.gameObject.AddComponent<WorldAreaContentBinding>();
+        }
+
         private void Awake()
         {
+            if (gateway == null) gateway = GetComponent<WorldGatewayClient>();
             if (gateway == null) gateway = FindObjectOfType<WorldGatewayClient>();
             if (contentDelivery == null) contentDelivery = FindObjectOfType<WorldContentDelivery>();
+            if (contentDelivery == null && gateway != null)
+                contentDelivery = gateway.gameObject.AddComponent<WorldContentDelivery>();
         }
 
         private void OnEnable()
