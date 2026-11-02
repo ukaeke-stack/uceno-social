@@ -23,6 +23,12 @@ REQUIRED_FILES = [
     ASSETS / "Editor/FreeAssetModelPostprocessor.cs",
     ASSETS / "Editor/FreeAssetTexturePostprocessor.cs",
     ASSETS / "Editor/StarterSceneBuilder.cs",
+    ASSETS / "Editor/WorldInteractableAuthoring.cs",
+    ASSETS / "Editor/WorldInteractableRegistryExporter.cs",
+    ASSETS / "Editor/WorldDistrictSceneValidator.cs",
+    ASSETS / "Scripts/WorldInteractable.cs",
+    ASSETS / "Scripts/WorldObjectInteractor.cs",
+    ASSETS / "Scripts/WorldGatewayClient.cs",
     ASSETS / "Scripts/PlayerMotor.cs",
     ASSETS / "Scripts/FollowCamera.cs",
     ASSETS / "Scripts/AvatarLocomotionDriver.cs",
@@ -210,6 +216,27 @@ def main():
                      "gateway.RequestInteraction", "KeyCode.E", "GUI.Button"):
         if required not in interactor:
             fail("World object interaction input/target dispatch is missing: " + required)
+
+    authoring = read_text(ASSETS / "Editor/WorldInteractableAuthoring.cs")
+    if "GlobalObjectId.GetGlobalObjectIdSlow" not in authoring or "SHA256" not in authoring or '"scene:"' not in authoring:
+        fail("Interactable authoring must assign stable, hashed GlobalObjectId values.")
+    marker = read_text(ASSETS / "Scripts/WorldInteractable.cs")
+    if "gameObject.name.ToLowerInvariant()" in marker or "HasDoorPivot" not in marker:
+        fail("Interactable IDs must not be derived from display names, and door pivots must be inspectable.")
+    registry_exporter = read_text(ASSETS / "Editor/WorldInteractableRegistryExporter.cs")
+    for required in ("Export Scene Interactables to Gateway Registry",
+                     "WORLD_INTERACTABLES_FILE", "GetComponentsInChildren<Collider>",
+                     "world-interactables.json", "marker.HasDoorPivot",
+                     "No scene interactables were found"):
+        if required not in registry_exporter:
+            fail("Scene-to-gateway object registry export is missing: " + required)
+    gateway_server = read_text(Path("runtime/world-gateway/src/server.ts"))
+    if "WORLD_INTERACTABLES_FILE" not in gateway_server or "ensureObjectStatesLoaded(identity.worldId)" not in gateway_server:
+        fail("Gateway is not loading configured scene interactables and their durable states.")
+    gateway_client = read_text(ASSETS / "Scripts/WorldGatewayClient.cs")
+    for required in ('packet.type == "object_state"', "item.ApplyServerState", "RequestInteraction"):
+        if required not in gateway_client:
+            fail("Unity is missing authoritative object-state application/interaction transport: " + required)
     if "player.AddComponent<WorldObjectInteractor>()" not in scene_builder:
         fail("Generated player does not include the world object interaction controller.")
     presence_runtime = read_text(ASSETS / "Scripts/WorldPresenceClient.cs")
