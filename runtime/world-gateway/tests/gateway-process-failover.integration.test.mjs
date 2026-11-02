@@ -321,6 +321,19 @@ test("two real gateway processes: primary loss leaves the replacement process re
         "both gateway processes must reconnect and resume database heartbeats without restarting");
       assert.ok(gatewayA.exitCode === null && gatewayB.exitCode === null,
         "database connection interruption must not terminate either gateway process");
+      const recoverySocket = await connectAuthenticated(portB, instanceB, worldId, userId);
+      await admin.unsafe(`
+        INSERT INTO "${schema}".virtual_world_realtime_events
+          (world_id, instance_id, event_type, payload)
+        VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb)
+      `, [worldId, instanceA, {
+        serverTime: Date.now(),
+        players: [{ userId, x: 4, y: 1.15, z: 4, yaw: 0 }]
+      }]);
+      const recoveredSnapshot = await receiveSocketMessage(recoverySocket.socket, "snapshot", 8000);
+      assert.equal(recoveredSnapshot.players[0].userId, userId,
+        "the recovered relay poller must resume consuming durable events after reconnecting");
+      recoverySocket.socket.close();
     });
 
     await t.test("replacement remains ready after the primary process is terminated", async () => {
