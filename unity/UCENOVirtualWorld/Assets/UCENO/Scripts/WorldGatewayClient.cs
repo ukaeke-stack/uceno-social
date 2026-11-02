@@ -752,6 +752,20 @@ namespace UCENO.VirtualWorld
                 return;
             }
 
+            if (packet.type == "district_content_cancelled")
+            {
+                if (packet.districtId == pendingDistrictId)
+                {
+                    pendingDistrictId = "";
+                    pendingDistrictNonce = "";
+                    pendingDistrictLabel = "";
+                    pendingDistrictName = "";
+                    districtDownloadRunning = false;
+                    spatialTransitionStatus = "";
+                }
+                return;
+            }
+
             if (packet.type == "spatial_location_entered")
             {
                 spatialTransitionStatus = "";
