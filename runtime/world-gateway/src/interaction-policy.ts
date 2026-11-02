@@ -1,4 +1,4 @@
-export type InteractableKind = "door" | "seat" | "object";
+export type InteractableKind = "door" | "seat" | "object" | "furniture" | "vehicle";
 export type InteractableAction = "toggle" | "use" | "sit" | "stand";
 
 export type InteractableState = {
@@ -21,7 +21,7 @@ export function resolveInteraction(
   action: unknown
 ): InteractionResult {
   if (!userId || (target.kind === "door" && action !== "toggle") ||
-      (target.kind === "object" && action !== "use") ||
+      ((target.kind === "object" || target.kind === "furniture" || target.kind === "vehicle") && action !== "use") ||
       (target.kind === "seat" && action !== "sit" && action !== "stand")) {
     return { ok: false, code: "unknown_or_invalid_object" };
   }
@@ -46,6 +46,10 @@ export function resolveInteraction(
     };
   }
 
+  if (target.kind === "vehicle") {
+    return { ok: true, state: target.state === "engine_on" ? "engine_off" : "engine_on",
+      occupantId: target.occupantId, seated: false };
+  }
   return {
     ok: true,
     state: target.state === "active" ? "idle" : "active",
