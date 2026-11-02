@@ -164,6 +164,27 @@ namespace UCENO.VirtualWorld.Editor
                     throw new InvalidOperationException("District configuration contains no districts.");
 
                 HashSet<string> globalIds = new HashSet<string>(StringComparer.Ordinal);
+                for (int sceneIndex = 0; sceneIndex < SceneManager.sceneCount; sceneIndex++)
+                {
+                    Scene scene = SceneManager.GetSceneAt(sceneIndex);
+                    if (!scene.IsValid() || !scene.isLoaded) continue;
+                    foreach (GameObject root in scene.GetRootGameObjects())
+                    foreach (WorldInteractable item in root.GetComponentsInChildren<WorldInteractable>(true))
+                    {
+                        if (item == null || !item.gameObject.activeInHierarchy) continue;
+                        string id = item.ObjectId;
+                        if (string.IsNullOrWhiteSpace(id) || id.Length > 80 ||
+                            !id.All(ch => char.IsLetterOrDigit(ch) || "._:-".IndexOf(ch) >= 0) ||
+                            !globalIds.Add(id))
+                            throw new InvalidOperationException("Invalid or duplicate interactable ID across loaded scenes: " + id);
+                        Vector3 position = item.transform.position;
+                        int districtMatches = districts.Count(d => Contains(d, position.x, position.z));
+                        if (districtMatches != 1)
+                            throw new InvalidOperationException("Interactable " + id +
+                                " must belong to exactly one district; found " + districtMatches + ".");
+                    }
+                }
+                globalIds.Clear();
                 List<DistrictMapEntry> entries = new List<DistrictMapEntry>();
                 string outputDirectory = Path.Combine(repositoryRoot, "runtime", "world-gateway", "data", "districts");
                 Directory.CreateDirectory(outputDirectory);
@@ -185,7 +206,6 @@ namespace UCENO.VirtualWorld.Editor
                                     collider.GetComponentInParent<PlayerMotor>() != null) continue;
                                 Bounds bounds = collider.bounds;
                                 if (bounds.size.sqrMagnitude < 0.0001f) continue;
-                                Vector3 center = bounds.center;
                                 if (!OverlapsDistrict(district, bounds)) continue;
                                 boxes.Add(new Box
                                 {
