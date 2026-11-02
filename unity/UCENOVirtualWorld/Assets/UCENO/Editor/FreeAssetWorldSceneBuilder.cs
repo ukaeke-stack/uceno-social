@@ -761,6 +761,7 @@ namespace UCENO.VirtualWorld.Editor
                 string districtName = ResolveDistrictName(child.position.z);
                 Scene districtScene = districtScenes[districtName];
                 Transform districtRoot = districtRoots[districtName];
+                child.SetParent(null, true);
                 SceneManager.MoveGameObjectToScene(child.gameObject, districtScene);
                 child.SetParent(districtRoot, true);
             }
