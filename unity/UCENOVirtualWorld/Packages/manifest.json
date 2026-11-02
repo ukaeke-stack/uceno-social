@@ -5,6 +5,7 @@
     "com.unity.modules.imgui": "1.0.0",
     "com.unity.modules.animation": "1.0.0",
     "com.unity.modules.unitywebrequest": "1.0.0",
-    "com.endel.nativewebsocket": "https://github.com/endel/NativeWebSocket.git#upm"
+    "com.endel.nativewebsocket": "https://github.com/endel/NativeWebSocket.git#upm",
+    "com.unity.webrtc": "3.0.0"
   }
 }
