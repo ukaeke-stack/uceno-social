@@ -7,7 +7,9 @@ namespace UCENO.VirtualWorld
     {
         Door,
         Seat,
-        Object
+        Object,
+        Furniture,
+        Vehicle
     }
 
     /// <summary>
@@ -27,8 +29,13 @@ namespace UCENO.VirtualWorld
         private Quaternion targetRotation;
         private bool initialized;
         public string ObjectId => objectId;
-        public string Kind => kind == WorldInteractableKind.Door ? "door" : kind == WorldInteractableKind.Seat ? "seat" : "object";
-        public string CurrentState { get; private set; } = "closed";
+        public string Kind => kind == WorldInteractableKind.Door ? "door" :
+            kind == WorldInteractableKind.Seat ? "seat" :
+            kind == WorldInteractableKind.Furniture ? "furniture" :
+            kind == WorldInteractableKind.Vehicle ? "vehicle" : "object";
+        public string CurrentState { get; private set; } = "idle";
+        public bool IsActive => CurrentState == "active";
+        public bool IsVehicleEngineOn => kind == WorldInteractableKind.Vehicle && CurrentState == "engine_on";
         public string OccupantId { get; private set; } = "";
 
         private void Awake()
