@@ -14,6 +14,7 @@ assert.match(voice, /public void SetPushToTalkHeld\(bool held\)/);
 assert.match(voice, /ConnectPeerWithRetry/);
 assert.match(voice, /voiceGeneration/);
 assert.match(voice, /ineligiblePeers/);
+assert.match(voice, /generationInvalidForConnect\\(string userId, int generation\\)/);
 assert.match(voice, /StopAllPeerRooms\(\)/);
 assert.doesNotMatch(voice, /private void OnGUI\(\)/, "voice debug overlay must stay out of the client");
 
