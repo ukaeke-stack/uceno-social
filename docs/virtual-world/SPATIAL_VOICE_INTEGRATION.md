@@ -91,7 +91,7 @@ Do not use Unity's deprecated `com.unity.webrtc` package for this feature.
 The SDK dependency has been added to the Unity manifest. Gateway signaling,
 pair-scoped token issuance, room teardown, the Unity audio client, microphone/
 track lifecycle and basic controls are implemented in source. LiveKit service
-provisioning, exact revocation verification, polished Canvas UI, Unity
+provisioning, exact revocation verification, polished Canvas UI (basic controls now live in the runtime HUD), Unity
 compilation and physical-device audio tests remain unverified. Do not describe
 spatial voice as operational until all verification gates pass.
 
@@ -119,9 +119,7 @@ spatial voice as operational until all verification gates pass.
 - This is source implementation, not a successful Unity compile or operational
   voice service. SDK API compatibility, Android microphone permissions, plugin
   import, audio routing and device behavior remain unverified.
-- The current speaker control gates Unity audio output; it does not yet select
-  the Android earpiece/loudspeaker/Bluetooth route. Native Android audio-route
-  selection remains outstanding.
+- The client now has a basic mobile HUD panel for voice opt-in, mic mute, push-to-talk/open-mic, output-route cycling, remote audio mute and leaving voice. Native Android speaker/earpiece/Bluetooth routing is source-implemented but remains uncompiled and untested.
 - Backgrounding intentionally leaves voice and releases pair rooms. Foreground
   return requests voice presence again; the user must have enabled voice in the
   current session. Android OS behavior and reconnection are not yet device-tested.
@@ -173,3 +171,13 @@ passed merely because the workflow has been added.
 - Bluetooth route selection requests the Android 12+ runtime `BLUETOOTH_CONNECT` permission. If permission is denied or a route is not present, the client reports that the route is unavailable instead of claiming that it switched.
 - The selected route is cleared when voice is disabled or the app backgrounds; it is reapplied when the user returns to the foreground with voice enabled.
 - This remains uncompiled and untested on Android hardware. The Android library import/Gradle merge, permission prompt, Bluetooth headset availability, earpiece behavior, and route restoration must be checked in Unity and on physical devices. This change does not constitute verified Android routing.
+
+
+## Mobile HUD integration — 2026-11-02
+
+- Moved the temporary voice debug overlay out of WorldSpatialVoiceClient and integrated the controls into WorldStatusHud, beside the existing mobile world controls.
+- Added a collapsible voice panel with explicit opt-in, microphone mute, push-to-talk/open-mic selection, hold-to-talk, output route cycling, remote voice mute and leave controls.
+- Added state properties so the HUD reports explicit microphone mute separately from the expected PTT-muted idle state.
+- Mobile camera-look input now ignores touches over the voice panel and sprint control, so voice interactions do not rotate the camera. PTT is released when the HUD is disabled.
+- Per-peer mute remains available in the voice client API but is not yet exposed as an individual contact list in the HUD. The panel is a runtime IMGUI HUD, not a polished Unity Canvas design.
+- No Unity Editor compilation or Android touch test has been run. Verify panel scaling, touch down/up behavior, permission prompts, camera-look exclusion, and interaction with movement controls on physical devices.
