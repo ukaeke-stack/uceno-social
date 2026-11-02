@@ -456,6 +456,41 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
       }
     });
 
+
+    await t.test("a restarted gateway restores only sessions whose current fenced owner is its instance", async () => {
+      await resetActivity();
+      // This query is the same ownership boundary used by restorePersistedActivities().
+      const restoreFor = instanceId => withSchema(tx => tx`
+        SELECT id, instance_id AS "instanceId", host_generation AS "hostGeneration",
+          version, state
+        FROM virtual_world_activity_sessions
+        WHERE instance_id = ${instanceId}::uuid
+          AND (phase IN ('lobby', 'active') OR completed_at > NOW() - INTERVAL '30 minutes')
+        ORDER BY updated_at DESC LIMIT 256
+      `);
+      const beforeTakeover = await restoreFor(ids.old);
+      assert.equal(beforeTakeover.length, 1);
+      assert.equal(beforeTakeover[0].instanceId, ids.old);
+      assert.equal(Number(beforeTakeover[0].hostGeneration), 1);
+
+      // A replacement process takes ownership after the previous instance lease is stale.
+      const moved = await takeover(ids.newA, ids.guest);
+      assert.equal(moved.length, 1);
+      assert.equal(Number(moved[0].hostGeneration), 2);
+
+      // A fresh process on the replacement instance sees the durable session;
+      // the old process no longer receives it during startup restoration.
+      const [restoredByReplacement, incorrectlyRestoredByOld] = await Promise.all([
+        restoreFor(ids.newA), restoreFor(ids.old)
+      ]);
+      assert.equal(restoredByReplacement.length, 1);
+      assert.equal(restoredByReplacement[0].instanceId, ids.newA);
+      assert.equal(Number(restoredByReplacement[0].hostGeneration), 2);
+      assert.equal(Number(restoredByReplacement[0].version), 2);
+      assert.equal(restoredByReplacement[0].state.participants[0].userId, ids.guest);
+      assert.equal(incorrectlyRestoredByOld.length, 0);
+    });
+
   } finally {
     await db.end({ timeout: 5 });
     await admin`DROP SCHEMA IF EXISTS ${ident} CASCADE`;
