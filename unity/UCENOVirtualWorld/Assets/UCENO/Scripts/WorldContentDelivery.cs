@@ -184,7 +184,7 @@ namespace UCENO.VirtualWorld
         {
             if (handle.IsValid())
             {
-                AsyncOperationHandle<SceneInstance> unload = Addressables.UnloadSceneAsync(handle, true);
+                AsyncOperationHandle<SceneInstance> unload = Addressables.UnloadSceneAsync(handle, false);
                 yield return unload;
                 if (unload.IsValid()) Addressables.Release(unload);
             }
