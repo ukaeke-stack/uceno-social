@@ -104,6 +104,12 @@ jobs:
             throw new Error('Server movement is not checked against the active district collision map');
           for (const marker of ['loadInteractables', 'type === "interact"', 'isInteractionAllowed(distance, now - player.lastInteractionAt)', 'resolveInteraction(target, player.id, msg.action)', 'object_state', 'releaseSeats', 'item.occupantId === player.id'])
             if (!gateway.includes(marker)) throw new Error('Missing authoritative interaction validation: ' + marker);
+          const registryPolicy = fs.readFileSync('./runtime/world-gateway/src/interactable-registry-policy.ts', 'utf8');
+          for (const marker of ['parseInteractableRegistry', 'interactables array', 'outside every configured world district', 'cannot exceed 500'])
+            if (!registryPolicy.includes(marker)) throw new Error('Missing strict scene registry validation: ' + marker);
+          const registryTests = fs.readFileSync('./runtime/world-gateway/tests/interactable-registry-policy.test.mjs', 'utf8');
+          for (const marker of ['loads Unity-exported doors and furniture', 'duplicate IDs', 'outside configured districts'])
+            if (!registryTests.includes(marker)) throw new Error('Missing scene registry validation tests: ' + marker);
           const interactionPolicy = fs.readFileSync('./runtime/world-gateway/src/interaction-policy.ts', 'utf8');
           for (const marker of ['distance <= maxDistance', 'elapsedSincePreviousMs >= cooldownMs', 'Number.isFinite(distance)', 'target.kind === "seat"', 'seat_occupied', 'seat_not_occupied_by_player', 'target.kind === "door"', 'target.kind === "object"', 'target.kind === "vehicle"', 'target.kind === "furniture"'])
             if (!interactionPolicy.includes(marker)) throw new Error('Missing extracted interaction policy: ' + marker);
