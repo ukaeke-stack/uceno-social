@@ -1137,7 +1137,12 @@ wss.on("connection", async (socket: WebSocket) => {
     // state of every scene interactable. Broadcasting only future changes
     // leaves late joiners with stale door/object visuals and unknown seat use.
     const joiningDistrictId = findWorldDistrict(WORLD_DISTRICTS, player.x, player.z)?.id ?? "unassigned";
-    for (const target of INTERACTABLES.values()) {
+    const joiningObjects = [...INTERACTABLES.values()].filter(target => target.districtId === joiningDistrictId);
+    console.info("world_interactable_snapshot_sent", {
+      userId: player.id, districtId: joiningDistrictId,
+      registeredCount: INTERACTABLES.size, sentCount: joiningObjects.length
+    });
+    for (const target of joiningObjects) {
       if (target.districtId !== joiningDistrictId) continue;
       send(socket, {
         type: "object_state",
