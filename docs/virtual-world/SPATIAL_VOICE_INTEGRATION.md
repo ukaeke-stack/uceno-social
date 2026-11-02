@@ -27,6 +27,10 @@ Do not use Unity's deprecated `com.unity.webrtc` package for this feature.
 - Spatial admission must be enforced server-side. Participants may publish only
   while opted in and eligible; subscriptions are limited to peers in the same
   world/home/event context and within the configured 24 m 3D range.
+- A shared world-wide LiveKit room with `canSubscribe=true` is NOT acceptable:
+  the gateway's proximity-scoped WebSocket signaling does not restrict LiveKit
+  media subscriptions. Each eligible peer pair needs a separately authorized
+  media room or equivalent server-enforced subscription permissions.
 - When players move out of range, change context, leave, disconnect, or block
   one another, the server revokes the relevant media subscription/permissions.
   Client-side volume attenuation is supplementary and is not an access-control
@@ -40,8 +44,8 @@ Do not use Unity's deprecated `com.unity.webrtc` package for this feature.
    a committed ScriptableObject.
 3. Publish a mono microphone track with echo cancellation, noise suppression,
    automatic gain control and a conservative voice bitrate.
-4. Subscribe to eligible remote audio tracks and attach them to positional audio
-   sources associated with the corresponding remote avatar.
+4. Subscribe only to eligible remote audio tracks and attach them to positional
+   audio sources associated with the corresponding remote avatar.
 5. Apply distance attenuation and optional occlusion locally; server-side
    subscription filtering remains authoritative.
 6. Implement push-to-talk and open-mic modes, local mute, per-player mute,
@@ -52,12 +56,20 @@ Do not use Unity's deprecated `com.unity.webrtc` package for this feature.
 
 ## Server work still required
 
-- Add LiveKit server SDK and a protected token-issuance endpoint.
-- Validate UCENO world-session JWT, instance lease, moderation status, membership,
-  owner blocks, home/event permissions and voice opt-in before issuing a token.
+- The current `/api/worlds/[worldId]/voice-token` endpoint is deliberately
+  fail-closed. It authenticates the UCENO session but returns HTTP 503 instead
+  of issuing a broad world-room token.
+- The previous token implementation accepted a client-selected zone and issued
+  world-wide publish/subscribe grants. That was not a safe proximity boundary:
+  every room member could potentially subscribe to every microphone track.
+  It has been disabled rather than treating signaling eligibility as media ACL.
+- Implement pair-scoped media authorization using server-derived active gateway
+  participants, current 3D positions, home/event context, explicit voice opt-in
+  and block checks. Never trust a client-supplied room or zone as authorization.
+- On movement/context/block/disconnect changes, revoke existing media access
+  and remove stale participants from the corresponding LiveKit room. Token TTL
+  alone does not disconnect already-connected participants.
 - Keep API key/secret in server environment only; configure the LiveKit endpoint.
-- Implement authoritative participant permission changes on proximity/context
-  updates and disconnect cleanup.
 - Add rate limits, short token TTL, audit-safe failure logging and health checks.
 - Decide whether to use LiveKit Cloud or self-hosted LiveKit before provisioning.
   No provider account, endpoint, secret or deployment has been configured.
@@ -76,8 +88,11 @@ Do not use Unity's deprecated `com.unity.webrtc` package for this feature.
 
 ## Current status
 
-The SDK dependency has been added to the Unity manifest. The token endpoint,
-server-side LiveKit integration, Unity audio client, UI, service provisioning,
-Unity compilation and physical-device audio tests are not yet implemented or
+The SDK dependency has been added to the Unity manifest. Existing gateway
+WebSocket signaling enforces opt-in, same world/home/event context, 24 m range
+and block checks, but this is signaling only. The UCENO LiveKit token endpoint
+now fails closed until pair-scoped media authorization is implemented. The
+Unity audio client, microphone/track lifecycle, UI, service provisioning,
+Unity compilation and physical-device audio tests are not implemented or
 verified. Do not describe spatial voice as operational until all verification
 gates pass.
