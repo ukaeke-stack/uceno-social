@@ -699,6 +699,14 @@ wss.on("connection", async (socket: WebSocket) => {
             msg.districtId === pending.id && msg.nonce === pending.nonce) {
           player.activeDistrictId = pending.id;
           player.pendingDistrict = null;
+          // District state is sent only after the client confirms its streamed
+          // scene is ready, so object visuals cannot race ahead of district loading.
+          for (const target of INTERACTABLES.values()) {
+            if (target.districtId !== pending.id) continue;
+            send(socket, { type: "object_state", objectId: target.id,
+              objectState: target.state, actorId: target.actorId,
+              occupantId: target.occupantId, version: target.version });
+          }
           send(socket, { type: "district_content_accepted", districtId: msg.districtId });
         }
         return;
