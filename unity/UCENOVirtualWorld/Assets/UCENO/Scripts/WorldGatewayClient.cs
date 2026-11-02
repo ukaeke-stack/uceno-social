@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -189,6 +190,9 @@ namespace UCENO.VirtualWorld
         private int reconnectAttempts;
         private string localUserId;
         private AvatarLocomotionDriver localAvatar;
+        private WorldContentDelivery contentDelivery;
+        private bool spatialTransitionPending;
+        private string spatialTransitionStatus = "";
 
         public string ConnectionStatus { get; private set; } = "WAITING";
         public bool SetVoiceActive(bool active)
@@ -238,6 +242,8 @@ namespace UCENO.VirtualWorld
             if (session == null) session = FindObjectOfType<WorldSessionClient>();
             if (localPlayer == null) localPlayer = FindObjectOfType<PlayerMotor>();
             localAvatar = FindObjectOfType<AvatarLocomotionDriver>();
+            contentDelivery = FindObjectOfType<WorldContentDelivery>();
+            if (contentDelivery == null) contentDelivery = gameObject.AddComponent<WorldContentDelivery>();
             if (remoteAvatarPrefab == null || session == null || localPlayer == null)
             {
                 ConnectionStatus = "NOT CONFIGURED";
@@ -261,13 +267,77 @@ namespace UCENO.VirtualWorld
 
         private bool RequestSpatialContext(string type, string id)
         {
-            if (!connected || socket == null ||
+            if (!connected || socket == null || spatialTransitionPending ||
                 (type != "home_enter" && type != "home_exit" &&
                  type != "event_join" && type != "event_exit") ||
                 ((type == "home_enter" || type == "event_join") && string.IsNullOrWhiteSpace(id)))
                 return false;
+
+            if (type == "home_enter" || type == "event_join")
+            {
+                if (contentDelivery == null)
+                {
+                    spatialTransitionStatus = "World content service is unavailable. You remain in the current area.";
+                    return false;
+                }
+                string label = type == "home_enter" ? "home-interiors" : "world-event-venues";
+                StartCoroutine(PreloadBeforeSpatialTransition(type, id, label));
+                return true;
+            }
+
             _ = SendSpatialContextAsync(type, id);
             return true;
+        }
+
+        private IEnumerator PreloadBeforeSpatialTransition(string type, string id, string label)
+        {
+            spatialTransitionPending = true;
+            spatialTransitionStatus = "Downloading " + label.Replace('-', ' ') + " before travel...";
+            bool completed = false;
+            bool succeeded = false;
+            string error = null;
+            contentDelivery.EnsureContent(label, (ok, message) =>
+            {
+                succeeded = ok;
+                error = message;
+                completed = true;
+            });
+
+            while (!completed && connected && !destroying)
+                yield return null;
+
+            if (!connected || destroying)
+            {
+                spatialTransitionStatus = "Connection lost. You remain in the current area; retry travel when reconnected.";
+                spatialTransitionPending = false;
+                yield break;
+            }
+
+            if (!succeeded)
+            {
+                spatialTransitionStatus = "Travel cancelled: required area content could not be downloaded. " +
+                    (string.IsNullOrEmpty(error) ? "Check your connection and retry." : error);
+                spatialTransitionPending = false;
+                yield break;
+            }
+
+            spatialTransitionStatus = "Area content ready. Requesting server admission...";
+            yield return SendSpatialContextAsync(type, id);
+            spatialTransitionStatus = "Travel request sent. Waiting for server admission...";
+            spatialTransitionPending = false;
+        }
+
+        private void OnGUI()
+        {
+            if (string.IsNullOrEmpty(spatialTransitionStatus)) return;
+            float scale = Mathf.Clamp(Screen.width / 900f, 0.75f, 1.25f);
+            float width = Mathf.Min(Screen.width - 32f, 520f * scale);
+            GUI.Box(new Rect(16f, 16f, width, 54f * scale), spatialTransitionStatus);
+            if (!spatialTransitionPending && spatialTransitionStatus.StartsWith("Travel cancelled", StringComparison.Ordinal))
+            {
+                if (GUI.Button(new Rect(24f, 48f * scale, 92f * scale, 24f * scale), "DISMISS"))
+                    spatialTransitionStatus = "";
+            }
         }
 
         private async Task SendSpatialContextAsync(string type, string id)
