@@ -33,3 +33,13 @@
 - [ ] Re-enter a previously visited district; confirm Addressables cache avoids downloading the same bundles again.
 - [ ] Confirm district geometry and content labels match between every deployed gateway instance and its platform-specific Addressables catalog.
 - [ ] Verify asset quality and frame time in the same Android device profile; size reduction must not silently downgrade world visuals.
+
+- [ ] Enter a district and confirm its labeled assets are loaded into memory, not merely downloaded.
+- [ ] Cross into a second district; confirm both districts remain resident during the handover and the previous district is released only after server acceptance.
+- [ ] Turn back or cancel a pending district transition; confirm any newly acquired pending lease is released.
+- [ ] Enter and exit a home/event venue; confirm its content lease is acquired on entry and released on exit.
+- [ ] Acquire the same label from two consumers; confirm the Addressables handle remains loaded until both consumers release it.
+- [ ] Attempt to load a fifth distinct resident label with the default cap; confirm the load is rejected without evicting any active area's assets.
+- [ ] Confirm releasing a lease releases the Addressables handle and triggers Unity's unused-asset sweep while preserving the persistent downloaded-bundle cache.
+- [ ] Profile actual resident memory and frame time on a low-memory Android device; the four-label cap is not a substitute for byte-level profiling.
+- [ ] Verify runtime labels contain loadable assets rather than only Addressable scenes; scene streaming requires separate additive scene lifecycle handling.
