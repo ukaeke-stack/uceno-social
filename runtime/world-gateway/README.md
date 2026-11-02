@@ -162,6 +162,29 @@ countdown, checkpoint indicators, and results. CI verifies the gateway source an
 database fencing tests; it does not establish live race behavior or multi-process
 WebSocket failover on deployed infrastructure.
 
+## Exclusive OS-process ownership
+
+A logical `WORLD_INSTANCE_ID` may be owned by only one gateway OS process at a
+time. Apply `db/migrations/036_gateway_process_fencing.sql` after migration 035.
+At startup the gateway generates a fresh process UUID and atomically claims a
+12-second database lease. PostgreSQL increments a monotonic owner generation;
+a second process configured with the same instance UUID is refused while the
+first lease is live. The owner renews every three seconds. Graceful shutdown
+releases only the exact process UUID and generation that it acquired.
+
+Readiness and new WebSocket upgrades require a live local process lease. The
+simulation, relay polling and object refresh loops stop when the lease expires.
+A process that loses its generation closes connected clients and stops serving;
+a delayed heartbeat from an obsolete process cannot renew or overwrite the
+replacement process's owner lease. If the database is unavailable, the process
+may continue only until its last confirmed lease expires, then it fails closed.
+
+This is process ownership fencing, separate from per-player session generations
+and activity-host generations. The process-level integration test launches two
+real Node gateway processes with the same instance UUID and verifies the second
+cannot become ready while the first owns the lease. It requires
+`TEST_DATABASE_URL`; a skipped test is not evidence of process-failover safety.
+
 ## Provisioning and deployment sequence
 
 1. Apply database migrations 015–025 in numeric order.
