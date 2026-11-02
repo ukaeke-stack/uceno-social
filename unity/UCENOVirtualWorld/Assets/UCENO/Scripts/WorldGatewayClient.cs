@@ -762,6 +762,13 @@ namespace UCENO.VirtualWorld
             {
                 connecting = false;
                 connected = false;
+                if (transferringGateway)
+                {
+                    transferringGateway = false;
+                    pendingTransferActivityId = "";
+                    transferEndpointOverride = "";
+                    transferTokenOverride = "";
+                }
                 ConnectionStatus = "RETRYING";
                 ScheduleReconnect();
                 Debug.LogWarning("UCENO gateway connection failed: " + error.Message);
