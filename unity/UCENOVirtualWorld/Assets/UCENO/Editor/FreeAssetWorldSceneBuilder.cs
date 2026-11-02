@@ -704,8 +704,36 @@ namespace UCENO.VirtualWorld.Editor
             data.FindProperty("kind").enumValueIndex = (int)kind;
             data.FindProperty("objectId").stringValue = "";
             data.ApplyModifiedPropertiesWithoutUndo();
+            EnsureTargetingCollider(target);
             EditorUtility.SetDirty(marker);
             return marker;
+        }
+
+        private static void EnsureTargetingCollider(GameObject target)
+        {
+            Collider[] existing = target.GetComponentsInChildren<Collider>(true);
+            if (existing.Any(collider => collider != null && collider.enabled && !collider.isTrigger)) return;
+            Renderer[] renderers = target.GetComponentsInChildren<Renderer>(true)
+                .Where(renderer => renderer != null && renderer.enabled && renderer.gameObject.activeInHierarchy).ToArray();
+            if (renderers.Length == 0) throw new BuildFailedException("Interactable has no enabled renderer for collider bounds: " + target.name);
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            Vector3 min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+            Vector3 max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+            for (int x = -1; x <= 1; x += 2)
+            for (int y = -1; y <= 1; y += 2)
+            for (int z = -1; z <= 1; z += 2)
+            {
+                Vector3 corner = bounds.center + Vector3.Scale(bounds.extents, new Vector3(x, y, z));
+                Vector3 local = target.transform.InverseTransformPoint(corner);
+                min = Vector3.Min(min, local);
+                max = Vector3.Max(max, local);
+            }
+            BoxCollider box = target.AddComponent<BoxCollider>();
+            box.center = (min + max) * 0.5f;
+            box.size = max - min;
+            box.isTrigger = false;
+            EditorUtility.SetDirty(box);
         }
 
         private static GameObject BuildPlayer(Transform parent, GameObject avatarPrefab, WorldSessionClient worldSession, GameObject[] homeFurniturePrefabs)

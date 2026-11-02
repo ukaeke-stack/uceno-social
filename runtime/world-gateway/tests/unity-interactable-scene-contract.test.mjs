@@ -22,6 +22,9 @@ test("generated real furniture prefabs are authored as gateway interactables", (
   assert.match(sceneBuilder, /AddSceneInteractable\(leftSeat, WorldInteractableKind\.Seat\)/);
   assert.match(sceneBuilder, /AddSceneInteractable\(rightSeat, WorldInteractableKind\.Seat\)/);
   assert.match(sceneBuilder, /AddSceneInteractable\(table, WorldInteractableKind\.Furniture\)/);
+  assert.match(sceneBuilder, /EnsureTargetingCollider\(target\)/);
+  assert.match(sceneBuilder, /box\.isTrigger = false/);
+  assert.match(sceneBuilder, /target\.AddComponent<BoxCollider>\(\)/);
 });
 
 test("door marker is attached to its real hinge root and uses the hinged leaf pivot", () => {
