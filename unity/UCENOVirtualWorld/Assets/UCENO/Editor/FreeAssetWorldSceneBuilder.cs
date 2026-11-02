@@ -472,7 +472,7 @@ namespace UCENO.VirtualWorld.Editor
 
         private static void CreateRoadLine(Transform parent, Material material, Vector3 start, Vector3 end, float width, string objectName = "Road Marking")
         {
-            GameObject lineObject = new GameObject("Road Marking");
+            GameObject lineObject = new GameObject(objectName);
             lineObject.transform.SetParent(parent, false);
             lineObject.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
             LineRenderer line = lineObject.AddComponent<LineRenderer>();
