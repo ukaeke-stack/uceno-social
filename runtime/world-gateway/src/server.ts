@@ -812,23 +812,28 @@ server.on("upgrade", async (req, socket, head) => {
     if (req.url !== "/world" || !req.headers.authorization?.startsWith("Bearer "))
       throw new Error("unauthorized");
     const token = req.headers.authorization.slice(7);
-    const identity = await authenticate(token);
+    const identity = await authenticate(token, true);
+    const verified = await jwtVerify(token, secret, { algorithms: ["HS256"], issuer: "uceno-social", audience: "uceno-world-gateway" });
+    const payload = verified.payload;
+    const isTransfer = payload.scope === "activity-transfer";
+    if (isTransfer) {
+      const consumed = await sql`UPDATE virtual_world_activity_transfer_tickets ticket SET consumed_at = NOW() WHERE ticket.id = ${String(payload.jti)}::uuid AND ticket.world_id = ${identity.worldId}::uuid AND ticket.user_id = ${identity.userId}::uuid AND ticket.target_instance_id = ${INSTANCE_ID}::uuid AND ticket.activity_session_id = ${String(payload.transfer_session_id)}::uuid AND ticket.consumed_at IS NULL AND ticket.expires_at > NOW() AND EXISTS (SELECT 1 FROM virtual_world_activity_sessions activity WHERE activity.id = ticket.activity_session_id AND activity.world_id = ticket.world_id AND activity.instance_id = ticket.target_instance_id AND activity.phase = 'lobby') RETURNING ticket.id`;
+      if (!consumed[0]) throw new Error("transfer_ticket_invalid_or_used");
+    }
     await ensureObjectStatesLoaded(identity.worldId);
     if (players.size >= MAX_CLIENTS && !players.has(identity.userId)) throw new Error("instance_full");
     const sessionId = randomUUID();
-    const claimed = await sql`
+    const claimed = isTransfer ? await sql`INSERT INTO virtual_world_player_sessions (world_id, user_id, instance_id, session_id, generation, updated_at) SELECT ${identity.worldId}::uuid, ${identity.userId}::uuid, ${INSTANCE_ID}::uuid, ${sessionId}::uuid, 1, NOW() WHERE EXISTS (SELECT 1 FROM virtual_world_activity_transfer_tickets ticket WHERE ticket.id = ${String(payload.jti)}::uuid AND ticket.consumed_at IS NOT NULL AND ticket.user_id = ${identity.userId}::uuid AND ticket.target_instance_id = ${INSTANCE_ID}::uuid) ON CONFLICT (world_id, user_id) DO UPDATE SET instance_id = EXCLUDED.instance_id, session_id = EXCLUDED.session_id, generation = virtual_world_player_sessions.generation + 1, updated_at = NOW() RETURNING generation` : await sql`
       INSERT INTO virtual_world_player_sessions
         (world_id, user_id, instance_id, session_id, generation, updated_at)
       SELECT s.world_id, s.user_id, s.instance_id, ${sessionId}::uuid, 1, NOW()
       FROM virtual_world_instance_sessions s
       WHERE s.world_id = ${identity.worldId}::uuid AND s.user_id = ${identity.userId}::uuid
         AND s.instance_id = ${INSTANCE_ID}::uuid AND s.lease_expires_at > NOW()
-      ON CONFLICT (world_id, user_id) DO UPDATE SET
-        instance_id = EXCLUDED.instance_id, session_id = EXCLUDED.session_id,
-        generation = virtual_world_player_sessions.generation + 1, updated_at = NOW()
-      RETURNING generation
+      ON CONFLICT (world_id, user_id) DO UPDATE SET instance_id = EXCLUDED.instance_id, session_id = EXCLUDED.session_id,
+        generation = virtual_world_player_sessions.generation + 1, updated_at = NOW() RETURNING generation
     `;
-    if (!claimed[0]) throw new Error("session_lease_unavailable");
+    if (!claimed[0]) throw new Error(isTransfer ? "transfer_ticket_invalid_or_used" : "session_lease_unavailable");
     const sessionGeneration = Number(claimed[0].generation);
     wss.handleUpgrade(req, socket, head, (ws) => {
       upgradeIdentity.set(ws, { ...identity, token, sessionId, sessionGeneration });
