@@ -51,3 +51,19 @@ test("rejects impossible activity phase timestamps and invalid checkpoint bounds
   assert.equal(restoreActivitySession({ ...base, maxParticipants: 65 }), null);
   assert.equal(restoreActivitySession({ ...base, checkpointCount: 101 }), null);
 });
+
+test("rejects non-numeric and non-finite restored activity timestamps", () => {
+  const base = {
+    id: "persist-race-03", worldId: world, instanceId: "inst-a",
+    hostUserId: "host-user", hostGeneration: 1, raceId: null,
+    kind: "sports", phase: "active", version: 1,
+    createdAt: 100, startedAt: 110, completedAt: null,
+    maxParticipants: 8, checkpointCount: 3, participants: []
+  };
+  assert.ok(restoreActivitySession(base));
+  assert.equal(restoreActivitySession({ ...base, startedAt: "110" }), null);
+  assert.equal(restoreActivitySession({ ...base, startedAt: Number.POSITIVE_INFINITY }), null);
+  assert.equal(restoreActivitySession({ ...base, startedAt: Number.NaN }), null);
+  assert.equal(restoreActivitySession({ ...base, completedAt: "120", phase: "completed" }), null);
+  assert.equal(restoreActivitySession({ ...base, completedAt: Number.POSITIVE_INFINITY, phase: "completed" }), null);
+});
