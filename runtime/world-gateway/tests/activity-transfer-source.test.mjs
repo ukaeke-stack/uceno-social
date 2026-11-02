@@ -49,6 +49,8 @@ test("stale activity host takeover preserves an active participant checkpoint an
   assert.match(takeover, /(?:activity\.)?host_generation = activity\.host_generation \+ 1/);
   assert.match(takeover, /version = activity\.version \+ 1/);
   assert.match(takeover, /previous_instance\.heartbeat_at < NOW\(\) - INTERVAL '30 seconds'/);
+  assert.match(takeover, /replacement_instance\.status = 'ready'/);
+  assert.match(takeover, /replacement_instance\.heartbeat_at > NOW\(\) - INTERVAL '30 seconds'/);
   assert.match(takeover, /participant->>'userId' = \$\{player\.id\}/);
   assert.match(takeover, /participant->>'status' = 'joined'/);
   assert.match(takeover, /restoreActivitySession\(rows\[0\]\.state\)/);
