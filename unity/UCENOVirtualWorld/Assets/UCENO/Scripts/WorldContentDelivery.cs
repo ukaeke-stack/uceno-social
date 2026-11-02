@@ -26,6 +26,11 @@ namespace UCENO.VirtualWorld
         public event Action<string> ContentFailed;
 
         private readonly HashSet<string> readyLabels = new HashSet<string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, AsyncOperationHandle<IList<UnityEngine.Object>>> residentHandles =
+            new Dictionary<string, AsyncOperationHandle<IList<UnityEngine.Object>>>(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> residencyReferences =
+            new Dictionary<string, int>(StringComparer.Ordinal);
+        private readonly HashSet<string> residencyLoads = new HashSet<string>(StringComparer.Ordinal);
         private bool initialized;
         private bool initializing;
 
@@ -44,6 +49,96 @@ namespace UCENO.VirtualWorld
                 return;
             }
             StartCoroutine(EnsureContentRoutine(label.Trim(), completed));
+        }
+
+        public void AcquireContent(string label, Action<bool, string> completed = null)
+        {
+            if (string.IsNullOrWhiteSpace(label))
+            {
+                completed?.Invoke(false, "A content label is required.");
+                return;
+            }
+            StartCoroutine(AcquireContentRoutine(label.Trim(), completed));
+        }
+
+        private IEnumerator AcquireContentRoutine(string label, Action<bool, string> completed)
+        {
+            bool downloaded = false;
+            string downloadError = null;
+            yield return EnsureContentRoutine(label, (ok, error) =>
+            {
+                downloaded = ok;
+                downloadError = error;
+            });
+            if (!downloaded)
+            {
+                completed?.Invoke(false, downloadError);
+                yield break;
+            }
+
+            // Coalesce concurrent loads for the same label. A successful lease
+            // keeps its Addressables handle alive until every consumer releases it.
+            while (residencyLoads.Contains(label)) yield return null;
+            if (residentHandles.ContainsKey(label))
+            {
+                residencyReferences[label] = residencyReferences[label] + 1;
+                completed?.Invoke(true, null);
+                yield break;
+            }
+
+            residencyLoads.Add(label);
+            AsyncOperationHandle<IList<UnityEngine.Object>> load =
+                Addressables.LoadAssetsAsync<UnityEngine.Object>(label, null);
+            yield return load;
+            residencyLoads.Remove(label);
+            if (load.Status != AsyncOperationStatus.Succeeded)
+            {
+                Addressables.Release(load);
+                completed?.Invoke(false, "Downloaded content could not be loaded into memory.");
+                ContentFailed?.Invoke(label);
+                yield break;
+            }
+
+            residentHandles[label] = load;
+            residencyReferences[label] = 1;
+            StatusChanged?.Invoke(label + " loaded into memory.");
+            completed?.Invoke(true, null);
+        }
+
+        public void ReleaseContent(string label)
+        {
+            if (string.IsNullOrWhiteSpace(label) || !residencyReferences.TryGetValue(label, out int count))
+                return;
+            if (count > 1)
+            {
+                residencyReferences[label] = count - 1;
+                return;
+            }
+
+            residencyReferences.Remove(label);
+            if (residentHandles.TryGetValue(label, out AsyncOperationHandle<IList<UnityEngine.Object>> handle))
+            {
+                residentHandles.Remove(label);
+                Addressables.Release(handle);
+                StatusChanged?.Invoke(label + " released from memory.");
+                StartCoroutine(UnloadUnusedAssetsRoutine());
+            }
+        }
+
+        private IEnumerator UnloadUnusedAssetsRoutine()
+        {
+            // Addressables releases its references immediately; Unity performs
+            // the final native-object reclamation asynchronously.
+            yield return Resources.UnloadUnusedAssets();
+        }
+
+        private void OnDestroy()
+        {
+            foreach (AsyncOperationHandle<IList<UnityEngine.Object>> handle in residentHandles.Values)
+                if (handle.IsValid()) Addressables.Release(handle);
+            residentHandles.Clear();
+            residencyReferences.Clear();
+            residencyLoads.Clear();
         }
 
         public void PreloadConfiguredContent(Action<bool, string> completed = null)
