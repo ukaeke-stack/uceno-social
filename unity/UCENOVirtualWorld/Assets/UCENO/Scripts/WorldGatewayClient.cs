@@ -368,8 +368,69 @@ namespace UCENO.VirtualWorld
             });
         }
 
-        public bool RequestActivityJoin(string activityId) =>
-            SendActivityRequest(new GatewayActivityRequest { type = "activity_join", id = activityId });
+        public bool RequestActivityJoin(string activityId)
+        {
+            if (!connected || socket == null || spatialTransitionPending || string.IsNullOrWhiteSpace(activityId))
+                return false;
+
+            GatewayActivitySessionState activity = activitySessions.Find(item => item != null && item.id == activityId);
+            if (activity == null) return false;
+            string label = ResolveActivityContentLabel(activity.kind);
+            if (string.IsNullOrEmpty(label))
+                return SendActivityRequest(new GatewayActivityRequest { type = "activity_join", id = activityId });
+            if (contentDelivery == null) return false;
+
+            StartCoroutine(PreloadBeforeActivityJoin(activityId, label));
+            return true;
+        }
+
+        private static string ResolveActivityContentLabel(string kind)
+        {
+            switch ((kind ?? "").Trim().ToLowerInvariant())
+            {
+                case "sports": return "activity-sports";
+                case "checkpoint_race": return "activity-racing";
+                case "dance": return "activity-dance";
+                case "adventure": return "activity-adventure";
+                default: return "";
+            }
+        }
+
+        private IEnumerator PreloadBeforeActivityJoin(string activityId, string label)
+        {
+            spatialTransitionPending = true;
+            spatialTransitionStatus = "Preparing " + label.Replace('-', ' ') + " before joining...";
+            bool completed = false;
+            bool succeeded = false;
+            string error = null;
+            contentDelivery.EnsureContent(label, (ok, message) =>
+            {
+                succeeded = ok;
+                error = message;
+                completed = true;
+            });
+
+            while (!completed && connected && !destroying)
+                yield return null;
+
+            if (!connected || destroying)
+            {
+                spatialTransitionStatus = "Connection lost. Activity join was not sent.";
+                spatialTransitionPending = false;
+                yield break;
+            }
+            if (!succeeded)
+            {
+                spatialTransitionStatus = "Activity join cancelled: required content could not be downloaded. " +
+                    (string.IsNullOrEmpty(error) ? "Check your connection and retry." : error);
+                spatialTransitionPending = false;
+                yield break;
+            }
+
+            spatialTransitionStatus = "Activity content ready. Requesting admission...";
+            _ = SendActivityRequestAsync(new GatewayActivityRequest { type = "activity_join", id = activityId });
+            spatialTransitionPending = false;
+        }
 
         public bool RequestActivityStart(string activityId) =>
             SendActivityRequest(new GatewayActivityRequest { type = "activity_start", id = activityId });
