@@ -60,7 +60,7 @@ Do not use Unity's deprecated `com.unity.webrtc` package for this feature.
   assigned healthy gateway. It forwards the authenticated UCENO bearer token
   and a requested peer UUID; it does not mint LiveKit tokens itself.
 - The gateway validates both live participants, voice opt-in, same spatial
-  context, current 24 m range and block state before issuing a 30-second token.
+  context, current 24 m range and block state before issuing a 15-second token.
 - Each eligible pair receives a private LiveKit room with a server-generated
   room name and participant identity. A new room generation is used after a
   pair has been torn down, preventing reuse of the prior room name.
@@ -70,7 +70,7 @@ Do not use Unity's deprecated `com.unity.webrtc` package for this feature.
   on the gateway server. These are optional for ordinary gateway startup but
   required for voice token issuance. Do not add them to Unity or the APK.
 - LiveKit's exact token revocation and room-deletion behavior must be tested
-  against the chosen Cloud or self-hosted deployment. A 30-second token TTL is
+  against the chosen Cloud or self-hosted deployment. A 15-second token TTL is
   a fallback bound; it is not proof of instantaneous revocation of an already
   issued token or a connected participant.
 
@@ -164,3 +164,12 @@ passed merely because the workflow has been added.
   the pair is re-authorized. A transient LiveKit API failure is logged and
   still requires operational monitoring; it is not a proof of immediate
   revocation under every provider outage.
+
+
+## Android audio routing implementation — 2026-11-02
+
+- Added `UCENOAudioRoute.androidlib` under `Assets/Plugins/Android`, including the Android communication-device adapter and Bluetooth Connect permission.
+- The Unity client exposes Speaker, Earpiece and Bluetooth route choices. It applies `MODE_IN_COMMUNICATION`, uses `setCommunicationDevice` on Android 12+ and legacy speakerphone/SCO routing on older Android versions.
+- Bluetooth route selection requests the Android 12+ runtime `BLUETOOTH_CONNECT` permission. If permission is denied or a route is not present, the client reports that the route is unavailable instead of claiming that it switched.
+- The selected route is cleared when voice is disabled or the app backgrounds; it is reapplied when the user returns to the foreground with voice enabled.
+- This remains uncompiled and untested on Android hardware. The Android library import/Gradle merge, permission prompt, Bluetooth headset availability, earpiece behavior, and route restoration must be checked in Unity and on physical devices. This change does not constitute verified Android routing.
