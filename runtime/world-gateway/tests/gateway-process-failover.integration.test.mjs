@@ -164,12 +164,14 @@ test("two real gateway processes: primary loss leaves the replacement process re
   const instanceC = randomUUID();
   const portA = await freePort();
   const portB = await freePort();
+  const portC = await freePort();
   const worldId = randomUUID();
   const userId = randomUUID();
   const activityId = randomUUID();
   const createdAt = Date.now();
   let gatewayA;
   let gatewayB;
+  let gatewayC;
 
   try {
     await admin.unsafe(`CREATE SCHEMA "${schema}"`);
@@ -391,6 +393,50 @@ test("two real gateway processes: primary loss leaves the replacement process re
 
       // Race two independent database claims against a second stale activity.
       // PostgreSQL must serialize the row update so exactly one candidate wins.
+      // Race two independent replacement gateway OS processes against one stale activity.
+      gatewayC = startGateway(portC, instanceC, scoped.toString());
+      const readyC = await waitForReady(portC, gatewayC);
+      assert.equal(readyC.instanceId, instanceC);
+      const processRaceActivityId = randomUUID();
+      const processRaceState = { ...persistedActivity, id: processRaceActivityId,
+        instanceId: instanceA, version: 3, hostGeneration: 1 };
+      await admin.unsafe("INSERT INTO \"${schema}\".virtual_world_activity_sessions " +
+        "(id, world_id, instance_id, host_user_id, host_generation, activity_kind, phase, version, state, created_at, updated_at) " +
+        "VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race', 'active', 3, $5::jsonb, NOW(), NOW())",
+        [processRaceActivityId, worldId, instanceA, userId, processRaceState]);
+      await admin.unsafe("UPDATE \"${schema}\".virtual_world_instances SET heartbeat_at = NOW() WHERE id IN ($1::uuid, $2::uuid)",
+        [instanceB, instanceC]);
+      await admin.unsafe("UPDATE \"${schema}\".virtual_world_instance_sessions SET instance_id = $3::uuid WHERE world_id = $1::uuid AND user_id = $2::uuid",
+        [worldId, userId, instanceB]);
+      const contenderB = await connectAuthenticated(portB, instanceB, worldId, userId);
+      await admin.unsafe("UPDATE \"${schema}\".virtual_world_instance_sessions SET instance_id = $3::uuid WHERE world_id = $1::uuid AND user_id = $2::uuid",
+        [worldId, userId, instanceC]);
+      const contenderC = await connectAuthenticated(portC, instanceC, worldId, userId);
+      const packetsB = [], packetsC = [];
+      contenderB.socket.on("message", raw => { try { packetsB.push(JSON.parse(raw.toString())); } catch {} });
+      contenderC.socket.on("message", raw => { try { packetsC.push(JSON.parse(raw.toString())); } catch {} });
+      contenderB.socket.send(JSON.stringify({ type: "activity_join", id: processRaceActivityId }));
+      contenderC.socket.send(JSON.stringify({ type: "activity_join", id: processRaceActivityId }));
+      const raceDeadline = Date.now() + 5000;
+      let processAuthority = [];
+      while (Date.now() < raceDeadline) {
+        processAuthority = await admin.unsafe("SELECT instance_id, host_generation FROM \"${schema}\".virtual_world_activity_sessions WHERE id = $1::uuid",
+          [processRaceActivityId]);
+        if (Number(processAuthority[0]?.host_generation) === 2) break;
+        await delay(100);
+      }
+      assert.equal(Number(processAuthority[0]?.host_generation), 2,
+        "one real replacement gateway process must claim the stale activity");
+      assert.ok([instanceB, instanceC].includes(processAuthority[0].instance_id));
+      await delay(500);
+      const recoveredByB = packetsB.filter(packet => packet.type === "activity_host_recovered");
+      const recoveredByC = packetsC.filter(packet => packet.type === "activity_host_recovered");
+      assert.equal(recoveredByB.length + recoveredByC.length, 1,
+        "exactly one replacement WebSocket process may report successful takeover");
+      assert.equal(recoveredByB.length ? instanceB : instanceC, processAuthority[0].instance_id);
+      contenderB.socket.close();
+      contenderC.socket.close();
+
       const concurrentActivityId = randomUUID();
       const concurrentState = { ...persistedActivity, id: concurrentActivityId,
         instanceId: instanceA, version: 3, hostGeneration: 1 };
@@ -437,7 +483,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
     if (logs) error.message += `\nGateway process output:\n${logs}`;
     throw error;
   } finally {
-    await Promise.all([gatewayA && stopGateway(gatewayA), gatewayB && stopGateway(gatewayB)].filter(Boolean));
+    await Promise.all([gatewayA && stopGateway(gatewayA), gatewayB && stopGateway(gatewayB), gatewayC && stopGateway(gatewayC)].filter(Boolean));
     await admin.unsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {});
     await admin.end({ timeout: 5 });
   }
