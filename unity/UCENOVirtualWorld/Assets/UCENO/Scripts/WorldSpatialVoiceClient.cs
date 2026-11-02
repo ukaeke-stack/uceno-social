@@ -316,22 +316,7 @@ namespace UCENO.VirtualWorld
                 Microphone.End(Microphone.devices[0]);
         }
 
-        private string ReadWorldId()
-        {
-            if (session == null || string.IsNullOrWhiteSpace(session.AccessToken)) return "";
-            string[] parts = session.AccessToken.Split('.');
-            if (parts.Length != 3) return "";
-            try
-            {
-                string payload = parts[1].Replace('-', '+').Replace('_', '/');
-                payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
-                var data = Convert.FromBase64String(payload);
-                var json = Encoding.UTF8.GetString(data);
-                var match = System.Text.RegularExpressions.Regex.Match(json, "\"world_id\"\s*:\s*\"([0-9a-fA-F-]{36})\"");
-                return match.Success ? match.Groups[1].Value : "";
-            }
-            catch { return ""; }
-        }
+        private string ReadWorldId() => session != null ? session.WorldId : "";
 
         private string ReadUserId()
         {
