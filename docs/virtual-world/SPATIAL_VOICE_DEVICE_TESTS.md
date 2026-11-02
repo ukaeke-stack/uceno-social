@@ -32,6 +32,7 @@ Status: test plan only. No physical-device run is claimed. Native Android audio 
 | Mobile HUD | Open and close the voice panel; use each control | Controls remain inside the HUD; touches do not rotate the camera; PTT releases on finger-up or HUD disable |
 | Gateway reconnect | Drop and restore the world WebSocket | Existing pair rooms close while gateway is offline; voice presence and eligible peers reconnect with bounded backoff |
 | Token retry | Temporarily make voice-token endpoint unavailable, then restore it | Client retries a limited number of times with increasing delay and stops retrying after voice is disabled or peer eligibility is removed |
+| Pending join cancellation | Disable voice or revoke peer eligibility while a token request/LiveKit connect is pending | Stale coroutine cannot publish microphone audio or rejoin after disable/revocation; rapid re-enable uses the new voice-session generation |
 | Context separation | Put one participant in a different home/event context | Pair is revoked; no media is delivered across contexts |
 | Range revocation | Move one participant beyond 24 m | Gateway withdraws voice presence and deletes pair room; client disconnects pair room |
 | Block revocation | Block either participant | Gateway withdraws pair authorization; client removes peer audio and cannot rejoin |
