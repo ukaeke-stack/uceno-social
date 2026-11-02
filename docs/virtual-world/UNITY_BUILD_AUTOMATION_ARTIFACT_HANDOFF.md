@@ -19,12 +19,15 @@ The pre-export method generates the city scene and exports the explicit interact
 
 ## Required private target variables
 
-In Unity Dashboard → Build Automation → Configurations → edit the Android target → Advanced Settings → Environment variables, add:
+In Unity Dashboard → Build Automation → Configurations → edit the Android target → Advanced Settings → Environment variables, add the Unity service-account credentials:
 
 | Variable | Value |
 |---|---|
-| `UCENO_UBA_API_KEY` | Unity Build Automation API key; mark it secret/private in the dashboard |
- 
+| `UCENO_UBA_SERVICE_ACCOUNT_KEY_ID` | Service account key ID |
+| `UCENO_UBA_SERVICE_ACCOUNT_SECRET` | Service account secret; keep it secret |
+
+Create a Unity service account and grant it the least privilege needed to create and upload Build Automation artifacts. The uploader encodes `keyId:secret` as HTTP Basic credentials for the current v2 API. A legacy Build Automation API key is not accepted by v2. Do not log either credential.
+
 The script uses UBA's built-in `ORG_ID`, `PROJECT_ID`, `BUILD_TARGET`, and `UCB_BUILD_NUMBER` values. Do not copy these into source control. The API key is never logged.
 
 The post-build script deliberately fails if the registry is absent, empty, malformed, has duplicate IDs, or contains unsupported object kinds. It does not invent markers or silently upload a stale/empty file.
