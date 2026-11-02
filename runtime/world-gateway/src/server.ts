@@ -368,6 +368,7 @@ function activityPayload(session: ActivitySession) {
       raceId: activityRaceIds.get(session.id) || "",
       worldId: session.worldId,
       instanceId: session.instanceId,
+      hostGeneration: activityHostGenerations.get(session.id) ?? 1,
       kind: session.kind,
       phase: session.phase,
       createdAt: session.createdAt,
@@ -393,76 +394,89 @@ async function persistActivity(session: ActivitySession): Promise<boolean> {
   const hostGeneration = activityHostGenerations.get(session.id) ?? 1;
   const raceId = activityRaceIds.get(session.id) ?? null;
   const state = serializeActivitySession(session, hostUserId, hostGeneration, raceId);
-  return sql`INSERT INTO virtual_world_activity_sessions
-    (id, world_id, instance_id, host_user_id, host_generation, race_id, activity_kind,
-     phase, version, state, created_at, started_at, completed_at)
-    VALUES (${session.id}::uuid, ${session.worldId}::uuid, ${session.instanceId}::uuid,
-      ${hostUserId}::uuid, ${hostGeneration}, ${raceId}, ${session.kind}, ${session.phase},
-      ${session.version}, ${JSON.stringify(state)}::jsonb,
-      to_timestamp(${session.createdAt / 1000}),
-      ${session.startedAt === null ? null : new Date(session.startedAt)},
-      ${session.completedAt === null ? null : new Date(session.completedAt)})
-    ON CONFLICT (id) DO UPDATE SET host_user_id = EXCLUDED.host_user_id,
-      host_generation = EXCLUDED.host_generation, race_id = EXCLUDED.race_id,
-      phase = EXCLUDED.phase, version = EXCLUDED.version, state = EXCLUDED.state,
-      started_at = EXCLUDED.started_at, completed_at = EXCLUDED.completed_at, updated_at = NOW()
-    WHERE virtual_world_activity_sessions.host_generation < EXCLUDED.host_generation
-       OR (virtual_world_activity_sessions.host_generation = EXCLUDED.host_generation
-           AND virtual_world_activity_sessions.version < EXCLUDED.version)`
-    .then(async savedRows => {
-      if (savedRows.length === 0) {
-        const current = await sql`SELECT instance_id AS "instanceId",
-            host_generation AS "hostGeneration"
-          FROM virtual_world_activity_sessions WHERE id = ${session.id}::uuid LIMIT 1`;
-        const row = current[0];
-        const stillOwned = row && row.instanceId === INSTANCE_ID &&
-          Number(row.hostGeneration) === hostGeneration;
-        if (!stillOwned) {
-          fencedActivitySessions.add(session.id);
-          activitySessions.delete(session.id);
-          activityHosts.delete(session.id);
-          activityHostGenerations.delete(session.id);
-          activityRaceIds.delete(session.id);
-          for (const peer of players.values()) {
-            if (peer.worldId === session.worldId) send(peer.socket, {
-              type: "activity_host_fenced", sessionId: session.id
-            });
-          }
-          console.warn("activity_host_authority_revoked", session.id, hostGeneration);
-        }
-        return false;
-      }
-      void sql`INSERT INTO virtual_world_realtime_events (world_id, instance_id, event_type, payload)
+
+  // Persist the authoritative state and its relay event in one transaction.
+  // A takeover that wins the row lock first makes this write a no-op; a takeover
+  // that follows this transaction makes the relay reject the now-stale event.
+  let saved = false;
+  try {
+    saved = await sql.begin(async tx => {
+      const rows = await tx`INSERT INTO virtual_world_activity_sessions
+        (id, world_id, instance_id, host_user_id, host_generation, race_id, activity_kind,
+         phase, version, state, created_at, started_at, completed_at)
+        VALUES (${session.id}::uuid, ${session.worldId}::uuid, ${session.instanceId}::uuid,
+          ${hostUserId}::uuid, ${hostGeneration}, ${raceId}, ${session.kind}, ${session.phase},
+          ${session.version}, ${JSON.stringify(state)}::jsonb,
+          to_timestamp(${session.createdAt / 1000}),
+          ${session.startedAt === null ? null : new Date(session.startedAt)},
+          ${session.completedAt === null ? null : new Date(session.completedAt)})
+        ON CONFLICT (id) DO UPDATE SET host_user_id = EXCLUDED.host_user_id,
+          host_generation = EXCLUDED.host_generation, race_id = EXCLUDED.race_id,
+          phase = EXCLUDED.phase, version = EXCLUDED.version, state = EXCLUDED.state,
+          started_at = EXCLUDED.started_at, completed_at = EXCLUDED.completed_at, updated_at = NOW()
+        WHERE virtual_world_activity_sessions.instance_id = EXCLUDED.instance_id
+          AND virtual_world_activity_sessions.host_generation = EXCLUDED.host_generation
+          AND virtual_world_activity_sessions.version < EXCLUDED.version
+        RETURNING id`;
+      if (!rows[0]) return false;
+      await tx`INSERT INTO virtual_world_realtime_events
+        (world_id, instance_id, event_type, payload)
         VALUES (${session.worldId}::uuid, ${INSTANCE_ID}::uuid, 'activity_state',
-          ${JSON.stringify(activityPayload(session))}::jsonb)`
-        .catch(error => console.error("activity_state_relay_publish_failed", session.id, error));
-      if (session.phase !== "completed" && session.phase !== "cancelled") return true;
-      const ordered = [...session.participants.values()]
-        .filter(p => p.status === "finished" || p.status === "dnf" || p.status === "left")
-        .sort((a, b) => a.status === "finished" && b.status === "finished"
-          ? (a.finishTime ?? Number.MAX_SAFE_INTEGER) - (b.finishTime ?? Number.MAX_SAFE_INTEGER)
-          : a.status === "finished" ? -1 : b.status === "finished" ? 1 : a.joinedAt - b.joinedAt);
-      for (const [index, participant] of ordered.entries()) {
-        await sql`INSERT INTO virtual_world_activity_results
-          (session_id, world_id, user_id, placement, status, checkpoint_index, finish_time)
-          VALUES (${session.id}::uuid, ${session.worldId}::uuid, ${participant.userId}::uuid,
-            ${participant.status === "finished" ? index + 1 : null}, ${participant.status},
-            ${participant.checkpointIndex}, ${participant.finishTime})
-          ON CONFLICT (session_id, user_id) DO UPDATE SET
-            placement = EXCLUDED.placement, status = EXCLUDED.status,
-            checkpoint_index = EXCLUDED.checkpoint_index, finish_time = EXCLUDED.finish_time`;
-      }
+          ${JSON.stringify(activityPayload(session))}::jsonb)`;
       return true;
-    })
-    .catch(error => { console.error("activity_persistence_failed", session.id, error); return false; });
+    });
+  } catch (error) {
+    console.error("activity_persistence_failed", session.id, error);
+    return false;
+  }
+
+  if (!saved) {
+    const current = await sql`SELECT instance_id AS "instanceId",
+        host_generation AS "hostGeneration"
+      FROM virtual_world_activity_sessions WHERE id = ${session.id}::uuid LIMIT 1`
+      .catch(() => []);
+    const row = current[0];
+    const stillOwned = row && row.instanceId === INSTANCE_ID &&
+      Number(row.hostGeneration) === hostGeneration;
+    if (!stillOwned) {
+      fencedActivitySessions.add(session.id);
+      activitySessions.delete(session.id);
+      activityHosts.delete(session.id);
+      activityHostGenerations.delete(session.id);
+      activityRaceIds.delete(session.id);
+      for (const peer of players.values()) {
+        if (peer.worldId === session.worldId) send(peer.socket, {
+          type: "activity_host_fenced", sessionId: session.id
+        });
+      }
+      console.warn("activity_host_authority_revoked", session.id, hostGeneration);
+    }
+    return false;
+  }
+
+  if (session.phase !== "completed" && session.phase !== "cancelled") return true;
+  const ordered = [...session.participants.values()]
+    .filter(p => p.status === "finished" || p.status === "dnf" || p.status === "left")
+    .sort((a, b) => a.status === "finished" && b.status === "finished"
+      ? (a.finishTime ?? Number.MAX_SAFE_INTEGER) - (b.finishTime ?? Number.MAX_SAFE_INTEGER)
+      : a.status === "finished" ? -1 : b.status === "finished" ? 1 : a.joinedAt - b.joinedAt);
+  for (const [index, participant] of ordered.entries()) {
+    await sql`INSERT INTO virtual_world_activity_results
+      (session_id, world_id, user_id, placement, status, checkpoint_index, finish_time)
+      VALUES (${session.id}::uuid, ${session.worldId}::uuid, ${participant.userId}::uuid,
+        ${participant.status === "finished" ? index + 1 : null}, ${participant.status},
+        ${participant.checkpointIndex}, ${participant.finishTime})
+      ON CONFLICT (session_id, user_id) DO UPDATE SET
+        placement = EXCLUDED.placement, status = EXCLUDED.status,
+        checkpoint_index = EXCLUDED.checkpoint_index, finish_time = EXCLUDED.finish_time`;
+  }
+  return true;
 }
 
 async function broadcastActivity(session: ActivitySession) {
-  if (!await persistActivity(session)) return;
-  const packet = activityPayload(session);
-  for (const peer of players.values()) {
-    if (peer.worldId === session.worldId) send(peer.socket, packet);
-  }
+  // Activity state is delivered only through the durable relay. The relay
+  // re-checks the persisted host generation immediately before fan-out.
+  await persistActivity(session);
 }
 
 async function restorePersistedActivities(): Promise<void> {
@@ -1841,7 +1855,7 @@ setInterval(async () => {
     for (const row of rows) {
       const eventId = Number(row.id);
       if (Number.isSafeInteger(eventId) && eventId > worldRelayCursor) worldRelayCursor = eventId;
-      if (row.instanceId === INSTANCE_ID) continue;
+      if (row.instanceId === INSTANCE_ID && row.eventType === 'player_snapshot') continue;
       if (row.eventType === 'player_snapshot') {
         const payload = row.payload as { serverTime?: number; players?: unknown };
         if (!payload || !Array.isArray(payload.players) || !Number.isFinite(payload.serverTime)) continue;
@@ -1850,9 +1864,15 @@ setInterval(async () => {
           if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
         }
       } else if (row.eventType === 'activity_state') {
-        const payload = row.payload as { type?: string; session?: { id?: string; worldId?: string; instanceId?: string } };
+        const payload = row.payload as { type?: string; session?: { id?: string; worldId?: string; instanceId?: string; hostGeneration?: number } };
         if (payload?.type !== 'activity_state' || payload.session?.worldId !== row.worldId ||
             payload.session?.instanceId !== row.instanceId || typeof payload.session?.id !== 'string') continue;
+        const authority = await sql`SELECT 1 FROM virtual_world_activity_sessions
+          WHERE id = ${payload.session.id}::uuid AND world_id = ${row.worldId}::uuid
+            AND instance_id = ${row.instanceId}::uuid
+            AND host_generation = ${payload.session.hostGeneration}
+          LIMIT 1`;
+        if (!authority[0]) continue;
         const packet = JSON.stringify(payload);
         for (const peer of players.values()) {
           if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
