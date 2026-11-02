@@ -37,9 +37,14 @@ services; it does not reuse an Android APK.
 - Configure a developer-only preload list for selected labels or all test
   labels. Expose that control only in development builds and preferably prompt
   for Wi-Fi; never make manual pre-download a requirement for ordinary players.
-- Preflight currently covers home interiors and event venues. District streaming
-  and activity-specific bundles still need explicit area/label metadata and
-  their own preflight transition integration.
+- Preflight also covers joining known playable activity sessions. The session's
+  server-provided kind maps to `activity-sports`, `activity-racing`,
+  `activity-dance`, or `activity-adventure`; the join packet is not sent until
+  the corresponding content is ready. Unknown activity kinds retain the
+  existing server admission flow and should not be assigned a guessed bundle.
+- District streaming still needs explicit server-authored area metadata,
+  enter/exit boundaries, and a matching content-label contract before it can
+  be safely preloaded.
 - Keep content delivery separate from gameplay authorization. The server still
   decides whether a user may enter a world, home, event, or activity.
 
