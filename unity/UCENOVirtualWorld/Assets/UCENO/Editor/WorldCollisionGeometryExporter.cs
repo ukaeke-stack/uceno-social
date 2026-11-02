@@ -94,6 +94,9 @@ namespace UCENO.VirtualWorld.Editor
             if (boxes.Count > 500)
                 throw new InvalidOperationException("Collision export contains " + boxes.Count +
                     " colliders; gateway limit is 500. Merge static colliders or simplify the scene.");
+            if (interactables.Count > 500)
+                throw new InvalidOperationException("Collision export contains " + interactables.Count +
+                    " interactables; gateway limit is 500. Split the district into smaller authored interaction sets.");
 
             string repositoryRoot = Path.GetFullPath(Path.Combine(
                 Directory.GetParent(Application.dataPath).FullName, "..", ".."));
