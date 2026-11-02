@@ -135,7 +135,7 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
     });
 
     await t.test("expired tickets cannot be consumed", async () => {
-      await withSchema(seedActivity);
+      await resetActivity(ids.newA);
       await withSchema(tx => tx`INSERT INTO virtual_world_activity_transfer_tickets
         (id, world_id, user_id, activity_session_id, source_instance_id, target_instance_id,
          host_generation, expires_at)
@@ -148,7 +148,7 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
     });
 
     await t.test("ticket authorization binds user, world, target, activity and host generation", async () => {
-      await withSchema(seedActivity);
+      await resetActivity(ids.newA);
       await withSchema(tx => tx`INSERT INTO virtual_world_activity_transfer_tickets
         (id, world_id, user_id, activity_session_id, source_instance_id, target_instance_id,
          host_generation, expires_at)
@@ -170,7 +170,7 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
     });
 
     await t.test("old gateway cannot mutate or enqueue a broadcast after takeover", async () => {
-      await withSchema(seedActivity);
+      await resetActivity();
       const moved = await takeover(ids.newA, ids.guest);
       assert.equal(moved.length, 1);
       const staleWrite = await withSchema(async tx => {
