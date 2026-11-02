@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
-import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, type ActivitySession } from "./activity-session.js";
+import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, selectNextActivityHost, type ActivitySession } from "./activity-session.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
