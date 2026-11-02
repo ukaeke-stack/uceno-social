@@ -227,6 +227,11 @@ def main():
                      "inactiveStateVisuals", "stateBoolParameter"):
         if required not in marker:
             fail("Authoritative furniture/object state is not connected to Unity visuals: " + required)
+    scene_builder = read_text(ASSETS / "Editor/FreeAssetWorldSceneBuilder.cs")
+    for required in ("Build Realistic Starter City Scene", "BuildConfiguredInteractionObjects",
+                     "WorldInteractableRegistryExporter.Export(false)"):
+        if required not in scene_builder:
+            fail("Real city scene generation is not connected to the registered interaction flow: " + required)
     registry_exporter = read_text(ASSETS / "Editor/WorldInteractableRegistryExporter.cs")
     for required in ("Export Scene Interactables to Gateway Registry",
                      "WORLD_INTERACTABLES_FILE", "GetComponentsInChildren<Collider>",
