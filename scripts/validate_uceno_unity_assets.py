@@ -223,6 +223,10 @@ def main():
     marker = read_text(ASSETS / "Scripts/WorldInteractable.cs")
     if "gameObject.name.ToLowerInvariant()" in marker or "HasDoorPivot" not in marker:
         fail("Interactable IDs must not be derived from display names, and door pivots must be inspectable.")
+    for required in ("ApplyStateVisuals", "stateAnimator", "activeStateVisuals",
+                     "inactiveStateVisuals", "stateBoolParameter"):
+        if required not in marker:
+            fail("Authoritative furniture/object state is not connected to Unity visuals: " + required)
     registry_exporter = read_text(ASSETS / "Editor/WorldInteractableRegistryExporter.cs")
     for required in ("Export Scene Interactables to Gateway Registry",
                      "WORLD_INTERACTABLES_FILE", "GetComponentsInChildren<Collider>",
