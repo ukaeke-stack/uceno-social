@@ -7,7 +7,6 @@ import { setTimeout as delay } from "node:timers/promises";
 import postgres from "postgres";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
-const gatewayDir = new URL("../", import.meta.url);
 const tokenSecret = "process-failover-test-secret-with-more-than-32-characters";
 
 async function freePort() {
@@ -106,7 +105,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_activity_transfer_tickets (
       expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ
     )`);
-    await admin`INSERT INTO "${schema}".virtual_world_instances (id, status, endpoint)
+    await admin`INSERT INTO ${schemaIdent}.virtual_world_instances (id, status, endpoint)
       VALUES (${instanceA}::uuid, 'ready', ${`http://127.0.0.1:${portA}`}),
              (${instanceB}::uuid, 'ready', ${`http://127.0.0.1:${portB}`})`;
 
@@ -118,7 +117,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.equal(readyB.instanceId, instanceB);
 
     await t.test("both independent processes publish their own database heartbeat", async () => {
-      const rows = await admin`SELECT id, heartbeat_at FROM "${schema}".virtual_world_instances
+      const rows = await admin`SELECT id, heartbeat_at FROM ${schemaIdent}.virtual_world_instances
         WHERE id IN (${instanceA}::uuid, ${instanceB}::uuid)`;
       assert.equal(rows.length, 2);
       assert.ok(rows.every(row => row.heartbeat_at instanceof Date));
@@ -132,7 +131,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
       const primary = await admin`SELECT heartbeat_at FROM "${schema}".virtual_world_instances
         WHERE id = ${instanceA}::uuid`;
       assert.equal(primary.length, 1);
-      await admin`UPDATE "${schema}".virtual_world_instances
+      await admin`UPDATE ${schemaIdent}.virtual_world_instances
         SET heartbeat_at = NOW() - INTERVAL '1 minute'
         WHERE id = ${instanceA}::uuid`;
       const stale = await admin`SELECT heartbeat_at < NOW() - INTERVAL '30 seconds' AS stale
