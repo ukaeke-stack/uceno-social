@@ -347,9 +347,21 @@ const fencedActivitySessions = new Set<string>();
 let lastWorldSnapshotRelayAt = 0;
 let worldRelayCursor = 0;
 let worldRelayCursorReady = false;
-void sql`SELECT COALESCE(MAX(id), 0)::bigint AS cursor FROM virtual_world_realtime_events`
-  .then(rows => { worldRelayCursor = Number(rows[0]?.cursor ?? 0); worldRelayCursorReady = true; })
-  .catch(error => console.error("world_relay_cursor_init_failed", error));
+async function initializeWorldRelayCursor(): Promise<void> {
+  if (worldRelayCursorReady) return;
+  try {
+    const rows = await sql`SELECT COALESCE(MAX(id), 0)::bigint AS cursor FROM virtual_world_realtime_events`;
+    const cursor = Number(rows[0]?.cursor ?? 0);
+    if (!Number.isSafeInteger(cursor) || cursor < 0) throw new Error("invalid_world_relay_cursor");
+    worldRelayCursor = cursor;
+    worldRelayCursorReady = true;
+    console.log("world_relay_cursor_initialized", worldRelayCursor);
+  } catch (error) {
+    console.error("world_relay_cursor_init_failed_retrying", error);
+    setTimeout(() => { void initializeWorldRelayCursor(); }, 5000);
+  }
+}
+void initializeWorldRelayCursor();
 const activityHosts = new Map<string, string>();
 const activityHostGenerations = new Map<string, number>();
 const activityRaceIds = new Map<string, string>();
@@ -1858,7 +1870,7 @@ setInterval(async () => {
   worldRelayPollInProgress = true;
   try {
     const rows = await sql`SELECT id, world_id AS "worldId", instance_id AS "instanceId", event_type AS "eventType", payload
-      FROM virtual_world_realtime_events WHERE id > ${worldRelayCursor} AND created_at > NOW() - INTERVAL '30 seconds' ORDER BY id ASC LIMIT ${WORLD_RELAY_BATCH_SIZE}`;
+      FROM virtual_world_realtime_events WHERE id > ${worldRelayCursor} ORDER BY id ASC LIMIT ${WORLD_RELAY_BATCH_SIZE}`;
     for (const row of rows) {
       const eventId = Number(row.id);
       if (!Number.isSafeInteger(eventId) || eventId <= worldRelayCursor) continue;
