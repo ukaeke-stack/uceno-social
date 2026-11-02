@@ -192,6 +192,32 @@ def main():
         if required not in gateway_server:
             fail("Server-authoritative home collision bounds are missing: " + required)
 
+    scene_builder = read_text(ASSETS / "Editor/FreeAssetWorldSceneBuilder.cs")
+    for prefab_name in ("UCENO_Home_Sofa_01", "UCENO_Home_Arm_Chair_01",
+                        "UCENO_Home_Round_Table_01", "UCENO_Home_Gothic_Bed_01",
+                        "UCENO_Home_Gothic_Cabinet_01"):
+        marker = '"' + prefab_name + '", true)'
+        # Each named furniture prefab must be generated with a physical collider.
+        if marker not in scene_builder:
+            fail("Home furniture prefab is missing collider generation: " + prefab_name)
+    collider_builder = scene_builder[scene_builder.index("private static void AddEnvironmentCollider"):
+                                     scene_builder.index("private static Bounds CalculateLocalBounds")]
+    if "BoxCollider box = wrapper.AddComponent<BoxCollider>()" not in collider_builder or "box.size = Vector3.Max" not in collider_builder:
+        fail("Imported home furniture is missing bounded box-collider generation.")
+
+    interactor = read_text(ASSETS / "Scripts/WorldObjectInteractor.cs")
+    for required in ("Physics.Raycast", "GetComponentInParent<WorldInteractable>()",
+                     "gateway.RequestInteraction", "KeyCode.E", "GUI.Button"):
+        if required not in interactor:
+            fail("World object interaction input/target dispatch is missing: " + required)
+    if "player.AddComponent<WorldObjectInteractor>()" not in scene_builder:
+        fail("Generated player does not include the world object interaction controller.")
+    presence_runtime = read_text(ASSETS / "Scripts/WorldPresenceClient.cs")
+    for required in ("gameObject.AddComponent<WorldGatewayClient>()",
+                     "gateway.Configure(session, localPlayer, remoteAvatarPrefab)"):
+        if required not in presence_runtime:
+            fail("World object interactions are not connected to the authenticated gateway: " + required)
+
     home_client = read_text(ASSETS / "Scripts/WorldHomeClient.cs")
     for required in ("RequestHomes", "CreateHomeRoutine", "LoadHomeRoutine",
                      "SaveHomeRoutine", "PlaceFurniture", "MoveSelectedFurniture", "WithinHomeBounds", "RotateSelectedFurniture", "RemoveSelectedFurniture", "CanEditSelectedHome",
