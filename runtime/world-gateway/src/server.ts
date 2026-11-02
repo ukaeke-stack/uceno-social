@@ -5,6 +5,7 @@ import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, selectNextActivityHost, type ActivitySession } from "./activity-session.js";
 import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./district-policy.js";
 import { isDistrictTransitionExpired, matchesDistrictTransition } from "./district-transition-policy.js";
+import { parseDistrictCollisionManifest } from "./district-collision-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { isPersistentObjectState, defaultPersistentObjectState } from "./district-object-policy.js";
@@ -145,67 +146,20 @@ type DistrictCollisionMaps = Map<string, CollisionBox[]>;
 function loadDistrictCollisionMaps(): DistrictCollisionMaps {
   const manifestPath = process.env.WORLD_DISTRICT_MAP_MANIFEST_FILE;
   if (!manifestPath) return new Map();
-  let parsed: unknown;
-  try { parsed = JSON.parse(readFileSync(manifestPath, "utf8")); }
+  let raw: string;
+  try { raw = readFileSync(manifestPath, "utf8"); }
   catch (error) {
     throw new Error("Could not read WORLD_DISTRICT_MAP_MANIFEST_FILE: " +
       (error instanceof Error ? error.message : "invalid JSON"));
   }
-  const entries = parsed && typeof parsed === "object" &&
-    Array.isArray((parsed as { districts?: unknown }).districts)
-      ? (parsed as { districts: unknown[] }).districts : null;
-  if (!entries || entries.length !== WORLD_DISTRICTS.length)
-    throw new Error("District collision manifest must contain every configured district exactly once");
-  const configured = new Map(WORLD_DISTRICTS.map(d => [d.id, d]));
-  const result: DistrictCollisionMaps = new Map();
-  for (const [index, rawEntry] of entries.entries()) {
-    if (!rawEntry || typeof rawEntry !== "object")
-      throw new Error(`District map entry ${index} is invalid`);
-    const entry = rawEntry as Record<string, unknown>;
-    if (typeof entry.id !== "string" || typeof entry.contentLabel !== "string" ||
-        typeof entry.file !== "string" || !/^[a-zA-Z0-9_-]{1,64}\.json$/.test(entry.file) ||
-        result.has(entry.id))
-      throw new Error(`District map entry ${index} has invalid or duplicate fields`);
-    const district = configured.get(entry.id);
-    if (!district || district.contentLabel !== entry.contentLabel ||
-        entry.minX !== district.minX || entry.maxX !== district.maxX ||
-        entry.minZ !== district.minZ || entry.maxZ !== district.maxZ)
-      throw new Error(`District map entry ${index} does not match WORLD_DISTRICTS`);
-    const mapPath = resolve(dirname(resolve(manifestPath)), entry.file);
-    if (dirname(mapPath) !== dirname(resolve(manifestPath)) || isAbsolute(entry.file))
-      throw new Error(`District map entry ${index} has an unsafe map path`);
-    let mapRaw: string;
-    try { mapRaw = readFileSync(mapPath, "utf8"); }
+  return parseDistrictCollisionManifest(raw, WORLD_DISTRICTS, WORLD_BOUNDS, (filename, districtId) => {
+    const mapPath = resolve(dirname(resolve(manifestPath)), filename);
+    try { return readFileSync(mapPath, "utf8"); }
     catch (error) {
-      throw new Error(`Could not read district map ${entry.id}: ` +
+      throw new Error(`Could not read district map ${districtId}: ` +
         (error instanceof Error ? error.message : "unknown file error"));
     }
-    let mapParsed: unknown;
-    try { mapParsed = JSON.parse(mapRaw); }
-    catch { throw new Error(`District map ${entry.id} is not valid JSON`); }
-    const boxes = mapParsed && typeof mapParsed === "object" &&
-      Array.isArray((mapParsed as { boxes?: unknown }).boxes)
-        ? (mapParsed as { boxes: unknown[] }).boxes : null;
-    if (!boxes || boxes.length === 0 || boxes.length > 500)
-      throw new Error(`District map ${entry.id} must contain 1–500 collision boxes`);
-    const validated = boxes.map((value, boxIndex): CollisionBox => {
-      if (!value || typeof value !== "object") throw new Error(`District ${entry.id} box ${boxIndex} is invalid`);
-      const box = value as Record<string, unknown>;
-      const keys = ["minX", "maxX", "minY", "maxY", "minZ", "maxZ"] as const;
-      for (const key of keys)
-        if (typeof box[key] !== "number" || !Number.isFinite(box[key]))
-          throw new Error(`District ${entry.id} box ${boxIndex} has invalid ${key}`);
-      const b = box as unknown as CollisionBox;
-      if (b.minX >= b.maxX || b.minY >= b.maxY || b.minZ >= b.maxZ ||
-          [b.minX,b.maxX,b.minY,b.maxY,b.minZ,b.maxZ].some(v => Math.abs(v) > WORLD_BOUNDS))
-        throw new Error(`District ${entry.id} box ${boxIndex} has invalid bounds`);
-      return b;
-    });
-    result.set(entry.id, validated);
-  }
-  if (result.size !== configured.size)
-    throw new Error("District collision manifest is missing configured districts");
-  return result;
+  });
 }
 
 const DISTRICT_COLLISION_BOXES = loadDistrictCollisionMaps();
