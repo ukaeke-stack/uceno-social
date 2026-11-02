@@ -345,7 +345,7 @@ function leaveVoiceRoom(player: Player): void {
 
 function voiceRoomName(key: string): string {
   const digest = createHash("sha256").update(`${INSTANCE_ID}:${key}`).digest("hex").slice(0, 32);
-  return `uceno-pair-${digest}`;
+  return `uceno-pair-${digest}-${randomUUID().replace(/-/g, "").slice(0, 12)}`;
 }
 
 async function revokeVoicePairRoom(key: string): Promise<void> {
@@ -1098,6 +1098,8 @@ setInterval(async () => {
             send(a.socket, { type: "voice_presence", userId: b.id, active: false });
             send(b.socket, { type: "voice_presence", userId: a.id, active: false });
           }
+          voiceBlockCheckAt.delete(key);
+          void revokeVoicePairRoom(key);
           continue;
         }
         // Re-check after the database await; either peer may have left voice
