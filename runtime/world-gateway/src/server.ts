@@ -822,14 +822,49 @@ server.on("upgrade", async (req, socket, head) => {
     const verified = await jwtVerify(token, secret, { algorithms: ["HS256"], issuer: "uceno-social", audience: "uceno-world-gateway" });
     const payload = verified.payload;
     const isTransfer = payload.scope === "activity-transfer";
-    if (isTransfer) {
-      const consumed = await sql`UPDATE virtual_world_activity_transfer_tickets ticket SET consumed_at = NOW() WHERE ticket.id = ${String(payload.jti)}::uuid AND ticket.world_id = ${identity.worldId}::uuid AND ticket.user_id = ${identity.userId}::uuid AND ticket.target_instance_id = ${INSTANCE_ID}::uuid AND ticket.activity_session_id = ${String(payload.transfer_session_id)}::uuid AND ticket.consumed_at IS NULL AND ticket.expires_at > NOW() AND EXISTS (SELECT 1 FROM virtual_world_activity_sessions activity WHERE activity.id = ticket.activity_session_id AND activity.world_id = ticket.world_id AND activity.instance_id = ticket.target_instance_id AND activity.phase = 'lobby') RETURNING ticket.id`;
-      if (!consumed[0]) throw new Error("transfer_ticket_invalid_or_used");
-    }
     await ensureObjectStatesLoaded(identity.worldId);
     if (players.size >= MAX_CLIENTS && !players.has(identity.userId)) throw new Error("instance_full");
     const sessionId = randomUUID();
-    const claimed = isTransfer ? await sql`INSERT INTO virtual_world_player_sessions (world_id, user_id, instance_id, session_id, generation, updated_at) SELECT ${identity.worldId}::uuid, ${identity.userId}::uuid, ${INSTANCE_ID}::uuid, ${sessionId}::uuid, 1, NOW() WHERE EXISTS (SELECT 1 FROM virtual_world_activity_transfer_tickets ticket WHERE ticket.id = ${String(payload.jti)}::uuid AND ticket.consumed_at IS NOT NULL AND ticket.user_id = ${identity.userId}::uuid AND ticket.target_instance_id = ${INSTANCE_ID}::uuid) ON CONFLICT (world_id, user_id) DO UPDATE SET instance_id = EXCLUDED.instance_id, session_id = EXCLUDED.session_id, generation = virtual_world_player_sessions.generation + 1, updated_at = NOW() RETURNING generation` : await sql`
+    const claimed = isTransfer ? await sql.begin(async tx => {
+      // Consume the ticket and claim the new player-session generation in one
+      // transaction. If the fence claim fails, the ticket consumption rolls back.
+      const consumed = await tx`UPDATE virtual_world_activity_transfer_tickets ticket
+        SET consumed_at = NOW()
+        WHERE ticket.id = ${String(payload.jti)}::uuid
+          AND ticket.world_id = ${identity.worldId}::uuid
+          AND ticket.user_id = ${identity.userId}::uuid
+          AND ticket.target_instance_id = ${INSTANCE_ID}::uuid
+          AND ticket.activity_session_id = ${String(payload.transfer_session_id)}::uuid
+          AND ticket.consumed_at IS NULL AND ticket.expires_at > NOW()
+          AND EXISTS (
+            SELECT 1 FROM virtual_world_activity_sessions activity
+            WHERE activity.id = ticket.activity_session_id
+              AND activity.world_id = ticket.world_id
+              AND activity.instance_id = ticket.target_instance_id
+              AND activity.phase = 'lobby'
+          )
+        RETURNING ticket.id`;
+      if (!consumed[0]) return null;
+      const fenced = await tx`INSERT INTO virtual_world_player_sessions
+        (world_id, user_id, instance_id, session_id, generation, updated_at)
+        SELECT ${identity.worldId}::uuid, ${identity.userId}::uuid,
+          ${INSTANCE_ID}::uuid, ${sessionId}::uuid, 1, NOW()
+        WHERE EXISTS (
+          SELECT 1 FROM virtual_world_activity_transfer_tickets ticket
+          WHERE ticket.id = ${String(payload.jti)}::uuid
+            AND ticket.consumed_at IS NOT NULL
+            AND ticket.user_id = ${identity.userId}::uuid
+            AND ticket.target_instance_id = ${INSTANCE_ID}::uuid
+        )
+        ON CONFLICT (world_id, user_id) DO UPDATE
+          SET instance_id = EXCLUDED.instance_id,
+              session_id = EXCLUDED.session_id,
+              generation = virtual_world_player_sessions.generation + 1,
+              updated_at = NOW()
+        RETURNING generation`;
+      if (!fenced[0]) throw new Error("transfer_session_claim_failed");
+      return fenced;
+    }) : await sql`
       INSERT INTO virtual_world_player_sessions
         (world_id, user_id, instance_id, session_id, generation, updated_at)
       SELECT s.world_id, s.user_id, s.instance_id, ${sessionId}::uuid, 1, NOW()
@@ -1484,6 +1519,23 @@ setInterval(() => {
     })();
   }
 }, 5000);
+
+// Keep short-lived transfer authorization rows bounded. Retain expired and
+// consumed records for one day for operational diagnosis, then remove them.
+let transferTicketCleanupInProgress = false;
+setInterval(async () => {
+  if (transferTicketCleanupInProgress) return;
+  transferTicketCleanupInProgress = true;
+  try {
+    await sql`DELETE FROM virtual_world_activity_transfer_tickets
+      WHERE expires_at < NOW() - INTERVAL '1 day'
+         OR consumed_at < NOW() - INTERVAL '1 day'`;
+  } catch (error) {
+    console.error("activity_transfer_ticket_cleanup_failed", error);
+  } finally {
+    transferTicketCleanupInProgress = false;
+  }
+}, 60_000);
 
 let voiceReconciliationInProgress = false;
 setInterval(async () => {
