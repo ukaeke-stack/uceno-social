@@ -24,6 +24,7 @@ on:
       - "runtime/world-gateway/**"
       - "db/migrations/024_virtual_world_instance_leases.sql"
       - "db/migrations/025_virtual_world_event_locations.sql"
+      - "db/migrations/028_district_object_persistence.sql"
       - "scripts/validate-uceno-spatial-features.cjs"
       - "app/api/worlds/**"
       - "app/api/world-homes/**"
