@@ -311,20 +311,32 @@ async function ensureObjectStatesLoaded(worldId: string): Promise<void> {
 }
 
 async function persistDatabaseObjectState(worldId: string, actorId: string, target: Interactable): Promise<boolean> {
-  const rows = await sql`
-    INSERT INTO virtual_world_object_states
-      (world_id, district_id, object_id, object_kind, object_state, updated_by, version, updated_at)
-    VALUES (${worldId}::uuid, ${target.districtId}, ${target.id}, ${target.kind}, ${target.state}, ${actorId}::uuid, 1, NOW())
-    ON CONFLICT (world_id, district_id, object_id) DO UPDATE SET
-      object_kind = EXCLUDED.object_kind, object_state = EXCLUDED.object_state,
-      updated_by = EXCLUDED.updated_by, version = virtual_world_object_states.version + 1,
-      updated_at = NOW()
-    WHERE virtual_world_object_states.version = ${target.version}
-      AND virtual_world_object_states.object_kind = EXCLUDED.object_kind
-    RETURNING version
-  `;
-  if (!rows[0]) return false;
-  target.version = Number(rows[0].version);
+  const version = await sql.begin(async tx => {
+    // Serialize object mutations against process takeover. The row lock is
+    // held until the object-state write commits.
+    const owner = await tx`SELECT id FROM virtual_world_instances
+      WHERE id = ${INSTANCE_ID}::uuid
+        AND owner_process_id = ${PROCESS_ID}::uuid
+        AND owner_generation = ${processGeneration}
+        AND owner_lease_expires_at > clock_timestamp()
+      FOR SHARE`;
+    if (!owner.length) return null;
+    const rows = await tx`
+      INSERT INTO virtual_world_object_states
+        (world_id, district_id, object_id, object_kind, object_state, updated_by, version, updated_at)
+      VALUES (${worldId}::uuid, ${target.districtId}, ${target.id}, ${target.kind}, ${target.state}, ${actorId}::uuid, 1, NOW())
+      ON CONFLICT (world_id, district_id, object_id) DO UPDATE SET
+        object_kind = EXCLUDED.object_kind, object_state = EXCLUDED.object_state,
+        updated_by = EXCLUDED.updated_by, version = virtual_world_object_states.version + 1,
+        updated_at = NOW()
+      WHERE virtual_world_object_states.version = ${target.version}
+        AND virtual_world_object_states.object_kind = EXCLUDED.object_kind
+      RETURNING version
+    `;
+    return rows[0] ? Number(rows[0].version) : null;
+  });
+  if (version === null) return false;
+  target.version = version;
   return true;
 }
 
@@ -586,7 +598,15 @@ async function restorePersistedActivities(): Promise<void> {
  */
 async function tryTakeoverStaleActivity(sessionId: string, player: Player): Promise<ActivitySession | null> {
   if (activitySessions.has(sessionId) || !/^[0-9a-f-]{36}$/i.test(sessionId)) return null;
-  const rows = await sql`UPDATE virtual_world_activity_sessions AS activity
+  const rows = await sql.begin(async tx => {
+    const owner = await tx`SELECT id FROM virtual_world_instances
+      WHERE id = ${INSTANCE_ID}::uuid
+        AND owner_process_id = ${PROCESS_ID}::uuid
+        AND owner_generation = ${processGeneration}
+        AND owner_lease_expires_at > clock_timestamp()
+      FOR SHARE`;
+    if (!owner.length) return [];
+    return tx`UPDATE virtual_world_activity_sessions AS activity
     SET instance_id = ${INSTANCE_ID}::uuid,
         host_user_id = ${player.id}::uuid,
         host_generation = activity.host_generation + 1,
@@ -620,6 +640,7 @@ async function tryTakeoverStaleActivity(sessionId: string, player: Player): Prom
         OR previous_instance.heartbeat_at IS NULL
         OR previous_instance.heartbeat_at < NOW() - INTERVAL '30 seconds')
     RETURNING activity.state`;
+  });
   if (!rows[0]) return null;
   const restored = restoreActivitySession(rows[0].state);
   if (!restored || restored.session.instanceId !== INSTANCE_ID ||
