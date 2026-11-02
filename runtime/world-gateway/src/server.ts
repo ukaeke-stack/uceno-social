@@ -874,7 +874,7 @@ server.on("upgrade", async (req, socket, head) => {
       ON CONFLICT (world_id, user_id) DO UPDATE SET instance_id = EXCLUDED.instance_id, session_id = EXCLUDED.session_id,
         generation = virtual_world_player_sessions.generation + 1, updated_at = NOW() RETURNING generation
     `;
-    if (!claimed[0]) throw new Error(isTransfer ? "transfer_ticket_invalid_or_used" : "session_lease_unavailable");
+    if (!claimed || !claimed[0]) throw new Error(isTransfer ? "transfer_ticket_invalid_or_used" : "session_lease_unavailable");
     const sessionGeneration = Number(claimed[0].generation);
     wss.handleUpgrade(req, socket, head, (ws) => {
       upgradeIdentity.set(ws, { ...identity, token, sessionId, sessionGeneration, clientType: String(payload.client_type), isTransfer });
