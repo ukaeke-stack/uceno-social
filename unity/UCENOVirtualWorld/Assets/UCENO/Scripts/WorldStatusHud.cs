@@ -25,6 +25,7 @@ namespace UCENO.VirtualWorld
         private bool sprintToggle;
         private bool voicePanelOpen;
         private static bool voicePanelVisible;
+        private static float voicePanelHeight;
         private GUIStyle voicePanelStyle;
         private GUIStyle voiceButtonStyle;
         private GUIStyle voiceLabelStyle;
@@ -163,7 +164,11 @@ namespace UCENO.VirtualWorld
 
             float innerWidth = width - 16f * scale;
             float left = x + 8f * scale;
-            float panelHeight = (spatialVoice.VoiceEnabled ? 6f : 2f) * rowHeight + 12f * scale;
+            string[] connectedPeers = spatialVoice.GetConnectedPeerIds();
+            int visiblePeerRows = Mathf.Min(3, connectedPeers.Length);
+            int peerExtraRows = connectedPeers.Length > 0 ? 1 + visiblePeerRows + (connectedPeers.Length > visiblePeerRows ? 1 : 0) : 0;
+            float panelHeight = (spatialVoice.VoiceEnabled ? 6f : 2f) * rowHeight + peerExtraRows * rowHeight + 12f * scale;
+            voicePanelHeight = panelHeight;
             Rect panel = new Rect(x, y + 46f * scale, width, panelHeight);
             Color previousColor = GUI.color;
             GUI.color = new Color(0f, 0f, 0f, 0.82f);
@@ -215,6 +220,25 @@ namespace UCENO.VirtualWorld
                 spatialVoice.SpeakerEnabled ? "REMOTE AUDIO: ON" : "REMOTE AUDIO: MUTED"))
                 spatialVoice.SetSpeakerEnabled(!spatialVoice.SpeakerEnabled);
             currentY += rowHeight + 3f * scale;
+            if (connectedPeers.Length > 0)
+            {
+                GUI.Label(new Rect(left, currentY, innerWidth, rowHeight), "NEARBY VOICE", voiceLabelStyle);
+                currentY += rowHeight;
+                for (int i = 0; i < visiblePeerRows; i++)
+                {
+                    string peerId = connectedPeers[i];
+                    string shortId = peerId.Length > 8 ? peerId.Substring(0, 8) : peerId;
+                    bool muted = spatialVoice.IsPeerMuted(peerId);
+                    if (GUI.Button(new Rect(left, currentY, innerWidth, rowHeight), (muted ? "UNMUTE " : "MUTE ") + shortId))
+                        spatialVoice.SetPeerMuted(peerId, !muted);
+                    currentY += rowHeight + 2f * scale;
+                }
+                if (connectedPeers.Length > visiblePeerRows)
+                {
+                    GUI.Label(new Rect(left, currentY, innerWidth, rowHeight), "+" + (connectedPeers.Length - visiblePeerRows) + " more nearby", voiceLabelStyle);
+                    currentY += rowHeight;
+                }
+            }
             if (GUI.Button(new Rect(left, currentY, innerWidth, rowHeight), "LEAVE VOICE"))
                 spatialVoice.DisableVoice();
         }
@@ -255,7 +279,7 @@ namespace UCENO.VirtualWorld
             if (voicePanelVisible)
             {
                 float rowHeight = 38f * scale;
-                float panelHeight = 6f * rowHeight + 12f * scale;
+                float panelHeight = voicePanelHeight > 0f ? voicePanelHeight : 6f * rowHeight + 12f * scale;
                 Rect panel = new Rect(x, y + 46f * scale, width, panelHeight);
                 if (panel.Contains(guiPosition)) return true;
             }
@@ -299,6 +323,7 @@ namespace UCENO.VirtualWorld
         {
             sprintToggle = false;
             voicePanelVisible = false;
+            voicePanelHeight = 0f;
             if (spatialVoice != null) spatialVoice.SetPushToTalkHeld(false);
             if (player != null)
                 player.SetSprinting(false);
