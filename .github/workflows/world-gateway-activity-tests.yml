@@ -9,6 +9,12 @@ on:
       - "runtime/world-gateway/tests/**"
       - "runtime/world-gateway/package.json"
       - "runtime/world-gateway/tsconfig.json"
+      - "db/migrations/029_*.sql"
+      - "db/migrations/030_*.sql"
+      - "db/migrations/031_*.sql"
+      - "db/migrations/032_*.sql"
+      - "db/migrations/033_*.sql"
+      - "db/migrations/034_*.sql"
       - ".github/workflows/world-gateway-activity-tests.yml"
   pull_request:
     paths:
@@ -23,6 +29,20 @@ permissions:
 
 jobs:
   activity-domain:
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     name: Compile gateway and test activity state machine
     runs-on: ubuntu-latest
     defaults:
