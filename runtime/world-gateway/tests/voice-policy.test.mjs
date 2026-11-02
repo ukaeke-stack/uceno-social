@@ -57,7 +57,9 @@ test("voice proximity hysteresis stabilizes room membership at the edge", () => 
   assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 21.9 }, false), true);
   assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 22.1 }, false), false);
   assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 24.5 }, true), true);
-  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 26.1 }, true), false);
+  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 26 }, true), true);
+  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 26.001 }, true), false);
+  assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 22 }, false), true);
   assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 24 }, false), false);
   assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 24 }, true), true);
   assert.equal(isWithinVoiceRangeWithHysteresis(base, { ...base, x: 23 }, false, 24, 22), false);
