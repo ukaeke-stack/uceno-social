@@ -120,6 +120,17 @@ jobs:
           const authoring = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableAuthoring.cs', 'utf8');
           for (const marker of ['Mark Selected as Door', 'Mark Selected as Seat', 'Mark Selected as Usable Object', 'Mark Selected as Furniture', 'Mark Selected as Vehicle', 'WorldCollisionGeometryExporter.Export'])
             if (!authoring.includes(marker)) throw new Error('Missing Unity interactable authoring tool: ' + marker);
+          const registryAuthoring = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableAuthoring.cs', 'utf8');
+          if (!registryAuthoring.includes('GlobalObjectId.GetGlobalObjectIdSlow') || !registryAuthoring.includes('SHA256'))
+            throw new Error('Scene object IDs must be stable hashes of Unity GlobalObjectId values.');
+          const registryExporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableRegistryExporter.cs', 'utf8');
+          for (const marker of ['Export Scene Interactables to Gateway Registry', 'world-interactables.json', 'GetComponentsInChildren<Collider>', 'marker.HasDoorPivot', 'No scene interactables were found'])
+            if (!registryExporter.includes(marker)) throw new Error('Missing scene-to-gateway interactable registry export: ' + marker);
+          const interactableMarker = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldInteractable.cs', 'utf8');
+          if (interactableMarker.includes('gameObject.name.ToLowerInvariant()') || !interactableMarker.includes('HasDoorPivot'))
+            throw new Error('World object IDs must not depend on display names and door pivot validation must be available.');
+          if (!gateway.includes('WORLD_INTERACTABLES_FILE') || !gateway.includes('World interactables must contain an interactables array'))
+            throw new Error('Gateway must load and validate the exported scene object registry.');
           const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
           for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes.json'])
             if (!exporter.includes(marker)) throw new Error('Missing Unity geometry export behavior: ' + marker);
