@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, selectNextActivityHost, type ActivitySession } from "./activity-session.js";
+import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./district-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
@@ -36,11 +37,6 @@ type CollisionBox = {
 };
 type Interactable = { id: string; kind: "door" | "seat" | "object"; x: number; y: number; z: number; yaw: number; state: string; actorId: string | null; occupantId: string | null };
 
-type WorldDistrict = {
-  id: string; name: string; contentLabel: string;
-  minX: number; maxX: number; minZ: number; maxZ: number;
-};
-
 function loadWorldDistricts(): WorldDistrict[] {
   const filePath = process.env.WORLD_DISTRICTS_FILE;
   let raw = process.env.WORLD_DISTRICTS;
@@ -51,50 +47,10 @@ function loadWorldDistricts(): WorldDistrict[] {
         (error instanceof Error ? error.message : "unknown file error"));
     }
   }
-  if (!raw) return [];
-  let parsed: unknown;
-  try { parsed = JSON.parse(raw); }
-  catch { throw new Error("WORLD_DISTRICTS must be valid JSON"); }
-  const values = parsed && typeof parsed === "object" &&
-    Array.isArray((parsed as { districts?: unknown }).districts)
-      ? (parsed as { districts: unknown[] }).districts : null;
-  if (!values || values.length > 100)
-    throw new Error("WORLD_DISTRICTS must contain a districts array with at most 100 entries");
-  const ids = new Set<string>();
-  const districts = values.map((value, index): WorldDistrict => {
-    if (!value || typeof value !== "object") throw new Error(`District ${index} is invalid`);
-    const item = value as Record<string, unknown>;
-    if (typeof item.id !== "string" || !/^[a-zA-Z0-9_-]{1,64}$/.test(item.id) ||
-        ids.has(item.id) || typeof item.name !== "string" || !item.name.trim() || item.name.length > 80 ||
-        typeof item.contentLabel !== "string" || !/^world-city-district-[a-z0-9-]{1,48}$/.test(item.contentLabel) ||
-        !finiteNumber(item.minX, -WORLD_BOUNDS, WORLD_BOUNDS) ||
-        !finiteNumber(item.maxX, -WORLD_BOUNDS, WORLD_BOUNDS) ||
-        !finiteNumber(item.minZ, -WORLD_BOUNDS, WORLD_BOUNDS) ||
-        !finiteNumber(item.maxZ, -WORLD_BOUNDS, WORLD_BOUNDS) ||
-        item.minX >= item.maxX || item.minZ >= item.maxZ)
-      throw new Error(`District ${index} has invalid or duplicate fields`);
-    ids.add(item.id);
-    return { id: item.id, name: item.name.trim(), contentLabel: item.contentLabel,
-      minX: item.minX, maxX: item.maxX, minZ: item.minZ, maxZ: item.maxZ };
-  });
-  for (let i = 0; i < districts.length; i++) {
-    for (let j = i + 1; j < districts.length; j++) {
-      const a = districts[i], b = districts[j];
-      const overlaps = a.minX < b.maxX && a.maxX > b.minX &&
-        a.minZ < b.maxZ && a.maxZ > b.minZ;
-      if (overlaps) throw new Error(`Districts ${a.id} and ${b.id} overlap`);
-    }
-  }
-  return districts;
+  return parseWorldDistricts(raw, WORLD_BOUNDS);
 }
 
 const WORLD_DISTRICTS = loadWorldDistricts();
-function findWorldDistrict(x: number, z: number): WorldDistrict | null {
-  return WORLD_DISTRICTS.find(district =>
-    x >= district.minX && x < district.maxX &&
-    z >= district.minZ && z < district.maxZ) || null;
-}
-type EquippedWardrobeItem = { slot: string; itemId: string };
 
 function loadInteractables(): Map<string, Interactable> {
   const filePath = process.env.WORLD_INTERACTABLES_FILE || process.env.WORLD_COLLISION_BOXES_FILE;
@@ -1247,7 +1203,7 @@ setInterval(async () => {
     p.vy -= GRAVITY * dt;
     const proposedX = p.x + p.vx * dt;
     const proposedZ = p.z + p.vz * dt;
-    const targetDistrict = p.homeId || p.eventId ? null : findWorldDistrict(proposedX, proposedZ);
+    const targetDistrict = p.homeId || p.eventId ? null : findWorldDistrict(WORLD_DISTRICTS, proposedX, proposedZ);
     const targetDistrictId = targetDistrict?.id ?? null;
     if (targetDistrictId !== p.activeDistrictId) {
       if (!targetDistrict) {
