@@ -150,6 +150,12 @@ namespace UCENO.VirtualWorld
         {
             if (route != "speaker" && route != "earpiece" && route != "bluetooth") return false;
 #if UNITY_ANDROID && !UNITY_EDITOR
+            if (route == "bluetooth" && !Permission.HasUserAuthorizedPermission("android.permission.BLUETOOTH_CONNECT"))
+            {
+                Permission.RequestUserPermission("android.permission.BLUETOOTH_CONNECT");
+                status = "BLUETOOTH PERMISSION REQUIRED";
+                return false;
+            }
             try
             {
                 using (var plugin = new AndroidJavaClass("com.uceno.virtualworld.UCENOAudioRoute"))
