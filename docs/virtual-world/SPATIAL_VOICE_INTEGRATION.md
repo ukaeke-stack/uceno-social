@@ -133,3 +133,26 @@ Do not describe spatial voice as operational until all verification gates pass.
   background handling or revocation as verified until the acceptance matrix in
   `SPATIAL_VOICE_DEVICE_TESTS.md` passes.
 - Do not start an APK build in this phase. Keep PR #38 draft and unmerged.
+
+
+## Reliability follow-up — 2026-11-02
+
+- Gateway pair discovery now uses hysteresis: pairs enter at 22 m and remain
+  authorized until 26 m. The Unity audio attenuation still reaches its maximum
+  fade distance at 24 m. This avoids room churn when players hover at the edge.
+- Added boundary tests for entry/exit thresholds and invalid hysteresis settings.
+- Added a GitHub Actions workflow to compile the world gateway and run its
+  activity-session and voice-policy tests on relevant changes.
+- Push-to-talk now uses the LiveKit `MicrophoneSource.SetMute` API while keeping
+  the capture pipeline started after publication, instead of repeatedly
+  starting/stopping the microphone for each button press. The source is stopped
+  and disposed when the pair room is removed.
+- Speaker mute now affects only remote voice AudioSources; it no longer changes
+  the global Unity AudioListener volume or unintentionally silences world audio.
+- Voice presence retries after gateway reconnection. Returned token responses
+  are checked for expected pair-room naming, local identity, peer identity,
+  bounded expiry and secure WSS URL before LiveKit connect.
+
+These are source changes. CI results, Unity compilation, Android behavior and
+two-device revocation tests still need to be observed; do not treat them as
+passed merely because the workflow has been added.
