@@ -70,8 +70,11 @@ jobs:
           node - <<'NODE'
           const fs = require('fs');
           const gateway = fs.readFileSync('./runtime/world-gateway/src/server.ts', 'utf8');
-          for (const marker of ['WORLD_OBJECT_STATE_FILE', 'restorePersistentObjectStates', 'persistObjectStates', 'renameSync', 'state_persistence_failed'])
-            if (!gateway.includes(marker)) throw new Error('Missing durable world-object state behavior: ' + marker);
+          for (const marker of ['virtual_world_object_states', 'ensureObjectStatesLoaded', 'persistDatabaseObjectState', 'version = virtual_world_object_states.version + 1', 'district_id', 'district_content_ready', 'object_in_different_district', 'state_persistence_failed', '2500'])
+            if (!gateway.includes(marker)) throw new Error('Missing district-scoped durable object-state behavior: ' + marker);
+          const objectMigration = fs.readFileSync('./db/migrations/027_district_object_persistence.sql', 'utf8');
+          for (const marker of ['PRIMARY KEY (world_id, district_id, object_id)', "'vehicle'", "'furniture'"])
+            if (!objectMigration.includes(marker)) throw new Error('Missing district object persistence schema: ' + marker);
           for (const marker of ['const previousState = target.state', 'target.state = previousState', 'target.actorId = previousActorId'])
             if (!gateway.includes(marker)) throw new Error('Missing interaction rollback on persistence failure: ' + marker);
           for (const marker of ['WORLD_COLLISION_BOXES_FILE', 'readFileSync', 'loadCollisionBoxes', 'PLAYER_RADIUS', 'PLAYER_HEIGHT', 'resolveHorizontalMovement', 'overlapsBox'])
@@ -81,7 +84,7 @@ jobs:
           for (const marker of ['loadInteractables', 'type === "interact"', 'isInteractionAllowed(distance, now - player.lastInteractionAt)', 'resolveInteraction(target, player.id, msg.action)', 'object_state', 'releaseSeats', 'item.occupantId === player.id'])
             if (!gateway.includes(marker)) throw new Error('Missing authoritative interaction validation: ' + marker);
           const interactionPolicy = fs.readFileSync('./runtime/world-gateway/src/interaction-policy.ts', 'utf8');
-          for (const marker of ['distance <= maxDistance', 'elapsedSincePreviousMs >= cooldownMs', 'Number.isFinite(distance)', 'target.kind === "seat"', 'seat_occupied', 'seat_not_occupied_by_player', 'target.kind === "door"', 'target.kind === "object"'])
+          for (const marker of ['distance <= maxDistance', 'elapsedSincePreviousMs >= cooldownMs', 'Number.isFinite(distance)', 'target.kind === "seat"', 'seat_occupied', 'seat_not_occupied_by_player', 'target.kind === "door"', 'target.kind === "object"', 'target.kind === "vehicle"', 'target.kind === "furniture"'])
             if (!interactionPolicy.includes(marker)) throw new Error('Missing extracted interaction policy: ' + marker);
           for (const marker of ['for (const target of INTERACTABLES.values())', 'actorId: target.actorId', 'occupantId: target.occupantId'])
             if (!gateway.includes(marker)) throw new Error('Missing initial interactable-state synchronization for joining clients: ' + marker);
