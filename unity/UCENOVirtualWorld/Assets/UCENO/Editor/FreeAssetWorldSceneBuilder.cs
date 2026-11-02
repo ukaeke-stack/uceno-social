@@ -136,6 +136,7 @@ namespace UCENO.VirtualWorld.Editor
             // gateway collision map still covers every generated city collider.
             string collisionMapPath = WorldCollisionGeometryExporter.Export(scene);
             BuildDistrictScenes(worldRoot);
+            WorldInteractableRegistryExporter.Export(false);
 
             EditorSceneManager.MarkSceneDirty(scene);
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
