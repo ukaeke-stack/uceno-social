@@ -1867,16 +1867,21 @@ setInterval(async () => {
         const payload = row.payload as { type?: string; session?: { id?: string; worldId?: string; instanceId?: string; hostGeneration?: number } };
         if (payload?.type !== 'activity_state' || payload.session?.worldId !== row.worldId ||
             payload.session?.instanceId !== row.instanceId || typeof payload.session?.id !== 'string') continue;
-        const authority = await sql`SELECT 1 FROM virtual_world_activity_sessions
-          WHERE id = ${payload.session.id}::uuid AND world_id = ${row.worldId}::uuid
-            AND instance_id = ${row.instanceId}::uuid
-            AND host_generation = ${payload.session.hostGeneration}
-          LIMIT 1`;
-        if (!authority[0]) continue;
-        const packet = JSON.stringify(payload);
-        for (const peer of players.values()) {
-          if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
-        }
+        await sql.begin(async tx => {
+          // Hold the activity row lock through fan-out. A takeover must either
+          // commit before this check (and suppress the stale event) or wait
+          // until this already-authorized broadcast has completed.
+          const authority = await tx`SELECT 1 FROM virtual_world_activity_sessions
+            WHERE id = ${payload.session.id}::uuid AND world_id = ${row.worldId}::uuid
+              AND instance_id = ${row.instanceId}::uuid
+              AND host_generation = ${payload.session.hostGeneration}
+            FOR UPDATE`;
+          if (!authority[0]) return;
+          const packet = JSON.stringify(payload);
+          for (const peer of players.values()) {
+            if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
+          }
+        });
       }
     }
   } catch (error) { console.error('world_snapshot_relay_poll_failed', error); }
