@@ -61,14 +61,15 @@ test("seat registry entries start available and persistent furniture starts idle
   assert.equal(registry.get("table-1").state, "idle");
 });
 
-
-test("required registry mode fails startup instead of silently disabling all world objects", () => {
+test("required registry mode rejects missing and empty scene exports", () => {
   assert.equal(loadInteractableRegistry(undefined, districts, 100, false).size, 0);
   assert.equal(loadInteractableRegistry("  ", districts, 100, false).size, 0);
   assert.throws(() => loadInteractableRegistry(undefined, districts, 100, true),
     /WORLD_REQUIRE_INTERACTABLE_REGISTRY.*no world interactable registry/);
   assert.throws(() => loadInteractableRegistry("  ", districts, 100, true),
     /WORLD_REQUIRE_INTERACTABLE_REGISTRY.*no world interactable registry/);
+  assert.throws(() => loadInteractableRegistry(JSON.stringify({ interactables: [] }), districts, 100, true),
+    /WORLD_REQUIRE_INTERACTABLE_REGISTRY.*contains no objects/);
   const loaded = loadInteractableRegistry(JSON.stringify({ interactables: [
     { id: "scene:door-required", kind: "door", x: 0, y: 0, z: 0 }
   ] }), districts, 100, true);
