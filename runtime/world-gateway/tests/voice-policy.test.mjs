@@ -24,3 +24,31 @@ test("voice signaling accepts only bounded SDP and ICE candidate payloads", () =
   assert.equal(isValidVoiceSignal("unknown", "v=0", null), false);
   assert.equal(isValidVoiceSignal("offer", "", null), false);
 });
+test("voice room scopes do not accidentally mix public, home, and event contexts", () => {
+  const publicRoom = { ...base, homeId: null, eventId: null };
+  const homeRoom = { ...base, homeId: "home-a", eventId: null };
+  const eventRoom = { ...base, homeId: null, eventId: "event-a" };
+  assert.equal(sameSpatialVoiceRoom(publicRoom, homeRoom), false);
+  assert.equal(sameSpatialVoiceRoom(publicRoom, eventRoom), false);
+  assert.equal(sameSpatialVoiceRoom(homeRoom, eventRoom), false);
+  assert.equal(sameSpatialVoiceRoom(homeRoom, { ...homeRoom, x: 23.9 }), true);
+});
+test("voice proximity rejects non-finite coordinates and invalid distance limits", () => {
+  assert.equal(isWithinVoiceRange(base, { ...base, z: NaN }), false);
+  assert.equal(isWithinVoiceRange(base, { ...base, y: -Infinity }), false);
+  assert.equal(isWithinVoiceRange(base, { ...base, x: 0.1 }, 0), false);
+  assert.equal(isWithinVoiceRange(base, { ...base, x: 0.1 }, -1), false);
+  assert.equal(isWithinVoiceRange(base, { ...base, x: 0.1 }, Infinity), false);
+  assert.equal(isWithinVoiceRange(base, { ...base, x: 24, y: 0, z: 0 }), true);
+  assert.equal(isWithinVoiceRange(base, { ...base, x: 24, y: 0.01, z: 0 }), false);
+});
+test("voice signal validation rejects wrong payload types and overlong boundary values", () => {
+  assert.equal(isValidVoiceSignal("offer", 123, null), false);
+  assert.equal(isValidVoiceSignal("answer", null, null), false);
+  assert.equal(isValidVoiceSignal("candidate", null, 123), false);
+  assert.equal(isValidVoiceSignal("candidate", null, ""), false);
+  assert.equal(isValidVoiceSignal("offer", "x".repeat(12000), null), true);
+  assert.equal(isValidVoiceSignal("offer", "x".repeat(12001), null), false);
+  assert.equal(isValidVoiceSignal("candidate", null, "x".repeat(2048)), true);
+  assert.equal(isValidVoiceSignal("candidate", null, "x".repeat(2049)), false);
+});
