@@ -36,6 +36,7 @@ type CollisionBox = {
   minZ: number; maxZ: number;
 };
 type Interactable = { id: string; kind: "door" | "seat" | "object"; x: number; y: number; z: number; yaw: number; state: string; actorId: string | null; occupantId: string | null };
+type EquippedWardrobeItem = { slot: string; itemId: string };
 
 function loadWorldDistricts(): WorldDistrict[] {
   const filePath = process.env.WORLD_DISTRICTS_FILE;
