@@ -128,6 +128,24 @@ namespace UCENO.VirtualWorld
         public GatewayActivityParticipantState[] participants;
     }
 
+    [Serializable] internal sealed class GatewayActivityDiscoverySession
+    {
+        public string id;
+        public string instanceId;
+        public string endpoint;
+        public string kind;
+        public string phase;
+        public string hostUserId;
+        public string raceId;
+        public double createdAt;
+        public double startedAt;
+        public double completedAt;
+        public int version;
+        public int maxParticipants;
+        public int checkpointCount;
+        public GatewayActivityParticipantState[] participants;
+    }
+
     [Serializable] internal sealed class GatewayPacket
     {
         public string type;
@@ -160,6 +178,10 @@ namespace UCENO.VirtualWorld
         public GatewayVectorState state;
         public GatewaySnapshotPlayer[] players;
         public GatewayActivitySessionState session;
+        public GatewayActivityDiscoverySession[] sessions;
+        public string instanceId;
+        public string endpoint;
+        public string sessionId;
     }
 
     /// <summary>
@@ -246,6 +268,7 @@ namespace UCENO.VirtualWorld
         public event Action<string> SpatialLocationRejected;
         public event Action<GatewayActivitySessionState> ActivityStateChanged;
         public event Action<string> ActivityRejected;
+        public event Action<string, string> ActivityRouteRequired;
         public event Action<string, bool> VoicePeerPresenceChanged;
         public event Action<string, string, string, string, string, int> VoiceSignalReceived;
         public event Action<string> VoiceSignalRejected;
@@ -461,6 +484,9 @@ namespace UCENO.VirtualWorld
                 Debug.LogWarning("UCENO spatial context request failed: " + error.Message);
             }
         }
+
+        public bool RequestActivityDiscovery() =>
+            SendActivityRequest(new GatewayActivityRequest { type = "activity_discover" });
 
         public bool RequestActivityCreate(string kind, string raceId = "", int maxParticipants = 16)
         {
@@ -751,6 +777,7 @@ namespace UCENO.VirtualWorld
                     localPlayer.SetServerAuthority(true);
                 }
                 ConnectionStatus = "ONLINE";
+                RequestActivityDiscovery();
                 return;
             }
 
@@ -858,6 +885,36 @@ namespace UCENO.VirtualWorld
                 else activitySessions.Insert(0, packet.session);
                 if (activitySessions.Count > 64) activitySessions.RemoveRange(64, activitySessions.Count - 64);
                 ActivityStateChanged?.Invoke(packet.session);
+                return;
+            }
+
+            if (packet.type == "activity_discovery" && packet.sessions != null)
+            {
+                foreach (GatewayActivityDiscoverySession discovered in packet.sessions)
+                {
+                    if (discovered == null || string.IsNullOrWhiteSpace(discovered.id)) continue;
+                    int existingIndex = activitySessions.FindIndex(item => item.id == discovered.id);
+                    GatewayActivitySessionState state = new GatewayActivitySessionState
+                    {
+                        id = discovered.id, hostUserId = discovered.hostUserId,
+                        raceId = discovered.raceId, instanceId = discovered.instanceId,
+                        kind = discovered.kind, phase = discovered.phase,
+                        createdAt = discovered.createdAt, startedAt = discovered.startedAt,
+                        completedAt = discovered.completedAt, version = discovered.version,
+                        maxParticipants = discovered.maxParticipants,
+                        checkpointCount = discovered.checkpointCount,
+                        participants = discovered.participants
+                    };
+                    if (existingIndex >= 0) activitySessions[existingIndex] = state;
+                    else activitySessions.Insert(0, state);
+                    ActivityStateChanged?.Invoke(state);
+                }
+                return;
+            }
+
+            if (packet.type == "activity_route_required")
+            {
+                ActivityRouteRequired?.Invoke(packet.endpoint ?? "", packet.sessionId ?? "");
                 return;
             }
 
