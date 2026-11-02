@@ -66,21 +66,32 @@ function startGateway(port, instanceId, scopedDatabaseUrl) {
   return child;
 }
 
-async function receiveSocketMessage(socket, expectedType, timeoutMs = 5000) {
+async function receiveSocketMessage(socket, expectedType, timeoutMs = 5000, predicate = () => true) {
   return new Promise((resolve, reject) => {
     const seen = [];
-    const timeout = setTimeout(() => reject(new Error(`timed out waiting for ${expectedType}; received: ${JSON.stringify(seen)}`)), timeoutMs);
+    const cleanup = () => {
+      clearTimeout(timeout);
+      socket.off("message", onMessage);
+      socket.off("error", onError);
+    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error(`timed out waiting for matching ${expectedType}; received: ${JSON.stringify(seen)}`));
+    }, timeoutMs);
     const onMessage = raw => {
       let packet;
       try { packet = JSON.parse(raw.toString()); } catch { return; }
-      seen.push(packet);
-      if (packet.type !== expectedType) return;
-      clearTimeout(timeout);
-      socket.off("message", onMessage);
+      if (seen.length < 12) seen.push(packet);
+      if (packet.type !== expectedType || !predicate(packet)) return;
+      cleanup();
       resolve(packet);
     };
+    const onError = error => {
+      cleanup();
+      reject(error);
+    };
     socket.on("message", onMessage);
-    socket.once("error", error => { clearTimeout(timeout); reject(error); });
+    socket.on("error", onError);
   });
 }
 
@@ -345,7 +356,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
         serverTime: Date.now(),
         players: [{ userId, x: 4, y: 1.15, z: 4, yaw: 0 }]
       }]);
-      const recoveredSnapshot = await receiveSocketMessage(recoverySocket.socket, "snapshot", 8000);
+      const recoveredSnapshot = await receiveSocketMessage(recoverySocket.socket, "snapshot", 8000,
+        packet => packet.players?.some(player => player.userId === userId && player.x === 4));
       assert.equal(recoveredSnapshot.players[0].userId, userId,
         "the recovered relay poller must resume consuming durable events after reconnecting");
       assert.equal(recoveredSnapshot.players[0].x, 4,
@@ -367,7 +379,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
       const restarted = await waitForReady(portB, gatewayB);
       assert.equal(restarted.instanceId, instanceB);
       const restartedSocket = await connectAuthenticated(portB, instanceB, worldId, userId);
-      const replayed = await receiveSocketMessage(restartedSocket.socket, "snapshot", 8000);
+      const replayed = await receiveSocketMessage(restartedSocket.socket, "snapshot", 8000,
+        packet => packet.players?.some(player => player.userId === userId && player.x === 19 && player.z === -7));
       assert.equal(replayed.players[0].x, 19,
         "same instance replacement must replay events appended while its previous process was down");
       assert.equal(replayed.players[0].z, -7);
@@ -455,7 +468,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
             staleRelayPackets.push(packet);
           if (packet.type === "snapshot" &&
               Array.isArray(packet.players) &&
-              packet.players.some(player => player.userId === userId))
+              packet.players.some(player => player.userId === userId && player.x === 999 && player.y === 1.15 && player.z === 999))
             staleSnapshotPackets.push(packet);
         } catch { /* Ignore unrelated or malformed packets. */ }
       };
