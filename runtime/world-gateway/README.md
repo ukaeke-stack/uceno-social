@@ -196,3 +196,31 @@ server-derived instance endpoint. The request body contains only
 This is still not end-to-end voice chat: Unity microphone capture, LiveKit room
 connection, remote audio playback, positional attenuation, mute controls and
 Android audio lifecycle integration remain to be implemented and tested.
+
+## District-aware object persistence
+
+Set WORLD_INTERACTABLES_FILE to the JSON map exported by Unity's
+UCENO/World/Export Current Scene Collision Map command, or use
+WORLD_COLLISION_BOXES_FILE for the same combined map. The file contains both
+static collision boxes and an interactables array. WORLD_INTERACTABLES may
+instead provide the interactables JSON directly.
+
+Each exported interactable has a stable object ID, kind, and authoritative
+world-space interaction anchor. The gateway derives district ownership from
+the anchor coordinates and WORLD_DISTRICTS; clients cannot submit or override
+the district. Supported durable kinds are door, furniture, vehicle and object.
+Seats remain temporary and are released on disconnect.
+
+Apply db/migrations/028_district_object_persistence.sql after migrations
+015–027. PostgreSQL stores state by world, district and object ID. Runtime
+instances load state before admitting a WebSocket session, use version-checked
+writes, and refresh newer versions every 2.5 seconds so separate instances
+converge. A district's object state is sent after its content-ready handshake.
+Do not enable the gateway against a database that has not received migration
+028.
+
+Unity's GameObject/UCENO authoring menu can mark selected scene objects as
+doors, seats, usable objects, furniture or vehicles. Assign the actual door
+pivot where applicable, keep object IDs stable, and export the scene map after
+authoring. The editor source change does not itself place markers on every
+furnished/city asset.
