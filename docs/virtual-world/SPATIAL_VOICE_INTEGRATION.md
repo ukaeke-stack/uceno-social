@@ -189,3 +189,10 @@ passed merely because the workflow has been added.
 - Voice presence requests retry on a bounded interval after the gateway returns. Each peer token/connect attempt retries up to five times with exponential delays capped at 16 seconds.
 - The HUD's connected-peer count now excludes peers still connecting.
 - These changes remain source-only; gateway reconnect, revocation races, and token failure recovery require the two-device acceptance tests.
+
+
+## Per-player mute controls — 2026-11-02
+
+- The mobile voice panel now lists up to three currently connected nearby peers and provides an individual mute/unmute control for each. Additional connected peers are counted rather than expanding the panel without limit.
+- Individual mute remains local playback control only; it does not block a user, alter social relationships, or replace server-side moderation and room revocation.
+- The connected peer count excludes peers whose LiveKit room has not completed connection.
