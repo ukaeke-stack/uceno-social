@@ -31,7 +31,7 @@ async function waitForReady(port, child, timeoutMs = 15000) {
   let lastError;
   while (Date.now() < deadline) {
     if (child.exitCode !== null || child.signalCode !== null)
-      throw new Error(`gateway process exited before readiness (code=${child.exitCode}, signal=${child.signalCode})\\nGateway process output:\\n${child.testOutput?.() ?? ""}`);
+      throw new Error(`gateway process exited before readiness (code=${child.exitCode}, signal=${child.signalCode})\nGateway process output:\n${child.testOutput?.() ?? ""}`);
     try {
       const response = await fetch(`http://127.0.0.1:${port}/ready`);
       if (response.status === 200) return await response.json();
@@ -42,7 +42,7 @@ async function waitForReady(port, child, timeoutMs = 15000) {
     await delay(150);
   }
   const diagnostics = typeof child.testOutput === "function" ? child.testOutput() : "";
-  throw new Error(`gateway readiness timed out: ${lastError?.message ?? "unknown error"}\\nGateway process output:\\n${diagnostics}`);
+  throw new Error(`gateway readiness timed out: ${lastError?.message ?? "unknown error"}\nGateway process output:\n${diagnostics}`);
 }
 
 function startGateway(port, instanceId, scopedDatabaseUrl, registryFile) {
@@ -148,27 +148,37 @@ async function connectAuthenticated(port, instanceId, worldId, userId) {
 
 async function assertWebSocketRejectsWrongInstance(port, instanceId) {
   const token = await new SignJWT({
-    world_id: randomUUID(), instance_id: instanceId, client_type: "unity-android"
+    world_id: randomUUID(),
+    instance_id: randomUUID(),
+    client_type: "unity-android"
   }).setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setIssuer("uceno-social").setAudience("uceno-world-gateway")
-    .setSubject(randomUUID()).setIssuedAt().setExpirationTime("1h")
+    .setSubject(randomUUID()).setIssuedAt().setExpirationTime("1m")
     .sign(new TextEncoder().encode(tokenSecret));
-  const socket = new WebSocket(`ws://127.0.0.1:${port}/world`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  assert.notEqual(instanceId, "", "test instance id must be configured");
   await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("wrong instance WebSocket was not rejected")), 5000);
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/world`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const timeout = setTimeout(() => {
+      socket.terminate();
+      reject(new Error("WebSocket authentication rejection timed out"));
+    }, 5000);
     socket.once("unexpected-response", (_request, response) => {
       clearTimeout(timeout);
+      assert.equal(response.statusCode, 401);
       response.resume();
       resolve();
     });
     socket.once("open", () => {
       clearTimeout(timeout);
-      socket.close();
-      reject(new Error("wrong instance WebSocket unexpectedly opened"));
+      socket.terminate();
+      reject(new Error("gateway accepted a token scoped to a different instance"));
     });
-    socket.once("error", error => { clearTimeout(timeout); reject(error); });
+    socket.once("error", error => {
+      clearTimeout(timeout);
+      reject(error);
+    });
   });
 }
 
@@ -285,10 +295,13 @@ test("two real gateway processes: primary loss leaves the replacement process re
       lease_expires_at TIMESTAMPTZ NOT NULL, PRIMARY KEY (world_id, user_id)
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_player_state (
-      world_id UUID NOT NULL, user_id UUID NOT NULL, position JSONB NOT NULL,
-      rotation JSONB NOT NULL, session_generation BIGINT NOT NULL DEFAULT 0,
-      state_version BIGINT NOT NULL DEFAULT 0, updated_by_session UUID, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      world_id UUID NOT NULL, user_id UUID NOT NULL, position JSONB, rotation JSONB,
+      session_generation BIGINT NOT NULL DEFAULT 0, state_version BIGINT NOT NULL DEFAULT 0,
+      updated_by_session UUID, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (world_id, user_id)
+    )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".user_avatar_wardrobe_equipped (
+      user_id UUID NOT NULL, slot TEXT NOT NULL, item_id TEXT NOT NULL
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".user_avatar_wardrobe_inventory (
       user_id UUID NOT NULL, item_id TEXT NOT NULL
@@ -307,16 +320,13 @@ test("two real gateway processes: primary loss leaves the replacement process re
       session_id UUID NOT NULL, generation BIGINT NOT NULL, updated_at TIMESTAMPTZ NOT NULL,
       PRIMARY KEY (world_id, user_id)
     )`);
-    await admin.unsafe(`INSERT INTO "${schema}".virtual_world_instances
-      (id, status, heartbeat_at, endpoint) VALUES
-      ($1::uuid, 'ready', NOW(), $2), ($3::uuid, 'ready', NOW(), $4)`,
-      [instanceA, `http://127.0.0.1:${portA}`, instanceB, `http://127.0.0.1:${portB}`]);
+    await admin.unsafe(`INSERT INTO "${schema}".virtual_world_instances (id, status, endpoint)
+      VALUES ($1::uuid, 'ready', $2), ($3::uuid, 'ready', $4), ($5::uuid, 'ready', $6)`,
+      [instanceA, `http://127.0.0.1:${portA}`, instanceB, `http://127.0.0.1:${portB}`, instanceC, "http://127.0.0.1:1"]);
+
     await admin.unsafe(`INSERT INTO "${schema}".users (id) VALUES ($1::uuid)`, [userId]);
-    await admin.unsafe(`INSERT INTO "${schema}".virtual_worlds
-      (id, status, visibility, owner_user_id) VALUES ($1::uuid, 'active', 'public', $2::uuid)`,
-      [worldId, userId]);
-    await admin.unsafe(`INSERT INTO "${schema}".virtual_world_memberships
-      (world_id, user_id, status) VALUES ($1::uuid, $2::uuid, 'active')`, [worldId, userId]);
+    await admin.unsafe(`INSERT INTO "${schema}".virtual_worlds (id, status, visibility, owner_user_id)
+      VALUES ($1::uuid, 'published', 'public', $2::uuid)`, [worldId, userId]);
     await admin.unsafe(`INSERT INTO "${schema}".virtual_world_instance_sessions
       (world_id, user_id, instance_id, lease_expires_at)
       VALUES ($1::uuid, $2::uuid, $3::uuid, NOW() + INTERVAL '5 minutes')`,
@@ -356,6 +366,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.notEqual(duplicateGatewayA.exitCode, null, "duplicate instance process must fail startup");
     assert.match(duplicateGatewayA.testOutput(), /world_instance_process_already_owned/);
 
+    await assertWebSocketRejectsWrongInstance(portA, instanceA);
+    await assertWebSocketRejectsWrongInstance(portB, instanceB);
     // A replacement process must restore the last durable player checkpoint,
     // not silently spawn the player at the world origin after a process loss.
     await admin.unsafe(`INSERT INTO "${schema}".virtual_world_player_state
@@ -392,8 +404,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
     const initialFurnitureState = await receiveSocketMessage(authenticated.socket, "object_state", 5000,
       packet => packet.objectId === "scene:test-furniture", "initial furniture snapshot");
     assert.equal(initialFurnitureState.objectState, "idle");
-    // The gateway enforces a 250 ms per-player interaction cooldown. Keep this
-    // integration sequence deterministic instead of racing the second action.
+    // The gateway enforces a 250 ms per-player interaction cooldown.
+    // Wait explicitly so this integration test exercises persistence rather than racing the rate limit.
     await delay(275);
     authenticated.socket.send(JSON.stringify({
       type: "interact", objectId: "scene:test-furniture", action: "use"
@@ -414,15 +426,338 @@ test("two real gateway processes: primary loss leaves the replacement process re
     let liveHeartbeats = [];
     while (Date.now() < heartbeatDeadline) {
       liveHeartbeats = await admin.unsafe(`SELECT id FROM "${schema}".virtual_world_instances
-        WHERE id = $1::uuid AND heartbeat_at > NOW() - INTERVAL '30 seconds'`, [instanceB]);
-      if (liveHeartbeats.length) break;
+        WHERE id IN ($1::uuid, $2::uuid) AND heartbeat_at > NOW() - INTERVAL '30 seconds'`,
+        [instanceA, instanceB]);
+      if (liveHeartbeats.length === 2) break;
       await delay(100);
     }
-    assert.equal(liveHeartbeats.length, 1);
-    // ... remaining failover assertions unchanged ...
+    assert.equal(liveHeartbeats.length, 2, "both running gateway processes must renew their database heartbeat");
+
+    await t.test("both independent processes publish their own database heartbeat", async () => {
+      const rows = await admin.unsafe(`SELECT id, heartbeat_at FROM "${schema}".virtual_world_instances
+        WHERE id IN ($1::uuid, $2::uuid)`, [instanceA, instanceB]);
+      assert.equal(rows.length, 2);
+      assert.ok(rows.every(row => row.heartbeat_at instanceof Date));
+      assert.deepEqual(new Set(rows.map(row => row.id)), new Set([instanceA, instanceB]));
+    });
+
+    await t.test("live gateway processes recover after PostgreSQL terminates their pooled connections", async () => {
+      const appNames = ["uceno-gateway-" + instanceA, "uceno-gateway-" + instanceB];
+      const terminated = await admin.unsafe(
+        "SELECT pg_terminate_backend(pid) AS terminated FROM pg_stat_activity " +
+        "WHERE application_name = ANY($1::text[]) AND pid <> pg_backend_pid()",
+        [appNames]
+      );
+      assert.ok(terminated.some(row => row.terminated),
+        "the test must interrupt at least one real gateway database connection");
+      const recoveryDeadline = Date.now() + 25000;
+      let recoveredRows = [];
+      while (Date.now() < recoveryDeadline) {
+        recoveredRows = await admin.unsafe(`SELECT id, heartbeat_at FROM "${schema}".virtual_world_instances
+          WHERE id IN ($1::uuid, $2::uuid) AND heartbeat_at > NOW() - INTERVAL '30 seconds'`,
+          [instanceA, instanceB]);
+        if (recoveredRows.length === 2) break;
+        await delay(250);
+      }
+      assert.equal(recoveredRows.length, 2,
+        "both gateway processes must reconnect and resume database heartbeats without restarting");
+      assert.ok(gatewayA.exitCode === null && gatewayB.exitCode === null,
+        "database connection interruption must not terminate either gateway process");
+      // Database pool recovery and WebSocket authorization can recover on adjacent
+      // poll cycles. Retry a transient rejection, but still fail if authentication
+      // does not recover within the bounded window.
+      const authRecoveryDeadline = Date.now() + 10000;
+      let recoverySocket;
+      let lastAuthError;
+      while (Date.now() < authRecoveryDeadline) {
+        try {
+          recoverySocket = await connectAuthenticated(portB, instanceB, worldId, userId);
+          break;
+        } catch (error) {
+          lastAuthError = error;
+          await delay(250);
+        }
+      }
+      assert.ok(recoverySocket, `gateway WebSocket authorization did not recover: ${lastAuthError?.message ?? "unknown error"}`);
+      const restoredDoorAfterReconnect = await receiveSocketMessage(recoverySocket.socket, "object_state", 5000,
+        packet => packet.objectId === "scene:test-door", "door state after reconnect");
+      assert.equal(restoredDoorAfterReconnect.objectState, "open",
+        "a reconnecting client must receive the persisted scene object state, not the registry default");
+      assert.equal(restoredDoorAfterReconnect.version, 1);
+      const restoredFurnitureAfterReconnect = await receiveSocketMessage(recoverySocket.socket, "object_state", 5000,
+        packet => packet.objectId === "scene:test-furniture", "furniture state after reconnect");
+      assert.equal(restoredFurnitureAfterReconnect.objectState, "active",
+        "a reconnecting client must receive the persisted furniture state");
+      assert.equal(restoredFurnitureAfterReconnect.version, 1);
+      await admin.unsafe(`
+        INSERT INTO "${schema}".virtual_world_realtime_events
+          (world_id, instance_id, event_type, payload, created_at)
+        VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb, NOW() - INTERVAL '1 minute')
+      `, [worldId, instanceA, {
+        serverTime: Date.now(),
+        players: [{ userId, x: 4, y: 1.15, z: 4, yaw: 0 }]
+      }]);
+      const recoveredSnapshot = await receiveSocketMessage(recoverySocket.socket, "snapshot", 8000,
+        packet => packet.players?.some(player => player.userId === userId && player.x === 4));
+      assert.equal(recoveredSnapshot.players[0].userId, userId,
+        "the recovered relay poller must resume consuming durable events after reconnecting");
+      assert.equal(recoveredSnapshot.players[0].x, 4,
+        "recovery must drain durable backlog older than the former 30-second cutoff");
+      recoverySocket.socket.close();
+    });
+
+    await t.test("replacement process resumes the persisted relay offset after a full process restart", async () => {
+      const priorOffset = await admin.unsafe(`SELECT last_event_id FROM "${schema}".virtual_world_realtime_consumers
+        WHERE instance_id = $1::uuid`, [instanceB]);
+      assert.equal(priorOffset.length, 1, "running gateway must persist its relay consumer offset");
+      await stopGateway(gatewayB);
+      gatewayB = null;
+      // SIGKILL cannot release the database lease. A replacement must wait
+      // until the last confirmed lease expires; starting earlier is correctly
+      // rejected as a duplicate owner, not evidence of failed recovery.
+      const leaseDeadline = Date.now() + 20000;
+      let leaseExpired = false;
+      while (Date.now() < leaseDeadline) {
+        const leaseRows = await admin.unsafe(`SELECT owner_lease_expires_at <= NOW() AS expired
+          FROM "${schema}".virtual_world_instances WHERE id = $1::uuid`, [instanceB]);
+        leaseExpired = leaseRows[0]?.expired === true;
+        if (leaseExpired) break;
+        await delay(150);
+      }
+      assert.equal(leaseExpired, true, "replacement must wait for the crashed process lease to expire");
+      const inserted = await admin.unsafe(`INSERT INTO "${schema}".virtual_world_realtime_events
+        (world_id, instance_id, event_type, payload, created_at)
+        VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb, NOW() - INTERVAL '1 minute')
+        RETURNING id`,
+        [worldId, instanceA, { serverTime: Date.now(), players: [{ userId, x: 19, y: 1.15, z: -7, yaw: 0 }] }]);
+      const replayedEventId = Number(inserted[0].id);
+      gatewayB = startGateway(portB, instanceB, scoped.toString(), registryFile);
+      const restarted = await waitForReady(portB, gatewayB);
+      assert.equal(restarted.instanceId, instanceB);
+      // The relay is a live fan-out, not a per-client replay queue: it can consume
+      // durable rows before a newly connecting socket exists. Verify process
+      // restart recovery by requiring the persisted consumer offset to pass the
+      // event inserted while the previous process was down.
+      const replayDeadline = Date.now() + 8000;
+      let replayCursor = 0;
+      while (Date.now() < replayDeadline) {
+        const cursorRows = await admin.unsafe(`SELECT last_event_id FROM "${schema}".virtual_world_realtime_consumers
+          WHERE instance_id = $1::uuid`, [instanceB]);
+        replayCursor = Number(cursorRows[0]?.last_event_id ?? 0);
+        if (replayCursor >= replayedEventId) break;
+        await delay(100);
+      }
+      assert.ok(replayCursor >= replayedEventId,
+        "replacement process must resume consuming durable events appended while its previous process was down");
+      const restartedSocket = await connectAuthenticated(portB, instanceB, worldId, userId);
+      assert.equal(restartedSocket.welcome.userId, userId);
+      restartedSocket.socket.close();
+    });
+
+    await t.test("replacement remains ready after the primary process is terminated", async () => {
+      await stopGateway(gatewayA);
+      assert.equal(gatewayA.signalCode, "SIGKILL", "primary gateway must have been terminated as an OS process");
+      await assert.rejects(fetch(`http://127.0.0.1:${portA}/health`), "terminated primary must stop serving HTTP");
+      const replacement = await waitForReady(portB, gatewayB);
+      assert.equal(replacement.instanceId, instanceB);
+      assert.equal(replacement.status, "ready");
+      const primary = await admin.unsafe(`SELECT heartbeat_at FROM "${schema}".virtual_world_instances
+        WHERE id = $1::uuid`, [instanceA]);
+      assert.equal(primary.length, 1);
+      await admin.unsafe(`UPDATE "${schema}".virtual_world_instances
+        SET heartbeat_at = NOW() - INTERVAL '1 minute' WHERE id = $1::uuid`, [instanceA]);
+      const stale = await admin.unsafe(`SELECT heartbeat_at < NOW() - INTERVAL '30 seconds' AS stale
+        FROM "${schema}".virtual_world_instances WHERE id = $1::uuid`, [instanceA]);
+      assert.equal(stale[0].stale, true);
+      assert.equal((await waitForReady(portB, gatewayB)).instanceId, instanceB);
+      const replacementSocket = await connectAuthenticated(portB, instanceB, worldId, userId);
+      replacementSocket.socket.send(JSON.stringify({ type: "activity_join", id: activityId }));
+      let recovered;
+      try {
+        recovered = await receiveSocketMessage(replacementSocket.socket, "activity_host_recovered");
+      } catch (error) {
+        error.message += `\nReplacement gateway logs:\n${gatewayB.testOutput()}\nPersisted activity:\n${JSON.stringify(await admin.unsafe(`SELECT instance_id, host_generation, phase, state FROM "${schema}".virtual_world_activity_sessions WHERE id = $1::uuid`, [activityId]))}`;
+        throw error;
+      }
+      assert.equal(recovered.sessionId, activityId);
+      assert.equal(recovered.hostGeneration, 2);
+      const authority = await admin.unsafe(`SELECT instance_id, host_user_id, host_generation, version, state
+        FROM "${schema}".virtual_world_activity_sessions WHERE id = $1::uuid`, [activityId]);
+      assert.equal(authority[0].instance_id, instanceB);
+      assert.equal(authority[0].host_user_id, userId);
+      assert.equal(Number(authority[0].host_generation), 2);
+      assert.equal(Number(authority[0].version), 8);
+      assert.equal(authority[0].state.instanceId, instanceB);
+      assert.equal(Number(authority[0].state.hostGeneration), 2);
+      assert.equal(authority[0].state.phase, "active");
+      assert.equal(authority[0].state.participants[0].userId, userId);
+      assert.equal(authority[0].state.participants[0].checkpointIndex, 2);
+
+      // Simulate a delayed write from the dead host after B has claimed generation 2.
+      // The same conditional upsert used by persistActivity must reject generation 1,
+      // even if the stale host presents a numerically newer activity version.
+      await admin.unsafe(`
+        INSERT INTO "${schema}".virtual_world_activity_sessions AS current
+          (id, world_id, instance_id, host_user_id, host_generation, activity_kind,
+           phase, version, state, created_at)
+        VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race',
+          'active', 999, $5::jsonb, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          host_user_id = EXCLUDED.host_user_id,
+          host_generation = EXCLUDED.host_generation,
+          phase = EXCLUDED.phase, version = EXCLUDED.version, state = EXCLUDED.state
+        WHERE current.instance_id = EXCLUDED.instance_id
+          AND current.host_generation = EXCLUDED.host_generation
+          AND current.version < EXCLUDED.version
+      `, [activityId, worldId, instanceA, userId, JSON.stringify({
+        id: activityId, worldId, instanceId: instanceA, hostUserId: userId,
+        hostGeneration: 1, raceId: null, kind: "checkpoint_race", phase: "active",
+        version: 999, createdAt, startedAt: createdAt + 1000, completedAt: null,
+        maxParticipants: 8, checkpointCount: 2, participants: []
+      })]);
+      const afterStaleWrite = await admin.unsafe(`
+        SELECT instance_id, host_generation, version, state
+        FROM "${schema}".virtual_world_activity_sessions WHERE id = $1::uuid
+      `, [activityId]);
+      assert.equal(afterStaleWrite[0].instance_id, instanceB);
+      assert.equal(Number(afterStaleWrite[0].host_generation), 2);
+      assert.equal(Number(afterStaleWrite[0].version), 8);
+      assert.equal(afterStaleWrite[0].state.instanceId, instanceB);
+
+      // A delayed durable relay event from the fenced host must not reach
+      // clients after the replacement has committed generation 2.
+      const staleRelayPackets = [];
+      const staleSnapshotPackets = [];
+      const captureStaleRelay = raw => {
+        try {
+          const packet = JSON.parse(raw.toString());
+          if (packet.type === "activity_state" && packet.session?.id === activityId)
+            staleRelayPackets.push(packet);
+          if (packet.type === "snapshot" &&
+              Array.isArray(packet.players) &&
+              packet.players.some(player => player.userId === userId && player.x === 999 && player.y === 1.15 && player.z === 999))
+            staleSnapshotPackets.push(packet);
+        } catch { /* Ignore unrelated or malformed packets. */ }
+      };
+      replacementSocket.socket.on("message", captureStaleRelay);
+      await admin.unsafe(`
+        INSERT INTO "${schema}".virtual_world_realtime_events
+          (world_id, instance_id, event_type, payload)
+        VALUES ($1::uuid, $2::uuid, 'activity_state', $3::jsonb)
+      `, [worldId, instanceA, {
+        type: "activity_state",
+        session: { id: activityId, worldId, instanceId: instanceA, hostGeneration: 1 }
+      }]);
+      await admin.unsafe(`
+        INSERT INTO "${schema}".virtual_world_realtime_events
+          (world_id, instance_id, event_type, payload)
+        VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb)
+      `, [worldId, instanceA, {
+        serverTime: Date.now(),
+        players: [{ userId, x: 999, y: 1.15, z: 999, yaw: 0 }]
+      }]);
+      await delay(1800);
+      replacementSocket.socket.off("message", captureStaleRelay);
+      assert.equal(staleRelayPackets.length, 0,
+        "stale generation-1 activity relay must not be broadcast by generation-2 gateway");
+      assert.equal(staleSnapshotPackets.length, 0,
+        "snapshots from an instance with an expired heartbeat must not reach replacement clients");
+
+      // Race two independent database claims against a second stale activity.
+      // PostgreSQL must serialize the row update so exactly one candidate wins.
+      // Race two independent replacement gateway OS processes against one stale activity.
+      gatewayC = startGateway(portC, instanceC, scoped.toString());
+      const readyC = await waitForReady(portC, gatewayC);
+      assert.equal(readyC.instanceId, instanceC);
+      const processRaceActivityId = randomUUID();
+      const processRaceState = { ...persistedActivity, id: processRaceActivityId,
+        instanceId: instanceA, version: 3, hostGeneration: 1 };
+      await admin.unsafe("INSERT INTO \"" + schema + "\".virtual_world_activity_sessions " +
+        "(id, world_id, instance_id, host_user_id, host_generation, activity_kind, phase, version, state, created_at, updated_at) " +
+        "VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race', 'active', 3, $5::jsonb, NOW(), NOW())",
+        [processRaceActivityId, worldId, instanceA, userId, processRaceState]);
+      await admin.unsafe("UPDATE \"" + schema + "\".virtual_world_instances SET heartbeat_at = NOW() WHERE id IN ($1::uuid, $2::uuid)",
+        [instanceB, instanceC]);
+      await admin.unsafe("UPDATE \"" + schema + "\".virtual_world_instance_sessions SET instance_id = $3::uuid WHERE world_id = $1::uuid AND user_id = $2::uuid",
+        [worldId, userId, instanceB]);
+      const contenderB = await connectAuthenticated(portB, instanceB, worldId, userId);
+      await admin.unsafe("UPDATE \"" + schema + "\".virtual_world_instance_sessions SET instance_id = $3::uuid WHERE world_id = $1::uuid AND user_id = $2::uuid",
+        [worldId, userId, instanceC]);
+      const contenderC = await connectAuthenticated(portC, instanceC, worldId, userId);
+      const packetsB = [], packetsC = [];
+      contenderB.socket.on("message", raw => { try { packetsB.push(JSON.parse(raw.toString())); } catch {} });
+      contenderC.socket.on("message", raw => { try { packetsC.push(JSON.parse(raw.toString())); } catch {} });
+      contenderB.socket.send(JSON.stringify({ type: "activity_join", id: processRaceActivityId }));
+      contenderC.socket.send(JSON.stringify({ type: "activity_join", id: processRaceActivityId }));
+      const raceDeadline = Date.now() + 5000;
+      let processAuthority = [];
+      while (Date.now() < raceDeadline) {
+        processAuthority = await admin.unsafe("SELECT instance_id, host_generation FROM \"" + schema + "\".virtual_world_activity_sessions WHERE id = $1::uuid",
+          [processRaceActivityId]);
+        if (Number(processAuthority[0]?.host_generation) === 2) break;
+        await delay(100);
+      }
+      assert.equal(Number(processAuthority[0]?.host_generation), 2,
+        "one real replacement gateway process must claim the stale activity");
+      assert.ok([instanceB, instanceC].includes(processAuthority[0].instance_id));
+      await delay(500);
+      const recoveredByB = packetsB.filter(packet => packet.type === "activity_host_recovered");
+      const recoveredByC = packetsC.filter(packet => packet.type === "activity_host_recovered");
+      assert.equal(recoveredByB.length + recoveredByC.length, 1,
+        "exactly one replacement WebSocket process may report successful takeover");
+      assert.equal(recoveredByB.length ? instanceB : instanceC, processAuthority[0].instance_id);
+      contenderB.socket.close();
+      contenderC.socket.close();
+
+      const concurrentActivityId = randomUUID();
+      const concurrentState = { ...persistedActivity, id: concurrentActivityId,
+        instanceId: instanceA, version: 3, hostGeneration: 1 };
+      await admin.unsafe(`
+        INSERT INTO "${schema}".virtual_world_activity_sessions
+          (id, world_id, instance_id, host_user_id, host_generation, activity_kind,
+           phase, version, state, created_at)
+        VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race',
+          'active', 3, $5::jsonb, NOW())
+      `, [concurrentActivityId, worldId, instanceA, userId, concurrentState]);
+      await admin.unsafe(`UPDATE "${schema}".virtual_world_instances
+        SET heartbeat_at = NOW() WHERE id IN ($1::uuid, $2::uuid)`, [instanceB, instanceC]);
+      const claim = candidateId => admin.unsafe(`
+        UPDATE "${schema}".virtual_world_activity_sessions AS activity
+        SET instance_id = $2::uuid, host_generation = activity.host_generation + 1,
+            version = activity.version + 1,
+            state = jsonb_set(jsonb_set(activity.state, '{instanceId}', to_jsonb($2::text)),
+              '{hostGeneration}', to_jsonb(activity.host_generation + 1))
+        FROM "${schema}".virtual_world_instances AS previous_instance
+        WHERE activity.id = $1::uuid AND activity.instance_id = previous_instance.id
+          AND activity.phase IN ('lobby', 'active')
+          AND previous_instance.heartbeat_at < NOW() - INTERVAL '30 seconds'
+          AND EXISTS (SELECT 1 FROM "${schema}".virtual_world_instances replacement
+            WHERE replacement.id = $2::uuid AND replacement.status = 'ready'
+              AND replacement.endpoint IS NOT NULL
+              AND replacement.heartbeat_at > NOW() - INTERVAL '30 seconds')
+        RETURNING activity.instance_id, activity.host_generation
+      `, [concurrentActivityId, candidateId]);
+      await admin.unsafe(`UPDATE "${schema}".virtual_world_instances
+        SET heartbeat_at = NOW() - INTERVAL '1 minute' WHERE id = $1::uuid`, [instanceA]);
+      const claims = await Promise.all([claim(instanceB), claim(instanceC)]);
+      const winners = claims.flatMap(result => result);
+      assert.equal(winners.length, 1, 'exactly one concurrent host claim may win');
+      const concurrentAuthority = await admin.unsafe(`
+        SELECT instance_id, host_generation FROM "${schema}".virtual_world_activity_sessions
+        WHERE id = $1::uuid
+      `, [concurrentActivityId]);
+      assert.equal(Number(concurrentAuthority[0].host_generation), 2);
+      assert.ok([instanceB, instanceC].includes(concurrentAuthority[0].instance_id));
+      replacementSocket.socket.close();
+    });
+  } catch (error) {
+    const logs = [gatewayA?.testOutput?.(), gatewayB?.testOutput?.(), gatewayC?.testOutput?.()].filter(Boolean).join("\n--- gateway ---\n");
+    if (logs) error.message += `\nGateway process output:\n${logs}`;
+    throw error;
   } finally {
-    await Promise.all([stopGateway(gatewayA), stopGateway(gatewayB), stopGateway(gatewayC), stopGateway(duplicateGatewayA)]);
-    await admin.end();
+    await Promise.all([gatewayA && stopGateway(gatewayA), gatewayB && stopGateway(gatewayB), gatewayC && stopGateway(gatewayC)].filter(Boolean));
+    await admin.unsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {});
     rmSync(registryDirectory, { recursive: true, force: true });
+    await admin.end({ timeout: 5 });
   }
 });
