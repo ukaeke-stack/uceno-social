@@ -530,7 +530,9 @@ async function authenticate(token: string) {
 
 async function loadPlayer(userId: string, worldId: string, token: string, socket: WebSocket, sessionId: string, sessionGeneration: number): Promise<Player> {
   const rows = await sql`
-    SELECT position, rotation FROM virtual_world_player_state
+    SELECT position, rotation, session_generation AS "sessionGeneration",
+      state_version AS "stateVersion"
+    FROM virtual_world_player_state
     WHERE world_id = ${worldId}::uuid AND user_id = ${userId}::uuid
     LIMIT 1
   `;
@@ -1154,9 +1156,9 @@ wss.on("connection", async (socket: WebSocket) => {
       // socket from the live-player map before the close event arrived.
       if (current && current.socket !== socket) return;
       if (current?.voiceActive) leaveVoiceRoom(current);
-      if (current.returnState) {
-        const destination = current.returnState;
-        current.stateVersion += 1;
+      const destination = current.returnState ?? { x: current.x, y: current.y, z: current.z, yaw: current.yaw };
+      current.stateVersion += 1;
+      {
         void sql`
           INSERT INTO virtual_world_player_state
             (world_id, user_id, position, rotation, session_generation, state_version, updated_by_session, updated_at)
@@ -1220,13 +1222,26 @@ setInterval(() => {
     if (now - player.lastAuthorizationCheck < 15000 || player.authorizationCheckInProgress) continue;
     player.lastAuthorizationCheck = now;
     player.authorizationCheckInProgress = true;
-    void authenticate(player.token).catch(() => {
-      if (players.get(player.id)?.socket === player.socket) {
-        send(player.socket, { type: "error", code: "access_revoked" });
-        player.socket.close(4003, "access_revoked");
-        players.delete(player.id);
-      }
-    }).finally(() => { player.authorizationCheckInProgress = false; });
+    void (async () => {
+      try {
+        await authenticate(player.token);
+        const fence = await sql`
+          SELECT 1 FROM virtual_world_player_sessions
+          WHERE world_id = ${player.worldId}::uuid AND user_id = ${player.id}::uuid
+            AND session_id = ${player.sessionId}::uuid AND generation = ${player.sessionGeneration}
+          LIMIT 1
+        `;
+        if (!fence[0]) throw new Error("session_superseded");
+      } catch {
+        if (players.get(player.id)?.socket === player.socket) {
+          send(player.socket, { type: "error", code: "session_or_access_revoked" });
+          leaveVoiceRoom(player);
+          releasePlayerSeats(player.id);
+          players.delete(player.id);
+          player.socket.close(4003, "session_or_access_revoked");
+        }
+      } finally { player.authorizationCheckInProgress = false; }
+    })();
   }
 }, 5000);
 
