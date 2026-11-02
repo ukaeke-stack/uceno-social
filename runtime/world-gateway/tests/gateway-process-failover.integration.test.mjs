@@ -161,6 +161,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
   scoped.searchParams.set("options", `-csearch_path=${schema},public`);
   const instanceA = randomUUID();
   const instanceB = randomUUID();
+  const instanceC = randomUUID();
   const portA = await freePort();
   const portB = await freePort();
   const worldId = randomUUID();
@@ -239,8 +240,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
       PRIMARY KEY (world_id, user_id)
     )`);
     await admin.unsafe(`INSERT INTO "${schema}".virtual_world_instances (id, status, endpoint)
-      VALUES ($1::uuid, 'ready', $2), ($3::uuid, 'ready', $4)`,
-      [instanceA, `http://127.0.0.1:${portA}`, instanceB, `http://127.0.0.1:${portB}`]);
+      VALUES ($1::uuid, 'ready', $2), ($3::uuid, 'ready', $4), ($5::uuid, 'ready', $6)`,
+      [instanceA, `http://127.0.0.1:${portA}`, instanceB, `http://127.0.0.1:${portB}`, instanceC, "http://127.0.0.1:1"]);
 
     await admin.unsafe(`INSERT INTO "${schema}".users (id) VALUES ($1::uuid)`, [userId]);
     await admin.unsafe(`INSERT INTO "${schema}".virtual_worlds (id, status, visibility, owner_user_id)
@@ -363,6 +364,48 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal(Number(afterStaleWrite[0].host_generation), 2);
       assert.equal(Number(afterStaleWrite[0].version), 8);
       assert.equal(afterStaleWrite[0].state.instanceId, instanceB);
+
+      // Race two independent database claims against a second stale activity.
+      // PostgreSQL must serialize the row update so exactly one candidate wins.
+      const concurrentActivityId = randomUUID();
+      const concurrentState = { ...persistedActivity, id: concurrentActivityId,
+        instanceId: instanceA, version: 3, hostGeneration: 1 };
+      await admin.unsafe(`
+        INSERT INTO "${schema}".virtual_world_activity_sessions
+          (id, world_id, instance_id, host_user_id, host_generation, activity_kind,
+           phase, version, state, created_at)
+        VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race',
+          'active', 3, $5::jsonb, NOW())
+      `, [concurrentActivityId, worldId, instanceA, userId, JSON.stringify(concurrentState)]);
+      await admin.unsafe(`UPDATE "${schema}".virtual_world_instances
+        SET heartbeat_at = NOW() WHERE id IN ($1::uuid, $2::uuid)`, [instanceB, instanceC]);
+      const claim = candidateId => admin.unsafe(`
+        UPDATE "${schema}".virtual_world_activity_sessions AS activity
+        SET instance_id = $2::uuid, host_generation = activity.host_generation + 1,
+            version = activity.version + 1,
+            state = jsonb_set(jsonb_set(activity.state, '{instanceId}', to_jsonb($2::text)),
+              '{hostGeneration}', to_jsonb(activity.host_generation + 1))
+        FROM "${schema}".virtual_world_instances AS previous_instance
+        WHERE activity.id = $1::uuid AND activity.instance_id = previous_instance.id
+          AND activity.phase IN ('lobby', 'active')
+          AND previous_instance.heartbeat_at < NOW() - INTERVAL '30 seconds'
+          AND EXISTS (SELECT 1 FROM "${schema}".virtual_world_instances replacement
+            WHERE replacement.id = $2::uuid AND replacement.status = 'ready'
+              AND replacement.endpoint IS NOT NULL
+              AND replacement.heartbeat_at > NOW() - INTERVAL '30 seconds')
+        RETURNING activity.instance_id, activity.host_generation
+      `, [concurrentActivityId, candidateId]);
+      await admin.unsafe(`UPDATE "${schema}".virtual_world_instances
+        SET heartbeat_at = NOW() - INTERVAL '1 minute' WHERE id = $1::uuid`, [instanceA]);
+      const claims = await Promise.all([claim(instanceB), claim(instanceC)]);
+      const winners = claims.flatMap(result => result);
+      assert.equal(winners.length, 1, 'exactly one concurrent host claim may win');
+      const concurrentAuthority = await admin.unsafe(`
+        SELECT instance_id, host_generation FROM "${schema}".virtual_world_activity_sessions
+        WHERE id = $1::uuid
+      `, [concurrentActivityId]);
+      assert.equal(Number(concurrentAuthority[0].host_generation), 2);
+      assert.ok([instanceB, instanceC].includes(concurrentAuthority[0].instance_id));
       replacementSocket.socket.close();
     });
   } catch (error) {
