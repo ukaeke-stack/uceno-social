@@ -282,6 +282,7 @@ function fenceProcess(reason: string): void {
   console.error("instance_process_fenced", { processId: PROCESS_ID, generation: processGeneration, reason });
   for (const player of players.values()) player.socket.close(1012, "instance_process_replaced");
   if (server.listening) server.close();
+  void sql.end({ timeout: 2 }).finally(() => process.exit(1));
 }
 
 function assertProcessAuthority(): void {
@@ -2064,7 +2065,8 @@ void acquireProcessOwnership()
     console.error("gateway_process_ownership_or_restore_failed", error);
     processAuthority = false;
     process.exitCode = 1;
-    await sql.end({ timeout: 5 });
+    await sql.end({ timeout: 2 });
+    process.exit(1);
   });
 process.on("SIGTERM", async () => {
   processAuthority = false;
