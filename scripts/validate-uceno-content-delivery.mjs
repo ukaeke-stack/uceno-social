@@ -5,6 +5,7 @@ const root = process.cwd();
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 const manifest = JSON.parse(read("unity/UCENOVirtualWorld/Packages/manifest.json"));
 const delivery = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldContentDelivery.cs");
+const areaBinding = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldAreaContentBinding.cs");
 const architecture = read("docs/virtual-world/REMOTE_CONTENT_DELIVERY.md");
 const tests = read("docs/virtual-world/REMOTE_CONTENT_DELIVERY_TESTS.md");
 
@@ -17,6 +18,10 @@ const checks = [
   ["Successful labels are cached in session", /readyLabels\.Add\(label\)/.test(delivery)],
   ["Developer preload list exists", /preloadLabels/.test(delivery) && /PreloadConfiguredContent/.test(delivery)],
   ["Remote catalog is configurable", /remoteCatalogUrl/.test(delivery)],
+  ["World-area binding auto-installs beside the gateway", /RuntimeInitializeOnLoadMethod/.test(areaBinding) && /WorldGatewayClient/.test(areaBinding)],
+  ["Home transitions request interior content", /case "home": return "home-interiors"/.test(areaBinding)],
+  ["Event transitions request venue content", /case "event": return "world-event-venues"/.test(areaBinding)],
+  ["Area content binding reports progress and failures", /ProgressChanged/.test(areaBinding) && /ContentFailed/.test(areaBinding)],
   ["Architecture documents automatic loading and persistent cache", /automatically|on demand/i.test(architecture) && /persistent.*cache/i.test(architecture)),
   ["Acceptance tests cover interrupted downloads", /Interrupt the connection mid-download/.test(tests))
 ];
