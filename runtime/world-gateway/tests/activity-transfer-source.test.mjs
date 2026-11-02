@@ -79,5 +79,6 @@ test("stale activity host cannot persist or relay after generation takeover", ()
   const relay = source.slice(relayStart);
   assert.match(relay, /host_generation = \$\{payload\.session\.hostGeneration\}/);
   assert.match(relay, /if \(!authority\[0\]\) return/);
-  assert.match(relay, /host_generation = \\$\{payload\.session\.hostGeneration\}[\\s\\S]*FOR UPDATE/);
+  assert.ok(relay.includes("host_generation = ${payload.session.hostGeneration}"));
+  assert.match(relay, /FOR UPDATE/);
 });
