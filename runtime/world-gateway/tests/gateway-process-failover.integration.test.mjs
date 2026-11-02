@@ -365,6 +365,30 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal(Number(afterStaleWrite[0].version), 8);
       assert.equal(afterStaleWrite[0].state.instanceId, instanceB);
 
+      // A delayed durable relay event from the fenced host must not reach
+      // clients after the replacement has committed generation 2.
+      const staleRelayPackets = [];
+      const captureStaleRelay = raw => {
+        try {
+          const packet = JSON.parse(raw.toString());
+          if (packet.type === "activity_state" && packet.session?.id === activityId)
+            staleRelayPackets.push(packet);
+        } catch { /* Ignore unrelated or malformed packets. */ }
+      };
+      replacementSocket.socket.on("message", captureStaleRelay);
+      await admin.unsafe(`
+        INSERT INTO "${schema}".virtual_world_realtime_events
+          (world_id, instance_id, event_type, payload)
+        VALUES ($1::uuid, $2::uuid, 'activity_state', $3::jsonb)
+      `, [worldId, instanceA, {
+        type: "activity_state",
+        session: { id: activityId, worldId, instanceId: instanceA, hostGeneration: 1 }
+      }]);
+      await delay(1800);
+      replacementSocket.socket.off("message", captureStaleRelay);
+      assert.equal(staleRelayPackets.length, 0,
+        "stale generation-1 activity relay must not be broadcast by generation-2 gateway");
+
       // Race two independent database claims against a second stale activity.
       // PostgreSQL must serialize the row update so exactly one candidate wins.
       const concurrentActivityId = randomUUID();
