@@ -38,7 +38,8 @@ async function waitForReady(port, child, timeoutMs = 15000) {
     }
     await delay(150);
   }
-  throw lastError ?? new Error("gateway readiness timed out");
+  const diagnostics = typeof child.testOutput === "function" ? child.testOutput() : "";
+  throw new Error(`gateway readiness timed out: ${lastError?.message ?? "unknown error"}\nGateway process output:\n${diagnostics}`);
 }
 
 function startGateway(port, instanceId, scopedDatabaseUrl) {
