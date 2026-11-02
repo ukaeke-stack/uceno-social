@@ -55,3 +55,4 @@
 - [ ] Confirm a failed scene load does not send district_content_ready and the player remains held at the boundary with retry available.
 - [ ] Build Android and WebGL Addressables catalogs separately and verify each uses platform-compatible bundles and matching gateway labels.
 - [ ] Run the canonical `config/world-districts.json` fixture test and confirm all four gateway rectangles and labels match the Unity scene builder partitions.
+- [ ] Destroy/recreate the world content manager while an additive district scene is loading; confirm a successfully completed pending load is unloaded and no incomplete SceneInstance is passed to UnloadSceneAsync.
