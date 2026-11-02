@@ -1209,6 +1209,7 @@ setInterval(async () => {
     if (targetDistrictId !== p.activeDistrictId) {
       if (!targetDistrict) {
         if (p.pendingDistrict) send(p.socket, { type: "district_content_cancelled", districtId: p.pendingDistrict.id });
+        if (p.activeDistrictId) send(p.socket, { type: "district_content_exited", districtId: p.activeDistrictId });
         p.activeDistrictId = null;
         p.pendingDistrict = null;
       } else if (p.pendingDistrict?.id !== targetDistrict.id) {
