@@ -149,7 +149,7 @@ namespace UCENO.VirtualWorld
             Rect toggleRect = new Rect(x, y, width, 42f * scale);
             string toggleText = spatialVoice.VoiceEnabled
                 ? "VOICE ON  •  " + spatialVoice.ConnectedPeerCount + " nearby"
-                : "VOICE OFF  •  TAP TO JOIN";
+                : "VOICE OFF  •  TAP FOR CONTROLS";
             if (GUI.Button(toggleRect, toggleText, voiceButtonStyle))
                 voicePanelOpen = !voicePanelOpen;
             voicePanelVisible = voicePanelOpen;
@@ -294,6 +294,8 @@ namespace UCENO.VirtualWorld
         private void OnDisable()
         {
             sprintToggle = false;
+            voicePanelVisible = false;
+            if (spatialVoice != null) spatialVoice.SetPushToTalkHeld(false);
             if (player != null)
                 player.SetSprinting(false);
         }
