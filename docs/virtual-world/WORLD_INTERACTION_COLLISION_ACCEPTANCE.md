@@ -21,7 +21,11 @@ This document records the server-authoritative interaction contract implemented 
 2. Use the Unity editor's collision geometry exporter to produce `uceno-city-collision-boxes.json`.
 3. Place the exported collision map at the configured gateway collision-map path.
 4. The gateway loads and validates the box data and resolves player movement against those boxes.
-5. Mark doors, seats, and usable objects with the world interactable authoring tool; export collision geometry after scene geometry changes.
+5. In the saved Unity scene, select the actual hinged door mesh/pivot and use **GameObject → UCENO → Mark Selected as Door**. Select actual chairs/seats and furniture and use the matching Seat/Furniture authoring command. Each marker receives a stable hash of its Unity GlobalObjectId; display names are not used as identity.
+6. Run **UCENO → World → Validate Loaded District Scenes** to reject duplicate IDs and out-of-district objects.
+7. Run **UCENO → World → Export Scene Interactables to Gateway Registry**. This exports the real marked scene positions, yaw, kind and stable IDs to `runtime/world-gateway/config/world-interactables.json`. Export fails rather than writing an empty registry, and rejects missing colliders or an unassigned door pivot.
+8. Configure the gateway process with `WORLD_INTERACTABLES_FILE=/app/config/world-interactables.json` (or the deployed path). The file must be mounted into the gateway container. The gateway loads the registry at process start, restores durable state from PostgreSQL before admitting a player, and sends the current district's object states to each joining client.
+9. Re-export the registry whenever the authored scene object's identity, position, kind or district changes. Restart/redeploy the gateway after replacing the mounted registry file.
 
 The current exporter uses collider world-space bounds and the gateway resolves axis-aligned boxes. This is a conservative approximation for rotated/curved meshes; it is not a substitute for a baked navigation mesh or full physics simulation.
 
@@ -45,3 +49,8 @@ Source-contract CI additionally checks the Unity authoring/exporter wiring, gate
 - Rotated/complex collider accuracy and large-world collision performance.
 
 A passing source test or TypeScript build does not establish any of these device/Unity checks.
+
+
+## Scene registration boundary
+
+The exporter and gateway transport are source-implemented, but the current repository does not contain a generated, designer-authored city scene with door/furniture markers or an exported production `world-interactables.json`. Therefore no actual door or furniture instance is yet proven registered. A Unity Editor scene-authoring/export pass is still required before gateway interaction can be exercised against real props.
