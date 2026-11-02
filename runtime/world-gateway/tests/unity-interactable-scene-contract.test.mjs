@@ -62,8 +62,8 @@ test("player targeting submits object IDs and applies only server-broadcast stat
 test("imported prop authoring requires a real hinge child and creates raycastable colliders", () => {
   assert.match(authoring, /Use Selected Child as Parent Door Pivot/);
   assert.match(authoring, /selected != marker\.transform/);
-  assert.match(authoring, /doorPivot\"\)\.objectReferenceValue = null/);
+  assert.match(authoring, /FindProperty\("doorPivot"\)\.objectReferenceValue = null/);
   assert.match(authoring, /Add Targeting Collider From Renderers/);
-  assert.match(authoring, /renderer\.bounds/);
+  assert.match(authoring, /renderers\[0\]\.bounds/);
   assert.match(authoring, /box\.isTrigger = false/);
 });
