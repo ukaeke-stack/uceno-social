@@ -49,7 +49,7 @@ const checks = [
   ["Sports, racing, dance and adventure labels are mapped", /activity-sports/.test(gateway) && /activity-racing/.test(gateway) && /activity-dance/.test(gateway) && /activity-adventure/.test(gateway)],
   ["Server district boundaries are validated and non-overlapping", /parseWorldDistricts/.test(gatewayServer) && /overlap/.test(districtPolicy)],
   ["Server pauses movement pending district content acknowledgement without discarding direction input", /district_content_required/.test(gatewayServer) && /district_content_ready/.test(gatewayServer) && /Preserve the latest input intent/.test(gatewayServer)],
-  ["District acknowledgement requires matching nonce and district", /msg\.districtId === pending\.id && msg\.nonce === pending\.nonce/.test(gatewayServer)],
+  ["District acknowledgement requires matching nonce and district", (/matchesDistrictTransition\(pending, msg\.districtId, msg\.nonce\)/.test(gatewayServer) || /msg\.districtId === pending\.id && msg\.nonce === pending\.nonce/.test(gatewayServer))],
   ["Leaving a configured district releases its active client content lease", /district_content_exited/.test(gatewayServer) && /district_content_exited/.test(gateway) && /ReleaseContent\(activeDistrictLabel\)/.test(gateway)],
   ["Client loads server-selected district labels before acknowledgement", /district_content_required/.test(gateway) && /AcquireContent\(label/.test(gateway) && /district_content_ready/.test(gateway)],
   ["Client can retry and clears cancelled district transitions", /RetryPendingDistrictContent/.test(gateway) && /district_content_cancelled/.test(gateway)],
