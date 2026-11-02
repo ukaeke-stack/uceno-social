@@ -10,6 +10,7 @@ RUN npx tsc -p tsconfig.json
 FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /app
+COPY config ./config
 COPY package*.json ./
 RUN npm install --omit=dev
 RUN npm prune --omit=dev
