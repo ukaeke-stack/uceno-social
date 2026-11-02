@@ -28,6 +28,7 @@ namespace UCENO.VirtualWorld
         private Quaternion targetRotation;
         private bool initialized;
         public string ObjectId => objectId;
+        public bool HasDoorPivot => doorPivot != null;
         public string Kind => kind == WorldInteractableKind.Door ? "door" :
             kind == WorldInteractableKind.Seat ? "seat" :
             kind == WorldInteractableKind.Furniture ? "furniture" :
