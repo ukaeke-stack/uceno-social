@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { parseWorldDistricts, findWorldDistrict } from "../dist/district-policy.js";
 
 const source = JSON.stringify({ districts: [
@@ -47,4 +48,21 @@ test("rejects overlapping district rectangles", () => {
 
 test("supports an unconfigured gateway without district streaming", () => {
   assert.deepEqual(parseWorldDistricts(undefined, 1000), []);
+});
+
+test("canonical gateway config matches the four generated Unity district scenes", () => {
+  const fixture = readFileSync(new URL("../config/world-districts.json", import.meta.url), "utf8");
+  const districts = parseWorldDistricts(fixture, 10000);
+  assert.deepEqual(districts.map(d => d.id), ["south", "central-south", "central-north", "north"]);
+  assert.deepEqual(districts.map(d => d.contentLabel), [
+    "world-city-district-south",
+    "world-city-district-central-south",
+    "world-city-district-central-north",
+    "world-city-district-north"
+  ]);
+  assert.equal(findWorldDistrict(districts, 0, -90)?.id, "south");
+  assert.equal(findWorldDistrict(districts, 0, -30)?.id, "central-south");
+  assert.equal(findWorldDistrict(districts, 0, 30)?.id, "central-north");
+  assert.equal(findWorldDistrict(districts, 0, 90)?.id, "north");
+  assert.equal(findWorldDistrict(districts, 0, 120), null);
 });
