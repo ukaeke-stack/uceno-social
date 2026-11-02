@@ -337,7 +337,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
       // The same conditional upsert used by persistActivity must reject generation 1,
       // even if the stale host presents a numerically newer activity version.
       await admin.unsafe(`
-        INSERT INTO "${schema}".virtual_world_activity_sessions
+        INSERT INTO "${schema}".virtual_world_activity_sessions AS current
           (id, world_id, instance_id, host_user_id, host_generation, activity_kind,
            phase, version, state, created_at)
         VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race',
@@ -346,9 +346,9 @@ test("two real gateway processes: primary loss leaves the replacement process re
           host_user_id = EXCLUDED.host_user_id,
           host_generation = EXCLUDED.host_generation,
           phase = EXCLUDED.phase, version = EXCLUDED.version, state = EXCLUDED.state
-        WHERE "${schema}".virtual_world_activity_sessions.instance_id = EXCLUDED.instance_id
-          AND "${schema}".virtual_world_activity_sessions.host_generation = EXCLUDED.host_generation
-          AND "${schema}".virtual_world_activity_sessions.version < EXCLUDED.version
+        WHERE current.instance_id = EXCLUDED.instance_id
+          AND current.host_generation = EXCLUDED.host_generation
+          AND current.version < EXCLUDED.version
       `, [activityId, worldId, instanceA, userId, JSON.stringify({
         id: activityId, worldId, instanceId: instanceA, hostUserId: userId,
         hostGeneration: 1, raceId: null, kind: "checkpoint_race", phase: "active",
