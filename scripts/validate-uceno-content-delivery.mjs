@@ -5,6 +5,7 @@ const root = process.cwd();
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 const manifest = JSON.parse(read("unity/UCENOVirtualWorld/Packages/manifest.json"));
 const delivery = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldContentDelivery.cs");
+const sceneBuilder = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs");
 const areaBinding = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldAreaContentBinding.cs");
 const gateway = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs");
 const gatewayServer = read("runtime/world-gateway/src/server.ts");
@@ -26,6 +27,11 @@ const checks = [
   ["Resident content uses reference-counted leases", /residencyReferences/.test(delivery) && /AcquireContent\(/.test(delivery)],
   ["Resident labels are released at zero references", /ReleaseContent\(/.test(delivery) && /Addressables.Release\(handle\)/.test(delivery)],
   ["Concurrent resident labels are capped", /maxConcurrentResidentLabels/.test(delivery)],
+  ["District labels load additive Addressables scenes", /IsDistrictSceneLabel/.test(delivery) && /LoadSceneAsync\(label, LoadSceneMode.Additive/.test(delivery)],
+  ["District scene handles unload after final lease release", /UnloadSceneAsync\(handle, false\)/.test(delivery) && /residentSceneHandles/.test(delivery)],
+  ["Editor builder partitions city geometry into four additive scenes", /BuildDistrictScenes\(worldRoot\)/.test(sceneBuilder) && /central-south/.test(sceneBuilder) && /central-north/.test(sceneBuilder)],
+  ["District scenes are separately packed remote Addressables entries", /PackSeparately/.test(sceneBuilder) && /CreateOrMoveEntry/.test(sceneBuilder) && /kRemoteLoadPath/.test(sceneBuilder)],
+  ["Collision geometry is exported before district partitioning", /WorldCollisionGeometryExporter\.Export\(scene\)[\s\S]*?BuildDistrictScenes\(worldRoot\)/.test(sceneBuilder)],
   ["District transitions retain the new area and release the previous area", /activeDistrictLabel/.test(gateway) && /ReleaseContent\(activeDistrictLabel\)/.test(gateway)],
   ["Home and event interiors release their content after exit", /ReleaseContent\(activeLabel\)/.test(areaBinding) && /HandleLocationExited/.test(areaBinding)],
   ["World-area binding auto-installs beside the gateway", /RuntimeInitializeOnLoadMethod/.test(areaBinding) && /WorldGatewayClient/.test(areaBinding)],
