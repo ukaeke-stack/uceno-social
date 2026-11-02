@@ -341,8 +341,7 @@ const livekitRooms = LIVEKIT_URL && LIVEKIT_API_KEY && LIVEKIT_API_SECRET ? new 
 function voicePairKey(a: string, b: string): string {
   return a < b ? `${a}:${b}` : `${b}:${a}`;
 }
-// Activity sessions are scoped to this live gateway instance. They are deliberately
-// not advertised as persistent: process restarts currently clear sessions/results.
+// Activity sessions are persisted in PostgreSQL; each instance owns its local authoritative copy.
 const activitySessions = new Map<string, ActivitySession>();
 let lastWorldSnapshotRelayAt = 0;
 let worldRelayCursor = 0;
@@ -894,7 +893,9 @@ wss.on("connection", async (socket: WebSocket) => {
             return restored ? {
               id: row.id, instanceId: row.instanceId, endpoint: row.endpoint,
               kind: row.kind, phase: row.phase, createdAt: row.createdAt,
-              version: restored.session.version,
+              startedAt: restored.session.startedAt, completedAt: restored.session.completedAt,
+              version: restored.session.version, maxParticipants: restored.session.maxParticipants,
+              checkpointCount: restored.session.checkpointCount, raceId: restored.raceId,
               hostUserId: restored.hostUserId,
               participants: [...restored.session.participants.values()].map(p => ({
                 userId: p.userId, status: p.status, checkpointIndex: p.checkpointIndex
