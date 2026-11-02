@@ -181,8 +181,12 @@ namespace UCENO.VirtualWorld
             Vector2 result = Vector2.zero;
             if (Input.touchCount == 0)
             {
-                result.x += Input.GetAxis("Mouse X") * 4f;
-                result.y += Input.GetAxis("Mouse Y") * 4f;
+                if (!WorldStatusHud.IsPointerOnHudControl(Input.mousePosition) &&
+                    !WorldObjectInteractor.IsPointerOnInteractionControl(Input.mousePosition))
+                {
+                    result.x += Input.GetAxis("Mouse X") * 4f;
+                    result.y += Input.GetAxis("Mouse Y") * 4f;
+                }
             }
             for (int i = 0; i < Input.touchCount; i++)
             {
@@ -190,7 +194,8 @@ namespace UCENO.VirtualWorld
                 if (touch.phase == TouchPhase.Began &&
                     touch.position.x >= Screen.width * 0.5f &&
                     lookFingerId == -1 &&
-                    !WorldStatusHud.IsPointerOnHudControl(touch.position))
+                    !WorldStatusHud.IsPointerOnHudControl(touch.position) &&
+                    !WorldObjectInteractor.IsPointerOnInteractionControl(touch.position))
                     lookFingerId = touch.fingerId;
                 if (touch.fingerId != lookFingerId) continue;
                 if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
