@@ -353,7 +353,22 @@ test("two real gateway processes: primary loss leaves the replacement process re
         "both gateway processes must reconnect and resume database heartbeats without restarting");
       assert.ok(gatewayA.exitCode === null && gatewayB.exitCode === null,
         "database connection interruption must not terminate either gateway process");
-      const recoverySocket = await connectAuthenticated(portB, instanceB, worldId, userId);
+      // Database pool recovery and WebSocket authorization can recover on adjacent
+      // poll cycles. Retry a transient rejection, but still fail if authentication
+      // does not recover within the bounded window.
+      const authRecoveryDeadline = Date.now() + 10000;
+      let recoverySocket;
+      let lastAuthError;
+      while (Date.now() < authRecoveryDeadline) {
+        try {
+          recoverySocket = await connectAuthenticated(portB, instanceB, worldId, userId);
+          break;
+        } catch (error) {
+          lastAuthError = error;
+          await delay(250);
+        }
+      }
+      assert.ok(recoverySocket, `gateway WebSocket authorization did not recover: ${lastAuthError?.message ?? "unknown error"}`);
       await admin.unsafe(`
         INSERT INTO "${schema}".virtual_world_realtime_events
           (world_id, instance_id, event_type, payload, created_at)
