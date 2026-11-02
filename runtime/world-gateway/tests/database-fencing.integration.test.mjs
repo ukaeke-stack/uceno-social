@@ -445,7 +445,7 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
         `);
         assert.equal(events.length, 1);
         assert.equal(events[0].instanceId, ids.newA);
-        assert.equal(events[0].payload.state.hostGeneration, 2);
+        assert.equal(events[0].payload.version, 3);
       } finally {
         await gatewayA.end({ timeout: 5 });
         await gatewayB.end({ timeout: 5 });
