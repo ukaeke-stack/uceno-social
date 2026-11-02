@@ -72,7 +72,7 @@ jobs:
           const gateway = fs.readFileSync('./runtime/world-gateway/src/server.ts', 'utf8');
           for (const marker of ['virtual_world_object_states', 'ensureObjectStatesLoaded', 'persistDatabaseObjectState', 'version = virtual_world_object_states.version + 1', 'district_id', 'district_content_ready', 'object_in_different_district', 'state_persistence_failed', '2500'])
             if (!gateway.includes(marker)) throw new Error('Missing district-scoped durable object-state behavior: ' + marker);
-          const objectMigration = fs.readFileSync('./db/migrations/027_district_object_persistence.sql', 'utf8');
+          const objectMigration = fs.readFileSync('./db/migrations/028_district_object_persistence.sql', 'utf8');
           for (const marker of ['PRIMARY KEY (world_id, district_id, object_id)', "'vehicle'", "'furniture'"])
             if (!objectMigration.includes(marker)) throw new Error('Missing district object persistence schema: ' + marker);
           for (const marker of ['const previousState = target.state', 'target.state = previousState', 'target.actorId = previousActorId'])
