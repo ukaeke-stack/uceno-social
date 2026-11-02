@@ -54,3 +54,24 @@ test("stale activity host takeover preserves an active participant checkpoint an
   assert.match(takeover, /restoreActivitySession\(rows\[0\]\.state\)/);
   assert.match(takeover, /activityHostGenerations\.set\(sessionId, restored\.hostGeneration\)/);
 });
+
+
+test("stale activity host loses local authority before any state broadcast", () => {
+  const persistStart = source.indexOf("async function persistActivity");
+  const persistEnd = source.indexOf("async function broadcastActivity", persistStart);
+  const persist = source.slice(persistStart, persistEnd);
+  assert.match(persist, /if \(savedRows\.length === 0\)/);
+  assert.match(persist, /SELECT instance_id AS "instanceId"[\s\S]*host_generation AS "hostGeneration"/);
+  assert.match(persist, /Number\(row\.hostGeneration\) === hostGeneration/);
+  assert.match(persist, /fencedActivitySessions\.add\(session\.id\)/);
+  assert.match(persist, /activitySessions\.delete\(session\.id\)/);
+  assert.match(persist, /activityHosts\.delete\(session\.id\)/);
+  assert.match(persist, /type: "activity_host_fenced"/);
+  const broadcastStart = source.indexOf("async function broadcastActivity");
+  const broadcastEnd = source.indexOf("async function restorePersistedActivities", broadcastStart);
+  const broadcast = source.slice(broadcastStart, broadcastEnd);
+  assert.match(broadcast, /if \(!await persistActivity\(session\)\) return/);
+  const lookupStart = source.indexOf("function findAccessibleActivity");
+  const lookupEnd = source.indexOf("function leaveVoiceRoom", lookupStart);
+  assert.match(source.slice(lookupStart, lookupEnd), /fencedActivitySessions\.has\(sessionId\)/);
+});
