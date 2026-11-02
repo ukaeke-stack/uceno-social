@@ -1453,8 +1453,11 @@ setInterval(async () => {
     if (changed) broadcastActivity(session);
   }
   if (snapshots.length) {
-    const packet = JSON.stringify({ type: 'snapshot', serverTime: now, players: snapshots });
-    for (const p of players.values()) if (p.socket.readyState === WebSocket.OPEN) p.socket.send(packet);
+    for (const p of players.values()) {
+      if (p.socket.readyState !== WebSocket.OPEN) continue;
+      const visiblePlayers = snapshots.filter(snapshot => players.get(snapshot.userId)?.worldId === p.worldId);
+      if (visiblePlayers.length) p.socket.send(JSON.stringify({ type: 'snapshot', serverTime: now, players: visiblePlayers }));
+    }
     if (shouldPublishWorldSnapshot(lastWorldSnapshotRelayAt, now)) {
       lastWorldSnapshotRelayAt = now;
       const byWorld = new Map<string, typeof snapshots>();
@@ -1481,7 +1484,7 @@ setInterval(async () => {
   worldRelayPollInProgress = true;
   try {
     const rows = await sql`SELECT id, world_id AS "worldId", instance_id AS "instanceId", event_type AS "eventType", payload
-      FROM virtual_world_realtime_events WHERE id > ${worldRelayCursor} ORDER BY id ASC LIMIT ${WORLD_RELAY_BATCH_SIZE}`;
+      FROM virtual_world_realtime_events WHERE id > ${worldRelayCursor} AND created_at > NOW() - INTERVAL '30 seconds' ORDER BY id ASC LIMIT ${WORLD_RELAY_BATCH_SIZE}`;
     for (const row of rows) {
       const eventId = Number(row.id);
       if (Number.isSafeInteger(eventId) && eventId > worldRelayCursor) worldRelayCursor = eventId;
