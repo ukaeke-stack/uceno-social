@@ -705,6 +705,14 @@ wss.on("connection", async (socket: WebSocket) => {
         if (!left.ok) {
           send(socket, { type: "activity_rejected", code: left.code }); return;
         }
+        if (activityHosts.get(session.id) === player.id) {
+          const replacementHost = selectNextActivityHost(session, player.id);
+          if (replacementHost) activityHosts.set(session.id, replacementHost);
+          else if (session.phase !== "completed" && session.phase !== "cancelled") {
+            const cancelled = cancelActivity(session, true, Date.now());
+            if (!cancelled.ok) console.warn("activity_host_departure_cancel_failed", session.id, cancelled.code);
+          }
+        }
         broadcastActivity(session);
         return;
       }
