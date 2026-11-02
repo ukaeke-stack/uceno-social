@@ -14,7 +14,7 @@ import { checkpointVersionForSession } from "./session-fence-policy.js";
 import { shouldPublishWorldSnapshot, WORLD_RELAY_BATCH_SIZE, WORLD_RELAY_POLL_INTERVAL_MS } from "./world-relay-policy.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { jwtVerify } from "jose";
+import { jwtVerify, SignJWT } from "jose";
 import postgres from "postgres";
 import { WebSocketServer, WebSocket } from "ws";
 
@@ -602,14 +602,16 @@ function readSpatialTransform(value: unknown, zOffset = 0) {
   };
 }
 
-async function authenticate(token: string) {
+async function authenticate(token: string, allowActivityTransfer = false) {
   const { payload } = await jwtVerify(token, secret, {
     algorithms: ["HS256"], issuer: "uceno-social", audience: "uceno-world-gateway"
   });
+  const transfer = payload.scope === "activity-transfer";
   if (typeof payload.sub !== "string" || typeof payload.world_id !== "string" ||
       payload.instance_id !== INSTANCE_ID ||
-      !["unity-android", "unity-desktop"].includes(String(payload.client_type)))
-    throw new Error("invalid_scope");
+      !["unity-android", "unity-desktop"].includes(String(payload.client_type)) ||
+      (transfer && (!allowActivityTransfer || typeof payload.jti !== "string" || typeof payload.transfer_session_id !== "string" || payload.target_instance_id !== INSTANCE_ID)) ||
+      (!transfer && payload.scope !== undefined)) throw new Error("invalid_scope");
 
   const rows = await sql`
     SELECT u.id, u.moderation_status AS "moderationStatus",
@@ -640,7 +642,7 @@ async function authenticate(token: string) {
   if (!row || row.moderationStatus === "disabled" ||
       (row.moderationStatus === "suspended" &&
        (!row.suspendedUntil || new Date(row.suspendedUntil).getTime() > Date.now())) ||
-      row.worldStatus !== "published" || row.blocked || !row.leaseHealthy ||
+      row.worldStatus !== "published" || row.blocked || (!transfer && !row.leaseHealthy) ||
       row.membershipStatus === "banned" || row.membershipStatus === "suspended" ||
       (row.visibility === "private" && row.membershipStatus !== "active" && row.ownerUserId !== row.id))
     throw new Error("access_revoked");
