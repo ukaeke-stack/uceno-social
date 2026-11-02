@@ -185,13 +185,43 @@ test("two real gateway processes: primary loss leaves the replacement process re
   let gatewayA;
   let gatewayB;
   let gatewayC;
+  let duplicateGatewayA;
 
   try {
     await admin.unsafe(`CREATE SCHEMA "${schema}"`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_instances (
       id UUID PRIMARY KEY, status TEXT NOT NULL, heartbeat_at TIMESTAMPTZ,
-      endpoint TEXT, current_players INTEGER NOT NULL DEFAULT 0
+      endpoint TEXT, current_players INTEGER NOT NULL DEFAULT 0,
+      owner_process_id UUID, owner_generation BIGINT NOT NULL DEFAULT 0,
+      owner_lease_expires_at TIMESTAMPTZ
     )`);
+    await admin.unsafe(`CREATE FUNCTION "${schema}".claim_world_instance_process(
+      p_instance_id UUID, p_process_id UUID, p_lease_seconds INTEGER DEFAULT 12
+    ) RETURNS BIGINT LANGUAGE plpgsql AS $
+    DECLARE v_generation BIGINT;
+    BEGIN
+      UPDATE virtual_world_instances SET owner_process_id = p_process_id,
+        owner_generation = owner_generation + 1,
+        owner_lease_expires_at = NOW() + make_interval(secs => p_lease_seconds),
+        heartbeat_at = NOW(), current_players = 0
+      WHERE id = p_instance_id AND status IN ('ready','draining')
+        AND (owner_process_id IS NULL OR owner_lease_expires_at IS NULL OR owner_lease_expires_at <= NOW())
+      RETURNING owner_generation INTO v_generation;
+      RETURN v_generation;
+    END $`);
+    await admin.unsafe(`CREATE FUNCTION "${schema}".renew_world_instance_process(
+      p_instance_id UUID, p_process_id UUID, p_generation BIGINT,
+      p_current_players INTEGER, p_lease_seconds INTEGER DEFAULT 12
+    ) RETURNS BOOLEAN LANGUAGE plpgsql AS $
+    BEGIN
+      UPDATE virtual_world_instances SET heartbeat_at = NOW(),
+        current_players = p_current_players,
+        owner_lease_expires_at = NOW() + make_interval(secs => p_lease_seconds)
+      WHERE id = p_instance_id AND status IN ('ready','draining')
+        AND owner_process_id = p_process_id AND owner_generation = p_generation
+        AND owner_lease_expires_at > NOW();
+      RETURN FOUND;
+    END $`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_realtime_events (
       id BIGSERIAL PRIMARY KEY, world_id UUID, instance_id UUID,
       event_type TEXT NOT NULL, payload JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -296,6 +326,16 @@ test("two real gateway processes: primary loss leaves the replacement process re
     const readyB = await waitForReady(portB, gatewayB);
     assert.equal(readyA.instanceId, instanceA);
     assert.equal(readyB.instanceId, instanceB);
+
+    // A second real OS process using the same logical instance UUID must not
+    // acquire ownership while the first process still holds its database lease.
+    duplicateGatewayA = startGateway(portC, instanceA, scoped.toString());
+    const duplicateDeadline = Date.now() + 10000;
+    while (duplicateGatewayA.exitCode === null && Date.now() < duplicateDeadline)
+      await delay(100);
+    assert.notEqual(duplicateGatewayA.exitCode, null, "duplicate instance process must fail startup");
+    assert.match(duplicateGatewayA.testOutput(), /world_instance_process_already_owned/);
+
     await assertWebSocketRejectsWrongInstance(portA, instanceA);
     await assertWebSocketRejectsWrongInstance(portB, instanceB);
     // A replacement process must restore the last durable player checkpoint,
