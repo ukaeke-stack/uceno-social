@@ -81,8 +81,9 @@ namespace UCENO.VirtualWorld
             box.transform.SetParent(parent, false);
             box.transform.localPosition = localPosition;
             box.transform.localScale = localScale;
-            Collider collider = box.GetComponent<Collider>();
-            if (collider != null) Object.Destroy(collider);
+            // Keep the primitive collider: these generated walls, floor and ceiling
+            // are the actual home collision shell used by the player's CharacterController.
+            // Removing it made the rendered room physically non-solid.
             Renderer renderer = box.GetComponent<Renderer>();
             renderer.sharedMaterial = material;
         }
