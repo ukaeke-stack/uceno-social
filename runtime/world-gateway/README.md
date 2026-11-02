@@ -28,6 +28,7 @@ Standalone WebSocket runtime for an already-provisioned UCENO world instance.
 - `WORLD_TOKEN_SECRET` (same server-only secret used to sign world JWTs)
 - `WORLD_INSTANCE_CAPACITY` (optional, default 64; keep consistent with DB capacity)
 - `WORLD_BOUNDS` (optional, default 10000 world units)
+- `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (optional until spatial voice is provisioned; server-only credentials for pair-scoped audio rooms)
 - `WORLD_COLLISION_BOXES` (optional JSON array of up to 500 static axis-aligned boxes; each box has numeric `minX`, `maxX`, `minY`, `maxY`, `minZ`, `maxZ` world coordinates)
 
 Build with `npm install && npm run build`; run with `npm start`. The Dockerfile
@@ -125,3 +126,33 @@ The gateway provides an authenticated, proximity- and spatial-context-scoped Web
 The gateway reconciles active voice peers once per second. When either player moves out of range or changes spatial context, both clients receive inactive presence; when two opted-in players become eligible peers again, presence is re-announced after a server-side block check. Existing nearby pairs have their block relationship rechecked at least every five seconds, so a newly created block revokes voice presence without querying PostgreSQL on every position reconciliation. Reconciliation is source-implemented; runtime behavior and database load have not been tested.
 
 This is only the signaling plane. A WebRTC media implementation, microphone permissions, STUN/TURN service configuration, audio playback, spatial attenuation and physical-device testing are still required before voice chat works end to end.
+
+
+## Pair-scoped LiveKit media authorization
+
+When all three LiveKit environment variables are configured, the gateway exposes
+`GET /voice/token?peerUserId=<uuid>`. It requires the caller's existing UCENO
+world-session bearer token. The gateway validates the token and checks that both
+accounts are currently connected to this exact instance, have explicitly opted
+into voice, are in the same world/home/event context, are within 24 metres, and
+are not blocked. It then issues a 30-second LiveKit token for a private room
+whose name is derived server-side from the pair and a fresh room generation.
+Clients cannot choose the room or participant identity.
+
+Each pair gets a separate room, so a third nearby or distant player is not
+automatically admitted to another pair's media. Pair-room deletion is requested
+when voice eligibility ends, a block is detected, or either participant leaves.
+This server implementation requires a LiveKit deployment and server-only
+credentials. LiveKit token expiry is 30 seconds; teardown behavior and token
+revocation semantics must be tested against the selected LiveKit deployment.
+The 30-second token lifetime is a fallback bound, not proof of instantaneous
+revocation for a client already holding a token.
+
+The Next.js `POST /api/worlds/[worldId]/voice-token` route proxies to the
+user's assigned healthy gateway using the existing bearer token and a
+server-derived instance endpoint. The request body contains only
+`peerUserId`; all authorization decisions are made by the gateway.
+
+This is still not end-to-end voice chat: Unity microphone capture, LiveKit room
+connection, remote audio playback, positional attenuation, mute controls and
+Android audio lifecycle integration remain to be implemented and tested.
