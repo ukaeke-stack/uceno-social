@@ -260,6 +260,7 @@ type Player = {
 };
 const players = new Map<string, Player>();
 const voiceVisiblePairs = new Set<string>();
+const voiceBlockCheckAt = new Map<string, number>();
 
 function voicePairKey(a: string, b: string): string {
   return a < b ? `${a}:${b}` : `${b}:${a}`;
@@ -330,6 +331,7 @@ function leaveVoiceRoom(player: Player): void {
       send(player.socket, { type: "voice_presence", userId: peer.id, active: false });
     }
     voiceVisiblePairs.delete(key);
+    voiceBlockCheckAt.delete(key);
   }
 }
 
@@ -1014,16 +1016,31 @@ setInterval(async () => {
       }
     }
     for (const [key, [a, b]] of desired) {
-      if (voiceVisiblePairs.has(key)) continue;
+      const alreadyVisible = voiceVisiblePairs.has(key);
+      const lastBlockCheck = voiceBlockCheckAt.get(key) ?? 0;
+      // New pairs are checked before announcement. Existing pairs are checked
+      // every five seconds so a newly created block revokes voice presence
+      // without querying PostgreSQL on every one-second position reconcile.
+      if (alreadyVisible && Date.now() - lastBlockCheck < 5000) continue;
       try {
-        if (await isBlockedPair(a.id, b.id)) continue;
+        const blocked = await isBlockedPair(a.id, b.id);
+        voiceBlockCheckAt.set(key, Date.now());
+        if (blocked) {
+          if (voiceVisiblePairs.delete(key)) {
+            send(a.socket, { type: "voice_presence", userId: b.id, active: false });
+            send(b.socket, { type: "voice_presence", userId: a.id, active: false });
+          }
+          continue;
+        }
         // Re-check after the database await; either peer may have left voice
         // or changed spatial context while the block query was in flight.
         if (!players.has(a.id) || !players.has(b.id) || !a.voiceActive || !b.voiceActive ||
             !sameSpatialVoiceRoom(a, b) || !isWithinVoiceRange(a, b)) continue;
-        voiceVisiblePairs.add(key);
-        send(a.socket, { type: "voice_presence", userId: b.id, active: true });
-        send(b.socket, { type: "voice_presence", userId: a.id, active: true });
+        if (!alreadyVisible) {
+          voiceVisiblePairs.add(key);
+          send(a.socket, { type: "voice_presence", userId: b.id, active: true });
+          send(b.socket, { type: "voice_presence", userId: a.id, active: true });
+        }
       } catch (error) {
         console.error("voice_presence_check_failed", error);
       }
@@ -1038,6 +1055,7 @@ setInterval(async () => {
       } else if (a) send(a.socket, { type: "voice_presence", userId: bId, active: false });
       else if (b) send(b.socket, { type: "voice_presence", userId: aId, active: false });
       voiceVisiblePairs.delete(key);
+      voiceBlockCheckAt.delete(key);
     }
   } finally {
     voiceReconciliationInProgress = false;
