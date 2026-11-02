@@ -22,6 +22,12 @@ const checks = [
   ["Successful labels are cached in session", /readyLabels\.Add\(label\)/.test(delivery)],
   ["Developer preload list exists", /preloadLabels/.test(delivery) && /PreloadConfiguredContent/.test(delivery)],
   ["Remote catalog is configurable", /remoteCatalogUrl/.test(delivery)],
+  ["Labeled assets are loaded into memory through Addressables", /LoadAssetsAsync<UnityEngine.Object>/.test(delivery)],
+  ["Resident content uses reference-counted leases", /residencyReferences/.test(delivery) && /AcquireContent\(/.test(delivery)],
+  ["Resident labels are released at zero references", /ReleaseContent\(/.test(delivery) && /Addressables.Release\(handle\)/.test(delivery)],
+  ["Concurrent resident labels are capped", /maxConcurrentResidentLabels/.test(delivery)],
+  ["District transitions retain the new area and release the previous area", /activeDistrictLabel/.test(gateway) && /ReleaseContent\(activeDistrictLabel\)/.test(gateway)],
+  ["Home and event interiors release their content after exit", /ReleaseContent\(activeLabel\)/.test(areaBinding) && /HandleLocationExited/.test(areaBinding)],
   ["World-area binding auto-installs beside the gateway", /RuntimeInitializeOnLoadMethod/.test(areaBinding) && /WorldGatewayClient/.test(areaBinding)],
   ["Home transitions request interior content", /case "home": return "home-interiors"/.test(areaBinding)],
   ["Event transitions request venue content", /case "event": return "world-event-venues"/.test(areaBinding)],
@@ -35,11 +41,11 @@ const checks = [
   ["Server district boundaries are validated and non-overlapping", /parseWorldDistricts/.test(gatewayServer) && /overlap/.test(districtPolicy)],
   ["Server pauses movement pending district content acknowledgement without discarding direction input", /district_content_required/.test(gatewayServer) && /district_content_ready/.test(gatewayServer) && /Preserve the latest input intent/.test(gatewayServer)],
   ["District acknowledgement requires matching nonce and district", /msg\.districtId === pending\.id && msg\.nonce === pending\.nonce/.test(gatewayServer)],
-  ["Client downloads server-selected district labels before acknowledgement", /district_content_required/.test(gateway) && /EnsureContent\(label/.test(gateway) && /district_content_ready/.test(gateway)],
-  ["Client can retry and clears cancelled district transitions", /RetryPendingDistrictContent/.test(gateway) && /district_content_cancelled/.test(gateway)),
-  ["District policy tests cover bounds and overlaps", /rejects overlapping district rectangles/.test(districtTests) && /rejects malformed JSON/.test(districtTests)),
+  ["Client loads server-selected district labels before acknowledgement", /district_content_required/.test(gateway) && /AcquireContent\(label/.test(gateway) && /district_content_ready/.test(gateway)],
+  ["Client can retry and clears cancelled district transitions", /RetryPendingDistrictContent/.test(gateway) && /district_content_cancelled/.test(gateway)],
+  ["District policy tests cover bounds and overlaps", /rejects overlapping district rectangles/.test(districtTests) && /rejects malformed JSON/.test(districtTests)],
   ["Architecture documents automatic loading and persistent cache", /automatically|on demand|preflight/i.test(architecture) && /persistent.*cache/i.test(architecture)],
-  ["Acceptance tests cover interrupted downloads and district boundary gates", /Interrupt the connection mid-download/.test(tests) && /district boundary/.test(tests))
+  ["Acceptance tests cover interrupted downloads and district boundary gates", /Interrupt the connection mid-download/.test(tests) && /district boundary/.test(tests)]
 ];
 
 let failed = false;
