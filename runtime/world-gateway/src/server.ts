@@ -257,6 +257,39 @@ if (!/^[0-9a-f-]{36}$/i.test(INSTANCE_ID) || !DATABASE_URL || TOKEN_SECRET.lengt
   throw new Error("WORLD_INSTANCE_ID, DATABASE_URL and a 32+ character WORLD_TOKEN_SECRET are required");
 
 const sql = postgres(DATABASE_URL, { max: 8, idle_timeout: 20, connect_timeout: 10 });
+const PROCESS_ID = randomUUID();
+const PROCESS_LEASE_MS = 12000;
+let processGeneration = 0;
+let processAuthority = false;
+let processLeaseUntil = 0;
+
+async function acquireProcessOwnership(): Promise<void> {
+  const rows = await sql`SELECT claim_virtual_world_instance_process(
+    ${INSTANCE_ID}::uuid, ${PROCESS_ID}::uuid, 12
+  ) AS generation`;
+  const generation = Number(rows[0]?.generation);
+  if (!Number.isSafeInteger(generation) || generation < 1)
+    throw new Error("world_instance_process_already_owned");
+  processGeneration = generation;
+  processAuthority = true;
+  processLeaseUntil = Date.now() + PROCESS_LEASE_MS;
+  console.log("instance_process_ownership_acquired", { processId: PROCESS_ID, generation });
+}
+
+function fenceProcess(reason: string): void {
+  if (!processAuthority) return;
+  processAuthority = false;
+  console.error("instance_process_fenced", { processId: PROCESS_ID, generation: processGeneration, reason });
+  for (const player of players.values()) player.socket.close(1012, "instance_process_replaced");
+  server.close();
+}
+
+function assertProcessAuthority(): void {
+  if (!processAuthority || Date.now() >= processLeaseUntil) {
+    fenceProcess("process_lease_expired");
+    throw new Error("instance_process_not_authoritative");
+  }
+}
 
 const loadedObjectWorlds = new Set<string>();
 async function ensureObjectStatesLoaded(worldId: string): Promise<void> {
@@ -765,6 +798,11 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
 
 const server = createServer(async (req, res) => {
   const headers = { "content-type": "application/json", "cache-control": "no-store" };
+  if (req.url !== "/health" && !processAuthority) {
+    res.writeHead(503, headers);
+    res.end(JSON.stringify({ error: "instance_process_not_authoritative" }));
+    return;
+  }
   if (req.url === "/activity/transfer-ticket" && req.method === "POST") {
     try {
       const authorization = req.headers.authorization || "";
@@ -896,7 +934,7 @@ const server = createServer(async (req, res) => {
         LIMIT 1
       `;
       const instance = rows[0];
-      const ready = !!instance && instance.status === "ready" &&
+      const ready = processAuthority && Date.now() < processLeaseUntil && !!instance && instance.status === "ready" &&
         typeof instance.endpoint === "string" && instance.endpoint.length > 0 &&
         instance.heartbeat_at != null &&
         Date.now() - new Date(instance.heartbeat_at).getTime() < 30000;
@@ -921,6 +959,7 @@ const upgradeIdentity = new WeakMap<WebSocket, { userId: string; worldId: string
 
 server.on("upgrade", async (req, socket, head) => {
   try {
+    assertProcessAuthority();
     if (req.url !== "/world" || !req.headers.authorization?.startsWith("Bearer "))
       throw new Error("unauthorized");
     const token = req.headers.authorization.slice(7);
@@ -1950,16 +1989,22 @@ setInterval(async () => {
 }, WORLD_RELAY_POLL_INTERVAL_MS);
 
 const heartbeat = async () => {
+  if (!processAuthority) return;
   try {
-    await sql`
-      UPDATE virtual_world_instances SET heartbeat_at = NOW(),
-        current_players = ${players.size}
-      WHERE id = ${INSTANCE_ID}::uuid AND status IN ('ready', 'draining')
-    `;
-  } catch (error) { console.error("instance_heartbeat_failed", error); }
+    const rows = await sql`SELECT renew_world_instance_process(
+      ${INSTANCE_ID}::uuid, ${PROCESS_ID}::uuid, ${processGeneration}, ${players.size}, 12
+    ) AS renewed`;
+    if (rows[0]?.renewed !== true) {
+      fenceProcess("process_generation_replaced");
+      return;
+    }
+    processLeaseUntil = Date.now() + PROCESS_LEASE_MS;
+  } catch (error) {
+    console.error("instance_heartbeat_failed", error);
+    if (Date.now() >= processLeaseUntil) fenceProcess("process_lease_expired_during_database_outage");
+  }
 };
-void heartbeat();
-setInterval(heartbeat, 10000);
+setInterval(heartbeat, 3000);
 
 let objectRefreshInProgress = false;
 setInterval(async () => {
@@ -1995,11 +2040,25 @@ setInterval(async () => {
   finally { objectRefreshInProgress = false; }
 }, 2500);
 
-void restorePersistedActivities()
-  .then(() => server.listen(PORT, () => console.log("UCENO world gateway listening on " + PORT + " for instance " + INSTANCE_ID + "; restored " + activitySessions.size + " activities")))
-  .catch(error => { console.error("activity_restore_failed_gateway_start_aborted", error); process.exitCode = 1; });
+void acquireProcessOwnership()
+  .then(() => heartbeat())
+  .then(() => restorePersistedActivities())
+  .then(() => server.listen(PORT, () => console.log("UCENO world gateway listening on " + PORT + " for instance " + INSTANCE_ID + "; process " + PROCESS_ID + "; generation " + processGeneration + "; restored " + activitySessions.size + " activities")))
+  .catch(async error => {
+    console.error("gateway_process_ownership_or_restore_failed", error);
+    processAuthority = false;
+    process.exitCode = 1;
+    await sql.end({ timeout: 5 });
+  });
 process.on("SIGTERM", async () => {
+  processAuthority = false;
   for (const p of players.values()) p.socket.close(1001, "server_shutdown");
+  try {
+    await sql`UPDATE virtual_world_instances SET owner_process_id = NULL,
+      owner_lease_expires_at = NULL, heartbeat_at = NOW(), current_players = 0
+      WHERE id = ${INSTANCE_ID}::uuid AND owner_process_id = ${PROCESS_ID}::uuid
+        AND owner_generation = ${processGeneration}`;
+  } catch (error) { console.error("instance_process_release_failed", error); }
   await sql.end({ timeout: 5 });
   server.close();
 });
