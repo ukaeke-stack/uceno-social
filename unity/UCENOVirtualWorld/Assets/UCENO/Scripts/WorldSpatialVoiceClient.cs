@@ -63,6 +63,8 @@ namespace UCENO.VirtualWorld
 
         public bool VoiceEnabled => voiceEnabled;
         public bool IsMuted => localMuted || (pushToTalkMode && !pushToTalkHeld);
+        public bool LocalMicMuted => localMuted;
+        public bool PushToTalkHeld => pushToTalkHeld;
         public string Status => status;
         public string AudioRoute => audioRoute;
         public bool PushToTalkMode => pushToTalkMode;
