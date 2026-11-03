@@ -25,7 +25,7 @@ The Unity Editor now exposes a separate batch-mode entry point:
 Unity -batchmode -quit -projectPath unity/UCENOVirtualWorld -executeMethod UCENO.VirtualWorld.Editor.BuildCommand.ExportWorldContentOnly -logFile -
 ```
 
-Run this only in an environment with the matching Unity 6000.3 Editor installation and a valid Unity license. It invokes the scene builder, which creates and saves the boot scene plus four additive district scenes, exports the interactable registry and city collision map, then fails unless all seven expected files exist and are non-empty. It does not call `BuildPipeline.BuildPlayer`, switch to Android, or create an APK.
+Run this only in an environment with the matching Unity 6000.3 Editor installation and a valid Unity license. It invokes the scene builder, which creates and saves the boot scene plus four additive district scenes, exports the interactable registry and city collision map, then fails unless all seven generated scene and gateway data files exist and are non-empty. It also exports `artifacts/uceno-world-content.unitypackage` with scene dependencies included, and verifies that package is non-empty. It does not call `BuildPipeline.BuildPlayer`, switch to Android, or create an APK.
 
 The command is an Editor entry point, not a Unity Build Automation target setting. UBA's existing Android Pre-Export hook still runs as part of an Android player build; do not trigger that target merely to export content. After running the content-only command, archive the generated scene files and gateway JSON outputs from the workspace as a separate, private content artifact. Validate the registry with `scripts/validate-world-interactable-registry.mjs` before any gateway handoff.
 
@@ -37,7 +37,7 @@ To enable it without exposing credentials:
 3. Open GitHub Actions → **UCENO Unity Editor Content-Only Export** → Run workflow, selecting `feature/uceno-unity-foundation`.
 4. Download the generated `uceno-world-content-only-<run>` artifact only after the workflow succeeds.
 
-The workflow is manual-only and separately gated. It checks the five scene files plus registry and collision-map outputs, compiles the gateway parser, validates the actual registry against the district manifest, computes a SHA-256 checksum, and uploads a 14-day artifact. It does not invoke the Android build workflow, create an APK, upload to Unity Build Automation, or deploy a gateway.
+The workflow is manual-only and separately gated. Its archive contains the dependency-inclusive `.unitypackage` as well as the generated source scene files and gateway data, so the Unity content can be imported into another project without depending on the original checkout. It checks the five scene files, registry, collision map, and portable Unity dependency package; compiles the gateway parser, validates the actual registry against the district manifest, computes a SHA-256 checksum, and uploads a 14-day artifact. It does not invoke the Android build workflow, create an APK, upload to Unity Build Automation, or deploy a gateway.
 
 A source-check pass is not evidence that this workflow ran or that exported files exist. The actual export remains unverified until this manual workflow completes successfully.
 
