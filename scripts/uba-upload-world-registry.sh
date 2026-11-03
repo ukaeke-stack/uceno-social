@@ -7,7 +7,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-REGISTRY="$REPO_ROOT/runtime/world-gateway/config/world-interactables.json"
+CONFIG_DIR="$REPO_ROOT/runtime/world-gateway/config"
+REGISTRY="$CONFIG_DIR/world-interactables.json"
+DISTRICTS="$CONFIG_DIR/world-districts.json"
 API_ROOT="https://build-automation.services.api.unity.com/v2"
 
 required=(ORG_ID PROJECT_ID BUILD_TARGET UCB_BUILD_NUMBER UCENO_UBA_SERVICE_ACCOUNT_KEY_ID UCENO_UBA_SERVICE_ACCOUNT_SECRET)
@@ -23,24 +25,53 @@ if [[ ! -s "$REGISTRY" ]]; then
   echo "Configure UCENO.VirtualWorld.Editor.BuildCommand.PrepareAndroidBuild as the Pre-Export Method." >&2
   exit 3
 fi
+if [[ ! -s "$DISTRICTS" ]]; then
+  echo "Gateway district manifest is missing or empty: $DISTRICTS" >&2
+  exit 3
+fi
 
-node - "$REGISTRY" <<'NODE'
+node - "$REGISTRY" "$DISTRICTS" <<'NODE'
 const fs = require("node:fs");
-const path = process.argv[2];
-const document = JSON.parse(fs.readFileSync(path, "utf8"));
+const [registryPath, districtsPath] = process.argv.slice(2);
+const document = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+const districtDocument = JSON.parse(fs.readFileSync(districtsPath, "utf8"));
 if (!document || !Array.isArray(document.interactables) || document.interactables.length === 0) {
   throw new Error("world-interactables.json must contain a non-empty interactables array");
+}
+if (document.interactables.length > 500) {
+  throw new Error("world-interactables.json exceeds the gateway limit of 500 interactables");
+}
+if (!districtDocument || !Array.isArray(districtDocument.districts) || districtDocument.districts.length === 0) {
+  throw new Error("world-districts.json must contain a non-empty districts array");
+}
+const districts = districtDocument.districts;
+const districtIds = new Set();
+for (const district of districts) {
+  if (!district || typeof district.id !== "string" || !district.id.trim() ||
+      districtIds.has(district.id) ||
+      ![district.minX, district.maxX, district.minZ, district.maxZ].every(Number.isFinite) ||
+      district.minX >= district.maxX || district.minZ >= district.maxZ) {
+    throw new Error("Invalid or duplicate gateway district definition");
+  }
+  districtIds.add(district.id);
 }
 const ids = new Set();
 for (const item of document.interactables) {
   if (!item || typeof item.id !== "string" || !item.id.startsWith("scene:") ||
       !["door", "seat", "furniture", "vehicle", "object"].includes(item.kind) ||
-      ![item.x, item.y, item.z, item.yaw].every(Number.isFinite) || ids.has(item.id)) {
+      ![item.x, item.y, item.z, item.yaw].every(Number.isFinite) ||
+      ids.has(item.id)) {
     throw new Error("Invalid or duplicate scene interactable entry");
+  }
+  const owners = districts.filter(district =>
+    item.x >= district.minX && item.x < district.maxX &&
+    item.z >= district.minZ && item.z < district.maxZ);
+  if (owners.length !== 1) {
+    throw new Error("Scene interactable must belong to exactly one configured gateway district: " + item.id);
   }
   ids.add(item.id);
 }
-console.log("Validated " + ids.size + " exported scene interactables");
+console.log("Validated " + ids.size + " exported scene interactables against " + districts.length + " gateway districts");
 NODE
 
 command -v md5sum >/dev/null
