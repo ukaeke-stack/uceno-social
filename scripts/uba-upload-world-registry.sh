@@ -8,6 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_DIR="$REPO_ROOT/runtime/world-gateway/config"
+GATEWAY_DIR="$REPO_ROOT/runtime/world-gateway"
 REGISTRY="$CONFIG_DIR/world-interactables.json"
 DISTRICTS="$CONFIG_DIR/world-districts.json"
 API_ROOT="https://build-automation.services.api.unity.com/v2"
@@ -30,6 +31,10 @@ if [[ ! -s "$DISTRICTS" ]]; then
   exit 3
 fi
 
+# Compile and invoke the exact TypeScript parsers used by the gateway server.
+# This prevents the handoff validator from drifting into a second schema.
+npm install --prefix "$GATEWAY_DIR" --ignore-scripts --no-audit --no-fund
+npm --prefix "$GATEWAY_DIR" run build
 node "$SCRIPT_DIR/validate-world-interactable-registry.mjs" "$REGISTRY" "$DISTRICTS"
 command -v md5sum >/dev/null
 command -v sha256sum >/dev/null
