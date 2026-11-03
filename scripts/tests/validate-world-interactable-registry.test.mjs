@@ -41,6 +41,8 @@ try {
     districts, /Invalid or duplicate scene interactable/);
   rejected({ interactables: [{ ...item, x: 250 }] }, districts, /exactly one configured gateway district/);
   rejected({ interactables: [{ ...item, yaw: Math.PI * 5 }] }, districts, /Invalid or duplicate scene interactable/);
+  rejected({ interactables: [{ ...item, y: 10001 }] }, districts, /Invalid or duplicate scene interactable/);
+  rejected({ interactables: [item] }, { districts: [{ ...districts.districts[0], minX: -10001 }] }, /Invalid or duplicate gateway district/);
   rejected({ interactables: [item] }, { districts: [districts.districts[0], { ...districts.districts[1], minX: 90 }] },
     /districts overlap/);
   rejected({ interactables: [item] }, { districts: [districts.districts[0], { ...districts.districts[1], id: "central" }] },
