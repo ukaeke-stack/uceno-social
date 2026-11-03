@@ -29,7 +29,17 @@ Run this only in an environment with the matching Unity 6000.3 Editor installati
 
 The command is an Editor entry point, not a Unity Build Automation target setting. UBA's existing Android Pre-Export hook still runs as part of an Android player build; do not trigger that target merely to export content. After running the content-only command, archive the generated scene files and gateway JSON outputs from the workspace as a separate, private content artifact. Validate the registry with `scripts/validate-world-interactable-registry.mjs` before any gateway handoff.
 
-This repository does not currently have a verified licensed Unity Editor runner wired to execute this command automatically. A source-check pass is not evidence that the command ran or that exported files exist.
+The repository includes a separate manual GitHub Actions workflow at `.github/workflows/uceno-unity-content-export.yml`. It uses GameCI's custom `buildMethod` to invoke this Editor method on `StandaloneLinux64`; the custom method is not the default player-build method and does not call `BuildPipeline.BuildPlayer`.
+
+To enable it without exposing credentials:
+1. Add the repository Actions variable `UCENO_UNITY_CONTENT_EXPORT_ENABLED` with value `true`.
+2. Add the Unity license as the repository Actions secret `UNITY_LICENSE` (and `UNITY_EMAIL` / `UNITY_PASSWORD` only if your GameCI licensing setup requires them). Never commit or paste license contents into source files or chat.
+3. Open GitHub Actions → **UCENO Unity Editor Content-Only Export** → Run workflow, selecting `feature/uceno-unity-foundation`.
+4. Download the generated `uceno-world-content-only-<run>` artifact only after the workflow succeeds.
+
+The workflow is manual-only and separately gated. It checks the five scene files plus registry and collision-map outputs, compiles the gateway parser, validates the actual registry against the district manifest, computes a SHA-256 checksum, and uploads a 14-day artifact. It does not invoke the Android build workflow, create an APK, upload to Unity Build Automation, or deploy a gateway.
+
+A source-check pass is not evidence that this workflow ran or that exported files exist. The actual export remains unverified until this manual workflow completes successfully.
 
 ## Required private target variables
 
