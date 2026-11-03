@@ -29,6 +29,39 @@ namespace UCENO.VirtualWorld.Editor
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
         }
 
+        // Run with Unity Editor batch mode and -executeMethod
+        // UCENO.VirtualWorld.Editor.BuildCommand.ExportWorldContentOnly.
+        // This generates and validates scene content without invoking
+        // BuildPipeline.BuildPlayer or creating an Android package.
+        public static void ExportWorldContentOnly()
+        {
+            StarterSceneBuilder.CreateStarterScene();
+
+            string repositoryRoot = Path.GetFullPath(Path.Combine(
+                Directory.GetParent(Application.dataPath).FullName, "..", ".."));
+            string[] requiredFiles =
+            {
+                "unity/UCENOVirtualWorld/Assets/UCENO/Scenes/UCENO_Starter_World.unity",
+                "unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_South.unity",
+                "unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_Central_South.unity",
+                "unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_Central_North.unity",
+                "unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_North.unity",
+                "runtime/world-gateway/config/world-interactables.json",
+                "runtime/world-gateway/data/uceno-city-collision-boxes.json"
+            };
+
+            foreach (string relativePath in requiredFiles)
+            {
+                string path = Path.Combine(repositoryRoot, relativePath);
+                FileInfo info = new FileInfo(path);
+                if (!info.Exists || info.Length == 0)
+                    throw new Exception("Unity content export is incomplete; missing or empty artifact: " + path);
+                Debug.Log("UCENO content export artifact: " + relativePath + " (" + info.Length + " bytes)");
+            }
+
+            Debug.Log("UCENO content-only export completed. No Android player build was requested.");
+        }
+
         // Used by the repository's optional GitHub Actions/GameCI pipeline.
         public static void BuildAndroidDevelopment()
         {
