@@ -17,6 +17,20 @@ Use the existing target settings:
 
 The pre-export method generates the city scene and exports the explicit interactable registry. The post-build script runs after the Unity Editor build and before UBA uploads artifacts. It validates the JSON, creates a SHA-256 checksum, and registers/uploads a second, private, non-primary artifact named **UCENO World Interactables Registry**. The normal APK remains the primary artifact.
 
+## Unity Editor content-only export (no Android player build)
+
+The Unity Editor now exposes a separate batch-mode entry point:
+
+```bash
+Unity -batchmode -quit -projectPath unity/UCENOVirtualWorld -executeMethod UCENO.VirtualWorld.Editor.BuildCommand.ExportWorldContentOnly -logFile -
+```
+
+Run this only in an environment with the matching Unity 6000.3 Editor installation and a valid Unity license. It invokes the scene builder, which creates and saves the boot scene plus four additive district scenes, exports the interactable registry and city collision map, then fails unless all seven expected files exist and are non-empty. It does not call `BuildPipeline.BuildPlayer`, switch to Android, or create an APK.
+
+The command is an Editor entry point, not a Unity Build Automation target setting. UBA's existing Android Pre-Export hook still runs as part of an Android player build; do not trigger that target merely to export content. After running the content-only command, archive the generated scene files and gateway JSON outputs from the workspace as a separate, private content artifact. Validate the registry with `scripts/validate-world-interactable-registry.mjs` before any gateway handoff.
+
+This repository does not currently have a verified licensed Unity Editor runner wired to execute this command automatically. A source-check pass is not evidence that the command ran or that exported files exist.
+
 ## Required private target variables
 
 In Unity Dashboard → Build Automation → Configurations → edit the Android target → Advanced Settings → Environment variables, add the Unity service-account credentials:
