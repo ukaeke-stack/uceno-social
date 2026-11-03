@@ -25,6 +25,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check uploader shell syntax
         run: bash -n scripts/uba-upload-world-registry.sh
+      - name: Exercise registry validation fixtures
+        run: node scripts/tests/validate-world-interactable-registry.test.mjs
       - name: Check artifact handoff contract
         run: |
           node --input-type=module <<'NODE'
