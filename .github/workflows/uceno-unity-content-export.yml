@@ -64,6 +64,7 @@ jobs:
             runtime/world-gateway/config/world-interactables.json \
             runtime/world-gateway/data/uceno-city-collision-boxes.json \
             > uceno-world-content-SHA256SUMS
+          sha256sum -c uceno-world-content-SHA256SUMS
 
       - name: Package private world content artifact
         run: |
