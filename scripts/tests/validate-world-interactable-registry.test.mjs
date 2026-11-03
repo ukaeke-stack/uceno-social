@@ -33,7 +33,7 @@ function rejected(registry, districtDoc, pattern) {
 try {
   const valid = run({ interactables: [item] });
   assert.equal(valid.status, 0, valid.stderr);
-  assert.match(valid.stdout, /Validated 1 exported scene interactables against 2 gateway districts/);
+  assert.match(valid.stdout, /Gateway parser validated 1 exported scene interactables against 2 configured districts/);
 
   rejected({ interactables: [] }, districts, /non-empty interactables/);
   rejected({ interactables: [{ ...item, kind: "teleporter" }] }, districts, /invalid or duplicate fields/);
@@ -46,7 +46,7 @@ try {
   rejected({ interactables: [item] }, { districts: [districts.districts[0], { ...districts.districts[1], minX: 90 }] },
     /Districts central and harbour overlap/);
   rejected({ interactables: [item] }, { districts: [districts.districts[0], { ...districts.districts[1], id: "central" }] },
-    /District 0 has invalid or duplicate fields/);
+    /District 1 has invalid or duplicate fields/);
   rejected({ interactables: Array.from({ length: 501 }, (_, i) => ({ ...item,
     id: "scene:" + i.toString(16).padStart(32, "0") })) }, districts, /cannot exceed 500 entries/);
 
