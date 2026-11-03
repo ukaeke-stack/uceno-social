@@ -59,6 +59,30 @@ namespace UCENO.VirtualWorld.Editor
                 Debug.Log("UCENO content export artifact: " + relativePath + " (" + info.Length + " bytes)");
             }
 
+            // Export a portable Unity package with scene dependencies included.
+            // The package can be imported into another Unity project without
+            // relying on the original repository checkout being present.
+            string packageDirectory = Path.Combine(repositoryRoot, "artifacts");
+            Directory.CreateDirectory(packageDirectory);
+            string packagePath = Path.Combine(packageDirectory, "uceno-world-content.unitypackage");
+            string[] sceneAssets =
+            {
+                "Assets/UCENO/Scenes/UCENO_Starter_World.unity",
+                "Assets/UCENO/Scenes/Districts/UCENO_District_South.unity",
+                "Assets/UCENO/Scenes/Districts/UCENO_District_Central_South.unity",
+                "Assets/UCENO/Scenes/Districts/UCENO_District_Central_North.unity",
+                "Assets/UCENO/Scenes/Districts/UCENO_District_North.unity"
+            };
+            AssetDatabase.ExportPackage(
+                sceneAssets,
+                packagePath,
+                ExportPackageOptions.Recurse | ExportPackageOptions.IncludeDependencies
+            );
+            FileInfo packageInfo = new FileInfo(packagePath);
+            if (!packageInfo.Exists || packageInfo.Length == 0)
+                throw new Exception("Unity content export did not create a non-empty dependency package: " + packagePath);
+            Debug.Log("UCENO content export artifact: artifacts/uceno-world-content.unitypackage (" + packageInfo.Length + " bytes)");
+
             Debug.Log("UCENO content-only export completed. No Android player build was requested.");
         }
 
