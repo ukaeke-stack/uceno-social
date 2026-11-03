@@ -73,7 +73,8 @@ jobs:
             'UCENO_District_Central_North.unity',
             'UCENO_District_North.unity',
             'world-interactables.json',
-            'uceno-city-collision-boxes.json'
+            'uceno-city-collision-boxes.json',
+            'artifacts/uceno-world-content.unitypackage'
           ]) {
             if (!exportMethod.includes(value)) throw new Error('Content-only export missing required artifact: ' + value);
           }
