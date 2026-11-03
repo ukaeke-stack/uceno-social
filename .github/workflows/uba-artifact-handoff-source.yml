@@ -84,7 +84,8 @@ jobs:
           }
           if (!docs.includes('ExportWorldContentOnly') ||
               !docs.includes('does not call') ||
-              !docs.includes('licensed Unity Editor runner')) {
+              !docs.includes('actual export remains unverified') ||
+              !docs.includes('UCENO_UNITY_CONTENT_EXPORT_ENABLED')) {
             throw new Error('Editor-only export instructions or evidence boundary are incomplete');
           }
           if (!exportWorkflow.includes('workflow_dispatch:') ||
