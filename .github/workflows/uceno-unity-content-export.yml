@@ -61,6 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           tar -czf uceno-world-content-export.tar.gz \
+            artifacts/uceno-world-content.unitypackage \
             unity/UCENOVirtualWorld/Assets/UCENO/Scenes \
             runtime/world-gateway/config/world-interactables.json \
             runtime/world-gateway/config/world-interactables.json.sha256 \
