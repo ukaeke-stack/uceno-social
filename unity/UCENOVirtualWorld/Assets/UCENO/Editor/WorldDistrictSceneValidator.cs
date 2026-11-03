@@ -58,7 +58,7 @@ namespace UCENO.VirtualWorld.Editor
 
                         Collider[] targetingColliders = item.GetComponentsInChildren<Collider>(true);
                         if (!targetingColliders.Any(collider =>
-                            collider != null && collider.enabled && !collider.isTrigger))
+                            collider != null && collider.enabled && collider.gameObject.activeInHierarchy && !collider.isTrigger))
                             throw new InvalidOperationException(
                                 "Interactable has no enabled non-trigger collider for player raycast targeting: " + id);
                         if (item.Kind == "door" && !item.HasDoorPivot)
