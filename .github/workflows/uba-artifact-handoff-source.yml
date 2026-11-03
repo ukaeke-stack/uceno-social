@@ -27,7 +27,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check uploader shell syntax
         run: bash -n scripts/uba-upload-world-registry.sh
-      - name: Exercise registry validation fixtures
+      - name: Install gateway parser dependencies
+        run: npm install --prefix runtime/world-gateway --ignore-scripts --no-audit --no-fund
+      - name: Compile authoritative gateway parser
+        run: npm --prefix runtime/world-gateway run build
+      - name: Exercise registry validation fixtures against gateway parser
         run: node scripts/tests/validate-world-interactable-registry.test.mjs
       - name: Check artifact handoff contract
         run: |
@@ -36,6 +40,7 @@ jobs:
           const script = fs.readFileSync('scripts/uba-upload-world-registry.sh', 'utf8');
           const docs = fs.readFileSync('docs/virtual-world/UNITY_BUILD_AUTOMATION_ARTIFACT_HANDOFF.md', 'utf8');
           const required = [
+            'npm --prefix "$GATEWAY_DIR" run build', 'parseWorldDistricts', 'parseInteractableRegistry',
             'ORG_ID', 'PROJECT_ID', 'BUILD_TARGET', 'UCB_BUILD_NUMBER',
             'UCENO_UBA_SERVICE_ACCOUNT_KEY_ID', 'UCENO_UBA_SERVICE_ACCOUNT_SECRET', 'world-interactables.json',
             'world-interactables.json.sha256', 'Tus-Resumable: 1.0.0',
