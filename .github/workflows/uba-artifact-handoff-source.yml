@@ -10,6 +10,7 @@ on:
       - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/BuildCommand.cs"
       - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableRegistryExporter.cs"
       - ".github/workflows/uba-artifact-handoff-source.yml"
+      - ".github/workflows/uceno-unity-content-export.yml"
   push:
     branches:
       - feature/uceno-unity-foundation
@@ -41,6 +42,7 @@ jobs:
           const validator = fs.readFileSync('scripts/validate-world-interactable-registry.mjs', 'utf8');
           const docs = fs.readFileSync('docs/virtual-world/UNITY_BUILD_AUTOMATION_ARTIFACT_HANDOFF.md', 'utf8');
           const build = fs.readFileSync('unity/UCENOVirtualWorld/Assets/UCENO/Editor/BuildCommand.cs', 'utf8');
+          const exportWorkflow = fs.readFileSync('.github/workflows/uceno-unity-content-export.yml', 'utf8');
           const required = [
             'npm --prefix "$GATEWAY_DIR" run build',
             'ORG_ID', 'PROJECT_ID', 'BUILD_TARGET', 'UCB_BUILD_NUMBER',
@@ -84,6 +86,19 @@ jobs:
               !docs.includes('does not call') ||
               !docs.includes('licensed Unity Editor runner')) {
             throw new Error('Editor-only export instructions or evidence boundary are incomplete');
+          }
+          if (!exportWorkflow.includes('workflow_dispatch:') ||
+              !exportWorkflow.includes("vars.UCENO_UNITY_CONTENT_EXPORT_ENABLED == 'true'") ||
+              !exportWorkflow.includes('UCENO.VirtualWorld.Editor.BuildCommand.ExportWorldContentOnly') ||
+              !exportWorkflow.includes('targetPlatform: StandaloneLinux64') ||
+              !exportWorkflow.includes('scripts/validate-world-interactable-registry.mjs') ||
+              !exportWorkflow.includes('actions/upload-artifact@v4')) {
+            throw new Error('Manual content-only export workflow is missing its explicit gate, Unity method, validation, or artifact upload');
+          }
+          if (exportWorkflow.includes('BuildAndroidDevelopment') ||
+              exportWorkflow.includes('targetPlatform: Android') ||
+              exportWorkflow.includes('UCENO-Virtual-World-dev.apk')) {
+            throw new Error('Content-only workflow must not request or upload an Android player');
           }
           console.log('UBA registry artifact handoff source contract passed');
           NODE
