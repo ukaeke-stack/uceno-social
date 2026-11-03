@@ -11,6 +11,7 @@ on:
       - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableRegistryExporter.cs"
       - ".github/workflows/uba-artifact-handoff-source.yml"
       - ".github/workflows/uceno-unity-content-export.yml"
+      - ".github/workflows/uceno-unity-content-export.yml"
   push:
     branches:
       - feature/uceno-unity-foundation
@@ -95,7 +96,9 @@ jobs:
               !exportWorkflow.includes('targetPlatform: StandaloneLinux64') ||
               !exportWorkflow.includes('scripts/validate-world-interactable-registry.mjs') ||
               !exportWorkflow.includes('actions/upload-artifact@v4') ||
-              !exportWorkflow.includes('artifacts/uceno-world-content.unitypackage')) {
+              !exportWorkflow.includes('artifacts/uceno-world-content.unitypackage') ||
+              !exportWorkflow.includes('uceno-world-content-SHA256SUMS') ||
+              !exportWorkflow.includes('sha256sum -c')) {
             throw new Error('Manual content-only export workflow is missing its explicit gate, Unity method, validation, or artifact upload');
           }
           if (exportWorkflow.includes('BuildAndroidDevelopment') ||
