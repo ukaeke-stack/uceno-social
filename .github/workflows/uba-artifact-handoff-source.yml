@@ -40,6 +40,7 @@ jobs:
           const script = fs.readFileSync('scripts/uba-upload-world-registry.sh', 'utf8');
           const validator = fs.readFileSync('scripts/validate-world-interactable-registry.mjs', 'utf8');
           const docs = fs.readFileSync('docs/virtual-world/UNITY_BUILD_AUTOMATION_ARTIFACT_HANDOFF.md', 'utf8');
+          const build = fs.readFileSync('unity/UCENOVirtualWorld/Assets/UCENO/Editor/BuildCommand.cs', 'utf8');
           const required = [
             'npm --prefix "$GATEWAY_DIR" run build',
             'ORG_ID', 'PROJECT_ID', 'BUILD_TARGET', 'UCB_BUILD_NUMBER',
@@ -57,6 +58,32 @@ jobs:
               !docs.includes('WORLD_INTERACTABLES_FILE') ||
               !docs.includes('Manual gateway handoff')) {
             throw new Error('Unity Dashboard / gateway handoff instructions are incomplete');
+          }
+          const exportStart = build.indexOf('public static void ExportWorldContentOnly()');
+          const exportEnd = build.indexOf('// Used by the repository', exportStart);
+          if (exportStart < 0 || exportEnd < 0) throw new Error('Missing isolated Editor-only export entry point');
+          const exportMethod = build.slice(exportStart, exportEnd);
+          for (const value of [
+            'StarterSceneBuilder.CreateStarterScene()',
+            'UCENO_Starter_World.unity',
+            'UCENO_District_South.unity',
+            'UCENO_District_Central_South.unity',
+            'UCENO_District_Central_North.unity',
+            'UCENO_District_North.unity',
+            'world-interactables.json',
+            'uceno-city-collision-boxes.json'
+          ]) {
+            if (!exportMethod.includes(value)) throw new Error('Content-only export missing required artifact: ' + value);
+          }
+          if (exportMethod.includes('BuildPipeline.BuildPlayer') ||
+              exportMethod.includes('SwitchActiveBuildTarget') ||
+              exportMethod.includes('BuildAndroidDevelopment')) {
+            throw new Error('Content-only export must never start a player build');
+          }
+          if (!docs.includes('ExportWorldContentOnly') ||
+              !docs.includes('does not call') ||
+              !docs.includes('licensed Unity Editor runner')) {
+            throw new Error('Editor-only export instructions or evidence boundary are incomplete');
           }
           console.log('UBA registry artifact handoff source contract passed');
           NODE
