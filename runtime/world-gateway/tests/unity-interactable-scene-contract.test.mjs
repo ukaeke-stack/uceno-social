@@ -35,6 +35,7 @@ test("door marker is attached to its real hinge root and uses the hinged leaf pi
   assert.match(sceneBuilder, /doorData\.FindProperty\("doorPivot"\)\.objectReferenceValue = hinge\.transform/);
   assert.match(stateComponent, /doorPivot\.localRotation = Quaternion\.RotateTowards/);
   assert.match(stateComponent, /targetRotation = state == "open"/);
+  assert.match(stateComponent, /doorPivot != null && doorPivot != transform && doorPivot\.IsChildOf\(transform\)/);
 });
 
 test("scene export creates the exact file and schema loaded by the authoritative gateway", () => {
@@ -42,7 +43,7 @@ test("scene export creates the exact file and schema loaded by the authoritative
   assert.match(exporter, /world-interactables\.json/);
   assert.match(exporter, /interactables = entries\.ToArray\(\)/);
   assert.match(exporter, /GetComponentsInChildren<Collider>\(true\)/);
-  assert.match(exporter, /collider\.enabled && !collider\.isTrigger/);
+  assert.match(exporter, /collider\.enabled && collider\.gameObject\.activeInHierarchy && !collider\.isTrigger/);
   assert.match(exporter, /marker\.Kind == "door" && !marker\.HasDoorPivot/);
   assert.match(exporter, /GlobalObjectId\.GetGlobalObjectIdSlow/);
   assert.match(gateway, /process\.env\.WORLD_INTERACTABLES_FILE/);
@@ -56,7 +57,7 @@ test("scene export creates the exact file and schema loaded by the authoritative
 test("editor preflight enforces the same stable ID, collider, hinge and district contract", () => {
   assert.match(validator, /id\.StartsWith\("scene:", StringComparison\.Ordinal\)/);
   assert.match(validator, /id\.Length == 38/);
-  assert.match(validator, /collider\.enabled && !collider\.isTrigger/);
+  assert.match(validator, /collider\.enabled && collider\.gameObject\.activeInHierarchy && !collider\.isTrigger/);
   assert.match(validator, /item\.Kind == "door" && !item\.HasDoorPivot/);
   assert.match(validator, /matches != 1/);
 });
