@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "scripts/uba-upload-world-registry.sh"
+      - "scripts/validate-world-interactable-registry.mjs"
+      - "scripts/tests/validate-world-interactable-registry.test.mjs"
       - "docs/virtual-world/UNITY_BUILD_AUTOMATION_ARTIFACT_HANDOFF.md"
       - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/BuildCommand.cs"
       - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableRegistryExporter.cs"
