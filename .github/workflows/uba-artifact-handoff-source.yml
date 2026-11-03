@@ -38,9 +38,10 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const script = fs.readFileSync('scripts/uba-upload-world-registry.sh', 'utf8');
+          const validator = fs.readFileSync('scripts/validate-world-interactable-registry.mjs', 'utf8');
           const docs = fs.readFileSync('docs/virtual-world/UNITY_BUILD_AUTOMATION_ARTIFACT_HANDOFF.md', 'utf8');
           const required = [
-            'npm --prefix "$GATEWAY_DIR" run build', 'parseWorldDistricts', 'parseInteractableRegistry',
+            'npm --prefix "$GATEWAY_DIR" run build',
             'ORG_ID', 'PROJECT_ID', 'BUILD_TARGET', 'UCB_BUILD_NUMBER',
             'UCENO_UBA_SERVICE_ACCOUNT_KEY_ID', 'UCENO_UBA_SERVICE_ACCOUNT_SECRET', 'world-interactables.json',
             'world-interactables.json.sha256', 'Tus-Resumable: 1.0.0',
@@ -48,6 +49,9 @@ jobs:
           ];
           for (const value of required) {
             if (!script.includes(value)) throw new Error('Uploader missing contract: ' + value);
+          }
+          if (!validator.includes('parseWorldDistricts') || !validator.includes('parseInteractableRegistry')) {
+            throw new Error('Registry validator must use the authoritative gateway parsers');
           }
           if (!docs.includes('scripts/uba-upload-world-registry.sh') ||
               !docs.includes('WORLD_INTERACTABLES_FILE') ||
