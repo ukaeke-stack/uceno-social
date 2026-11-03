@@ -36,19 +36,19 @@ try {
   assert.match(valid.stdout, /Validated 1 exported scene interactables against 2 gateway districts/);
 
   rejected({ interactables: [] }, districts, /non-empty interactables/);
-  rejected({ interactables: [{ ...item, kind: "teleporter" }] }, districts, /Invalid or duplicate scene interactable/);
+  rejected({ interactables: [{ ...item, kind: "teleporter" }] }, districts, /invalid or duplicate fields/);
   rejected({ interactables: [{ ...item, id: "scene:0123456789abcdef0123456789abcdef" }, { ...item }] },
-    districts, /Invalid or duplicate scene interactable/);
-  rejected({ interactables: [{ ...item, x: 250 }] }, districts, /exactly one configured gateway district/);
-  rejected({ interactables: [{ ...item, yaw: Math.PI * 5 }] }, districts, /Invalid or duplicate scene interactable/);
-  rejected({ interactables: [{ ...item, y: 10001 }] }, districts, /Invalid or duplicate scene interactable/);
-  rejected({ interactables: [item] }, { districts: [{ ...districts.districts[0], minX: -10001 }] }, /Invalid or duplicate gateway district/);
+    districts, /invalid or duplicate fields/);
+  rejected({ interactables: [{ ...item, x: 250 }] }, districts, /outside every configured world district/);
+  rejected({ interactables: [{ ...item, yaw: Math.PI * 5 }] }, districts, /invalid or duplicate fields/);
+  rejected({ interactables: [{ ...item, y: 10001 }] }, districts, /invalid or duplicate fields/);
+  rejected({ interactables: [item] }, { districts: [{ ...districts.districts[0], minX: -10001 }] }, /District 0 has invalid or duplicate fields/);
   rejected({ interactables: [item] }, { districts: [districts.districts[0], { ...districts.districts[1], minX: 90 }] },
-    /districts overlap/);
+    /Districts central and harbour overlap/);
   rejected({ interactables: [item] }, { districts: [districts.districts[0], { ...districts.districts[1], id: "central" }] },
-    /Invalid or duplicate gateway district/);
+    /District 0 has invalid or duplicate fields/);
   rejected({ interactables: Array.from({ length: 501 }, (_, i) => ({ ...item,
-    id: "scene:" + i.toString(16).padStart(32, "0") })) }, districts, /exceeds the gateway limit/);
+    id: "scene:" + i.toString(16).padStart(32, "0") })) }, districts, /cannot exceed 500 entries/);
 
   console.log("UBA registry validator tests passed (8 rejection cases plus valid export)");
 } finally {
