@@ -48,6 +48,7 @@ jobs:
           done
           test -s runtime/world-gateway/config/world-interactables.json
           test -s runtime/world-gateway/data/uceno-city-collision-boxes.json
+          test -s artifacts/uceno-world-content.unitypackage
           npm install --prefix runtime/world-gateway --ignore-scripts --no-audit --no-fund
           npm --prefix runtime/world-gateway run build
           WORLD_BOUNDS=10000 node scripts/validate-world-interactable-registry.mjs \
