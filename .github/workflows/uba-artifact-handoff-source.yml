@@ -94,7 +94,8 @@ jobs:
               !exportWorkflow.includes('UCENO.VirtualWorld.Editor.BuildCommand.ExportWorldContentOnly') ||
               !exportWorkflow.includes('targetPlatform: StandaloneLinux64') ||
               !exportWorkflow.includes('scripts/validate-world-interactable-registry.mjs') ||
-              !exportWorkflow.includes('actions/upload-artifact@v4')) {
+              !exportWorkflow.includes('actions/upload-artifact@v4') ||
+              !exportWorkflow.includes('artifacts/uceno-world-content.unitypackage')) {
             throw new Error('Manual content-only export workflow is missing its explicit gate, Unity method, validation, or artifact upload');
           }
           if (exportWorkflow.includes('BuildAndroidDevelopment') ||
