@@ -18,7 +18,7 @@ if (!districtDocument || !Array.isArray(districtDocument.districts) ||
     districtDocument.districts.length === 0 || districtDocument.districts.length > 100) {
   throw new Error("world-districts.json must contain between 1 and 100 districts");
 }
-const districts = districtDocument.districts;
+const worldBounds = Number(process.env.WORLD_BOUNDS || 10000);\nif (!Number.isFinite(worldBounds) || worldBounds <= 0) throw new Error("WORLD_BOUNDS must be a positive finite number");\nconst bounded = value => Number.isFinite(value) && value >= -worldBounds && value <= worldBounds;\nconst districts = districtDocument.districts;
 const districtIds = new Set();
 for (let i = 0; i < districts.length; i++) {
   const district = districts[i];
@@ -27,7 +27,7 @@ for (let i = 0; i < districts.length; i++) {
       typeof district.name !== "string" || !district.name.trim() || district.name.length > 80 ||
       typeof district.contentLabel !== "string" ||
       !/^world-city-district-[a-z0-9-]{1,48}$/.test(district.contentLabel) ||
-      ![district.minX, district.maxX, district.minZ, district.maxZ].every(Number.isFinite) ||
+      ![district.minX, district.maxX, district.minZ, district.maxZ].every(bounded) ||
       district.minX >= district.maxX || district.minZ >= district.maxZ) {
     throw new Error("Invalid or duplicate gateway district definition");
   }
@@ -44,7 +44,7 @@ const ids = new Set();
 for (const item of document.interactables) {
   if (!item || typeof item.id !== "string" || !/^scene:[0-9a-f]{32}$/.test(item.id) ||
       !["door", "seat", "furniture", "vehicle", "object"].includes(item.kind) ||
-      ![item.x, item.y, item.z, item.yaw].every(Number.isFinite) ||
+      ![item.x, item.y, item.z].every(bounded) || !Number.isFinite(item.yaw) ||
       item.yaw < -Math.PI * 4 || item.yaw > Math.PI * 4 || ids.has(item.id)) {
     throw new Error("Invalid or duplicate scene interactable entry");
   }
