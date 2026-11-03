@@ -41,26 +41,38 @@ if (!document || !Array.isArray(document.interactables) || document.interactable
 if (document.interactables.length > 500) {
   throw new Error("world-interactables.json exceeds the gateway limit of 500 interactables");
 }
-if (!districtDocument || !Array.isArray(districtDocument.districts) || districtDocument.districts.length === 0) {
-  throw new Error("world-districts.json must contain a non-empty districts array");
+if (!districtDocument || !Array.isArray(districtDocument.districts) ||
+    districtDocument.districts.length === 0 || districtDocument.districts.length > 100) {
+  throw new Error("world-districts.json must contain between 1 and 100 districts");
 }
 const districts = districtDocument.districts;
 const districtIds = new Set();
-for (const district of districts) {
-  if (!district || typeof district.id !== "string" || !district.id.trim() ||
-      districtIds.has(district.id) ||
+for (let i = 0; i < districts.length; i++) {
+  const district = districts[i];
+  if (!district || typeof district.id !== "string" ||
+      !/^[a-zA-Z0-9_-]{1,64}$/.test(district.id) || districtIds.has(district.id) ||
+      typeof district.name !== "string" || !district.name.trim() || district.name.length > 80 ||
+      typeof district.contentLabel !== "string" ||
+      !/^world-city-district-[a-z0-9-]{1,48}$/.test(district.contentLabel) ||
       ![district.minX, district.maxX, district.minZ, district.maxZ].every(Number.isFinite) ||
       district.minX >= district.maxX || district.minZ >= district.maxZ) {
     throw new Error("Invalid or duplicate gateway district definition");
   }
   districtIds.add(district.id);
+  for (let j = 0; j < i; j++) {
+    const previous = districts[j];
+    if (district.minX < previous.maxX && district.maxX > previous.minX &&
+        district.minZ < previous.maxZ && district.maxZ > previous.minZ) {
+      throw new Error("Gateway districts overlap: " + previous.id + " and " + district.id);
+    }
+  }
 }
 const ids = new Set();
 for (const item of document.interactables) {
-  if (!item || typeof item.id !== "string" || !item.id.startsWith("scene:") ||
+  if (!item || typeof item.id !== "string" || !/^scene:[0-9a-f]{32}$/.test(item.id) ||
       !["door", "seat", "furniture", "vehicle", "object"].includes(item.kind) ||
       ![item.x, item.y, item.z, item.yaw].every(Number.isFinite) ||
-      ids.has(item.id)) {
+      item.yaw < -Math.PI * 4 || item.yaw > Math.PI * 4 || ids.has(item.id)) {
     throw new Error("Invalid or duplicate scene interactable entry");
   }
   const owners = districts.filter(district =>
