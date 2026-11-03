@@ -54,8 +54,16 @@ jobs:
           WORLD_BOUNDS=10000 node scripts/validate-world-interactable-registry.mjs \
             runtime/world-gateway/config/world-interactables.json \
             runtime/world-gateway/config/world-districts.json
-          sha256sum runtime/world-gateway/config/world-interactables.json \
-            > runtime/world-gateway/config/world-interactables.json.sha256
+          sha256sum \
+            unity/UCENOVirtualWorld/Assets/UCENO/Scenes/UCENO_Starter_World.unity \
+            unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_South.unity \
+            unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_Central_South.unity \
+            unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_Central_North.unity \
+            unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_North.unity \
+            artifacts/uceno-world-content.unitypackage \
+            runtime/world-gateway/config/world-interactables.json \
+            runtime/world-gateway/data/uceno-city-collision-boxes.json \
+            > uceno-world-content-SHA256SUMS
 
       - name: Package private world content artifact
         run: |
@@ -64,8 +72,8 @@ jobs:
             artifacts/uceno-world-content.unitypackage \
             unity/UCENOVirtualWorld/Assets/UCENO/Scenes \
             runtime/world-gateway/config/world-interactables.json \
-            runtime/world-gateway/config/world-interactables.json.sha256 \
-            runtime/world-gateway/data/uceno-city-collision-boxes.json
+            runtime/world-gateway/data/uceno-city-collision-boxes.json \
+            uceno-world-content-SHA256SUMS
 
       - name: Upload content-only artifact
         uses: actions/upload-artifact@v4
