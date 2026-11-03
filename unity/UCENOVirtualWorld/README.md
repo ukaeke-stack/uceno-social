@@ -172,11 +172,45 @@ chair root or a dedicated seat-point transform. Then run
 scene. The exported map must be copied/deployed to the gateway host and loaded
 through `WORLD_COLLISION_BOXES_FILE`.
 
-No door mesh, chair or furniture item is marked as interactable in the generated
-city yet. This is a reusable interaction system, not a claim that the current
-scene props are already usable. Object state and seat occupancy currently live
-in gateway memory and reset when that process restarts; durable object state,
-furniture placement and chair-specific avatar alignment remain later work.
+## Generated scene interactables and export status
+
+The starter-scene builder currently authors the following gateway interactables in
+its generated plaza area:
+
+- Two seats instantiated from the imported arm-chair prefab.
+- One table instantiated from the imported round wooden table prefab.
+- One service-door assembly with an explicit hinge pivot. The door leaf, frame
+  and handle are currently generated from Unity primitives; this is a functional
+  interaction test fixture, **not** an imported architectural door asset.
+
+The builder adds non-trigger targeting colliders and WorldInteractable markers
+to these objects. The registry exporter assigns stable scene: IDs from Unity
+GlobalObjectId values after the scenes are saved, then checks ID uniqueness,
+collider presence, door-pivot validity and exactly-one-district ownership. It
+refuses to write an empty registry.
+
+The four generated additive district scenes are loaded before registry export,
+so interactables moved into those scenes are included. The gateway registry and
+collision map are generated only when the Unity Editor actually runs the scene
+builder. Passing repository source checks does **not** mean these scene files
+or JSON exports exist.
+
+To perform the actual export, open the project in the pinned Unity Editor and
+run **UCENO Virtual World → Build Realistic City Scene** (or run the configured
+Unity Build Automation Pre-Export Method
+UCENO.VirtualWorld.Editor.BuildCommand.PrepareAndroidBuild). Confirm that
+Assets/UCENO/Scenes/UCENO_Starter_World.unity, the four files under
+Assets/UCENO/Scenes/Districts/, and
+runtime/world-gateway/config/world-interactables.json were generated. Inspect
+the registry contents and checksum before uploading it as the separate private
+UBA registry artifact. The post-build upload is not a substitute for verifying
+that Unity successfully generated the scene and registry.
+
+Object state and seat occupancy currently live in gateway memory unless
+WORLD_OBJECT_STATE_FILE is configured on a durable mounted volume. The
+current seating pose does not yet align to a chair-specific sit point or use IK.
+The service door is a test fixture; imported building doors still need to be
+authored against their actual mesh and hinge transforms.
 
 This scene has not yet been opened and compiled in the Unity Editor after the
 asset import. Unity compilation, rendering review and physical Android testing
