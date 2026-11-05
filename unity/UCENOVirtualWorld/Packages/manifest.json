@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "com.unity.addressables": "2.7.6",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.modules.imgui": "1.0.0",
+    "com.unity.modules.animation": "1.0.0",
+    "com.unity.modules.unitywebrequest": "1.0.0",
+    "com.endel.nativewebsocket": "https://github.com/endel/NativeWebSocket.git#upm",
+    "io.livekit:client-sdk-unity": "https://github.com/livekit/client-sdk-unity.git#v2.1.0"
+  }
+}

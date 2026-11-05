@@ -1,0 +1,27 @@
+{
+  "name": "Modular Chainlink Fence",
+  "asset_id": "modular_chainlink_fence",
+  "source": "https://polyhaven.com/a/modular_chainlink_fence",
+  "license": "CC0 1.0",
+  "authors": {
+    "James Ray Cock": "All",
+    "Amal Kumar": "Fence Wire Material"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 89232,
+  "lods": false,
+  "files": [
+    "modular_chainlink_fence.fbx",
+    "textures/modular_chainlink_fence_wire_alpha_1k.png",
+    "textures/modular_chainlink_fence_wire_metal_1k.png",
+    "textures/modular_chainlink_fence_posts_metal_1k.png",
+    "textures/modular_chainlink_fence_posts_diff_1k.png",
+    "textures/modular_chainlink_fence_wire_rough_1k.png",
+    "textures/modular_chainlink_fence_posts_nor_gl_1k.png",
+    "textures/modular_chainlink_fence_wire_diff_1k.png",
+    "textures/modular_chainlink_fence_wire_nor_gl_1k.png",
+    "textures/modular_chainlink_fence_posts_rough_1k.png"
+  ],
+  "runtime_api_dependency": false
+}

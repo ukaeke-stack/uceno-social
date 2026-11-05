@@ -1,0 +1,21 @@
+{
+  "name": "Covered Car",
+  "asset_id": "covered_car",
+  "source": "https://polyhaven.com/a/covered_car",
+  "license": "CC0 1.0",
+  "authors": {
+    "MP": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 12592,
+  "lods": false,
+  "files": [
+    "covered_car.fbx",
+    "textures/covered_car_metal_1k.exr",
+    "textures/covered_car_nor_gl_1k.exr",
+    "textures/covered_car_rough_1k.exr",
+    "textures/covered_car_diff_1k.jpg"
+  ],
+  "runtime_api_dependency": false
+}

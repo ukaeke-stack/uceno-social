@@ -1,0 +1,211 @@
+using UnityEngine;
+
+namespace UCENO.VirtualWorld
+{
+    [RequireComponent(typeof(CharacterController))]
+    public sealed class PlayerMotor : MonoBehaviour
+    {
+        [Header("Movement")]
+        [SerializeField] private float moveSpeed = 4.5f;
+        [SerializeField] private float sprintMultiplier = 1.65f;
+        [SerializeField] private float gravity = -20f;
+        [SerializeField] private float maximumFallSpeed = 30f;
+        [SerializeField] private float jumpHeight = 1.15f;
+        [SerializeField] private float fallRecoveryHeight = -3f;
+        [SerializeField] private Vector3 spawnPosition = new Vector3(0f, 1.15f, 0f);
+
+        [Header("Camera look")]
+        [SerializeField] private float lookSensitivity = 0.12f;
+        [SerializeField] private float minimumPitch = -10f;
+        [SerializeField] private float maximumPitch = 55f;
+
+        private CharacterController controller;
+        private float verticalVelocity;
+        private float yaw;
+        private float pitch = 12f;
+        private Vector2 moveTouchStart;
+        private int moveFingerId = -1;
+        private int lookFingerId = -1;
+        private bool sprintRequested;
+        private bool jumpRequested;
+        private bool serverAuthoritative;
+        public bool IsSeated { get; private set; }
+
+        public void SetSeated(bool seated)
+        {
+            IsSeated = seated;
+            sprintRequested = false;
+            jumpRequested = false;
+            MovementInput = Vector2.zero;
+            IsSprinting = false;
+            AnimationSpeed = 0f;
+        }
+
+        public void ToggleSeated()
+        {
+            SetSeated(!IsSeated);
+        }
+
+        public bool IsServerAuthoritative => serverAuthoritative;
+        public float Yaw => yaw;
+        public float Pitch => pitch;
+        public Vector2 MovementInput { get; private set; }
+        public bool IsSprinting { get; private set; }
+        public float AnimationSpeed { get; private set; }
+
+        /// <summary>Allows a mobile sprint control to request sprint without changing movement input.</summary>
+        public void SetSprinting(bool value)
+        {
+            sprintRequested = value;
+        }
+
+        /// <summary>Requests one grounded jump from keyboard or mobile HUD.</summary>
+        public void RequestJump()
+        {
+            jumpRequested = true;
+        }
+
+        public bool ConsumeJumpRequest()
+        {
+            bool requested = jumpRequested;
+            jumpRequested = false;
+            return requested && !IsSeated;
+        }
+
+        public void SetServerAuthority(bool enabled)
+        {
+            serverAuthoritative = enabled;
+            verticalVelocity = 0f;
+            if (!enabled) jumpRequested = false;
+        }
+
+        public void ApplyServerState(Vector3 position, float serverYawRadians)
+        {
+            yaw = serverYawRadians * Mathf.Rad2Deg;
+            controller.enabled = false;
+            transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
+            controller.enabled = true;
+        }
+
+        private void Awake()
+        {
+            controller = GetComponent<CharacterController>();
+            yaw = transform.eulerAngles.y;
+        }
+
+        private void OnDisable()
+        {
+            moveFingerId = -1;
+            lookFingerId = -1;
+            sprintRequested = false;
+            jumpRequested = false;
+            IsSprinting = false;
+            AnimationSpeed = 0f;
+        }
+
+        private void Update()
+        {
+            if (!serverAuthoritative && transform.position.y < fallRecoveryHeight)
+            {
+                // Prevent an unnoticed collision failure from sending the
+                // player and camera infinitely below the test environment.
+                controller.enabled = false;
+                transform.position = spawnPosition;
+                controller.enabled = true;
+                verticalVelocity = 0f;
+            }
+
+            if (!serverAuthoritative && Input.GetKeyDown(KeyCode.C))
+                ToggleSeated();
+
+            if (Input.GetKeyDown(KeyCode.Space) && !IsSeated)
+                RequestJump();
+
+            Vector2 move = IsSeated ? Vector2.zero : ReadMoveInput();
+            Vector2 look = ReadLookInput();
+            MovementInput = move;
+            IsSprinting = move.sqrMagnitude > 0.01f &&
+                (sprintRequested || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
+            AnimationSpeed = move.sqrMagnitude <= 0.01f
+                ? 0f
+                : (IsSprinting ? 1f : Mathf.Clamp01(move.magnitude) * 0.5f);
+            yaw = Mathf.Repeat(yaw + look.x * lookSensitivity + 180f, 360f) - 180f;
+            pitch = Mathf.Clamp(pitch - look.y * lookSensitivity, minimumPitch, maximumPitch);
+            transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+
+            if (serverAuthoritative)
+                return;
+
+            Vector3 direction = transform.right * move.x + transform.forward * move.y;
+            if (direction.sqrMagnitude > 1f) direction.Normalize();
+
+            if (controller.isGrounded && verticalVelocity < 0f)
+                verticalVelocity = -2f;
+
+            if (!IsSeated && jumpRequested && controller.isGrounded)
+                verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            jumpRequested = false;
+
+            verticalVelocity = Mathf.Max(verticalVelocity + gravity * Time.deltaTime, -maximumFallSpeed);
+            Vector3 velocity = IsSeated ? Vector3.zero : direction * (moveSpeed * (IsSprinting ? sprintMultiplier : 1f));
+            velocity.y = verticalVelocity;
+            controller.Move(velocity * Time.deltaTime);
+        }
+
+        private Vector2 ReadMoveInput()
+        {
+            Vector2 result = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase == TouchPhase.Began && touch.position.x < Screen.width * 0.5f && moveFingerId == -1)
+                {
+                    moveFingerId = touch.fingerId;
+                    moveTouchStart = touch.position;
+                }
+                if (touch.fingerId != moveFingerId) continue;
+                if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                {
+                    moveFingerId = -1;
+                    continue;
+                }
+                float dragRange = Mathf.Max(70f, Screen.width * 0.16f);
+                Vector2 drag = (touch.position - moveTouchStart) / dragRange;
+                result += Vector2.ClampMagnitude(drag, 1f);
+            }
+            return Vector2.ClampMagnitude(result, 1f);
+        }
+
+        private Vector2 ReadLookInput()
+        {
+            Vector2 result = Vector2.zero;
+            if (Input.touchCount == 0)
+            {
+                if (!WorldStatusHud.IsPointerOnHudControl(Input.mousePosition) &&
+                    !WorldObjectInteractor.IsPointerOnInteractionControl(Input.mousePosition))
+                {
+                    result.x += Input.GetAxis("Mouse X") * 4f;
+                    result.y += Input.GetAxis("Mouse Y") * 4f;
+                }
+            }
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch touch = Input.GetTouch(i);
+                if (touch.phase == TouchPhase.Began &&
+                    touch.position.x >= Screen.width * 0.5f &&
+                    lookFingerId == -1 &&
+                    !WorldStatusHud.IsPointerOnHudControl(touch.position) &&
+                    !WorldObjectInteractor.IsPointerOnInteractionControl(touch.position))
+                    lookFingerId = touch.fingerId;
+                if (touch.fingerId != lookFingerId) continue;
+                if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                {
+                    lookFingerId = -1;
+                    continue;
+                }
+                if (touch.phase == TouchPhase.Moved) result += touch.deltaPosition;
+            }
+            return result;
+        }
+    }
+}

@@ -1,0 +1,211 @@
+name: UCENO World Gateway and Unity Client
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/world-gateway.yml"
+      - "runtime/world-gateway/**"
+      - "db/migrations/024_virtual_world_instance_leases.sql"
+      - "db/migrations/025_virtual_world_event_locations.sql"
+      - "db/migrations/028_district_object_persistence.sql"
+      - "scripts/validate-uceno-spatial-features.cjs"
+      - "app/api/worlds/**"
+      - "app/api/world-homes/**"
+      - "app/api/world-events/**"
+      - "lib/world-client-session.ts"
+      - "lib/world-home-layout.ts"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/**"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/**"
+      - "unity/UCENOVirtualWorld/Packages/manifest.json"
+  push:
+    branches:
+      - feature/uceno-unity-foundation
+    paths:
+      - ".github/workflows/world-gateway.yml"
+      - "runtime/world-gateway/**"
+      - "db/migrations/024_virtual_world_instance_leases.sql"
+      - "db/migrations/025_virtual_world_event_locations.sql"
+      - "db/migrations/028_district_object_persistence.sql"
+      - "scripts/validate-uceno-spatial-features.cjs"
+      - "app/api/worlds/**"
+      - "app/api/world-homes/**"
+      - "lib/world-client-session.ts"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/**"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/**"
+      - "unity/UCENOVirtualWorld/Packages/manifest.json"
+jobs:
+  web-app-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm --prefix runtime/world-gateway install
+      - run: npm run build
+
+  gateway-build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: uceno_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d uceno_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/uceno_test
+    defaults:
+      run:
+        working-directory: runtime/world-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run build
+      - name: Run PostgreSQL fencing and real-process failover tests
+        run: npm run test:activity
+
+  unity-source-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate Unity package manifest
+        run: |
+          node -e "const p=require('./unity/UCENOVirtualWorld/Packages/manifest.json'); if (!p.dependencies || !p.dependencies['com.endel.nativewebsocket']) process.exit(1);"
+      - name: Verify collision configuration and server resolution
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const gateway = fs.readFileSync('./runtime/world-gateway/src/server.ts', 'utf8');
+          for (const marker of ['virtual_world_object_states', 'ensureObjectStatesLoaded', 'persistDatabaseObjectState', 'refreshDistrictObjectStates', 'version = virtual_world_object_states.version + 1', 'district_id', 'district_content_ready', 'object_in_different_district', 'state_persistence_failed', '2500'])
+            if (!gateway.includes(marker)) throw new Error('Missing district-scoped durable object-state behavior: ' + marker);
+          const objectMigration = fs.readFileSync('./db/migrations/028_district_object_persistence.sql', 'utf8');
+          for (const marker of ['PRIMARY KEY (world_id, district_id, object_id)', "'vehicle'", "'furniture'"])
+            if (!objectMigration.includes(marker)) throw new Error('Missing district object persistence schema: ' + marker);
+          for (const marker of ['const previousState = target.state', 'target.state = previousState', 'target.actorId = previousActorId'])
+            if (!gateway.includes(marker)) throw new Error('Missing interaction rollback on persistence failure: ' + marker);
+          for (const marker of ['WORLD_COLLISION_BOXES_FILE', 'readFileSync', 'loadCollisionBoxes', 'PLAYER_RADIUS', 'PLAYER_HEIGHT', 'resolveHorizontalMovement', 'overlapsBox'])
+            if (!gateway.includes(marker)) throw new Error('Missing server collision behavior: ' + marker);
+          if (!gateway.includes('collisionBoxes.some(box => overlapsBox(candidateX, player.y, player.z, box))') ||
+              !gateway.includes('DISTRICT_COLLISION_BOXES.get(player.activeDistrictId)'))
+            throw new Error('Server movement is not checked against the active district collision map');
+          for (const marker of ['loadInteractables', 'type === "interact"', 'isInteractionAllowed(distance, now - player.lastInteractionAt)', 'resolveInteraction(target, player.id, msg.action)', 'object_state', 'releaseSeats', 'item.occupantId === player.id'])
+            if (!gateway.includes(marker)) throw new Error('Missing authoritative interaction validation: ' + marker);
+          const registryPolicy = fs.readFileSync('./runtime/world-gateway/src/interactable-registry-policy.ts', 'utf8');
+          for (const marker of ['parseInteractableRegistry', 'interactables array', 'outside every configured world district', 'cannot exceed 500'])
+            if (!registryPolicy.includes(marker)) throw new Error('Missing strict scene registry validation: ' + marker);
+          const registryTests = fs.readFileSync('./runtime/world-gateway/tests/interactable-registry-policy.test.mjs', 'utf8');
+          for (const marker of ['loads Unity-exported doors and furniture', 'duplicate IDs', 'outside configured districts'])
+            if (!registryTests.includes(marker)) throw new Error('Missing scene registry validation tests: ' + marker);
+          const interactionPolicy = fs.readFileSync('./runtime/world-gateway/src/interaction-policy.ts', 'utf8');
+          for (const marker of ['distance <= maxDistance', 'elapsedSincePreviousMs >= cooldownMs', 'Number.isFinite(distance)', 'target.kind === "seat"', 'seat_occupied', 'seat_not_occupied_by_player', 'target.kind === "door"', 'target.kind === "object"', 'target.kind === "vehicle"', 'target.kind === "furniture"'])
+            if (!interactionPolicy.includes(marker)) throw new Error('Missing extracted interaction policy: ' + marker);
+          for (const marker of ['for (const target of INTERACTABLES.values())', 'actorId: target.actorId', 'occupantId: target.occupantId'])
+            if (!gateway.includes(marker)) throw new Error('Missing initial interactable-state synchronization for joining clients: ' + marker);
+          const objectScript = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldInteractable.cs', 'utf8');
+          const interactor = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldObjectInteractor.cs', 'utf8');
+          const client = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs', 'utf8');
+          for (const marker of ['ApplyServerState', 'doorPivot', 'OccupantId']) if (!objectScript.includes(marker)) throw new Error('Missing interactable state behavior: ' + marker);
+          for (const marker of ['Physics.Raycast', 'KeyCode.E', 'RequestInteraction', '"SIT"', '"STAND"']) if (!interactor.includes(marker)) throw new Error('Missing interaction targeting: ' + marker);
+          for (const marker of ['RequestInteraction', 'object_state', 'objectState', 'occupantId', 'SetSeated', 'LocalUserId', 'objectStateVersions', 'packet.version']) if (!client.includes(marker)) throw new Error('Missing client interaction transport: ' + marker);
+          if (!gateway.includes('Array.isArray((parsed as { boxes?: unknown }).boxes)'))
+            throw new Error('Gateway does not accept the Unity-exported collision map format');
+          const authoring = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableAuthoring.cs', 'utf8');
+          for (const marker of ['Mark Selected as Door', 'Mark Selected as Seat', 'Mark Selected as Usable Object', 'Mark Selected as Furniture', 'Mark Selected as Vehicle', 'WorldCollisionGeometryExporter.Export'])
+            if (!authoring.includes(marker)) throw new Error('Missing Unity interactable authoring tool: ' + marker);
+          const registryAuthoring = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableAuthoring.cs', 'utf8');
+          if (!registryAuthoring.includes('GlobalObjectId.GetGlobalObjectIdSlow') || !registryAuthoring.includes('SHA256'))
+            throw new Error('Scene object IDs must be stable hashes of Unity GlobalObjectId values.');
+          const registryExporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableRegistryExporter.cs', 'utf8');
+          for (const marker of ['Export Scene Interactables to Gateway Registry', 'world-interactables.json', 'GetComponentsInChildren<Collider>', 'marker.HasDoorPivot', 'No scene interactables were found'])
+            if (!registryExporter.includes(marker)) throw new Error('Missing scene-to-gateway interactable registry export: ' + marker);
+          const interactableMarker = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldInteractable.cs', 'utf8');
+          if (interactableMarker.includes('gameObject.name.ToLowerInvariant()') || !interactableMarker.includes('HasDoorPivot'))
+            throw new Error('World object IDs must not depend on display names and door pivot validation must be available.');
+          if (!gateway.includes('WORLD_INTERACTABLES_FILE') || !registryPolicy.includes('World interactables must contain an interactables array'))
+            throw new Error('Gateway must load and validate the exported scene object registry.');
+          for (const marker of ['BuildConfiguredInteractionObjects(worldRoot, homeFurniturePrefabs)', 'WorldInteractableKind.Seat', 'WorldInteractableKind.Furniture', 'WorldInteractableKind.Door', 'Door Hinge Pivot', 'Door Leaf', 'WorldInteractableRegistryExporter.Export(false)'])
+            if (!fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs', 'utf8').includes(marker))
+              throw new Error('Generated playable city is missing registered scene interaction objects: ' + marker);
+          for (const marker of ['StableObjectId(marker)', 'GlobalObjectId.GetGlobalObjectIdSlow', 'SaveScene(scene)', 'SHA256'])
+            if (!registryExporter.includes(marker))
+              throw new Error('Scene registry export must assign stable IDs and save final additive scenes: ' + marker);
+          const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
+          for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes.json'])
+            if (!exporter.includes(marker)) throw new Error('Missing Unity geometry export behavior: ' + marker);
+          const eventsApi = fs.readFileSync('./app/api/world-events/route.ts', 'utf8');
+          if (!eventsApi.includes('if (!await canAccessWorld(body.worldId, session.id))'))
+            throw new Error('Event creation does not enforce world visibility/block access.');
+          const attendanceApi = fs.readFileSync('./app/api/world-events/[eventId]/attendance/route.ts', 'utf8');
+          if (!attendanceApi.includes('event.blocked || event.membershipStatus'))
+            throw new Error('Event RSVP does not enforce world block restrictions.');
+          for (const marker of ['const canHost =', 'membershipRole === "admin"', 'ownerUserId === session.id'])
+            if (!eventsApi.includes(marker)) throw new Error('World event hosting permission is not returned securely: ' + marker);
+          const homeMembers = fs.readFileSync('./app/api/world-homes/[homeId]/members/route.ts', 'utf8');
+          for (const marker of ['export async function GET', 'Only the home owner can view the invitation roster', 'FROM virtual_home_members', 'Cache-Control'])
+            if (!homeMembers.includes(marker)) throw new Error('Missing private owner-only home invitation roster behavior: ' + marker);
+          const homeMembersApi = fs.readFileSync('./app/api/world-homes/[homeId]/members/route.ts', 'utf8');
+          for (const marker of ['ownerMembership', 'home[0].worldOwnerId !== session.id', 'home[0].worldStatus !== "published"'])
+            if (!homeMembersApi.includes(marker)) throw new Error('Home roster does not enforce current world access: ' + marker);
+
+          for (const marker of ["owner_m.status", "home.ownerMembership === \"banned\"", "home.ownerMembership === \"suspended\""])
+            if (!homeMembersApi.includes(marker)) throw new Error('Home invite API does not revalidate owner world membership: ' + marker);
+          const homeRoute = fs.readFileSync('./app/api/world-homes/[homeId]/route.ts', 'utf8');
+          for (const marker of ['export async function GET', 'Home is unavailable', 'worldStatus', 'worldMembership', 'home.visibility !== "invite"', 'home.worldOwnerId !== session.id', 'w.owner_user_id = ${session.id}::uuid', 'COALESCE(wm.status, \'none\') NOT IN', "w.status = 'published'", "h.visibility = 'invite'", 'Cache-Control'])
+            if (!homeRoute.includes(marker)) throw new Error('Missing access-controlled home retrieval behavior: ' + marker);
+          for (const marker of ['const hasVisibility = body.visibility !== undefined && body.visibility !== ""', 'const hasTransform = body.transform !== undefined && body.transform !== null', 'NOT ${hasVisibility} OR h.owner_user_id', 'NOT ${hasTransform} OR h.owner_user_id', "transform_editor.permission = 'co_owner'"])
+            if (!homeRoute.includes(marker)) throw new Error('Home visibility changes are not owner-restricted: ' + marker);
+          const homeClient = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldHomeClient.cs', 'utf8');
+          for (const marker of ['RequestHomes', 'CreateHomeRoutine', 'LoadHomeRoutine', 'SaveHomeRoutine', 'PlaceFurniture', 'MoveSelectedFurniture', 'RotateSelectedFurniture', 'RemoveSelectedFurniture', 'InviteMemberRoutine', 'RevokeMemberRoutine', 'SHARING: ON', 'HOMES', 'Application.isMobilePlatform', 'CLOSE'])
+            if (!homeClient.includes(marker)) throw new Error('Missing Unity home-management behavior: ' + marker);
+          const eventsClient = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldEventsClient.cs', 'utf8');
+          for (const marker of ['LoadEventsRoutine', 'CreateEventRoutine', 'SetAttendanceRoutine', '/api/world-events?worldId=', '/api/world-events', 'canHost', 'INTERESTED'])
+            if (!eventsClient.includes(marker)) throw new Error('Missing Unity world event RSVP behavior: ' + marker);
+          const sceneBuilder = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs', 'utf8');
+          if (!sceneBuilder.includes('WorldHomeClient homeClient = player.AddComponent<WorldHomeClient>()'))
+            throw new Error('Generated Unity player is missing the home-management client.');
+          const layoutValidation = fs.readFileSync('./lib/world-home-layout.ts', 'utf8');
+          for (const marker of ['Number.isFinite', '-10000', '10000', 'finiteBounded(value.x, -10000, 10000)', 'finiteBounded(value.y, 1.15, 10000)', 'finiteBounded(value.z, -10000, 10000)', 'finiteBounded(item.x, -25, 25)', 'finiteBounded(item.z, -25, 25)', 'assetId', 'item.scale', 'value.length > 100'])
+            if (!layoutValidation.includes(marker)) throw new Error('Missing bounded home layout validation: ' + marker);
+          for (const [file, marker] of [
+            ['./app/api/world-homes/route.ts', 'isValidHomeFurnishing(furnishing)'],
+            ['./app/api/world-homes/[homeId]/route.ts', 'isValidHomeFurnishing(body.furnishing)']
+          ]) if (!fs.readFileSync(file, 'utf8').includes(marker))
+            throw new Error('Home endpoint does not apply layout validation: ' + file);
+          console.log('Home retrieval and invitation roster authorization source checks passed.');
+          console.log('Static collision configuration and movement-resolution source checks passed.');
+          NODE
+      - name: Verify authoritative client wiring
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const root = './unity/UCENOVirtualWorld/Assets/UCENO/Scripts/';
+          const gateway = fs.readFileSync(root + 'WorldGatewayClient.cs', 'utf8');
+          const motor = fs.readFileSync(root + 'PlayerMotor.cs', 'utf8');
+          const presence = fs.readFileSync(root + 'WorldPresenceClient.cs', 'utf8');
+          const animation = fs.readFileSync(root + 'AvatarLocomotionDriver.cs', 'utf8');
+          for (const marker of ['OnMessage', 'SendText', 'DispatchMessageQueue', 'ApplyServerState', 'SetServerAuthority'])
+            if (!gateway.includes(marker)) throw new Error('Missing gateway behavior: ' + marker);
+          for (const marker of ['SetServerAuthority', 'ConsumeJumpRequest', 'ApplyServerState'])
+            if (!motor.includes(marker)) throw new Error('Missing motor behavior: ' + marker);
+          if (!presence.includes('AddComponent<WorldGatewayClient>()'))
+            throw new Error('WorldPresenceClient does not attach the gateway transport');
+          for (const marker of ['ApplyRemoteState', 'IsSeated', 'Wave', 'Cheer'])
+            if (!animation.includes(marker)) throw new Error('Missing remote avatar animation support: ' + marker);
+          console.log('Unity package and gateway wiring checks passed. This is not a Unity Editor/Android build.');
+          NODE
+      - name: Validate residential and spatial event admission contracts
+        run: node scripts/validate-uceno-spatial-features.cjs

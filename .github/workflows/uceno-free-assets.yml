@@ -1,0 +1,107 @@
+name: Import UCENO free realistic 3D assets
+
+on:
+  push:
+    branches:
+      - feature/uceno-unity-foundation
+    paths:
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Characters/uceno_default_avatar.params.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: uceno-free-assets-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  import-free-assets:
+    name: Generate avatar and download CC0 environment models
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out UCENO source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+          persist-credentials: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Clone Ara 3D Gen
+        run: git clone --depth 1 https://github.com/olatunde85/3d-gen.git "$RUNNER_TEMP/ara3dgen"
+
+      - name: Install character generator dependencies
+        working-directory: ${{ runner.temp }}/ara3dgen
+        run: npm ci
+
+      - name: Prepare CC0 MakeHuman assets without redundant mocap downloads
+        working-directory: ${{ runner.temp }}/ara3dgen
+        run: |
+          mkdir -p vendor/dl vendor/sys
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/makehumancommunity/makehuman.git vendor/mh
+          git -C vendor/mh sparse-checkout set makehuman/data
+          curl --fail --location --retry 3 --retry-all-errors --connect-timeout 30 --max-time 1200 \
+            https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip \
+            --output vendor/dl/sys.zip
+          unzip -q vendor/dl/sys.zip -d vendor/sys
+          test -d vendor/mh/makehuman/data
+          test -d vendor/sys/skins
+          npm run build-assets
+
+      - name: Generate rigged UCENO humanoid with animations
+        working-directory: ${{ runner.temp }}/ara3dgen
+        run: |
+          npm run export -- \
+            --params "$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Characters/uceno_default_avatar.params.json" \
+            --formats fbx \
+            --detail medium \
+            --out "$RUNNER_TEMP/uceno-avatar-export"
+          avatar="$(find "$RUNNER_TEMP/uceno-avatar-export" -type f -name 'UCENO_Default_Avatar.fbx' -print -quit)"
+          if [ -z "$avatar" ]; then
+            mkdir -p "$RUNNER_TEMP/uceno-avatar-extracted"
+            archive="$(find "$RUNNER_TEMP/uceno-avatar-export" -maxdepth 1 -type f -name '*.zip' -print -quit)"
+            if [ -n "$archive" ]; then
+              unzip -q "$archive" -d "$RUNNER_TEMP/uceno-avatar-extracted"
+              avatar="$(find "$RUNNER_TEMP/uceno-avatar-extracted" -type f -name 'UCENO_Default_Avatar.fbx' -print -quit)"
+            fi
+          fi
+          test -n "$avatar"
+          import_dir="$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported"
+          mkdir -p "$import_dir"
+          cp -a "$RUNNER_TEMP/uceno-avatar-export/." "$import_dir/"
+          if [ "$avatar" != "$import_dir/UCENO_Default_Avatar.fbx" ]; then
+            cp "$avatar" "$import_dir/UCENO_Default_Avatar.fbx"
+          fi
+          license_dir="$GITHUB_WORKSPACE/unity/UCENOVirtualWorld/Assets/UCENO/Documentation/Ara3DGen"
+          mkdir -p "$license_dir"
+          cp "$RUNNER_TEMP/ara3dgen/scripts/ASSETS_LICENSE.txt" "$license_dir/ASSETS_LICENSE.txt"
+          echo "Generated avatar:"
+          ls -lh "$import_dir/UCENO_Default_Avatar.fbx"
+
+
+      - name: Commit imported free assets to the feature branch
+        env:
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported
+          git add unity/UCENOVirtualWorld/Assets/UCENO/Documentation/Ara3DGen
+          if git diff --cached --quiet; then
+            echo "No new imported assets to commit."
+            exit 0
+          fi
+          git commit -m "Regenerate free rigged UCENO humanoid avatar"
+          git fetch origin "${BRANCH_NAME}"
+          git rebase "origin/${BRANCH_NAME}"
+          git push origin "HEAD:${BRANCH_NAME}"

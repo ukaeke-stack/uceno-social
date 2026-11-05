@@ -1,0 +1,8 @@
+{
+  "districts": [
+    {"id":"south","name":"South District","contentLabel":"world-city-district-south","minX":-40,"maxX":60,"minZ":-120,"maxZ":-60},
+    {"id":"central-south","name":"Central South","contentLabel":"world-city-district-central-south","minX":-40,"maxX":60,"minZ":-60,"maxZ":0},
+    {"id":"central-north","name":"Central North","contentLabel":"world-city-district-central-north","minX":-40,"maxX":60,"minZ":0,"maxZ":60},
+    {"id":"north","name":"North District","contentLabel":"world-city-district-north","minX":-40,"maxX":60,"minZ":60,"maxZ":120}
+  ]
+}

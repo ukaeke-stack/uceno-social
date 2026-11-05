@@ -1,0 +1,85 @@
+name: UCENO Unity Editor Content-Only Export
+
+# Manual-only. This runs a custom Unity Editor method and does not build an
+# Android, desktop, or other player. Enable explicitly with a repository variable.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uceno-unity-content-export-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  export-world-content:
+    if: ${{ vars.UCENO_UNITY_CONTENT_EXPORT_ENABLED == 'true' }}
+    name: Generate Unity scenes and gateway data only
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          lfs: true
+
+      - name: Run Unity Editor content-only method
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: unity/UCENOVirtualWorld
+          unityVersion: 6000.3.27f1
+          targetPlatform: StandaloneLinux64
+          buildMethod: UCENO.VirtualWorld.Editor.BuildCommand.ExportWorldContentOnly
+          buildsPath: Builds/ContentOnly
+          buildName: uceno-world-content-only
+
+      - name: Validate generated files with authoritative gateway parser
+        run: |
+          set -euo pipefail
+          test -s unity/UCENOVirtualWorld/Assets/UCENO/Scenes/UCENO_Starter_World.unity
+          for district in South Central_South Central_North North; do
+            test -s "unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_${district}.unity"
+          done
+          test -s runtime/world-gateway/config/world-interactables.json
+          test -s runtime/world-gateway/data/uceno-city-collision-boxes.json
+          test -s artifacts/uceno-world-content.unitypackage
+          npm install --prefix runtime/world-gateway --ignore-scripts --no-audit --no-fund
+          npm --prefix runtime/world-gateway run build
+          WORLD_BOUNDS=10000 node scripts/validate-world-interactable-registry.mjs \
+            runtime/world-gateway/config/world-interactables.json \
+            runtime/world-gateway/config/world-districts.json
+          sha256sum \
+            unity/UCENOVirtualWorld/Assets/UCENO/Scenes/UCENO_Starter_World.unity \
+            unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_South.unity \
+            unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_Central_South.unity \
+            unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_Central_North.unity \
+            unity/UCENOVirtualWorld/Assets/UCENO/Scenes/Districts/UCENO_District_North.unity \
+            artifacts/uceno-world-content.unitypackage \
+            runtime/world-gateway/config/world-interactables.json \
+            runtime/world-gateway/data/uceno-city-collision-boxes.json \
+            > uceno-world-content-SHA256SUMS
+          sha256sum -c uceno-world-content-SHA256SUMS
+
+      - name: Package private world content artifact
+        run: |
+          set -euo pipefail
+          tar -czf uceno-world-content-export.tar.gz \
+            artifacts/uceno-world-content.unitypackage \
+            unity/UCENOVirtualWorld/Assets/UCENO/Scenes \
+            runtime/world-gateway/config/world-interactables.json \
+            runtime/world-gateway/data/uceno-city-collision-boxes.json \
+            uceno-world-content-SHA256SUMS
+
+      - name: Upload content-only artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: uceno-world-content-only-${{ github.run_number }}
+          path: uceno-world-content-export.tar.gz
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,25 @@
+{
+  "name": "Pachira Aquatica 01",
+  "asset_id": "pachira_aquatica_01",
+  "source": "https://polyhaven.com/a/pachira_aquatica_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Rob Tuytel": "scanning",
+    "Rico Cilliers": "modeling"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 76914,
+  "lods": false,
+  "files": [
+    "pachira_aquatica_01.fbx",
+    "textures/pachira_aquatica_01_leaves_rough_1k.png",
+    "textures/pachira_aquatica_01_bark_diff_1k.png",
+    "textures/pachira_aquatica_01_bark_rough_1k.png",
+    "textures/pachira_aquatica_01_leaves_nor_gl_1k.png",
+    "textures/pachira_aquatica_01_bark_nor_gl_1k.png",
+    "textures/pachira_aquatica_01_leaves_diff_1k.png",
+    "textures/pachira_aquatica_01_leaves_alpha_1k.png"
+  ],
+  "runtime_api_dependency": false
+}
