@@ -13,7 +13,7 @@ export async function GET() {
     const sql = getDb();
     const rows = await sql`
       SELECT c.id, c.type, c.title, c.created_at AS "createdAt",
-        lm.body AS "lastMessage", lm.created_at AS "lastMessageAt",
+        CASE WHEN lm.body LIKE 'UCENO_VOICE_NOTE:%' THEN 'Voice note' ELSE lm.body END AS "lastMessage", lm.created_at AS "lastMessageAt",
         COALESCE(members.member_count, 0)::int AS "memberCount",
         other_user.display_name AS "otherDisplayName", other_user.handle AS "otherHandle"
       FROM conversation_members mine
