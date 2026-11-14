@@ -11,7 +11,6 @@ namespace UCENO.VirtualWorld.Editor
     /// </summary>
     public static class UCENOCityPublicRealmBuilder
     {
-        private static Material pavement;
         private static Material darkMetal;
         private static Material warmLight;
         private static Material leaf;
@@ -22,7 +21,6 @@ namespace UCENO.VirtualWorld.Editor
 
         public static void Build(Transform cityRoot)
         {
-            pavement = Make("UCENO_PublicRealm_Paving", new Color(0.48f, 0.51f, 0.52f), 0.08f, 0.28f);
             darkMetal = Make("UCENO_PublicRealm_GraphiteMetal", new Color(0.075f, 0.095f, 0.105f), 0.78f, 0.72f);
             warmLight = Make("UCENO_PublicRealm_WarmLED", new Color(1f, 0.72f, 0.38f), 0.15f, 0.45f);
             warmLight.EnableKeyword("_EMISSION");
@@ -55,11 +53,11 @@ namespace UCENO.VirtualWorld.Editor
                 Primitive(root, PrimitiveType.Cube, "Raised stone tree bed",
                     new Vector3(0f, 0.12f, 0f), new Vector3(3.4f, 0.24f, 3.4f), planter);
                 Primitive(root, PrimitiveType.Cylinder, "Tree trunk",
-                    new Vector3(0f, 2.3f, 0f), new Vector3(0.34f, 2.3f, 0.34f), trunk);
+                    new Vector3(0f, 1.35f, 0f), new Vector3(0.34f, 2.3f, 0.34f), trunk);
                 Primitive(root, PrimitiveType.Sphere, "Canopy core",
-                    new Vector3(0f, 5.2f, 0f), new Vector3(3.3f, 3.1f, 3.3f), leaf);
+                    new Vector3(0f, 3.4f, 0f), new Vector3(3.3f, 3.1f, 3.3f), leaf);
                 Primitive(root, PrimitiveType.Sphere, "Canopy upper",
-                    new Vector3(0.1f, 6.3f, 0.25f), new Vector3(2.6f, 2.2f, 2.6f), leaf);
+                    new Vector3(0.1f, 4.5f, 0.25f), new Vector3(2.6f, 2.2f, 2.6f), leaf);
                 index++;
             }
         }
@@ -72,11 +70,11 @@ namespace UCENO.VirtualWorld.Editor
                 Transform root = Group(parent, "UCENO Pedestrian Light " + x + " " + index,
                     new Vector3(x, 0f, z));
                 Primitive(root, PrimitiveType.Cylinder, "Tapered light column",
-                    new Vector3(0f, 3.1f, 0f), new Vector3(0.11f, 3.1f, 0.11f), darkMetal);
+                    new Vector3(0f, 1.55f, 0f), new Vector3(0.11f, 3.1f, 0.11f), darkMetal);
                 Primitive(root, PrimitiveType.Cube, "Cantilever arm",
-                    new Vector3(0.48f, 6.1f, 0f), new Vector3(1.05f, 0.09f, 0.09f), darkMetal);
+                    new Vector3(0.48f, 3.3f, 0f), new Vector3(1.05f, 0.09f, 0.09f), darkMetal);
                 Primitive(root, PrimitiveType.Cube, "Warm LED luminaire",
-                    new Vector3(0.92f, 6.02f, 0f), new Vector3(0.55f, 0.12f, 0.32f), warmLight);
+                    new Vector3(0.92f, 3.22f, 0f), new Vector3(0.55f, 0.12f, 0.32f), warmLight);
                 index++;
             }
         }
@@ -133,7 +131,7 @@ namespace UCENO.VirtualWorld.Editor
             for (int z = -180; z <= 180; z += 90)
             {
                 Transform crossing = Group(parent, "UCENO Raised Pedestrian Crossing " + z,
-                    new Vector3(0f, 0.18f, z));
+                    new Vector3(0f, 0.04f, z));
                 for (int i = -5; i <= 5; i++)
                     Primitive(crossing, PrimitiveType.Cube, "Crosswalk stripe",
                         new Vector3(i * 1.55f, 0f, 0f), new Vector3(0.92f, 0.035f, 5.8f), stripe);
