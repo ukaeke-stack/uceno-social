@@ -134,7 +134,7 @@ namespace UCENO.VirtualWorld.Editor
         {
             GameObject plaza = new GameObject("UCENO Skyline Arrival Plaza");
             plaza.transform.SetParent(parent, false);
-            plaza.transform.localPosition = new Vector3(0f, 0f, 112f);
+            plaza.transform.localPosition = new Vector3(0f, 0f, 150f);
             Box(plaza.transform, "Plaza platform", Vector3.zero,
                 new Vector3(82f, 0.35f, 34f), concrete, true);
             Box(plaza.transform, "Reflecting pool", new Vector3(0f, 0.22f, 5f),
