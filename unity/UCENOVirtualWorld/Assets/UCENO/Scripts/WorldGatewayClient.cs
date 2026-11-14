@@ -51,6 +51,16 @@ namespace UCENO.VirtualWorld
         public string gesture;
         public int gestureSequence;
         public GatewayWardrobeItemState[] wardrobe;
+        public GatewayAvatarAppearanceState appearance;
+    }
+
+    [Serializable] internal sealed class GatewayAvatarAppearanceState
+    {
+        public string skin;
+        public string hair;
+        public string top;
+        public string trousers;
+        public string shoes;
     }
 
     [Serializable] internal sealed class GatewayInteractionPacket
@@ -218,6 +228,8 @@ namespace UCENO.VirtualWorld
             public bool hasSample;
             public AvatarWardrobeController wardrobe;
             public string wardrobeSignature;
+            public AvatarAppearanceProfile appearance;
+            public string appearanceSignature;
         }
 
         private readonly Dictionary<string, RemotePlayer> remotePlayers = new Dictionary<string, RemotePlayer>();
@@ -1049,8 +1061,14 @@ namespace UCENO.VirtualWorld
                     {
                         root = avatar.transform,
                         locomotion = avatar.GetComponentInChildren<AvatarLocomotionDriver>(),
-                        wardrobe = avatar.GetComponentInChildren<AvatarWardrobeController>()
+                        wardrobe = avatar.GetComponentInChildren<AvatarWardrobeController>(),
+                        appearance = avatar.GetComponentInChildren<AvatarAppearanceProfile>()
                     };
+                    if (remote.appearance == null)
+                    {
+                        Transform model = avatar.transform;
+                        remote.appearance = model.GetComponentInChildren<AvatarAppearanceProfile>();
+                    }
                     if (remote.wardrobe == null) remote.wardrobe = avatar.AddComponent<AvatarWardrobeController>();
                     if (remote.locomotion != null) remote.locomotion.enabled = true;
                     remotePlayers.Add(state.userId, remote);
@@ -1071,6 +1089,22 @@ namespace UCENO.VirtualWorld
                 if (remote.locomotion != null)
                     remote.locomotion.ApplyRemoteState(Mathf.Clamp01(speed / 8f), state.seated,
                         state.sprint || speed > 6f, state.gesture ?? "none", state.gestureSequence);
+                if (remote.appearance != null && state.appearance != null)
+                {
+                    string appearanceSignature = string.Join("|", state.appearance.skin, state.appearance.hair,
+                        state.appearance.top, state.appearance.trousers, state.appearance.shoes);
+                    if (appearanceSignature != remote.appearanceSignature)
+                    {
+                        AvatarAppearanceProfile.Palette palette = remote.appearance.CurrentPalette;
+                        if (ColorUtility.TryParseHtmlString(state.appearance.skin, out Color skin)) palette.skin = skin;
+                        if (ColorUtility.TryParseHtmlString(state.appearance.hair, out Color hair)) palette.hair = hair;
+                        if (ColorUtility.TryParseHtmlString(state.appearance.top, out Color top)) palette.top = top;
+                        if (ColorUtility.TryParseHtmlString(state.appearance.trousers, out Color trousers)) palette.trousers = trousers;
+                        if (ColorUtility.TryParseHtmlString(state.appearance.shoes, out Color shoes)) palette.shoes = shoes;
+                        remote.appearance.Apply(palette);
+                        remote.appearanceSignature = appearanceSignature;
+                    }
+                }
                 if (remote.wardrobe != null && state.wardrobe != null)
                 {
                     string signature = "";
