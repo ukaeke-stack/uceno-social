@@ -44,6 +44,56 @@ namespace UCENO.VirtualWorld.Editor
             }
 
             BuildPlaza(parent, stone, metal, concrete);
+            BuildExpandedUrbanGrid(parent, concrete, stone, glass, litGlass, metal);
+        }
+
+        private static void BuildExpandedUrbanGrid(Transform parent, Material concrete,
+            Material stone, Material glass, Material litGlass, Material metal)
+        {
+            int[] rows = { -190, -125, 125, 190 };
+            float[] columns = { -100f, -52f, 52f, 100f };
+            int seed = 20;
+            foreach (int z in rows)
+            foreach (float x in columns)
+            {
+                float width = (seed % 3 == 0) ? 19f : 16f;
+                float depth = (seed % 2 == 0) ? 18f : 15f;
+                int floors = 11 + (seed * 7 % 13);
+                BuildTower(parent, "UCENO Skyline Tower " + seed,
+                    new Vector3(x, 0f, z + ((seed % 2 == 0) ? 10f : -10f)),
+                    width, depth, floors, seed, concrete, stone, glass, litGlass, metal);
+                seed++;
+            }
+
+            Material asphalt = CreateMaterial("UCENO_City_Grid_Asphalt",
+                new Color(0.105f, 0.12f, 0.135f), 0.08f, 0.22f);
+            Material markings = CreateMaterial("UCENO_City_Grid_Road_Marking",
+                new Color(0.86f, 0.84f, 0.74f), 0.02f, 0.18f);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Transform boulevard = new GameObject("UCENO Secondary Boulevard " + side).transform;
+                boulevard.SetParent(parent, false);
+                boulevard.localPosition = new Vector3(side * 72f, 0f, 0f);
+                Box(boulevard, "Boulevard asphalt", Vector3.zero,
+                    new Vector3(12f, 0.12f, 500f), asphalt, true);
+                Box(boulevard, "Boulevard median", new Vector3(0f, 0.08f, 0f),
+                    new Vector3(0.45f, 0.08f, 500f), concrete, false);
+                for (int z = -240; z <= 240; z += 18)
+                    Box(boulevard, "Lane dash", new Vector3(-2.8f, 0.16f, z),
+                        new Vector3(0.10f, 0.025f, 7f), markings, false);
+            }
+
+            for (int z = -180; z <= 180; z += 90)
+            {
+                Transform crossStreet = new GameObject("UCENO Cross Street " + z).transform;
+                crossStreet.SetParent(parent, false);
+                crossStreet.localPosition = new Vector3(0f, 0f, z);
+                Box(crossStreet, "Cross street asphalt", Vector3.zero,
+                    new Vector3(250f, 0.12f, 10f), asphalt, true);
+                for (int x = -115; x <= 115; x += 18)
+                    Box(crossStreet, "Cross street lane dash", new Vector3(x, 0.16f, 0f),
+                        new Vector3(7f, 0.025f, 0.10f), markings, false);
+            }
         }
 
         private static void BuildTower(Transform parent, string name, Vector3 origin,
@@ -125,6 +175,27 @@ namespace UCENO.VirtualWorld.Editor
             // legible at street scale.
             Box(root.transform, "Entrance canopy", new Vector3(0f, 3.0f, depth * 0.5f + 2.1f),
                 new Vector3(width * 0.42f, 0.22f, 3.4f), metal, false);
+
+            GameObject distant = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            distant.name = "Distance Skyline LOD";
+            distant.transform.SetParent(root.transform, false);
+            distant.transform.localPosition = new Vector3(0f, height * 0.5f + 1.8f, 0f);
+            distant.transform.localScale = new Vector3(width * 0.82f, height, depth * 0.82f);
+            distant.GetComponent<Renderer>().sharedMaterial = stone;
+            Collider distantCollider = distant.GetComponent<Collider>();
+            if (distantCollider != null) Object.DestroyImmediate(distantCollider);
+            Renderer[] detailedRenderers = root.GetComponentsInChildren<Renderer>(true);
+            Renderer distantRenderer = distant.GetComponent<Renderer>();
+            Renderer[] closeRenderers = System.Array.FindAll(detailedRenderers,
+                renderer => renderer != distantRenderer);
+            LODGroup lodGroup = root.AddComponent<LODGroup>();
+            lodGroup.SetLODs(new[]
+            {
+                new LOD(0.22f, closeRenderers),
+                new LOD(0.035f, new[] { distantRenderer })
+            });
+            lodGroup.RecalculateBounds();
+
             GameObjectUtility.SetStaticEditorFlags(root,
                 StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccludeeStatic |
                 StaticEditorFlags.OccluderStatic | StaticEditorFlags.ContributeGI);
