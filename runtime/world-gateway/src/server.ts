@@ -347,6 +347,7 @@ type Player = {
   homeId: string | null;
   homeAnchor: { x: number; y: number; z: number; yaw: number } | null;
   eventId: string | null;
+  avatarAppearance: Record<string, string>;
   wardrobe: EquippedWardrobeItem[];
   returnState: { x: number; y: number; z: number; yaw: number } | null;
   activeDistrictId: string | null;
@@ -808,6 +809,13 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
   const x = finiteNumber(p.x, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.x : 0;
   const y = finiteNumber(p.y, GROUND_Y, WORLD_BOUNDS) ? p.y : GROUND_Y;
   const z = finiteNumber(p.z, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.z : 0;
+  const appearanceRows = await sql`
+    SELECT appearance
+    FROM user_avatar_appearances
+    WHERE user_id = ${userId}::uuid
+    LIMIT 1
+  `;
+  const avatarAppearance = appearanceRows[0]?.appearance ?? {};
   const wardrobeRows = await sql`
     SELECT e.slot, e.item_id AS "itemId"
     FROM user_avatar_wardrobe_equipped e
@@ -828,7 +836,7 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
-    lastInteractionAt: 0, lastWardrobeRefreshAt: 0, voiceActive: false, lastVoiceSignalAt: 0, voiceSignalWindowAt: Date.now(), voiceSignalCount: 0, homeId: null, homeAnchor: null, eventId: null, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null,
+    lastInteractionAt: 0, lastWardrobeRefreshAt: 0, voiceActive: false, lastVoiceSignalAt: 0, voiceSignalWindowAt: Date.now(), voiceSignalCount: 0, homeId: null, homeAnchor: null, eventId: null, avatarAppearance, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null,
     activeDistrictId: null, pendingDistrict: null
   };
 }
@@ -1841,7 +1849,7 @@ setInterval(async () => {
   const now = Date.now();
   const dt = Math.min(0.05, Math.max(0.001, (now - lastTick) / 1000));
   lastTick = now;
-  const snapshots: Array<{ userId: string; x: number; y: number; z: number; yaw: number; grounded: boolean; seated: boolean; sprint: boolean; gesture: string; gestureSequence: number; wardrobe: EquippedWardrobeItem[] }> = [];
+  const snapshots: Array<{ userId: string; x: number; y: number; z: number; yaw: number; grounded: boolean; seated: boolean; sprint: boolean; gesture: string; gestureSequence: number; wardrobe: EquippedWardrobeItem[]; appearance: Record<string, string> }> = [];
   for (const p of players.values()) {
     if (p.socket.readyState !== WebSocket.OPEN) continue;
     if (now - p.lastInputAt > 1500) { p.moveX = 0; p.moveZ = 0; p.sprint = false; }
@@ -1884,7 +1892,7 @@ setInterval(async () => {
       const pendingGroundY = p.homeAnchor ? p.homeAnchor.y : GROUND_Y;
       if (p.y <= pendingGroundY) { p.y = pendingGroundY; p.vy = 0; p.grounded = true; }
       snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
-        seated: p.seated, sprint: false, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe });
+        seated: p.seated, sprint: false, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe, appearance: p.avatarAppearance });
       continue;
     }
     resolveHorizontalMovement(p, proposedX, proposedZ);
