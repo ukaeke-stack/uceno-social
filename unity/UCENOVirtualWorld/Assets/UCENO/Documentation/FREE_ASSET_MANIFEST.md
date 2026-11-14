@@ -129,3 +129,20 @@ reflection probes, occlusion validation and Android profiling remain required.
 The city scene generator must be run in Unity Editor before these structures
 exist in the exported scenes. Validate district ownership and collision export
 after generation; do not produce an APK based on source-only checks.
+
+## Mixed-use boulevard frontage
+
+The original UCENO city generator now places sixteen low-rise retail pavilions
+along both sides of the main avenue. Each pavilion has a stone podium,
+shopfront glazing, upper-floor glazing, vertical facade fins, a recessed
+entrance canopy, illuminated fascia, roof parapet and a simple terrace
+pergola/planter composition. The pavilions are separate district-root children
+so the existing four-scene Addressables split can stream them with their
+geographic district.
+
+These are original modular blockout meshes authored in the Unity Editor, not
+finished architectural product models. Store interiors, signage content,
+doorway interactions, tenant fit-outs, realistic glass/PBR response, landscape
+detail and visual validation still need implementation and testing. Their
+presence in source code does not mean they have already been generated into
+Unity scenes.
