@@ -945,9 +945,9 @@ namespace UCENO.VirtualWorld.Editor
 
         private static string ResolveDistrictName(float worldZ)
         {
-            if (worldZ < -60f) return "south";
+            if (worldZ < -120f) return "south";
             if (worldZ < 0f) return "central-south";
-            if (worldZ < 60f) return "central-north";
+            if (worldZ < 120f) return "central-north";
             return "north";
         }
 
