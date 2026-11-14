@@ -70,15 +70,16 @@ namespace UCENO.VirtualWorld.Editor
             Material markings = CreateMaterial("UCENO_City_Grid_Road_Marking",
                 new Color(0.86f, 0.84f, 0.74f), 0.02f, 0.18f);
             for (int side = -1; side <= 1; side += 2)
+            for (int segment = -180; segment <= 180; segment += 120)
             {
-                Transform boulevard = new GameObject("UCENO Secondary Boulevard " + side).transform;
+                Transform boulevard = new GameObject("UCENO Secondary Boulevard " + side + " Segment " + segment).transform;
                 boulevard.SetParent(parent, false);
-                boulevard.localPosition = new Vector3(side * 72f, 0f, 0f);
+                boulevard.localPosition = new Vector3(side * 72f, 0f, segment);
                 Box(boulevard, "Boulevard asphalt", Vector3.zero,
-                    new Vector3(12f, 0.12f, 500f), asphalt, true);
+                    new Vector3(12f, 0.12f, 132f), asphalt, true);
                 Box(boulevard, "Boulevard median", new Vector3(0f, 0.08f, 0f),
-                    new Vector3(0.45f, 0.08f, 500f), concrete, false);
-                for (int z = -240; z <= 240; z += 18)
+                    new Vector3(0.45f, 0.08f, 132f), concrete, false);
+                for (int z = -60; z <= 60; z += 18)
                     Box(boulevard, "Lane dash", new Vector3(-2.8f, 0.16f, z),
                         new Vector3(0.10f, 0.025f, 7f), markings, false);
             }
