@@ -110,3 +110,22 @@ architectural depth/interiors, more varied building silhouettes, street-level
 props, authored animation clips, avatar customization and visual review in the
 Unity Editor. The scene builder must be run in Unity before these changes appear
 in a playable scene. Unity compilation and Android performance remain unverified.
+
+## Expanded original city-scale layout
+
+The UCENO-owned scene generator now lays out a substantially larger first
+playable urban area: a 300 m wide by 560 m long terrain footprint, a 520 m
+main avenue, two segmented secondary boulevards, and cross streets. It composes
+24 original high-rise structures from generated architectural modules, with
+curtain-wall glazing, floor slabs, structural piers, balconies, podiums and
+roof silhouettes. The four longitudinal district scenes remain separately
+addressable so the existing Addressables delivery system can stream them.
+
+Each generated tower has close-range architectural geometry and a simplified
+distance silhouette LOD. This is a scalable starter-city layout, not an
+infinite city and not a claim of photorealism: detailed façade assets, authentic
+interiors, street furniture, vehicles, vegetation variety, baked lighting,
+reflection probes, occlusion validation and Android profiling remain required.
+The city scene generator must be run in Unity Editor before these structures
+exist in the exported scenes. Validate district ownership and collision export
+after generation; do not produce an APK based on source-only checks.
