@@ -11,7 +11,9 @@ const migrations = [
   "031_durable_activity_sessions.sql",
   "032_activity_cross_instance_discovery.sql",
   "033_activity_gateway_transfer_tickets.sql",
-  "034_activity_transfer_host_fencing.sql"
+  "034_activity_transfer_host_fencing.sql",
+  "035_world_realtime_consumer_offsets.sql",
+  "036_gateway_process_fencing.sql"
 ];
 
 test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl }, async t => {
@@ -98,6 +100,60 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
           OR previous_instance.heartbeat_at < NOW() - INTERVAL '30 seconds')
       RETURNING activity.instance_id AS "instanceId", activity.host_generation AS "hostGeneration"
     `);
+
+    await t.test("migration 036 enforces exclusive process ownership and stale-generation fencing", async () => {
+      const processA = randomUUID();
+      const processB = randomUUID();
+      const claim = processId => withSchema(tx => tx`
+        SELECT claim_world_instance_process(
+          ${ids.old}::uuid, ${processId}::uuid, 12
+        ) AS generation
+      `);
+      const first = await claim(processA);
+      assert.equal(Number(first[0].generation), 1);
+
+      const duplicate = await claim(processB);
+      assert.equal(duplicate[0].generation, null,
+        "a second process must not claim an instance with a live owner lease");
+
+      const renewed = await withSchema(tx => tx`
+        SELECT renew_world_instance_process(
+          ${ids.old}::uuid, ${processA}::uuid, 1, 3, 12
+        ) AS renewed
+      `);
+      assert.equal(renewed[0].renewed, true);
+
+      const staleRenewal = await withSchema(tx => tx`
+        SELECT renew_world_instance_process(
+          ${ids.old}::uuid, ${processB}::uuid, 2, 0, 12
+        ) AS renewed
+      `);
+      assert.equal(staleRenewal[0].renewed, false);
+
+      await withSchema(tx => tx`
+        UPDATE virtual_world_instances
+        SET owner_lease_expires_at = NOW() - INTERVAL '1 second'
+        WHERE id = ${ids.old}::uuid
+      `);
+      const replacement = await claim(processB);
+      assert.equal(Number(replacement[0].generation), 2,
+        "a replacement process must receive a strictly newer generation");
+
+      const oldOwnerRenewal = await withSchema(tx => tx`
+        SELECT renew_world_instance_process(
+          ${ids.old}::uuid, ${processA}::uuid, 1, 3, 12
+        ) AS renewed
+      `);
+      assert.equal(oldOwnerRenewal[0].renewed, false,
+        "the previous process generation must remain fenced after takeover");
+
+      const currentOwner = await withSchema(tx => tx`
+        SELECT owner_process_id AS "processId", owner_generation AS generation
+        FROM virtual_world_instances WHERE id = ${ids.old}::uuid
+      `);
+      assert.equal(currentOwner[0].processId, processB);
+      assert.equal(Number(currentOwner[0].generation), 2);
+    });
 
     await t.test("concurrent player reconnects advance one authoritative session generation", async () => {
       await withSchema(tx => tx`DELETE FROM virtual_world_player_sessions
