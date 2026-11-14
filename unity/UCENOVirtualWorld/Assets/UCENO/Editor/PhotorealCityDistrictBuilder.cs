@@ -45,6 +45,7 @@ namespace UCENO.VirtualWorld.Editor
 
             BuildPlaza(parent, stone, metal, concrete);
             BuildExpandedUrbanGrid(parent, concrete, stone, glass, litGlass, metal);
+            UCENOCityPublicRealmBuilder.Build(parent);
         }
 
         private static void BuildExpandedUrbanGrid(Transform parent, Material concrete,
