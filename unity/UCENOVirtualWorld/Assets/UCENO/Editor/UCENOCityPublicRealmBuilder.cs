@@ -105,8 +105,8 @@ namespace UCENO.VirtualWorld.Editor
 
         private static void BuildTransitShelters(Transform parent)
         {
-            BuildShelter(parent, new Vector3(-86f, 0f, -6f));
-            BuildShelter(parent, new Vector3(86f, 0f, 78f));
+            BuildShelter(parent, new Vector3(-91f, 0f, -6f));
+            BuildShelter(parent, new Vector3(91f, 0f, 78f));
         }
 
         private static void BuildShelter(Transform parent, Vector3 position)
@@ -133,7 +133,7 @@ namespace UCENO.VirtualWorld.Editor
             for (int z = -180; z <= 180; z += 90)
             {
                 Transform crossing = Group(parent, "UCENO Raised Pedestrian Crossing " + z,
-                    new Vector3(0f, 0.18f, z + 8f));
+                    new Vector3(0f, 0.18f, z));
                 for (int i = -5; i <= 5; i++)
                     Primitive(crossing, PrimitiveType.Cube, "Crosswalk stripe",
                         new Vector3(i * 1.55f, 0f, 0f), new Vector3(0.92f, 0.035f, 5.8f), stripe);
