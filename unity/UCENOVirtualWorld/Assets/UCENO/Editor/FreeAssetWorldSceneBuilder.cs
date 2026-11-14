@@ -119,6 +119,11 @@ namespace UCENO.VirtualWorld.Editor
                 apartmentPrefab, factoryPrefab, lampPrefab,
                 pachiraPrefab, shrub02Prefab, shrub03Prefab,
                 carPrefab, fencePrefab);
+
+            // Original UCENO-owned high-rise architecture. This is generated
+            // into the scene before district extraction and collision export.
+            PhotorealCityDistrictBuilder.Build(worldRoot);
+
             BuildDistrictFeatures(
                 worldRoot, asphalt, concrete, grass, laneMarking,
                 pachiraPrefab, shrub03Prefab, lampPrefab, carPrefab);
