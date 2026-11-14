@@ -188,7 +188,7 @@ cannot become ready while the first owns the lease. It requires
 
 ## Provisioning and deployment sequence
 
-1. Apply database migrations 015–025 in numeric order.
+1. Apply database migrations 015–036 in numeric order, after reviewing the full sequence against the target database. This includes the later district persistence, player-session fencing, durable activity/transfer, relay-consumer offset and exclusive gateway-process ownership migrations. Do not apply only the latest migration or skip earlier dependencies.
 2. Create a runtime instance record with the target world, region, reachable
    WebSocket URL in `endpoint`, capacity and status `provisioning`.
 3. Deploy this service with the matching `WORLD_INSTANCE_ID` and secrets.
