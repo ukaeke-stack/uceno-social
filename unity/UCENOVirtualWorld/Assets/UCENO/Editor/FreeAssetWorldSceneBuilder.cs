@@ -454,16 +454,19 @@ namespace UCENO.VirtualWorld.Editor
             Material centreLine)
         {
             // A longer, wider walkable district built from the existing lightweight assets.
-            CreatePlane("Grass Terrain", parent, new Vector3(0f, -0.08f, 0f), 360f, 360f, grass);
-            CreatePlane("Main Asphalt Road", parent, new Vector3(0f, 0.005f, 0f), 10f, 240f, asphalt);
-            CreatePlane("Left Concrete Walkway", parent, new Vector3(-6.25f, 0.02f, 0f), 2.5f, 240f, concrete);
-            CreatePlane("Right Concrete Walkway", parent, new Vector3(6.25f, 0.02f, 0f), 2.5f, 240f, concrete);
-            CreatePlane("Left Grass Verge", parent, new Vector3(-8.5f, 0.01f, 0f), 2f, 240f, grassVerge);
-            CreatePlane("Right Grass Verge", parent, new Vector3(8.5f, 0.01f, 0f), 2f, 240f, grassVerge);
+            // The boot scene owns the continuous terrain and main avenue;
+            // building blocks, cross streets and secondary boulevards are
+            // extracted into the four independently streamed city districts.
+            CreatePlane("Grass Terrain", parent, new Vector3(0f, -0.08f, 0f), 300f, 560f, grass);
+            CreatePlane("Main Asphalt Road", parent, new Vector3(0f, 0.005f, 0f), 10f, 520f, asphalt);
+            CreatePlane("Left Concrete Walkway", parent, new Vector3(-6.25f, 0.02f, 0f), 2.5f, 520f, concrete);
+            CreatePlane("Right Concrete Walkway", parent, new Vector3(6.25f, 0.02f, 0f), 2.5f, 520f, concrete);
+            CreatePlane("Left Grass Verge", parent, new Vector3(-8.5f, 0.01f, 0f), 2f, 520f, grassVerge);
+            CreatePlane("Right Grass Verge", parent, new Vector3(8.5f, 0.01f, 0f), 2f, 520f, grassVerge);
 
-            CreateRoadLine(parent, edgeLine, new Vector3(-4.7f, 0.035f, -120f), new Vector3(-4.7f, 0.035f, 120f), 0.055f);
-            CreateRoadLine(parent, edgeLine, new Vector3(4.7f, 0.035f, -120f), new Vector3(4.7f, 0.035f, 120f), 0.055f);
-            for (int z = -115; z <= 115; z += 7)
+            CreateRoadLine(parent, edgeLine, new Vector3(-4.7f, 0.035f, -260f), new Vector3(-4.7f, 0.035f, 260f), 0.055f);
+            CreateRoadLine(parent, edgeLine, new Vector3(4.7f, 0.035f, -260f), new Vector3(4.7f, 0.035f, 260f), 0.055f);
+            for (int z = -255; z <= 255; z += 7)
                 CreateRoadLine(parent, centreLine, new Vector3(0f, 0.04f, z), new Vector3(0f, 0.04f, z + 3.2f), 0.10f);
         }
 
@@ -619,7 +622,7 @@ namespace UCENO.VirtualWorld.Editor
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = new Color(0.60f, 0.67f, 0.72f);
             RenderSettings.fogStartDistance = 65f;
-            RenderSettings.fogEndDistance = 155f;
+            RenderSettings.fogEndDistance = 240f;
 
             GameObject lightObject = new GameObject("City Sun");
             Light sun = lightObject.AddComponent<Light>();
