@@ -46,6 +46,79 @@ namespace UCENO.VirtualWorld.Editor
             BuildPlaza(parent, stone, metal, concrete);
             BuildExpandedUrbanGrid(parent, concrete, stone, glass, litGlass, metal);
             UCENOCityPublicRealmBuilder.Build(parent);
+            BuildBoulevardRetail(parent, concrete, stone, glass, litGlass, metal);
+
+        }
+
+
+        private static void BuildBoulevardRetail(Transform parent, Material concrete,
+            Material stone, Material glass, Material litGlass, Material metal)
+        {
+            // Mixed-use street frontage breaks up the skyline with walkable,
+            // human-scale retail buildings. Every block is its own district
+            // child so Addressables extraction can stream it with its area.
+            Material warmStone = CreateMaterial("UCENO_Retail_Warm_Stone",
+                new Color(0.48f, 0.39f, 0.29f), 0.08f, 0.28f);
+            Material darkGlass = CreateMaterial("UCENO_Retail_Tinted_Glass",
+                new Color(0.025f, 0.075f, 0.09f), 0.68f, 0.9f);
+            Material signGlow = CreateMaterial("UCENO_Retail_Signage_Light",
+                new Color(0.18f, 0.62f, 0.72f), 0.18f, 0.62f);
+            signGlow.EnableKeyword("_EMISSION");
+            signGlow.SetColor("_EmissionColor", new Color(0.08f, 0.48f, 0.62f) * 1.25f);
+
+            int[] positions = { -205, -145, -85, -25, 35, 95, 155, 215 };
+            for (int side = -1; side <= 1; side += 2)
+            for (int i = 0; i < positions.Length; i++)
+            {
+                float z = positions[i];
+                float x = side * 25f;
+                float width = 13f + (i % 3) * 1.5f;
+                float depth = 24f + (i % 2) * 4f;
+                float height = 10.5f + (i % 3) * 1.6f;
+                GameObject block = new GameObject("UCENO Boulevard Retail Pavilion " + side + " " + i);
+                block.transform.SetParent(parent, false);
+                block.transform.localPosition = new Vector3(x, 0f, z);
+                Transform root = block.transform;
+
+                Box(root, "Retail stone podium", new Vector3(0f, 1.05f, 0f),
+                    new Vector3(width, 2.1f, depth), warmStone, true);
+                Box(root, "Continuous shopfront glazing", new Vector3(0f, 1.2f, depth * 0.5f + 0.035f),
+                    new Vector3(width - 1.1f, 1.75f, 0.08f), darkGlass, false);
+                Box(root, "Recessed upper glazing", new Vector3(0f, 5.1f, depth * 0.5f + 0.04f),
+                    new Vector3(width - 1.5f, 3.0f, 0.08f), glass, false);
+                Box(root, "Upper floor slab", new Vector3(0f, 3.0f, 0f),
+                    new Vector3(width + 0.45f, 0.22f, depth + 0.45f), concrete, false);
+                Box(root, "Roof terrace parapet", new Vector3(0f, height, 0f),
+                    new Vector3(width + 0.2f, 0.55f, depth + 0.2f), stone, false);
+                Box(root, "Retail entrance canopy", new Vector3(0f, 2.35f, depth * 0.5f + 1.1f),
+                    new Vector3(width * 0.76f, 0.18f, 2.1f), metal, false);
+                Box(root, "Illuminated shop fascia", new Vector3(0f, 2.35f, depth * 0.5f + 0.11f),
+                    new Vector3(width * 0.68f, 0.34f, 0.09f), signGlow, false);
+
+                for (int bay = -2; bay <= 2; bay++)
+                {
+                    float finX = bay * (width / 5f);
+                    Box(root, "Facade vertical bronze fin",
+                        new Vector3(finX, 5.15f, depth * 0.5f + 0.12f),
+                        new Vector3(0.12f, 3.5f, 0.18f), metal, false);
+                }
+                for (int sideIndex = -1; sideIndex <= 1; sideIndex += 2)
+                {
+                    Box(root, "Corner stone pier",
+                        new Vector3(sideIndex * (width * 0.5f - 0.22f), 3.3f, depth * 0.5f + 0.12f),
+                        new Vector3(0.42f, 6.6f, 0.32f), warmStone, false);
+                }
+
+                // A shallow planted roof deck gives the low-rise blocks a
+                // recognisable mixed-use terrace silhouette.
+                Box(root, "Roof garden planter", new Vector3(0f, height + 0.42f, -depth * 0.22f),
+                    new Vector3(width * 0.62f, 0.72f, 2.0f), warmStone, false);
+                Box(root, "Roof shade pergola beam", new Vector3(0f, height + 2.1f, -depth * 0.22f),
+                    new Vector3(width * 0.58f, 0.14f, 2.5f), metal, false);
+                GameObjectUtility.SetStaticEditorFlags(block,
+                    StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccludeeStatic |
+                    StaticEditorFlags.OccluderStatic | StaticEditorFlags.ContributeGI);
+            }
         }
 
         private static void BuildExpandedUrbanGrid(Transform parent, Material concrete,
