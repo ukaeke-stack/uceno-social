@@ -32,7 +32,8 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
       await tx`CREATE TABLE users (id UUID PRIMARY KEY)`;
       await tx`CREATE TABLE virtual_worlds (id UUID PRIMARY KEY)`;
       await tx`CREATE TABLE virtual_world_instances (
-        id UUID PRIMARY KEY, status TEXT NOT NULL, heartbeat_at TIMESTAMPTZ, endpoint TEXT
+        id UUID PRIMARY KEY, status TEXT NOT NULL, heartbeat_at TIMESTAMPTZ, endpoint TEXT,
+        current_players INTEGER NOT NULL DEFAULT 0, capacity INTEGER NOT NULL DEFAULT 64
       )`;
       await tx`CREATE TABLE virtual_world_player_state (
         world_id UUID NOT NULL, user_id UUID NOT NULL, position JSONB NOT NULL DEFAULT '{}'::jsonb,
