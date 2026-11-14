@@ -1904,7 +1904,8 @@ setInterval(async () => {
     }
     if (p.y <= groundY) { p.y = groundY; p.vy = 0; p.grounded = true; }
     snapshots.push({ userId: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw, grounded: p.grounded,
-      seated: p.seated, sprint: p.sprint, gesture: p.gesture, gestureSequence: p.gestureSequence, wardrobe: p.wardrobe });
+      seated: p.seated, sprint: p.sprint, gesture: p.gesture, gestureSequence: p.gestureSequence,
+      wardrobe: p.wardrobe, appearance: p.avatarAppearance });
     if (now - p.lastCheckpointAt >= 5000) {
       p.lastCheckpointAt = now;
       void sql`
