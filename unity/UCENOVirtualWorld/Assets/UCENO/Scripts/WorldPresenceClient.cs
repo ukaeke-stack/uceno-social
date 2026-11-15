@@ -279,10 +279,9 @@ namespace UCENO.VirtualWorld
                     remote.targetRotation = new Quaternion(peer.rotation.x, peer.rotation.y, peer.rotation.z, peer.rotation.w);
                     remote.lastReceived = sampleTime;
 
-                    // Server-validated presence samples drive the remote humanoid.
-                    // A local Animator Controller uses its MoveSpeed parameter;
-                    // the procedural driver handles seated poses and gestures
-                    // when the imported avatar has no controller.
+                    // Server-validated presence samples drive imported Humanoid clips.
+                    // The release builder refuses to create an avatar without the full
+                    // retargeted Animator Controller; there is no procedural fallback.
                     float normalizedSpeed = peer.animationState != null
                         ? (peer.animationState.locomotion == "run" ? 1f :
                            peer.animationState.locomotion == "walk" ? 0.5f : 0f)
@@ -296,19 +295,6 @@ namespace UCENO.VirtualWorld
                             if (peer.animationState != null && parameter.name == "IsSeated" &&
                                 parameter.type == AnimatorControllerParameterType.Bool)
                                 remote.animator.SetBool(parameter.name, peer.animationState.seated);
-                        }
-                        if (peer.animationState != null &&
-                            peer.animationState.gestureSequence > remote.lastGestureSequence)
-                        {
-                            string trigger = peer.animationState.gesture == "wave" ? "Wave" :
-                                peer.animationState.gesture == "cheer" ? "Cheer" : null;
-                            if (!string.IsNullOrEmpty(trigger))
-                            {
-                                foreach (AnimatorControllerParameter parameter in remote.animator.parameters)
-                                    if (parameter.type == AnimatorControllerParameterType.Trigger && parameter.name == trigger)
-                                        remote.animator.SetTrigger(trigger);
-                            }
-                            remote.lastGestureSequence = peer.animationState.gestureSequence;
                         }
                     }
                     if (remote.locomotion != null && peer.animationState != null)
