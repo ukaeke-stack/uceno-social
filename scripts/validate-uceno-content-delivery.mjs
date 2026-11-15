@@ -20,8 +20,11 @@ const tests = read("docs/virtual-world/REMOTE_CONTENT_DELIVERY_TESTS.md");
 
 const checks = [
   ["Ten distinct city catalogue entries are defined (not counted from districts)", Array.isArray(cityCatalog.cities) && cityCatalog.cities.length >= 10 && new Set(cityCatalog.cities.map(city => city.id)).size === cityCatalog.cities.length],
-  ["Each city has its own root and four distinct district content labels", cityCatalog.cities?.every(city => city.contentLabel === "world-city-" + city.id && city.districts?.length >= 4 && new Set(city.districts.map(district => district.contentLabel)).size === city.districts.length)],
+  ["Each city has its own root and four distinct district content labels", cityCatalog.cities?.every(city => city.contentLabel === "world-city-" + city.id && city.districts?.length >= 4 && new Set(city.districts.map(district => district.contentLabel)).size === city.districts.length && city.landmarks?.length >= 3)],
   ["City catalogue policy enforces minimum count and city-specific labels", cityPolicy.includes("minimumCities") && cityPolicy.includes("world-city-${id}")],
+  ["Every city has a unique climate, biome, terrain and urban layout pattern", new Set(cityCatalog.cities.map(city => city.climate)).size === 10 && new Set(cityCatalog.cities.map(city => city.environment?.biome)).size === 10 && new Set(cityCatalog.cities.map(city => city.environment?.terrain)).size === 10 && new Set(cityCatalog.cities.map(city => city.layout?.pattern)).size === 10],
+  ["Each city has three or more named landmark content labels", cityCatalog.cities.every(city => city.landmarks.length >= 3 && city.landmarks.every(landmark => landmark.contentLabel.startsWith("world-city-" + city.id + "-landmark-")))],
+  ["Districts contain role, centre, radius and city-specific layout metadata", cityCatalog.cities.every(city => city.districts.every(district => district.role && district.center && Number.isFinite(district.radius) && district.layout === city.layout.pattern))],
   ["City catalogue tests cover duplicate IDs, bounds and incomplete districts", cityTests.includes("rejects fewer than ten cities") && cityTests.includes("invalid spawn bounds") && cityTests.includes("fewer than four districts")],
 
   ["Addressables package is declared", manifest.dependencies?.["com.unity.addressables"] === "2.7.6"],
@@ -62,7 +65,7 @@ const checks = [
   ["Client loads server-selected district labels before acknowledgement", /district_content_required/.test(gateway) && /AcquireContent\(label/.test(gateway) && /district_content_ready/.test(gateway)],
   ["Client can retry and clears cancelled district transitions", /RetryPendingDistrictContent/.test(gateway) && /district_content_cancelled/.test(gateway)],
   ["District policy tests cover bounds and overlaps", /rejects overlapping district rectangles/.test(districtTests) && /rejects malformed JSON/.test(districtTests)],
-  ["Canonical gateway district config has four matching Unity scene labels", districtConfig.districts?.length === 4 && ["south", "central-south", "central-north", "north"].every(id => districtConfig.districts.some(d => d.id === id && d.contentLabel === "world-city-district-" + id))],
+  ["Canonical gateway district config has four matching Unity scene labels", districtConfig.districts?.length === 4 && ["civic-core", "exchange-quarter", "garden-ring", "old-port"].every(id => districtConfig.districts.some(d => d.id === id && d.contentLabel === "world-city-district-" + id))],
   ["Gateway tests exercise canonical district geometry fixture", /canonical gateway config matches the four generated Unity district scenes/.test(districtTests)],
   ["Architecture documents automatic loading and persistent cache", /automatically|on demand|preflight/i.test(architecture) && /persistent.*cache/i.test(architecture)],
   ["Acceptance tests cover interrupted downloads and district boundary gates", /Interrupt the connection mid-download/.test(tests) && /district boundary/.test(tests)]
