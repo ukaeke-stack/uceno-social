@@ -39,6 +39,36 @@ namespace UCENO.VirtualWorld.Editor
         public float minX, maxX, minZ, maxZ;
     }
 
+    [Serializable]
+    internal sealed class WorldCityCatalogDocument
+    {
+        public WorldCityCatalogEntry[] cities;
+    }
+
+    [Serializable]
+    internal sealed class WorldCityCatalogEntry
+    {
+        public string id;
+        public string name;
+        public WorldCityCatalogDistrict[] districts;
+    }
+
+    [Serializable]
+    internal sealed class WorldCityCatalogDistrict
+    {
+        public string id;
+        public string name;
+        public string contentLabel;
+        public WorldCityCatalogPoint center;
+        public float radius;
+    }
+
+    [Serializable]
+    internal sealed class WorldCityCatalogPoint
+    {
+        public float x, z;
+    }
+
     /// <summary>
     /// Exports explicitly authored objects from loaded Unity scenes to the
     /// authoritative gateway registry. Objects absent from this file cannot
@@ -201,9 +231,9 @@ namespace UCENO.VirtualWorld.Editor
                 if (showDialog)
                     EditorUtility.DisplayDialog("UCENO gateway registry",
                         "Exported " + entries.Count + " scene interactables to:\n" + output +
-                        "\n\nConfigure WORLD_INTERACTABLES_FILE to this file in the gateway runtime.",
+                        "\n\nConfigure WORLD_DISTRICTS_FILE to " + districtOutput + " and WORLD_INTERACTABLES_FILE to this file in the gateway runtime.",
                         "OK");
-                Debug.Log("UCENO exported " + entries.Count + " scene interactables to " + output);
+                Debug.Log("UCENO exported " + entries.Count + " scene interactables for " + activeCity.name + " to " + output);
             }
             catch (Exception error)
             {
@@ -233,5 +263,60 @@ namespace UCENO.VirtualWorld.Editor
             }
         }
     }
+    internal sealed class WorldCityRegistrySettingsWindow : EditorWindow
+    {
+        private WorldCityCatalogEntry[] cities = Array.Empty<WorldCityCatalogEntry>();
+        private string[] cityLabels = Array.Empty<string>();
+        private int selectedIndex;
+
+        public static void Open()
+        {
+            var window = GetWindow<WorldCityRegistrySettingsWindow>("UCENO City Registry");
+            window.minSize = new Vector2(360f, 120f);
+            window.Show();
+        }
+
+        private void OnEnable()
+        {
+            try
+            {
+                string root = Path.GetFullPath(Path.Combine(
+                    Directory.GetParent(Application.dataPath).FullName, "..", ".."));
+                string path = Path.Combine(root, "runtime", "world-gateway", "config", "world-cities.json");
+                var document = JsonUtility.FromJson<WorldCityCatalogDocument>(File.ReadAllText(path));
+                cities = document?.cities ?? Array.Empty<WorldCityCatalogEntry>();
+                cityLabels = cities.Select(city => city.name + " (" + city.id + ")").ToArray();
+                string active = EditorPrefs.GetString("UCENO.ActiveCityId", "meridian");
+                selectedIndex = Array.FindIndex(cities, city => city.id == active);
+                if (selectedIndex < 0) selectedIndex = 0;
+            }
+            catch (Exception error)
+            {
+                Debug.LogException(error);
+                cities = Array.Empty<WorldCityCatalogEntry>();
+                cityLabels = Array.Empty<string>();
+            }
+        }
+
+        private void OnGUI()
+        {
+            EditorGUILayout.LabelField("Choose the city whose saved scene interactables will be exported.",
+                EditorStyles.wordWrappedLabel);
+            if (cities.Length == 0)
+            {
+                EditorGUILayout.HelpBox("The ten-city catalogue could not be loaded.", MessageType.Error);
+                return;
+            }
+            selectedIndex = EditorGUILayout.Popup("Active city", selectedIndex, cityLabels);
+            EditorGUILayout.Space();
+            if (GUILayout.Button("Save Active City"))
+            {
+                EditorPrefs.SetString("UCENO.ActiveCityId", cities[selectedIndex].id);
+                EditorUtility.DisplayDialog("UCENO City Registry",
+                    cities[selectedIndex].name + " is now selected for registry export.", "OK");
+            }
+        }
+    }
+
 }
 #endif
