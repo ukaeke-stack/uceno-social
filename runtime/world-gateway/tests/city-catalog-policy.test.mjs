@@ -281,3 +281,9 @@ test("gateway derives readiness only from city-matching exported content labels"
   assert.match(server, /keys\.add\(city\.id \+ .:/);
   assert.match(server, /function cityRuntimeInteractableKeys\(\)/);
 });
+test("interaction authorization and durable object broadcasts cannot use the legacy global district map", () => {
+  const server = readFileSync(new URL("../src/server.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(server, /findWorldDistrict\(WORLD_DISTRICTS, (?:player|peer)\.x/);
+  assert.match(server, /findPlayerDistrict\(player, player\.x, player\.z\)/);
+  assert.match(server, /findPlayerDistrict\(peer, peer\.x, peer\.z\)/);
+});
