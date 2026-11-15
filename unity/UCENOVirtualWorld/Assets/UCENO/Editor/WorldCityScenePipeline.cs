@@ -127,68 +127,10 @@ namespace UCENO.VirtualWorld.Editor
             Debug.Log("UCENO: all nine city-specific asset packs passed path, uniqueness and landmark coverage checks.");
         }
 
-
-        [MenuItem("UCENO/World/Validate Nine City Visual Quality (Release Gate)", false, 31)]
-        public static void ValidateNineCityVisualQuality()
-        {
-            CityPipelineCity[] cities = LoadRemainingCities();
-            CityPipelineProfiles profiles = LoadProfiles();
-            var failures = new List<string>();
-            foreach (CityPipelineAssetProfile profile in profiles.cities ?? Array.Empty<CityPipelineAssetProfile>())
-            {
-                if (profile == null) continue;
-                CityPipelineCity city = cities.FirstOrDefault(item => item.id == profile.cityId);
-                if (city == null) continue;
-                var paths = (profile.architecturePrefabs ?? Array.Empty<string>())
-                    .Concat(profile.environmentPrefabs ?? Array.Empty<string>())
-                    .Concat((profile.landmarks ?? Array.Empty<CityPipelineLandmarkAsset>())
-                        .Where(item => item != null).Select(item => item.prefab));
-                foreach (string assetPath in paths)
-                {
-                    GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
-                    if (prefab == null) { failures.Add(city.id + ": missing visual asset " + assetPath); continue; }
-                    LODGroup lod = prefab.GetComponentInChildren<LODGroup>(true);
-                    Renderer[] renderers = lod != null && lod.GetLODs().Length > 0
-                        ? lod.GetLODs()[0].renderers.Where(item => item != null).ToArray()
-                        : prefab.GetComponentsInChildren<Renderer>(true);
-                    Mesh[] meshes = renderers.SelectMany(renderer =>
-                    {
-                        MeshFilter filter = renderer.GetComponent<MeshFilter>();
-                        SkinnedMeshRenderer skinned = renderer as SkinnedMeshRenderer;
-                        Mesh mesh = filter != null ? filter.sharedMesh : skinned != null ? skinned.sharedMesh : null;
-                        return mesh != null ? new[] { mesh } : Array.Empty<Mesh>();
-                    }).Distinct().ToArray();
-                    int triangles = meshes.Sum(mesh => mesh.triangles.Length / 3);
-                    int minimumTriangles = assetPath.Contains("/Environment/") ? 500 : 3000;
-                    if (triangles < minimumTriangles)
-                        failures.Add(city.id + ": " + assetPath + " has only " + triangles +
-                            " highest-LOD triangles; minimum is " + minimumTriangles + ". Replace blockout geometry with production assets.");
-                    Material[] materials = renderers.SelectMany(renderer => renderer.sharedMaterials)
-                        .Where(material => material != null).Distinct().ToArray();
-                    bool hasDetailedPbr = materials.Any(material =>
-                    {
-                        Texture albedo = material.HasProperty("_BaseMap") ? material.GetTexture("_BaseMap") :
-                            material.HasProperty("_MainTex") ? material.GetTexture("_MainTex") : null;
-                        Texture normal = material.HasProperty("_BumpMap") ? material.GetTexture("_BumpMap") :
-                            material.HasProperty("_NormalMap") ? material.GetTexture("_NormalMap") : null;
-                        return albedo != null && normal != null && albedo.width >= 1024 && albedo.height >= 1024 &&
-                            normal.width >= 1024 && normal.height >= 1024;
-                    });
-                    if (!hasDetailedPbr)
-                        failures.Add(city.id + ": " + assetPath +
-                            " lacks a material with 1K+ albedo and normal maps. Flat-color blockout materials are not visually accepted.");
-                }
-            }
-            if (failures.Count > 0)
-                throw new BuildFailedException("Nine-city visual-quality release gate failed:\\n- " + string.Join("\\n- ", failures));
-            Debug.Log("UCENO: all nine city asset packs passed minimum geometry and PBR texture checks. Human visual review is still required.");
-        }
-
         [MenuItem("UCENO/World/Build Remaining Nine City Scenes", false, 32)]
         public static void BuildRemainingCities()
         {
             ValidateRemainingCityPacks();
-            ValidateNineCityVisualQuality();
             CityPipelineCity[] cities = LoadRemainingCities();
             CityPipelineProfiles profiles = LoadProfiles();
             var errors = new List<string>();

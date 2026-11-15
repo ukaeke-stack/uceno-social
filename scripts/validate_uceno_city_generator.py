@@ -64,6 +64,11 @@ for token in ("Build Remaining Nine City Scenes", "RegisterAddressableScene",
               "Verify Nine City Scene Registries"):
     require(token in pipeline, f"scene pipeline is missing {token}")
 
+require("VerifyNineCitySceneRegistries();" in pipeline,
+        "scene generation must automatically verify exported scene and registry data")
+require("ValidateNineCityVisualQuality();" in pipeline,
+        "city scene generation must enforce the PBR and geometry visual-quality release gate")
+
 style_rules = {
     "solstice": "terraced waterfront",
     "verdant": "biophilic",
