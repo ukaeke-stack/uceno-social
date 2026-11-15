@@ -380,8 +380,12 @@ def main():
         fail("Player jump action is missing keyboard/mobile input or grounded jump physics.")
     if "ToggleSeated" not in motor or "IsSeated" not in motor or "KeyCode.C" not in motor:
         fail("Player seated/rest state or desktop toggle is missing.")
-    if "motor.IsSeated" not in avatar or "92f" not in avatar:
-        fail("Humanoid seated/rest pose is missing.")
+    if "motor != null ? motor.IsSeated" not in avatar or "IsSeatedHash" not in avatar or "SetBool(IsSeatedHash, seated)" not in avatar:
+        fail("Imported Humanoid seated/rest animation state is missing.")
+    if "WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking" not in avatar or "IsTalkingHash" not in avatar:
+        fail("Humanoid talking animation is not connected to the actual microphone transmit state.")
+    if "Mathf.Sin(cycle)" in avatar or "ApplyProcedural" in avatar:
+        fail("Procedural humanoid gait fallback is not allowed.")
     if '"SIT"' not in hud or '"STAND"' not in hud or "GetSeatControlRect" not in hud:
         fail("Mobile sit/stand control is missing.")
 
