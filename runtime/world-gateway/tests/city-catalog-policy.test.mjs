@@ -252,3 +252,14 @@ test("gateway authentication binds the database city assignment and rechecks it 
   assert.match(server, /currentIdentity\.cityId !== player\.cityId/);
   assert.match(server, /city_assignment_changed/);
 });
+
+test("gateway movement, district snapshots and proximity routing use each player's assigned city", () => {
+  const server = readFileSync(new URL("../src/server.ts", import.meta.url), "utf8");
+  assert.match(server, /function findPlayerDistrict\(player: Pick<Player, "cityId">/);
+  assert.match(server, /resolveCityRuntime\(WORLD_CITIES, player\.cityId\)/);
+  assert.match(server, /findPlayerDistrict\(p, proposedX, proposedZ\)/);
+  assert.match(server, /findPlayerDistrict\(player, player\.x, player\.z\)/);
+  assert.match(server, /findPlayerDistrict\(peer, peer\.x, peer\.z\)/);
+  assert.match(server, /cityRuntime\.city\.spawn\.x/);
+  assert.match(server, /findWorldDistrict\(cityRuntime\.districts, p\.x, p\.z\)/);
+});
