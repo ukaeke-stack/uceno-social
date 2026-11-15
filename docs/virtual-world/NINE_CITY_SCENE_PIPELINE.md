@@ -4,7 +4,7 @@
 
 Meridian Prime remains the existing starter-city pipeline. The other nine cities are generated from `runtime/world-gateway/config/world-cities.json` by the Unity Editor tool `UCENO/World/Build Remaining Nine City Scenes`.
 
-The city catalogue supplies identity, architecture description, biome, terrain, weather, vegetation, road hierarchy, water description, district geometry and named landmarks. Each landmark explicitly names its owning district and must lie inside that district's bounds.
+The city catalogue supplies identity, architecture description, biome, terrain, weather, vegetation, road hierarchy, water description, district geometry and named landmarks. Each city asset profile also requires its own HDRI skybox; the scene pipeline applies city-specific fog, ambient lighting and directional daylight. Each landmark explicitly names its owning district and must lie inside that district's bounds.
 
 ## City-specific imported asset contract
 
@@ -14,7 +14,7 @@ The city catalogue supplies identity, architecture description, biome, terrain, 
 - Four unique environment prefabs: biome tree, ground cover, street furniture, and a signature landscape prop
 - One dedicated imported prefab for each of the city's three named landmarks; each landmark prefab must include a `WorldInteractable` marker and an enabled non-trigger collider
 
-The expected paths are under `Assets/UCENO/Cities/<city-id>/Prefabs`. This is 12 unique imported prefabs per city (108 total across nine cities). Paths must be unique within a city and across all nine cities. Reusing Meridian or another city's signature architecture is rejected. The validator also rejects missing prefabs and incomplete landmark mappings.
+The expected paths are under `Assets/UCENO/Cities/<city-id>/Prefabs`. This is 12 unique imported prefabs plus one city-specific HDRI per city (117 unique assets across nine cities). Paths must be unique within a city and across all nine cities. Reusing Meridian or another city's signature architecture is rejected. The validator also rejects missing prefabs and incomplete landmark mappings.
 
 ## Build procedure
 
