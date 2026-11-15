@@ -237,8 +237,12 @@ function resolveHorizontalMovement(player: Player, nextX: number, nextZ: number)
     return;
   }
   const candidateX = Math.max(-WORLD_BOUNDS, Math.min(WORLD_BOUNDS, nextX));
-  const collisionBoxes = player.activeDistrictId && DISTRICT_COLLISION_BOXES.has(player.activeDistrictId)
-    ? DISTRICT_COLLISION_BOXES.get(player.activeDistrictId)! : COLLISION_BOXES;
+  const currentDistrict = findPlayerDistrict(player, player.x, player.z);
+  const collisionBoxes = currentDistrict
+    ? DISTRICT_COLLISION_BOXES.get(player.cityId + ":" + currentDistrict.id)
+    : undefined;
+  // Never fall back to another city's or the legacy global collision geometry.
+  if (!collisionBoxes) return;
   const blockedX = collisionBoxes.some(box => overlapsBox(candidateX, player.y, player.z, box));
   if (!blockedX) player.x = candidateX;
 
