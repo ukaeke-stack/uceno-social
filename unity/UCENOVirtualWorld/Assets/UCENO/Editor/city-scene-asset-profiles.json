@@ -1,0 +1,258 @@
+{
+  "version": 1,
+  "description": "Per-city imported prefab contract. A city cannot be built or counted as scene-complete until every referenced prefab exists and has passed visual review.",
+  "cities": [
+    {
+      "cityId": "solstice",
+      "assetRoot": "Assets/UCENO/Cities/solstice/Prefabs",
+      "architecturePrefabs": [
+        "Assets/UCENO/Cities/solstice/Prefabs/Architecture/signature-tower.prefab",
+        "Assets/UCENO/Cities/solstice/Prefabs/Architecture/district-block.prefab",
+        "Assets/UCENO/Cities/solstice/Prefabs/Architecture/civic-or-cultural-anchor.prefab"
+      ],
+      "environmentPrefabs": [
+        "Assets/UCENO/Cities/solstice/Prefabs/Environment/biome-tree.prefab",
+        "Assets/UCENO/Cities/solstice/Prefabs/Environment/ground-cover.prefab",
+        "Assets/UCENO/Cities/solstice/Prefabs/Environment/street-furniture.prefab"
+      ],
+      "landmarks": [
+        {
+          "landmarkId": "lighthouse-pavilion",
+          "prefab": "Assets/UCENO/Cities/solstice/Prefabs/Landmarks/lighthouse-pavilion.prefab"
+        },
+        {
+          "landmarkId": "tidal-steps",
+          "prefab": "Assets/UCENO/Cities/solstice/Prefabs/Landmarks/tidal-steps.prefab"
+        },
+        {
+          "landmarkId": "oceanarium",
+          "prefab": "Assets/UCENO/Cities/solstice/Prefabs/Landmarks/oceanarium.prefab"
+        }
+      ]
+    },
+    {
+      "cityId": "verdant",
+      "assetRoot": "Assets/UCENO/Cities/verdant/Prefabs",
+      "architecturePrefabs": [
+        "Assets/UCENO/Cities/verdant/Prefabs/Architecture/signature-tower.prefab",
+        "Assets/UCENO/Cities/verdant/Prefabs/Architecture/district-block.prefab",
+        "Assets/UCENO/Cities/verdant/Prefabs/Architecture/civic-or-cultural-anchor.prefab"
+      ],
+      "environmentPrefabs": [
+        "Assets/UCENO/Cities/verdant/Prefabs/Environment/biome-tree.prefab",
+        "Assets/UCENO/Cities/verdant/Prefabs/Environment/ground-cover.prefab",
+        "Assets/UCENO/Cities/verdant/Prefabs/Environment/street-furniture.prefab"
+      ],
+      "landmarks": [
+        {
+          "landmarkId": "canopy-crown",
+          "prefab": "Assets/UCENO/Cities/verdant/Prefabs/Landmarks/canopy-crown.prefab"
+        },
+        {
+          "landmarkId": "living-bridge",
+          "prefab": "Assets/UCENO/Cities/verdant/Prefabs/Landmarks/living-bridge.prefab"
+        },
+        {
+          "landmarkId": "arboretum-dome",
+          "prefab": "Assets/UCENO/Cities/verdant/Prefabs/Landmarks/arboretum-dome.prefab"
+        }
+      ]
+    },
+    {
+      "cityId": "nexus",
+      "assetRoot": "Assets/UCENO/Cities/nexus/Prefabs",
+      "architecturePrefabs": [
+        "Assets/UCENO/Cities/nexus/Prefabs/Architecture/signature-tower.prefab",
+        "Assets/UCENO/Cities/nexus/Prefabs/Architecture/district-block.prefab",
+        "Assets/UCENO/Cities/nexus/Prefabs/Architecture/civic-or-cultural-anchor.prefab"
+      ],
+      "environmentPrefabs": [
+        "Assets/UCENO/Cities/nexus/Prefabs/Environment/biome-tree.prefab",
+        "Assets/UCENO/Cities/nexus/Prefabs/Environment/ground-cover.prefab",
+        "Assets/UCENO/Cities/nexus/Prefabs/Environment/street-furniture.prefab"
+      ],
+      "landmarks": [
+        {
+          "landmarkId": "delta-helix",
+          "prefab": "Assets/UCENO/Cities/nexus/Prefabs/Landmarks/delta-helix.prefab"
+        },
+        {
+          "landmarkId": "kinetic-crossing",
+          "prefab": "Assets/UCENO/Cities/nexus/Prefabs/Landmarks/kinetic-crossing.prefab"
+        },
+        {
+          "landmarkId": "innovation-forum",
+          "prefab": "Assets/UCENO/Cities/nexus/Prefabs/Landmarks/innovation-forum.prefab"
+        }
+      ]
+    },
+    {
+      "cityId": "aurora",
+      "assetRoot": "Assets/UCENO/Cities/aurora/Prefabs",
+      "architecturePrefabs": [
+        "Assets/UCENO/Cities/aurora/Prefabs/Architecture/signature-tower.prefab",
+        "Assets/UCENO/Cities/aurora/Prefabs/Architecture/district-block.prefab",
+        "Assets/UCENO/Cities/aurora/Prefabs/Architecture/civic-or-cultural-anchor.prefab"
+      ],
+      "environmentPrefabs": [
+        "Assets/UCENO/Cities/aurora/Prefabs/Environment/biome-tree.prefab",
+        "Assets/UCENO/Cities/aurora/Prefabs/Environment/ground-cover.prefab",
+        "Assets/UCENO/Cities/aurora/Prefabs/Environment/street-furniture.prefab"
+      ],
+      "landmarks": [
+        {
+          "landmarkId": "summit-observatory",
+          "prefab": "Assets/UCENO/Cities/aurora/Prefabs/Landmarks/summit-observatory.prefab"
+        },
+        {
+          "landmarkId": "aurora-amphitheatre",
+          "prefab": "Assets/UCENO/Cities/aurora/Prefabs/Landmarks/aurora-amphitheatre.prefab"
+        },
+        {
+          "landmarkId": "ridge-station",
+          "prefab": "Assets/UCENO/Cities/aurora/Prefabs/Landmarks/ridge-station.prefab"
+        }
+      ]
+    },
+    {
+      "cityId": "saffron",
+      "assetRoot": "Assets/UCENO/Cities/saffron/Prefabs",
+      "architecturePrefabs": [
+        "Assets/UCENO/Cities/saffron/Prefabs/Architecture/signature-tower.prefab",
+        "Assets/UCENO/Cities/saffron/Prefabs/Architecture/district-block.prefab",
+        "Assets/UCENO/Cities/saffron/Prefabs/Architecture/civic-or-cultural-anchor.prefab"
+      ],
+      "environmentPrefabs": [
+        "Assets/UCENO/Cities/saffron/Prefabs/Environment/biome-tree.prefab",
+        "Assets/UCENO/Cities/saffron/Prefabs/Environment/ground-cover.prefab",
+        "Assets/UCENO/Cities/saffron/Prefabs/Environment/street-furniture.prefab"
+      ],
+      "landmarks": [
+        {
+          "landmarkId": "sunvault",
+          "prefab": "Assets/UCENO/Cities/saffron/Prefabs/Landmarks/sunvault.prefab"
+        },
+        {
+          "landmarkId": "grand-souk",
+          "prefab": "Assets/UCENO/Cities/saffron/Prefabs/Landmarks/grand-souk.prefab"
+        },
+        {
+          "landmarkId": "oasis-court",
+          "prefab": "Assets/UCENO/Cities/saffron/Prefabs/Landmarks/oasis-court.prefab"
+        }
+      ]
+    },
+    {
+      "cityId": "monsoon",
+      "assetRoot": "Assets/UCENO/Cities/monsoon/Prefabs",
+      "architecturePrefabs": [
+        "Assets/UCENO/Cities/monsoon/Prefabs/Architecture/signature-tower.prefab",
+        "Assets/UCENO/Cities/monsoon/Prefabs/Architecture/district-block.prefab",
+        "Assets/UCENO/Cities/monsoon/Prefabs/Architecture/civic-or-cultural-anchor.prefab"
+      ],
+      "environmentPrefabs": [
+        "Assets/UCENO/Cities/monsoon/Prefabs/Environment/biome-tree.prefab",
+        "Assets/UCENO/Cities/monsoon/Prefabs/Environment/ground-cover.prefab",
+        "Assets/UCENO/Cities/monsoon/Prefabs/Environment/street-furniture.prefab"
+      ],
+      "landmarks": [
+        {
+          "landmarkId": "harbour-arc",
+          "prefab": "Assets/UCENO/Cities/monsoon/Prefabs/Landmarks/harbour-arc.prefab"
+        },
+        {
+          "landmarkId": "storm-garden",
+          "prefab": "Assets/UCENO/Cities/monsoon/Prefabs/Landmarks/storm-garden.prefab"
+        },
+        {
+          "landmarkId": "tide-clock",
+          "prefab": "Assets/UCENO/Cities/monsoon/Prefabs/Landmarks/tide-clock.prefab"
+        }
+      ]
+    },
+    {
+      "cityId": "eclipse",
+      "assetRoot": "Assets/UCENO/Cities/eclipse/Prefabs",
+      "architecturePrefabs": [
+        "Assets/UCENO/Cities/eclipse/Prefabs/Architecture/signature-tower.prefab",
+        "Assets/UCENO/Cities/eclipse/Prefabs/Architecture/district-block.prefab",
+        "Assets/UCENO/Cities/eclipse/Prefabs/Architecture/civic-or-cultural-anchor.prefab"
+      ],
+      "environmentPrefabs": [
+        "Assets/UCENO/Cities/eclipse/Prefabs/Environment/biome-tree.prefab",
+        "Assets/UCENO/Cities/eclipse/Prefabs/Environment/ground-cover.prefab",
+        "Assets/UCENO/Cities/eclipse/Prefabs/Environment/street-furniture.prefab"
+      ],
+      "landmarks": [
+        {
+          "landmarkId": "lumen-tower",
+          "prefab": "Assets/UCENO/Cities/eclipse/Prefabs/Landmarks/lumen-tower.prefab"
+        },
+        {
+          "landmarkId": "midnight-bowl",
+          "prefab": "Assets/UCENO/Cities/eclipse/Prefabs/Landmarks/midnight-bowl.prefab"
+        },
+        {
+          "landmarkId": "signal-museum",
+          "prefab": "Assets/UCENO/Cities/eclipse/Prefabs/Landmarks/signal-museum.prefab"
+        }
+      ]
+    },
+    {
+      "cityId": "origin",
+      "assetRoot": "Assets/UCENO/Cities/origin/Prefabs",
+      "architecturePrefabs": [
+        "Assets/UCENO/Cities/origin/Prefabs/Architecture/signature-tower.prefab",
+        "Assets/UCENO/Cities/origin/Prefabs/Architecture/district-block.prefab",
+        "Assets/UCENO/Cities/origin/Prefabs/Architecture/civic-or-cultural-anchor.prefab"
+      ],
+      "environmentPrefabs": [
+        "Assets/UCENO/Cities/origin/Prefabs/Environment/biome-tree.prefab",
+        "Assets/UCENO/Cities/origin/Prefabs/Environment/ground-cover.prefab",
+        "Assets/UCENO/Cities/origin/Prefabs/Environment/street-furniture.prefab"
+      ],
+      "landmarks": [
+        {
+          "landmarkId": "knowledge-tree",
+          "prefab": "Assets/UCENO/Cities/origin/Prefabs/Landmarks/knowledge-tree.prefab"
+        },
+        {
+          "landmarkId": "harvest-exchange",
+          "prefab": "Assets/UCENO/Cities/origin/Prefabs/Landmarks/harvest-exchange.prefab"
+        },
+        {
+          "landmarkId": "unity-commons",
+          "prefab": "Assets/UCENO/Cities/origin/Prefabs/Landmarks/unity-commons.prefab"
+        }
+      ]
+    },
+    {
+      "cityId": "atlas",
+      "assetRoot": "Assets/UCENO/Cities/atlas/Prefabs",
+      "architecturePrefabs": [
+        "Assets/UCENO/Cities/atlas/Prefabs/Architecture/signature-tower.prefab",
+        "Assets/UCENO/Cities/atlas/Prefabs/Architecture/district-block.prefab",
+        "Assets/UCENO/Cities/atlas/Prefabs/Architecture/civic-or-cultural-anchor.prefab"
+      ],
+      "environmentPrefabs": [
+        "Assets/UCENO/Cities/atlas/Prefabs/Environment/biome-tree.prefab",
+        "Assets/UCENO/Cities/atlas/Prefabs/Environment/ground-cover.prefab",
+        "Assets/UCENO/Cities/atlas/Prefabs/Environment/street-furniture.prefab"
+      ],
+      "landmarks": [
+        {
+          "landmarkId": "atlas-terminal",
+          "prefab": "Assets/UCENO/Cities/atlas/Prefabs/Landmarks/atlas-terminal.prefab"
+        },
+        {
+          "landmarkId": "maker-vault",
+          "prefab": "Assets/UCENO/Cities/atlas/Prefabs/Landmarks/maker-vault.prefab"
+        },
+        {
+          "landmarkId": "horizon-gateway",
+          "prefab": "Assets/UCENO/Cities/atlas/Prefabs/Landmarks/horizon-gateway.prefab"
+        }
+      ]
+    }
+  ]
+}
