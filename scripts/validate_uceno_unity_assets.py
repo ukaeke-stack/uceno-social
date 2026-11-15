@@ -217,6 +217,12 @@ def main():
     if "world-city-district-" in district_builder:
         fail("Newly generated city district scenes must not use the obsolete generic Addressables label.")
 
+    for layout in ("linear-waterfront", "multi-level-green-corridors", "river-island-campus",
+                   "contour-terraces", "oasis-radial-courtyards", "elevated-grid-and-canals",
+                   "entertainment-superblocks", "rail-spoke-industrial", "garden-city-radial"):
+        if 'layout == "' + layout + '"' not in city_pipeline:
+            fail("Nine-city scene generator is missing a dedicated layout branch: " + layout)
+
     profiles = json.loads(
         (ASSETS / "Editor/city-scene-asset-profiles.json").read_text(encoding="utf-8")
     ).get("cities", [])
