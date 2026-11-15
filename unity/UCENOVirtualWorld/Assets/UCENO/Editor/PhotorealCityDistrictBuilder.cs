@@ -276,6 +276,31 @@ namespace UCENO.VirtualWorld.Editor
             Box(root.transform, "Roof feature", new Vector3(0f, height + 5.0f, 0f),
                 new Vector3(width * 0.34f, 1.7f, depth * 0.34f), metal, false);
 
+            // Roof plant and communications details vary deterministically by
+            // tower seed, creating a more convincing skyline without runtime
+            // lights, scripts, or expensive animated geometry.
+            float plantWidth = width * (0.24f + (seed % 3) * 0.035f);
+            float plantDepth = depth * 0.22f;
+            float plantY = height + 6.25f;
+            Box(root.transform, "Rooftop mechanical penthouse",
+                new Vector3((seed % 2 == 0 ? -1f : 1f) * width * 0.22f, plantY, -depth * 0.18f),
+                new Vector3(plantWidth, 2.5f + (seed % 2) * 0.55f, plantDepth), concrete, false);
+            Box(root.transform, "Rooftop plant screen",
+                new Vector3((seed % 2 == 0 ? -1f : 1f) * width * 0.22f, plantY + 1.25f, -depth * 0.18f),
+                new Vector3(plantWidth + 0.18f, 0.12f, plantDepth + 0.18f), metal, false);
+
+            if (seed % 3 != 1)
+            {
+                float mastHeight = 4.5f + (seed % 4) * 1.25f;
+                float mastX = (seed % 2 == 0 ? 1f : -1f) * width * 0.18f;
+                Box(root.transform, "Roof communications mast",
+                    new Vector3(mastX, height + 7.2f + mastHeight * 0.5f, depth * 0.18f),
+                    new Vector3(0.12f, mastHeight, 0.12f), metal, false);
+                Box(root.transform, "Roof mast crossarm",
+                    new Vector3(mastX, height + 8.4f + mastHeight * 0.55f, depth * 0.18f),
+                    new Vector3(1.15f, 0.10f, 0.10f), metal, false);
+            }
+
             // A simple ground-level entrance canopy makes the tower base
             // legible at street scale.
             Box(root.transform, "Entrance canopy", new Vector3(0f, 3.0f, depth * 0.5f + 2.1f),
