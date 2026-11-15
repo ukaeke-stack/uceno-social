@@ -120,6 +120,7 @@ namespace UCENO.VirtualWorld
             pushToTalkHeld = false;
             voicePresenceRequested = gateway.SetVoiceActive(true);
             status = routeApplied ? "VOICE READY — HOLD TO TALK" : "VOICE READY — AUDIO ROUTE UNAVAILABLE";
+            ApplyMicrophoneGate();
         }
 
         public void DisableVoice()
