@@ -365,7 +365,8 @@ namespace UCENO.VirtualWorld.Editor
             AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
             controller.AddParameter("MoveSpeed", AnimatorControllerParameterType.Float);
             controller.AddParameter("IsSeated", AnimatorControllerParameterType.Bool);
-            foreach (string trigger in new[] { "Talk", "Turn", "Wave", "Cheer", "Dance", "Interact" })
+            controller.AddParameter("IsTalking", AnimatorControllerParameterType.Bool);
+            foreach (string trigger in new[] { "Turn", "Wave", "Cheer", "Dance", "Interact" })
                 controller.AddParameter(trigger, AnimatorControllerParameterType.Trigger);
 
             BlendTree tree = new BlendTree
@@ -385,7 +386,7 @@ namespace UCENO.VirtualWorld.Editor
             locomotion.motion = tree;
             machine.defaultState = locomotion;
 
-            AddGestureState(controller, machine, locomotion, "Talk", talk);
+            AddBooleanState(machine, locomotion, "Talking", talk, "IsTalking");
             AddGestureState(controller, machine, locomotion, "Turn", turn);
             AddGestureState(controller, machine, locomotion, "Wave", wave);
             AddGestureState(controller, machine, locomotion, "Cheer", cheer);
@@ -406,6 +407,21 @@ namespace UCENO.VirtualWorld.Editor
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
             return controller;
+        }
+
+        private static void AddBooleanState(AnimatorStateMachine machine, AnimatorState locomotion,
+            string stateName, AnimationClip clip, string parameter)
+        {
+            AnimatorState state = machine.AddState(stateName);
+            state.motion = clip;
+            AnimatorStateTransition enter = machine.AddAnyStateTransition(state);
+            enter.AddCondition(AnimatorConditionMode.If, 0f, parameter);
+            enter.hasExitTime = false;
+            enter.duration = 0.12f;
+            AnimatorStateTransition exit = state.AddTransition(locomotion);
+            exit.AddCondition(AnimatorConditionMode.IfNot, 0f, parameter);
+            exit.hasExitTime = false;
+            exit.duration = 0.16f;
         }
 
         private static void AddGestureState(AnimatorController controller, AnimatorStateMachine machine,
