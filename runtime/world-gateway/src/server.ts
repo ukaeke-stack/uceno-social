@@ -6,9 +6,9 @@ import { createActivitySession, joinActivity, startActivity, recordCheckpoint, l
 import { serializeActivitySession, restoreActivitySession } from "./activity-persistence.js";
 import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./district-policy.js";
 import { parseWorldCityCatalog, type WorldCity } from "./city-catalog-policy.js";
-import { resolveReadyCityRuntime, resolveCityRuntime } from "./city-runtime-policy.js";
+import { resolveReadyCityRuntime, resolveCityRuntime, districtsForCity } from "./city-runtime-policy.js";
 import { matchesDistrictTransition, planDistrictTransition } from "./district-transition-policy.js";
-import { parseDistrictCollisionManifest } from "./district-collision-policy.js";
+import { parseCityDistrictCollisionManifest } from "./district-collision-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { isPersistentObjectState } from "./district-object-policy.js";
@@ -146,11 +146,14 @@ function loadDistrictCollisionMaps(): DistrictCollisionMaps {
     throw new Error("Could not read WORLD_DISTRICT_MAP_MANIFEST_FILE: " +
       (error instanceof Error ? error.message : "invalid JSON"));
   }
-  return parseDistrictCollisionManifest(raw, WORLD_DISTRICTS, WORLD_BOUNDS, (filename, districtId) => {
+  const cityDistricts = WORLD_CITIES.flatMap(city =>
+    districtsForCity(city).map(district => ({ ...district, cityId: city.id }))
+  );
+  return parseCityDistrictCollisionManifest(raw, cityDistricts, WORLD_BOUNDS, (filename, cityId, districtId) => {
     const mapPath = resolve(dirname(resolve(manifestPath)), filename);
     try { return readFileSync(mapPath, "utf8"); }
     catch (error) {
-      throw new Error(`Could not read district map ${districtId}: ` +
+      throw new Error(`Could not read collision map ${cityId}/${districtId}: ` +
         (error instanceof Error ? error.message : "unknown file error"));
     }
   });
@@ -374,8 +377,8 @@ function cityRuntimeCollisionKeys(): Set<string> {
   const keys = new Set<string>();
   for (const city of WORLD_CITIES) {
     for (const district of city.districts) {
-      const configured = WORLD_DISTRICTS.find(item => item.id === district.id && item.contentLabel === district.contentLabel);
-      if (configured && DISTRICT_COLLISION_BOXES.has(configured.id)) keys.add(city.id + ':' + district.id);
+      if (DISTRICT_COLLISION_BOXES.has(city.id + ":" + district.id))
+        keys.add(city.id + ":" + district.id);
     }
   }
   return keys;
