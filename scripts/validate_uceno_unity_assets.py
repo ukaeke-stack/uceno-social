@@ -255,7 +255,12 @@ def main():
     if "TriggerWave" not in avatar or "TriggerCheer" not in avatar:
         fail("Avatar wave/cheer gesture actions are missing.")
 
+    if "avatarLodGroup.GetLODs().Length < 3" not in builder:
+        fail("Imported humanoid prefab is missing its three-level mesh LOD release gate.")
+
     crowd_lod = read_text(ASSETS / "Scripts/AvatarCrowdLod.cs")
+    if "meshLodGroup.GetLODs().Length < 3" not in crowd_lod:
+        fail("Human and AI crowd runtime is missing its three-level mesh LOD check.")
     for required in ("animator.enabled = visible", "AnimatorCullingMode.AlwaysAnimate",
                      "AnimatorCullingMode.CullUpdateTransforms", "locomotion.enabled = animate",
                      "expressions.enabled = facial"):
