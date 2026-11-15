@@ -80,7 +80,11 @@ namespace UCENO.VirtualWorld
                 Vector3 direction = lookTarget.position - head.position;
                 if (direction.sqrMagnitude > 0.001f)
                 {
-                    Vector3 localDirection = transform.InverseTransformDirection(direction.normalized);
+                    // Head rotation is applied in the head bone's local space.
+                    // Resolve the gaze vector in that same parent space so avatars
+                    // still look accurately when their torso/root is rotated.
+                    Transform headSpace = head.parent != null ? head.parent : transform;
+                    Vector3 localDirection = headSpace.InverseTransformDirection(direction.normalized);
                     float targetYaw = Mathf.Atan2(localDirection.x, localDirection.z) * Mathf.Rad2Deg;
                     float targetPitch = -Mathf.Atan2(localDirection.y,
                         new Vector2(localDirection.x, localDirection.z).magnitude) * Mathf.Rad2Deg;
