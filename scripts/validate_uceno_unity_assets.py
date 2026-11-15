@@ -174,7 +174,7 @@ def main():
         fail("The Meridian starter city is missing from the gateway city catalogue.")
     meridian_labels = {district.get("contentLabel") for district in meridian.get("districts", [])}
     district_builder = builder[builder.index("private static void BuildDistrictScenes"):]
-    for district_id in ("waterfront", "residential", "downtown", "culture"):
+    for district_id in ("south", "central-south", "central-north", "north"):
         expected_label = "world-city-meridian-" + district_id
         if expected_label not in meridian_labels or expected_label not in district_builder:
             fail("Meridian Addressables scene label is not aligned with the city catalogue: " + expected_label)
