@@ -30,7 +30,7 @@
             "x": -150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "exchange-quarter",
@@ -42,7 +42,7 @@
             "x": 150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "garden-ring",
@@ -54,7 +54,7 @@
             "x": -150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "old-port",
@@ -66,7 +66,7 @@
             "x": 150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         }
       ],
       "layout": {
@@ -154,7 +154,7 @@
             "x": -150,
             "z": -270
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "sunset-terraces",
@@ -166,7 +166,7 @@
             "x": 150,
             "z": -270
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "reef-gardens",
@@ -178,7 +178,7 @@
             "x": -150,
             "z": 30
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "arts-promenade",
@@ -190,7 +190,7 @@
             "x": 150,
             "z": 30
           },
-          "radius": 130
+          "radius": 150
         }
       ],
       "layout": {
@@ -278,7 +278,7 @@
             "x": -150,
             "z": -70
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "arboretum-belt",
@@ -290,7 +290,7 @@
             "x": 150,
             "z": -70
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "terrace-homes",
@@ -302,7 +302,7 @@
             "x": -150,
             "z": 230
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "solar-gardens",
@@ -314,7 +314,7 @@
             "x": 150,
             "z": 230
           },
-          "radius": 130
+          "radius": 150
         }
       ],
       "layout": {
@@ -402,7 +402,7 @@
             "x": -150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "bridge-market",
@@ -414,7 +414,7 @@
             "x": 150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "delta-residences",
@@ -426,7 +426,7 @@
             "x": -150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "wetland-campus",
@@ -438,7 +438,7 @@
             "x": 150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         }
       ],
       "layout": {
@@ -526,7 +526,7 @@
             "x": -150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "switchback-village",
@@ -538,7 +538,7 @@
             "x": 150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "alpine-commons",
@@ -550,7 +550,7 @@
             "x": -150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "cloudline-arts",
@@ -562,7 +562,7 @@
             "x": 150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         }
       ],
       "layout": {
@@ -650,7 +650,7 @@
             "x": -150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "oasis-gardens",
@@ -662,7 +662,7 @@
             "x": 150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "heritage-souk",
@@ -674,7 +674,7 @@
             "x": -150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "dune-residences",
@@ -686,7 +686,7 @@
             "x": 150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         }
       ],
       "layout": {
@@ -774,7 +774,7 @@
             "x": -150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "canal-quarter",
@@ -786,7 +786,7 @@
             "x": 150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "raised-homes",
@@ -798,7 +798,7 @@
             "x": -150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "mangrove-reserve",
@@ -810,7 +810,7 @@
             "x": 150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         }
       ],
       "layout": {
@@ -898,7 +898,7 @@
             "x": -150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "festival-mile",
@@ -910,7 +910,7 @@
             "x": 150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "midnight-residences",
@@ -922,7 +922,7 @@
             "x": -150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "signal-arts",
@@ -934,7 +934,7 @@
             "x": 150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         }
       ],
       "layout": {
@@ -1022,7 +1022,7 @@
             "x": -150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "harvest-quarter",
@@ -1034,7 +1034,7 @@
             "x": 150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "family-gardens",
@@ -1046,7 +1046,7 @@
             "x": -150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "unity-commons",
@@ -1058,7 +1058,7 @@
             "x": 150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         }
       ],
       "layout": {
@@ -1146,7 +1146,7 @@
             "x": -150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "maker-quarter",
@@ -1158,7 +1158,7 @@
             "x": 150,
             "z": -150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "horizon-homes",
@@ -1170,7 +1170,7 @@
             "x": -150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         },
         {
           "id": "frontier-park",
@@ -1182,7 +1182,7 @@
             "x": 150,
             "z": 150
           },
-          "radius": 130
+          "radius": 150
         }
       ],
       "layout": {
