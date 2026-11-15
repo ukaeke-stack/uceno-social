@@ -9,6 +9,7 @@ const sceneBuilder = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAsset
 const cityScenePipeline = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs");
 const buildCommand = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/BuildCommand.cs");
 const cityMobileImporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityMobileAssetPostprocessor.cs");
+const avatarCrowdLod = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarCrowdLod.cs");
 const cityRegistryExporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableRegistryExporter.cs");
 const cityCollisionExporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs");
 const cityAssetProfiles = JSON.parse(read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json"));
@@ -36,6 +37,7 @@ const checks = [
   ["Nine-city Unity pipeline validates city-specific assets before scene generation", /ValidateRemainingCityPacks/.test(cityScenePipeline) && /BuildRemainingCities/.test(cityScenePipeline) && /checkAssets: true/.test(cityScenePipeline) && /city-specific imported asset errors/.test(cityScenePipeline)],
   ["Nine-city scene pipeline generates separate district scenes and remote Addressables labels", /BuildCity\(/.test(cityScenePipeline) && /district.contentLabel/.test(cityScenePipeline) && /RegisterAddressableScene/.test(cityScenePipeline) && /PackSeparately/.test(cityScenePipeline)],
   ["City asset validation rejects shared imported mesh geometry across cities", /geometryOwners/.test(cityScenePipeline) && /GetAssetDependencyHash/.test(cityScenePipeline) && /mesh geometry is shared with/.test(cityScenePipeline)],
+  ["Human and AI avatars require three authored mesh LOD levels", /avatarLodGroup.GetLODs\(\).Length < 3/.test(sceneBuilder) && /meshLodGroup.GetLODs\(\).Length < 3/.test(avatarCrowdLod) && /lodGroup.GetLODs\(\).Length < 3/.test(cityScenePipeline)],
   ["City landmark prefabs must be interactable and have targeting colliders", /WorldInteractable/.test(cityScenePipeline) && /non-trigger targeting collider/.test(cityScenePipeline)],
   ["Generated city manifests and isolated registry exports are verified", /city-scene-manifest/.test(cityScenePipeline) && /WorldInteractableRegistryExporter/.test(cityScenePipeline) && /VerifyNineCitySceneRegistries/.test(cityScenePipeline)],
   ["Every city exports a dedicated collision map and verifies collider/interactable parity", /WorldCollisionGeometryExporter\.Export\(city.id/.test(cityScenePipeline) && /uceno-city-collision-boxes-/.test(cityCollisionExporter) && /collision map interactables do not match/.test(cityScenePipeline)],
