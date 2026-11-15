@@ -14,7 +14,14 @@ namespace UCENO.VirtualWorld.Editor
         // normal player build. Set this method as the target's Pre-Export Method.
         public static void PrepareAndroidBuild()
         {
+            // Release gate: the ten-city catalogue is not accepted as ten built cities.
+            // Every non-Meridian asset pack, generated scene, exported registry and
+            // Android remote Addressables catalog must pass before a player build.
+            WorldCityScenePipeline.ValidateRemainingCityPacks();
             StarterSceneBuilder.CreateStarterScene();
+            WorldCityScenePipeline.BuildRemainingCities();
+            WorldCityScenePipeline.VerifyNineCitySceneRegistries();
+            WorldCityScenePipeline.BuildRemoteAddressablesContent();
 
             PlayerSettings.companyName = "UCENO";
             PlayerSettings.productName = "UCENO Virtual World";
