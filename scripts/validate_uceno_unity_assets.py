@@ -188,6 +188,12 @@ def main():
     if "wrapper.AddComponent<AvatarCrowdLod>()" not in builder:
         fail("Generated avatar prefab is missing the shared human/AI crowd LOD controller.")
 
+    delivery = read_text(ASSETS / "Scripts/WorldContentDelivery.cs")
+    if "parts.Length >= 4" not in delivery or 'parts[0], "world"' not in delivery or 'parts[1], "city"' not in delivery:
+        fail("Addressables district-scene resolver does not recognise city-specific district labels.")
+    if "parts.Length >= 4" not in delivery or "world-city-district-" not in delivery:
+        fail("Addressables district-scene resolver must preserve legacy scene labels and distinguish root labels.")
+
     hud = read_text(ASSETS / "Scripts/WorldStatusHud.cs")
     if "GUI.Button" not in hud or "Position:" not in hud or '"JUMP"' not in hud or '"RUN"' not in hud or '"WAVE"' not in hud or '"CHEER"' not in hud:
         fail("World status HUD, mobile jump control, or sprint control is missing.")
