@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 namespace UCENO.VirtualWorld.Editor
 {
     [Serializable] internal sealed class CityAssetCatalog { public CityAssetCity[] cities; }
-    [Serializable] internal sealed class CityAssetCity { public string id; public CityAssetLandmark[] landmarks; }
+    [Serializable] internal sealed class CityAssetCity { public string id, identity, climate, architecture; public CityAssetLandmark[] landmarks; }
     [Serializable] internal sealed class CityAssetLandmark { public string id; }
     [Serializable] internal sealed class GeneratedCityProfiles
     {
@@ -78,7 +78,7 @@ namespace UCENO.VirtualWorld.Editor
                 EnsureFolder(cityRoot + "/Textures");
                 EnsureFolder(cityRoot + "/Textures/Skybox");
 
-                Material material = CreateCityMaterial(city.id, cityIndex);
+                int architecturalStyle = DetermineArchitecturalStyle(city.architecture);\n                Material material = CreateCityMaterial(city.id, cityIndex);
                 var profile = new GeneratedCityProfile
                 {
                     cityId = city.id,
@@ -92,20 +92,20 @@ namespace UCENO.VirtualWorld.Editor
                 for (int i = 0; i < ArchitectureNames.Length; i++)
                 {
                     string path = cityRoot + "/Prefabs/Architecture/" + ArchitectureNames[i] + ".prefab";
-                    CreatePrefab(cityRoot, city.id, "architecture-" + i, path, material, cityIndex, i, false);
+                    CreatePrefab(cityRoot, city.id, "architecture-" + i, path, material, architecturalStyle, i, false);
                     profile.architecturePrefabs[i] = path;
                 }
                 for (int i = 0; i < EnvironmentNames.Length; i++)
                 {
                     string path = cityRoot + "/Prefabs/Environment/" + EnvironmentNames[i] + ".prefab";
-                    CreatePrefab(cityRoot, city.id, "environment-" + i, path, material, cityIndex, i, true);
+                    CreatePrefab(cityRoot, city.id, "environment-" + i, path, material, architecturalStyle, i, true);
                     profile.environmentPrefabs[i] = path;
                 }
                 for (int i = 0; i < profile.landmarks.Length; i++)
                 {
                     string landmarkId = city.landmarks[i].id;
                     string path = cityRoot + "/Prefabs/Landmarks/" + landmarkId + ".prefab";
-                    CreatePrefab(cityRoot, city.id, "landmark-" + landmarkId, path, material, cityIndex, i, false);
+                    CreatePrefab(cityRoot, city.id, "landmark-" + landmarkId, path, material, architecturalStyle, i, false);
                     profile.landmarks[i] = new GeneratedCityLandmark { landmarkId = landmarkId, prefab = path };
                 }
                 generated.Add(profile);
@@ -117,6 +117,21 @@ namespace UCENO.VirtualWorld.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("Generated " + generated.Count + " city-owned asset packs. Run Validate Remaining Nine City Asset Packs next; scene completion is not claimed.");
+        }
+
+        private static int DetermineArchitecturalStyle(string architecture)
+        {
+            string value = (architecture ?? string.Empty).ToLowerInvariant();
+            if (value.Contains("terraced waterfront") || value.Contains("marina")) return 0;
+            if (value.Contains("biophilic") || value.Contains("forest") || value.Contains("botanical")) return 1;
+            if (value.Contains("parametric") || value.Contains("research") || value.Contains("kinetic")) return 2;
+            if (value.Contains("hillside") || value.Contains("alpine") || value.Contains("cable transit")) return 3;
+            if (value.Contains("shaded arcade") || value.Contains("solar mega") || value.Contains("oasis")) return 4;
+            if (value.Contains("elevated") || value.Contains("flood") || value.Contains("canal")) return 5;
+            if (value.Contains("entertainment") || value.Contains("kinetic light") || value.Contains("nightlife")) return 6;
+            if (value.Contains("garden city") || value.Contains("agr") || value.Contains("campus")) return 7;
+            if (value.Contains("industrial") || value.Contains("logistics") || value.Contains("manufacturing")) return 8;
+            throw new InvalidOperationException("No city-specific architectural style rule matches: " + architecture);
         }
 
         private static void CreatePrefab(string cityRoot, string cityId, string assetKey, string prefabPath,
