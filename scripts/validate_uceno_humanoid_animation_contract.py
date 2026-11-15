@@ -39,6 +39,10 @@ for token in (
     "sourceUrl",
     "license",
     "attribution",
+    "Uri.TryCreate(record.sourceUrl, UriKind.Absolute, out Uri sourceUri)",
+    "sourceUri.Scheme != Uri.UriSchemeHttps",
+    'record.sourceFbx.StartsWith(AnimationRoot + "/", StringComparison.Ordinal)',
+    "new HashSet<string>(provenance.Keys, StringComparer.Ordinal).SetEquals(importedPaths)",
     "idle", "walk", "run", "talk", "turn", "wave", "cheer", "dance", "interact", "sit",
 ):
     require(token in source, "validator is missing requirement: " + token)
