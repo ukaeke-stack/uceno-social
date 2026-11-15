@@ -193,7 +193,7 @@ namespace UCENO.VirtualWorld.Editor
                     CitySceneManifestDistrict entry = manifest.districts.FirstOrDefault(item =>
                         item != null && item.districtId == district.id);
                     if (entry == null || entry.contentLabel != district.contentLabel ||
-                        !File.Exists(Path.Combine(RepositoryRoot(), entry.scenePath)))
+                        !File.Exists(Path.GetFullPath(Path.Combine(Application.dataPath, "..", entry.scenePath))))
                     {
                         failures.Add(city.id + ": missing scene or wrong content label for district " + district.id);
                         continue;
