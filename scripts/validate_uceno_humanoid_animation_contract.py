@@ -61,12 +61,18 @@ for token in (
     'Animator.StringToHash("IsSeated")',
     'Animator.StringToHash("IsTalking")',
     "motor.AnimationSpeed",
+    "networkSprinting = sprinting",
+    "networkSprinting ? Mathf.Max(networkSpeed, 0.75f) : Mathf.Min(networkSpeed, 0.7f)",
+    "bool validController = true",
+    "validController &= RequireParameter",
+    "if (!validController)",
     "ApplyRemoteState(float speed, bool seated, bool sprinting, string gesture, int sequence)",
     "SetTalking(bool talking)",
     "TriggerWave()", "TriggerCheer()", "TriggerDance()", "TriggerTurn()", "TriggerInteract()",
     "animator.avatar.isHuman",
     "animator.runtimeAnimatorController == null",
     "Procedural locomotion is disabled",
+    "private bool RequireParameter(string parameterName, AnimatorControllerParameterType type)",
 ):
     require(token in locomotion, "runtime locomotion/gesture driver is missing: " + token)
 
