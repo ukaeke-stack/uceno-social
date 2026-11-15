@@ -10,11 +10,11 @@ The city catalogue supplies identity, architecture description, biome, terrain, 
 
 `unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json` defines nine independent asset packs. Each city must provide:
 
-- Three unique architecture prefabs: signature tower, district block, and civic/cultural anchor
-- Three unique environment prefabs: biome tree, ground cover, and street furniture
+- Five unique architecture prefabs: signature skyline anchor, residential typology, commercial/civic typology, transit/industrial structure, and public-realm structure
+- Four unique environment prefabs: biome tree, ground cover, street furniture, and a signature landscape prop
 - One dedicated imported prefab for each of the city's three named landmarks; each landmark prefab must include a `WorldInteractable` marker and an enabled non-trigger collider
 
-The expected paths are under `Assets/UCENO/Cities/<city-id>/Prefabs`. Paths must be unique within a city and across all nine cities. Reusing Meridian or another city's signature architecture is rejected. The validator also rejects missing prefabs and incomplete landmark mappings.
+The expected paths are under `Assets/UCENO/Cities/<city-id>/Prefabs`. This is 12 unique imported prefabs per city (108 total across nine cities). Paths must be unique within a city and across all nine cities. Reusing Meridian or another city's signature architecture is rejected. The validator also rejects missing prefabs and incomplete landmark mappings.
 
 ## Build procedure
 
