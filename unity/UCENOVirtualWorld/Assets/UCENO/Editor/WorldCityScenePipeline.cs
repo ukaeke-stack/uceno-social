@@ -131,6 +131,7 @@ namespace UCENO.VirtualWorld.Editor
         public static void BuildRemainingCities()
         {
             ValidateRemainingCityPacks();
+            ValidateNineCityVisualQuality();
             CityPipelineCity[] cities = LoadRemainingCities();
             CityPipelineProfiles profiles = LoadProfiles();
             var errors = new List<string>();
