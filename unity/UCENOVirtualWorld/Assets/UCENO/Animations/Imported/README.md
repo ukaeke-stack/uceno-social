@@ -4,7 +4,7 @@ This folder is the required home for licensed animation FBX files. Do not use ge
 
 ## Required imported motion
 
-The Unity Editor release gate searches actual imported AnimationClip sub-assets for:
+The Unity Editor release gate searches actual imported AnimationClip sub-assets in both the generated UCENO base-avatar FBX and any additional retargeted FBXs in this folder. Genuine embedded base-avatar locomotion clips count as source motion; they do not satisfy missing talk, turn, wave, cheer, dance, interact or sit clips unless those clips actually exist and pass the same motion-curve checks. Additional animation FBXs require an exact HTTPS provenance record for every imported file.
 
 - Idle
 - Walk
