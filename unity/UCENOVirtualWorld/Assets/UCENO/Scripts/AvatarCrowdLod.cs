@@ -52,7 +52,7 @@ namespace UCENO.VirtualWorld
         {
             currentTier = tier;
             bool visible = tier < 3;
-            bool animate = tier < 2;
+            bool animate = visible;
             bool facial = tier == 0;
 
             if (animator != null)
