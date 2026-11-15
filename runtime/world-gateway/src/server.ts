@@ -12,7 +12,7 @@ import { parseCityDistrictCollisionManifest } from "./district-collision-policy.
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
 import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.js";
 import { isPersistentObjectState } from "./district-object-policy.js";
-import { loadInteractableRegistry, type RegisteredInteractable } from "./interactable-registry-policy.js";
+import { loadInteractableRegistry, parseCityInteractableManifest, type RegisteredInteractable } from "./interactable-registry-policy.js";
 import { checkpointVersionForSession } from "./session-fence-policy.js";
 import { shouldPublishWorldSnapshot, WORLD_RELAY_BATCH_SIZE, WORLD_RELAY_POLL_INTERVAL_MS } from "./world-relay-policy.js";
 import { readFileSync } from "node:fs";
@@ -79,6 +79,33 @@ function loadWorldCities(): WorldCity[] {
 const WORLD_CITIES = loadWorldCities();
 
 function loadInteractables(): Map<string, Interactable> {
+  const manifestPath = process.env.WORLD_INTERACTABLES_MANIFEST_FILE;
+  const rawManifest = process.env.WORLD_INTERACTABLES_MANIFEST;
+  if (rawManifest || manifestPath) {
+    let manifest = rawManifest;
+    if (!manifest && manifestPath) {
+      try { manifest = readFileSync(manifestPath, "utf8"); }
+      catch (error) {
+        throw new Error("Could not read WORLD_INTERACTABLES_MANIFEST_FILE: " +
+          (error instanceof Error ? error.message : "unknown file error"));
+      }
+    }
+    const baseDirectory = manifestPath ? dirname(resolve(manifestPath)) : resolve(process.cwd(), "config");
+    const cityDistricts = WORLD_CITIES.map(city => ({
+      id: city.id,
+      districts: districtsForCity(city)
+    }));
+    return parseCityInteractableManifest(manifest!, cityDistricts, WORLD_BOUNDS, (file, cityId) => {
+      try { return readFileSync(resolve(baseDirectory, file), "utf8"); }
+      catch (error) {
+        throw new Error("Could not read interactable registry for city " + cityId + ": " +
+          (error instanceof Error ? error.message : "unknown file error"));
+      }
+    });
+  }
+
+  // Legacy single-city exports remain readable for migration diagnostics, but
+  // carry no city identity and therefore cannot satisfy city readiness.
   const filePath = process.env.WORLD_INTERACTABLES_FILE;
   let raw = process.env.WORLD_INTERACTABLES;
   if (!raw && filePath) {
@@ -392,8 +419,9 @@ function cityRuntimeInteractableKeys(): Set<string> {
   const keys = new Set<string>();
   for (const city of WORLD_CITIES) {
     for (const district of city.districts) {
-      const configured = WORLD_DISTRICTS.find(item => item.id === district.id && item.contentLabel === district.contentLabel);
-      if (configured && [...INTERACTABLES.values()].some(item => item.districtId === configured.id)) keys.add(city.id + ':' + district.id);
+      if ([...INTERACTABLES.values()].some(item =>
+        item.cityId === city.id && item.districtId === district.id))
+        keys.add(city.id + ":" + district.id);
     }
   }
   return keys;
@@ -1226,7 +1254,7 @@ wss.on("connection", async (socket: WebSocket) => {
     // state of every scene interactable. Broadcasting only future changes
     // leaves late joiners with stale door/object visuals and unknown seat use.
     const joiningDistrictId = findPlayerDistrict(player, player.x, player.z)?.id ?? "unassigned";
-    const joiningObjects = [...INTERACTABLES.values()].filter(target => target.districtId === joiningDistrictId);
+    const joiningObjects = [...INTERACTABLES.values()].filter(target => target.cityId === player.cityId && target.districtId === joiningDistrictId);
     console.info("world_interactable_snapshot_sent", {
       userId: player.id, districtId: joiningDistrictId,
       registeredCount: INTERACTABLES.size, sentCount: joiningObjects.length
@@ -1261,7 +1289,7 @@ wss.on("connection", async (socket: WebSocket) => {
           // Fetch the latest durable district version before sending the scene
           // snapshot; this also covers a fast re-entry on another runtime instance.
           for (const target of INTERACTABLES.values()) {
-            if (target.districtId !== pending.id) continue;
+            if (target.cityId !== player.cityId || target.districtId !== pending.id) continue;
             send(socket, { type: "object_state", objectId: target.id,
               objectState: target.state, actorId: target.actorId,
               occupantId: target.occupantId, version: target.version });
@@ -1590,7 +1618,7 @@ wss.on("connection", async (socket: WebSocket) => {
           send(socket, { type: "interaction_rejected", code: "unknown_or_invalid_object" }); return;
         }
         const playerDistrictId = findPlayerDistrict(player, player.x, player.z)?.id ?? "unassigned";
-        if (player.homeId || player.eventId || playerDistrictId !== target.districtId) {
+        if (target.cityId !== player.cityId || player.homeId || player.eventId || playerDistrictId !== target.districtId) {
           send(socket, { type: "interaction_rejected", code: "object_in_different_district" }); return;
         }
         const distance = Math.hypot(player.x - target.x, player.y - target.y, player.z - target.z);
@@ -1639,7 +1667,7 @@ wss.on("connection", async (socket: WebSocket) => {
         };
         for (const peer of players.values()) {
           const peerDistrictId = findPlayerDistrict(peer, peer.x, peer.z)?.id ?? "unassigned";
-          if (peer.worldId === player.worldId && !peer.homeId && !peer.eventId && peerDistrictId === target.districtId)
+          if (peer.worldId === player.worldId && peer.cityId === target.cityId && !peer.homeId && !peer.eventId && peerDistrictId === target.districtId)
             send(peer.socket, packet);
         }
         return;
@@ -2201,7 +2229,7 @@ setInterval(async () => {
           actorId: row.updatedBy, occupantId: null, version: target.version };
         for (const peer of players.values()) {
           const peerDistrictId = findPlayerDistrict(peer, peer.x, peer.z)?.id ?? "unassigned";
-          if (peer.worldId === worldId && !peer.homeId && !peer.eventId && peerDistrictId === target.districtId)
+          if (peer.worldId === worldId && peer.cityId === target.cityId && !peer.homeId && !peer.eventId && peerDistrictId === target.districtId)
             send(peer.socket, packet);
         }
       }
