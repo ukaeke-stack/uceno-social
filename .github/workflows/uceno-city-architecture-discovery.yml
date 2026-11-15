@@ -8,6 +8,9 @@ on:
       - ".github/workflows/uceno-city-architecture-discovery.yml"
 permissions:
   contents: read
+concurrency:
+  group: uceno-city-architecture-discovery
+  cancel-in-progress: true
 jobs:
   discover:
     runs-on: ubuntu-latest
