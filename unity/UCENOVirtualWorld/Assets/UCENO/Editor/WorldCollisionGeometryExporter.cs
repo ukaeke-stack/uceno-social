@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Security.Cryptography;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -105,7 +106,6 @@ namespace UCENO.VirtualWorld.Editor
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
             CollisionMap map = new CollisionMap { boxes = boxes.ToArray(), interactables = interactables.ToArray() };
             File.WriteAllText(outputPath, JsonUtility.ToJson(map, true), new UTF8Encoding(false));
-            File.WriteAllText(outputPath, JsonUtility.ToJson(map, true), new UTF8Encoding(false));
             ExportCityDistrictMaps(cityId, includeScenePaths, repositoryRoot);
             AssetDatabase.Refresh();
             Debug.Log("Exported " + boxes.Count + " colliders and " + interactables.Count +
@@ -144,6 +144,7 @@ namespace UCENO.VirtualWorld.Editor
             var filenames = new HashSet<string>(entries.Select(item => item.file), StringComparer.Ordinal);
             var allInteractableIds = new HashSet<string>(StringComparer.Ordinal);
             var newEntries = new List<DistrictMapEntry>();
+            var pendingMaps = new List<KeyValuePair<string, string>>();
 
             foreach (CityPipelineDistrict district in city.districts)
             {
@@ -192,17 +193,17 @@ namespace UCENO.VirtualWorld.Editor
                     throw new InvalidOperationException("City " + cityId + " district " + district.id + " has no collision geometry; manifest was not updated.");
                 if (districtBoxes.Count > 500 || districtInteractables.Count > 500)
                     throw new InvalidOperationException("City " + cityId + " district " + district.id + " exceeds the 500-item gateway limit.");
-                string fileName = cityId + "-" + district.id + ".json";
-                if (!filenames.Add(fileName))
-                    throw new InvalidOperationException("City district collision filename conflicts with another city: " + fileName);
-                string filePath = Path.Combine(outputDirectory, fileName);
                 string mapJson = JsonUtility.ToJson(new CollisionMap {
                     boxes = districtBoxes.ToArray(), interactables = districtInteractables.ToArray()
                 }, true);
-                string tempMapPath = filePath + ".tmp";
-                File.WriteAllText(tempMapPath, mapJson, new UTF8Encoding(false));
-                if (File.Exists(filePath)) File.Replace(tempMapPath, filePath, null);
-                else File.Move(tempMapPath, filePath);
+                string digest;
+                using (SHA256 hash = SHA256.Create())
+                    digest = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(mapJson)))
+                        .Replace("-", "").Substring(0, 12).ToLowerInvariant();
+                string fileName = cityId + "-" + district.id + "-" + digest + ".json";
+                if (!filenames.Add(fileName))
+                    throw new InvalidOperationException("City district collision filename conflicts with another city: " + fileName);
+                pendingMaps.Add(new KeyValuePair<string, string>(fileName, mapJson));
                 newEntries.Add(new DistrictMapEntry {
                     cityId = cityId, id = district.id, contentLabel = district.contentLabel,
                     file = fileName, minX = minX, maxX = maxX, minZ = minZ, maxZ = maxZ,
@@ -215,6 +216,25 @@ namespace UCENO.VirtualWorld.Editor
             foreach (DistrictMapEntry entry in entries)
                 if (!identities.Add(entry.cityId + ":" + entry.id))
                     throw new InvalidOperationException("Duplicate city district identity in collision manifest.");
+            // Write immutable, content-addressed map files first. The old
+            // manifest continues to reference the old complete set until the
+            // final atomic manifest replacement succeeds.
+            var stagedPaths = new List<string>();
+            foreach (KeyValuePair<string, string> pending in pendingMaps)
+            {
+                string finalPath = Path.Combine(outputDirectory, pending.Key);
+                if (File.Exists(finalPath)) continue;
+                string tempPath = finalPath + ".tmp";
+                File.WriteAllText(tempPath, pending.Value, new UTF8Encoding(false));
+                stagedPaths.Add(tempPath);
+            }
+            foreach (string tempPath in stagedPaths)
+            {
+                string finalPath = tempPath.Substring(0, tempPath.Length - 4);
+                if (!File.Exists(finalPath)) File.Move(tempPath, finalPath);
+                else File.Delete(tempPath);
+            }
+
             string manifestJson = JsonUtility.ToJson(new DistrictManifest { districts = entries.ToArray() }, true);
             string tempManifestPath = manifestPath + ".tmp";
             File.WriteAllText(tempManifestPath, manifestJson, new UTF8Encoding(false));
