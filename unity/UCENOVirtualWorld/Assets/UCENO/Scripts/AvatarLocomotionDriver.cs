@@ -19,7 +19,6 @@ namespace UCENO.VirtualWorld
 
         private Animator animator;
         private PlayerMotor motor;
-        private bool networkDriven;
         private float networkSpeed;
         private bool networkSeated;
         private int receivedGestureSequence;
@@ -82,7 +81,6 @@ namespace UCENO.VirtualWorld
 
         public void ApplyRemoteState(float speed, bool seated, bool sprinting, string gesture, int sequence)
         {
-            networkDriven = true;
             networkSpeed = Mathf.Clamp01(speed);
             networkSeated = seated;
             if (sequence <= receivedGestureSequence) return;
@@ -116,7 +114,7 @@ namespace UCENO.VirtualWorld
             lastYaw = yaw;
             if (Mathf.Abs(delta) < 0.15f) return;
             accumulatedTurn += delta;
-            if (Mathf.Abs(accumulatedTurn) >= 70f && speed < 0.35f && Time.time >= nextTurnAt)
+            if (Mathf.Abs(accumulatedTurn) >= 70f && speed < 0.7f && Time.time >= nextTurnAt)
             {
                 PlayGesture("turn", true);
                 accumulatedTurn = 0f;
