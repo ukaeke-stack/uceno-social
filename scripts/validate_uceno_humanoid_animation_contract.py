@@ -30,6 +30,8 @@ for token in (
     "AvatarSetup.CopyFromOther",
     "importer.sourceAvatar != baseAvatar",
     "AssetDatabase.LoadAllAssetsAtPath(path)",
+    "AssetDatabase.LoadAllAssetsAtPath(BaseAvatarPath)",
+    "baseAvatarClips",
     "OfType<AnimationClip>()",
     "clip.length <= 0f",
     "!clip.humanMotion",
