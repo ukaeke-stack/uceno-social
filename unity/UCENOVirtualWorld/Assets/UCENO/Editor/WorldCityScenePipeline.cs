@@ -674,11 +674,15 @@ namespace UCENO.VirtualWorld.Editor
             RenderSettings.ambientMode = AmbientMode.Skybox;
             RenderSettings.ambientIntensity = city.environment.biome.Contains("desert") ? 1.15f : 1f;
             RenderSettings.reflectionIntensity = 0.72f;
+            string weather = string.Join(" ", city.environment.weather ?? Array.Empty<string>()).ToLowerInvariant();
+            bool mistOrCloud = weather.Contains("mist") || weather.Contains("fog") || weather.Contains("cloud");
+            bool rainOrStorm = weather.Contains("rain") || weather.Contains("storm") || weather.Contains("shower");
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = city.environment.biome.Contains("alpine") ? 0.0022f :
-                city.environment.biome.Contains("coastal") || city.environment.biome.Contains("delta") ? 0.0012f :
-                city.environment.biome.Contains("desert") ? 0.00035f : 0.0008f;
+            RenderSettings.fogDensity = mistOrCloud ? 0.0024f :
+                rainOrStorm ? 0.0017f :
+                city.environment.biome.Contains("alpine") ? 0.0014f :
+                city.environment.biome.Contains("desert") ? 0.00025f : 0.00065f;
             RenderSettings.fogColor = city.environment.biome.Contains("desert")
                 ? new Color(0.72f, 0.59f, 0.42f)
                 : city.environment.biome.Contains("alpine")
