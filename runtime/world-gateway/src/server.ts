@@ -6,7 +6,7 @@ import { createActivitySession, joinActivity, startActivity, recordCheckpoint, l
 import { serializeActivitySession, restoreActivitySession } from "./activity-persistence.js";
 import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./district-policy.js";
 import { parseWorldCityCatalog, type WorldCity } from "./city-catalog-policy.js";
-import { resolveReadyCityRuntime } from "./city-runtime-policy.js";
+import { resolveReadyCityRuntime, resolveCityRuntime } from "./city-runtime-policy.js";
 import { matchesDistrictTransition, planDistrictTransition } from "./district-transition-policy.js";
 import { parseDistrictCollisionManifest } from "./district-collision-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
@@ -370,6 +370,10 @@ type Player = {
   activeDistrictId: string | null;
   pendingDistrict: { id: string; contentLabel: string; nonce: string; createdAt: number } | null;
 };
+function findPlayerDistrict(player: Pick<Player, "cityId">, x: number, z: number): WorldDistrict | null {
+  const runtime = resolveCityRuntime(WORLD_CITIES, player.cityId);
+  return runtime ? findWorldDistrict(runtime.districts, x, z) : null;
+}
 const players = new Map<string, Player>();
 const voiceVisiblePairs = new Set<string>();
 const voiceBlockCheckAt = new Map<string, number>();
@@ -826,10 +830,22 @@ async function loadPlayer(userId: string, worldId: string, cityId: string, token
     WHERE world_id = ${worldId}::uuid AND user_id = ${userId}::uuid
     LIMIT 1
   `;
-  const p = rows[0]?.position || { x: 0, y: GROUND_Y, z: 0 };
-  const x = finiteNumber(p.x, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.x : 0;
+  const cityRuntime = resolveReadyCityRuntime(
+    WORLD_CITIES, cityId,
+    new Set(DISTRICT_COLLISION_BOXES.keys()),
+    new Set([...INTERACTABLES.values()].map(item => item.districtId))
+  );
+  if (!cityRuntime) throw new Error("city_runtime_not_ready");
+  const p = rows[0]?.position || {
+    x: cityRuntime.city.spawn.x, y: GROUND_Y, z: cityRuntime.city.spawn.z
+  };
+  const savedPositionValid =
+    finiteNumber(p.x, cityRuntime.city.bounds.minX, cityRuntime.city.bounds.maxX) &&
+    finiteNumber(p.z, cityRuntime.city.bounds.minZ, cityRuntime.city.bounds.maxZ) &&
+    findWorldDistrict(cityRuntime.districts, p.x, p.z) !== null;
+  const x = savedPositionValid ? p.x : cityRuntime.city.spawn.x;
   const y = finiteNumber(p.y, GROUND_Y, WORLD_BOUNDS) ? p.y : GROUND_Y;
-  const z = finiteNumber(p.z, -WORLD_BOUNDS, WORLD_BOUNDS) ? p.z : 0;
+  const z = savedPositionValid ? p.z : cityRuntime.city.spawn.z;
   const appearanceRows = await sql`
     SELECT appearance
     FROM user_avatar_appearances
@@ -1181,7 +1197,7 @@ wss.on("connection", async (socket: WebSocket) => {
     // A joining or reconnecting client must receive the current authoritative
     // state of every scene interactable. Broadcasting only future changes
     // leaves late joiners with stale door/object visuals and unknown seat use.
-    const joiningDistrictId = findWorldDistrict(WORLD_DISTRICTS, player.x, player.z)?.id ?? "unassigned";
+    const joiningDistrictId = findPlayerDistrict(player, player.x, player.z)?.id ?? "unassigned";
     const joiningObjects = [...INTERACTABLES.values()].filter(target => target.districtId === joiningDistrictId);
     console.info("world_interactable_snapshot_sent", {
       userId: player.id, districtId: joiningDistrictId,
@@ -1594,7 +1610,7 @@ wss.on("connection", async (socket: WebSocket) => {
           actorId: player.id, occupantId: target.occupantId, version: target.version
         };
         for (const peer of players.values()) {
-          const peerDistrictId = findWorldDistrict(WORLD_DISTRICTS, peer.x, peer.z)?.id ?? "unassigned";
+          const peerDistrictId = findPlayerDistrict(peer, peer.x, peer.z)?.id ?? "unassigned";
           if (peer.worldId === player.worldId && !peer.homeId && !peer.eventId && peerDistrictId === target.districtId)
             send(peer.socket, packet);
         }
@@ -1903,7 +1919,7 @@ setInterval(async () => {
     p.vy -= GRAVITY * dt;
     const proposedX = p.x + p.vx * dt;
     const proposedZ = p.z + p.vz * dt;
-    const targetDistrict = p.homeId || p.eventId ? null : findWorldDistrict(WORLD_DISTRICTS, proposedX, proposedZ);
+    const targetDistrict = p.homeId || p.eventId ? null : findPlayerDistrict(p, proposedX, proposedZ);
     const transitionPlan = planDistrictTransition(
       p.activeDistrictId, p.pendingDistrict, targetDistrict, now, randomUUID
     );
