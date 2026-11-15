@@ -13,10 +13,11 @@ namespace UCENO.VirtualWorld.Editor
     /// </summary>
     public static class HumanoidAnimationLibraryValidator
     {
-        private const string AnimationRoot = "Assets/UCENO/Characters/Animations";
+        private const string AnimationRoot = "Assets/UCENO/Animations/Imported";
+        private const string BaseAvatarPath = "Assets/UCENO/Characters/Imported/UCENO_Default_Avatar.fbx";
         private static readonly string[] RequiredClips =
         {
-            "idle", "walk", "run", "talk", "turn", "wave", "cheer", "dance", "interact"
+            "idle", "walk", "run", "talk", "turn", "wave", "cheer", "dance", "interact", "sit"
         };
 
         [MenuItem("UCENO/Validate Imported Humanoid Animation Library")]
@@ -28,6 +29,11 @@ namespace UCENO.VirtualWorld.Editor
                     "No imported animation FBXs found. Add licensed Humanoid animation FBXs under " +
                     AnimationRoot + " and retarget them to the UCENO base Avatar before validation.");
 
+            Avatar baseAvatar = AssetDatabase.LoadAllAssetsAtPath(BaseAvatarPath).OfType<Avatar>()
+                .FirstOrDefault(candidate => candidate != null && candidate.isHuman);
+            if (baseAvatar == null)
+                throw new InvalidOperationException("The UCENO base Humanoid Avatar is missing: " + BaseAvatarPath);
+
             var clips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var errors = new List<string>();
             foreach (string guid in modelGuids)
@@ -37,8 +43,8 @@ namespace UCENO.VirtualWorld.Editor
                 if (importer == null) { errors.Add(path + ": not a ModelImporter asset."); continue; }
                 if (importer.animationType != ModelImporterAnimationType.Human)
                     errors.Add(path + ": Rig > Animation Type must be Humanoid.");
-                if (importer.avatarSetup != ModelImporterAvatarSetup.CopyFromOther || importer.sourceAvatar == null)
-                    errors.Add(path + ": Rig > Avatar Definition must be Copy From Other Avatar and reference the UCENO base Avatar.");
+                if (importer.avatarSetup != ModelImporterAvatarSetup.CopyFromOther || importer.sourceAvatar != baseAvatar)
+                    errors.Add(path + ": Rig > Avatar Definition must reference the exact UCENO base Avatar.");
 
                 foreach (var clip in importer.defaultClipAnimations)
                 {
