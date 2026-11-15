@@ -41,6 +41,76 @@ namespace UCENO.VirtualWorld.Editor
             public float minX, maxX, minY, maxY, minZ, maxZ;
         }
 
+        public static string Export(string cityId, string[] includeScenePaths)
+        {
+            if (string.IsNullOrWhiteSpace(cityId) || includeScenePaths == null || includeScenePaths.Length == 0)
+                throw new ArgumentException("A city ID and explicit generated district scene paths are required.");
+            var include = new HashSet<string>(includeScenePaths, StringComparer.Ordinal);
+            var loaded = new List<Scene>();
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                Scene scene = SceneManager.GetSceneAt(i);
+                if (!scene.IsValid() || !scene.isLoaded || !include.Contains(scene.path)) continue;
+                loaded.Add(scene);
+            }
+            if (loaded.Count != include.Count)
+                throw new InvalidOperationException("Not all selected city district scenes are loaded for collision export.");
+
+            var boxes = new List<Box>();
+            var interactables = new List<Interactable>();
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Scene scene in loaded)
+            {
+                foreach (GameObject root in scene.GetRootGameObjects())
+                {
+                    foreach (Collider collider in root.GetComponentsInChildren<Collider>(true))
+                    {
+                        if (collider == null || !collider.enabled || collider.isTrigger ||
+                            !collider.gameObject.activeInHierarchy ||
+                            collider.GetComponentInParent<PlayerMotor>() != null) continue;
+                        Bounds bounds = collider.bounds;
+                        if (bounds.size.sqrMagnitude < 0.0001f) continue;
+                        boxes.Add(new Box {
+                            minX = Round(bounds.min.x), maxX = Round(bounds.max.x),
+                            minY = Round(bounds.min.y), maxY = Round(bounds.max.y),
+                            minZ = Round(bounds.min.z), maxZ = Round(bounds.max.z)
+                        });
+                    }
+                    foreach (WorldInteractable item in root.GetComponentsInChildren<WorldInteractable>(true))
+                    {
+                        if (item == null || !item.gameObject.activeInHierarchy) continue;
+                        string id = item.ObjectId;
+                        if (string.IsNullOrWhiteSpace(id) || id.Length > 80 ||
+                            !id.All(character => char.IsLetterOrDigit(character) || "._:-".IndexOf(character) >= 0) ||
+                            !ids.Add(id))
+                            throw new InvalidOperationException("City collision export found invalid or duplicate interactable ID: " + id);
+                        Vector3 position = item.transform.position;
+                        interactables.Add(new Interactable {
+                            id = id, kind = item.Kind,
+                            x = Round(position.x), y = Round(position.y), z = Round(position.z),
+                            yaw = Round(item.transform.eulerAngles.y * Mathf.Deg2Rad)
+                        });
+                    }
+                }
+            }
+            if (boxes.Count == 0)
+                throw new InvalidOperationException("City " + cityId + " has no active non-trigger colliders.");
+            if (boxes.Count > 500 || interactables.Count > 500)
+                throw new InvalidOperationException("City " + cityId + " exceeds the gateway limit of 500 colliders or interactables.");
+
+            string repositoryRoot = Path.GetFullPath(Path.Combine(
+                Directory.GetParent(Application.dataPath).FullName, "..", ".."));
+            string outputPath = Path.Combine(repositoryRoot, "runtime", "world-gateway", "data",
+                "uceno-city-collision-boxes-" + cityId + ".json");
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+            CollisionMap map = new CollisionMap { boxes = boxes.ToArray(), interactables = interactables.ToArray() };
+            File.WriteAllText(outputPath, JsonUtility.ToJson(map, true), new UTF8Encoding(false));
+            AssetDatabase.Refresh();
+            Debug.Log("Exported " + boxes.Count + " colliders and " + interactables.Count +
+                " interactables for city " + cityId + " to " + outputPath);
+            return outputPath;
+        }
+
         public static string Export(Scene scene)
         {
             if (!scene.IsValid() || !scene.isLoaded)
