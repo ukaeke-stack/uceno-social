@@ -305,3 +305,13 @@ test("gateway snapshots and interaction broadcasts stay inside the player's assi
   assert.match(server, /peer\.cityId === target\.cityId/);
   assert.match(server, /item\.cityId === city\.id && item\.districtId === district\.id/);
 });
+
+
+test("Unity collision exporter switches a complete immutable map set through the manifest", () => {
+  const exporter = readFileSync(new URL("../../unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs", import.meta.url), "utf8");
+  assert.match(exporter, /SHA256\.Create\(\)/);
+  assert.match(exporter, /pendingMaps\.Add\(/);
+  assert.match(exporter, /content-addressed map files first/);
+  assert.match(exporter, /File\.Replace\(tempManifestPath, manifestPath, null\)/);
+  assert.match(exporter, /districtBoxes\.Count == 0/);
+});
