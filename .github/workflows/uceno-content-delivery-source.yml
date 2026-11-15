@@ -4,6 +4,13 @@ on:
   pull_request:
     paths:
       - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldContentDelivery.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json"
+      - "runtime/world-gateway/config/world-cities.json"
+      - "runtime/world-gateway/config/world-districts.json"
+      - "runtime/world-gateway/src/city-catalog-policy.ts"
+      - "runtime/world-gateway/tests/city-catalog-policy.test.mjs"
+      - "runtime/world-gateway/tests/district-policy.test.mjs"
       - "unity/UCENOVirtualWorld/Packages/manifest.json"
       - "docs/virtual-world/REMOTE_CONTENT_DELIVERY*"
       - "scripts/validate-uceno-content-delivery.mjs"
@@ -13,6 +20,13 @@ on:
       - feature/uceno-unity-foundation
     paths:
       - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldContentDelivery.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json"
+      - "runtime/world-gateway/config/world-cities.json"
+      - "runtime/world-gateway/config/world-districts.json"
+      - "runtime/world-gateway/src/city-catalog-policy.ts"
+      - "runtime/world-gateway/tests/city-catalog-policy.test.mjs"
+      - "runtime/world-gateway/tests/district-policy.test.mjs"
       - "unity/UCENOVirtualWorld/Packages/manifest.json"
       - "docs/virtual-world/REMOTE_CONTENT_DELIVERY*"
       - "scripts/validate-uceno-content-delivery.mjs"
