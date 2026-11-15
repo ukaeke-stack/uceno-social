@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "minimumCityCount": 10,
   "cities": [
     {
@@ -21,24 +21,108 @@
       },
       "districts": [
         {
-          "id": "south",
-          "name": "South District",
-          "contentLabel": "world-city-meridian-south"
+          "id": "civic-core",
+          "name": "Civic Core",
+          "role": "government",
+          "layout": "radial-civic",
+          "contentLabel": "world-city-meridian-civic-core",
+          "center": {
+            "x": -150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "central-south",
-          "name": "Central South",
-          "contentLabel": "world-city-meridian-central-south"
+          "id": "exchange-quarter",
+          "name": "Exchange Quarter",
+          "role": "finance",
+          "layout": "radial-civic",
+          "contentLabel": "world-city-meridian-exchange-quarter",
+          "center": {
+            "x": 150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "central-north",
-          "name": "Central North",
-          "contentLabel": "world-city-meridian-central-north"
+          "id": "garden-ring",
+          "name": "Garden Ring",
+          "role": "park",
+          "layout": "radial-civic",
+          "contentLabel": "world-city-meridian-garden-ring",
+          "center": {
+            "x": -150,
+            "z": 150
+          },
+          "radius": 130
         },
         {
-          "id": "north",
-          "name": "North District",
-          "contentLabel": "world-city-meridian-north"
+          "id": "old-port",
+          "name": "Old Port",
+          "role": "heritage",
+          "layout": "radial-civic",
+          "contentLabel": "world-city-meridian-old-port",
+          "center": {
+            "x": 150,
+            "z": 150
+          },
+          "radius": 130
+        }
+      ],
+      "layout": {
+        "pattern": "radial-civic",
+        "blockMeters": 110,
+        "roadHierarchy": [
+          "ceremonial-axis",
+          "boulevard",
+          "service-lane"
+        ],
+        "water": "central-canal"
+      },
+      "environment": {
+        "biome": "temperate-coastal",
+        "terrain": "gentle-harbour-plain",
+        "weather": [
+          "clear",
+          "mist",
+          "light-rain"
+        ],
+        "vegetation": [
+          "plane-tree",
+          "ornamental-grass",
+          "coastal-shrub"
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "civic-spire",
+          "name": "Civic Spire",
+          "kind": "government",
+          "contentLabel": "world-city-meridian-landmark-civic-spire",
+          "position": {
+            "x": -48,
+            "z": -75
+          }
+        },
+        {
+          "id": "grand-exchange",
+          "name": "Grand Exchange",
+          "kind": "finance",
+          "contentLabel": "world-city-meridian-landmark-grand-exchange",
+          "position": {
+            "x": 0,
+            "z": 75
+          }
+        },
+        {
+          "id": "founders-arcade",
+          "name": "Founders Arcade",
+          "kind": "culture",
+          "contentLabel": "world-city-meridian-landmark-founders-arcade",
+          "position": {
+            "x": 48,
+            "z": -75
+          }
         }
       ]
     },
@@ -61,24 +145,108 @@
       },
       "districts": [
         {
-          "id": "downtown",
-          "name": "Downtown",
-          "contentLabel": "world-city-solstice-downtown"
+          "id": "marina-front",
+          "name": "Marina Front",
+          "role": "waterfront",
+          "layout": "linear-waterfront",
+          "contentLabel": "world-city-solstice-marina-front",
+          "center": {
+            "x": -150,
+            "z": -270
+          },
+          "radius": 130
         },
         {
-          "id": "waterfront",
-          "name": "Waterfront",
-          "contentLabel": "world-city-solstice-waterfront"
+          "id": "sunset-terraces",
+          "name": "Sunset Terraces",
+          "role": "residential",
+          "layout": "linear-waterfront",
+          "contentLabel": "world-city-solstice-sunset-terraces",
+          "center": {
+            "x": 150,
+            "z": -270
+          },
+          "radius": 130
         },
         {
-          "id": "residential",
-          "name": "Residential",
-          "contentLabel": "world-city-solstice-residential"
+          "id": "reef-gardens",
+          "name": "Reef Gardens",
+          "role": "park",
+          "layout": "linear-waterfront",
+          "contentLabel": "world-city-solstice-reef-gardens",
+          "center": {
+            "x": -150,
+            "z": 30
+          },
+          "radius": 130
         },
         {
-          "id": "culture",
-          "name": "Culture",
-          "contentLabel": "world-city-solstice-culture"
+          "id": "arts-promenade",
+          "name": "Arts Promenade",
+          "role": "culture",
+          "layout": "linear-waterfront",
+          "contentLabel": "world-city-solstice-arts-promenade",
+          "center": {
+            "x": 150,
+            "z": 30
+          },
+          "radius": 130
+        }
+      ],
+      "layout": {
+        "pattern": "linear-waterfront",
+        "blockMeters": 85,
+        "roadHierarchy": [
+          "coastal-esplanade",
+          "terrace-street",
+          "promenade"
+        ],
+        "water": "open-bay-and-marina"
+      },
+      "environment": {
+        "biome": "tropical-coastal",
+        "terrain": "beach-and-limestone-headland",
+        "weather": [
+          "sunny",
+          "sea-breeze",
+          "tropical-shower"
+        ],
+        "vegetation": [
+          "palm",
+          "sea-grape",
+          "bougainvillea"
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "lighthouse-pavilion",
+          "name": "Solstice Lighthouse",
+          "kind": "maritime",
+          "contentLabel": "world-city-solstice-landmark-lighthouse-pavilion",
+          "position": {
+            "x": -48,
+            "z": -195
+          }
+        },
+        {
+          "id": "tidal-steps",
+          "name": "Tidal Steps",
+          "kind": "public-space",
+          "contentLabel": "world-city-solstice-landmark-tidal-steps",
+          "position": {
+            "x": 0,
+            "z": -45
+          }
+        },
+        {
+          "id": "oceanarium",
+          "name": "Oceanarium",
+          "kind": "culture",
+          "contentLabel": "world-city-solstice-landmark-oceanarium",
+          "position": {
+            "x": 48,
+            "z": -195
+          }
         }
       ]
     },
@@ -101,24 +269,108 @@
       },
       "districts": [
         {
-          "id": "downtown",
-          "name": "Downtown",
-          "contentLabel": "world-city-verdant-downtown"
+          "id": "canopy-centre",
+          "name": "Canopy Centre",
+          "role": "commercial",
+          "layout": "multi-level-green-corridors",
+          "contentLabel": "world-city-verdant-canopy-centre",
+          "center": {
+            "x": -150,
+            "z": -70
+          },
+          "radius": 130
         },
         {
-          "id": "waterfront",
-          "name": "Waterfront",
-          "contentLabel": "world-city-verdant-waterfront"
+          "id": "arboretum-belt",
+          "name": "Arboretum Belt",
+          "role": "botanical",
+          "layout": "multi-level-green-corridors",
+          "contentLabel": "world-city-verdant-arboretum-belt",
+          "center": {
+            "x": 150,
+            "z": -70
+          },
+          "radius": 130
         },
         {
-          "id": "residential",
-          "name": "Residential",
-          "contentLabel": "world-city-verdant-residential"
+          "id": "terrace-homes",
+          "name": "Terrace Homes",
+          "role": "residential",
+          "layout": "multi-level-green-corridors",
+          "contentLabel": "world-city-verdant-terrace-homes",
+          "center": {
+            "x": -150,
+            "z": 230
+          },
+          "radius": 130
         },
         {
-          "id": "culture",
-          "name": "Culture",
-          "contentLabel": "world-city-verdant-culture"
+          "id": "solar-gardens",
+          "name": "Solar Gardens",
+          "role": "energy-park",
+          "layout": "multi-level-green-corridors",
+          "contentLabel": "world-city-verdant-solar-gardens",
+          "center": {
+            "x": 150,
+            "z": 230
+          },
+          "radius": 130
+        }
+      ],
+      "layout": {
+        "pattern": "multi-level-green-corridors",
+        "blockMeters": 95,
+        "roadHierarchy": [
+          "skyway",
+          "garden-boulevard",
+          "service-ramp"
+        ],
+        "water": "rain-gardens-and-canopy-streams"
+      },
+      "environment": {
+        "biome": "tropical-rainforest",
+        "terrain": "forest-ridge",
+        "weather": [
+          "humid-sun",
+          "warm-rain",
+          "low-cloud"
+        ],
+        "vegetation": [
+          "kapok",
+          "fern",
+          "broadleaf-canopy"
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "canopy-crown",
+          "name": "Canopy Crown",
+          "kind": "biophilic-tower",
+          "contentLabel": "world-city-verdant-landmark-canopy-crown",
+          "position": {
+            "x": -48,
+            "z": 5
+          }
+        },
+        {
+          "id": "living-bridge",
+          "name": "Living Bridge",
+          "kind": "infrastructure",
+          "contentLabel": "world-city-verdant-landmark-living-bridge",
+          "position": {
+            "x": 0,
+            "z": 155
+          }
+        },
+        {
+          "id": "arboretum-dome",
+          "name": "Arboretum Dome",
+          "kind": "botanical",
+          "contentLabel": "world-city-verdant-landmark-arboretum-dome",
+          "position": {
+            "x": 48,
+            "z": 5
+          }
         }
       ]
     },
@@ -141,24 +393,108 @@
       },
       "districts": [
         {
-          "id": "downtown",
-          "name": "Downtown",
-          "contentLabel": "world-city-nexus-downtown"
+          "id": "research-island",
+          "name": "Research Island",
+          "role": "science",
+          "layout": "river-island-campus",
+          "contentLabel": "world-city-nexus-research-island",
+          "center": {
+            "x": -150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "waterfront",
-          "name": "Waterfront",
-          "contentLabel": "world-city-nexus-waterfront"
+          "id": "bridge-market",
+          "name": "Bridge Market",
+          "role": "commercial",
+          "layout": "river-island-campus",
+          "contentLabel": "world-city-nexus-bridge-market",
+          "center": {
+            "x": 150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "residential",
-          "name": "Residential",
-          "contentLabel": "world-city-nexus-residential"
+          "id": "delta-residences",
+          "name": "Delta Residences",
+          "role": "residential",
+          "layout": "river-island-campus",
+          "contentLabel": "world-city-nexus-delta-residences",
+          "center": {
+            "x": -150,
+            "z": 150
+          },
+          "radius": 130
         },
         {
-          "id": "culture",
-          "name": "Culture",
-          "contentLabel": "world-city-nexus-culture"
+          "id": "wetland-campus",
+          "name": "Wetland Campus",
+          "role": "ecology",
+          "layout": "river-island-campus",
+          "contentLabel": "world-city-nexus-wetland-campus",
+          "center": {
+            "x": 150,
+            "z": 150
+          },
+          "radius": 130
+        }
+      ],
+      "layout": {
+        "pattern": "river-island-campus",
+        "blockMeters": 100,
+        "roadHierarchy": [
+          "bridge-arterial",
+          "innovation-loop",
+          "pedestrian-spine"
+        ],
+        "water": "braided-river-channels"
+      },
+      "environment": {
+        "biome": "river-delta",
+        "terrain": "lowland-islands",
+        "weather": [
+          "humid",
+          "river-fog",
+          "storm"
+        ],
+        "vegetation": [
+          "willow",
+          "reed",
+          "wetland-grass"
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "delta-helix",
+          "name": "Delta Helix",
+          "kind": "research",
+          "contentLabel": "world-city-nexus-landmark-delta-helix",
+          "position": {
+            "x": -48,
+            "z": -75
+          }
+        },
+        {
+          "id": "kinetic-crossing",
+          "name": "Kinetic Crossing",
+          "kind": "bridge",
+          "contentLabel": "world-city-nexus-landmark-kinetic-crossing",
+          "position": {
+            "x": 0,
+            "z": 75
+          }
+        },
+        {
+          "id": "innovation-forum",
+          "name": "Innovation Forum",
+          "kind": "civic",
+          "contentLabel": "world-city-nexus-landmark-innovation-forum",
+          "position": {
+            "x": 48,
+            "z": -75
+          }
         }
       ]
     },
@@ -181,24 +517,108 @@
       },
       "districts": [
         {
-          "id": "downtown",
-          "name": "Downtown",
-          "contentLabel": "world-city-aurora-downtown"
+          "id": "summit-quarter",
+          "name": "Summit Quarter",
+          "role": "civic",
+          "layout": "contour-terraces",
+          "contentLabel": "world-city-aurora-summit-quarter",
+          "center": {
+            "x": -150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "waterfront",
-          "name": "Waterfront",
-          "contentLabel": "world-city-aurora-waterfront"
+          "id": "switchback-village",
+          "name": "Switchback Village",
+          "role": "residential",
+          "layout": "contour-terraces",
+          "contentLabel": "world-city-aurora-switchback-village",
+          "center": {
+            "x": 150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "residential",
-          "name": "Residential",
-          "contentLabel": "world-city-aurora-residential"
+          "id": "alpine-commons",
+          "name": "Alpine Commons",
+          "role": "park",
+          "layout": "contour-terraces",
+          "contentLabel": "world-city-aurora-alpine-commons",
+          "center": {
+            "x": -150,
+            "z": 150
+          },
+          "radius": 130
         },
         {
-          "id": "culture",
-          "name": "Culture",
-          "contentLabel": "world-city-aurora-culture"
+          "id": "cloudline-arts",
+          "name": "Cloudline Arts",
+          "role": "culture",
+          "layout": "contour-terraces",
+          "contentLabel": "world-city-aurora-cloudline-arts",
+          "center": {
+            "x": 150,
+            "z": 150
+          },
+          "radius": 130
+        }
+      ],
+      "layout": {
+        "pattern": "contour-terraces",
+        "blockMeters": 75,
+        "roadHierarchy": [
+          "ridge-parkway",
+          "switchback-avenue",
+          "funicular-walk"
+        ],
+        "water": "mountain-reservoirs"
+      },
+      "environment": {
+        "biome": "alpine-highland",
+        "terrain": "steep-mountain-slope",
+        "weather": [
+          "clear-cold",
+          "snowfall",
+          "mountain-mist"
+        ],
+        "vegetation": [
+          "pine",
+          "alpine-meadow",
+          "juniper"
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "summit-observatory",
+          "name": "Summit Observatory",
+          "kind": "science",
+          "contentLabel": "world-city-aurora-landmark-summit-observatory",
+          "position": {
+            "x": -48,
+            "z": -75
+          }
+        },
+        {
+          "id": "aurora-amphitheatre",
+          "name": "Aurora Amphitheatre",
+          "kind": "culture",
+          "contentLabel": "world-city-aurora-landmark-aurora-amphitheatre",
+          "position": {
+            "x": 0,
+            "z": 75
+          }
+        },
+        {
+          "id": "ridge-station",
+          "name": "Ridge Station",
+          "kind": "transit",
+          "contentLabel": "world-city-aurora-landmark-ridge-station",
+          "position": {
+            "x": 48,
+            "z": -75
+          }
         }
       ]
     },
@@ -221,24 +641,108 @@
       },
       "districts": [
         {
-          "id": "downtown",
-          "name": "Downtown",
-          "contentLabel": "world-city-saffron-downtown"
+          "id": "sunvault-core",
+          "name": "Sunvault Core",
+          "role": "commercial",
+          "layout": "oasis-radial-courtyards",
+          "contentLabel": "world-city-saffron-sunvault-core",
+          "center": {
+            "x": -150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "waterfront",
-          "name": "Waterfront",
-          "contentLabel": "world-city-saffron-waterfront"
+          "id": "oasis-gardens",
+          "name": "Oasis Gardens",
+          "role": "park",
+          "layout": "oasis-radial-courtyards",
+          "contentLabel": "world-city-saffron-oasis-gardens",
+          "center": {
+            "x": 150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "residential",
-          "name": "Residential",
-          "contentLabel": "world-city-saffron-residential"
+          "id": "heritage-souk",
+          "name": "Heritage Souk",
+          "role": "market",
+          "layout": "oasis-radial-courtyards",
+          "contentLabel": "world-city-saffron-heritage-souk",
+          "center": {
+            "x": -150,
+            "z": 150
+          },
+          "radius": 130
         },
         {
-          "id": "culture",
-          "name": "Culture",
-          "contentLabel": "world-city-saffron-culture"
+          "id": "dune-residences",
+          "name": "Dune Residences",
+          "role": "residential",
+          "layout": "oasis-radial-courtyards",
+          "contentLabel": "world-city-saffron-dune-residences",
+          "center": {
+            "x": 150,
+            "z": 150
+          },
+          "radius": 130
+        }
+      ],
+      "layout": {
+        "pattern": "oasis-radial-courtyards",
+        "blockMeters": 90,
+        "roadHierarchy": [
+          "shaded-grand-avenue",
+          "covered-souk",
+          "service-court"
+        ],
+        "water": "oasis-channels-and-cisterns"
+      },
+      "environment": {
+        "biome": "arid-desert",
+        "terrain": "sandstone-plateau-and-dunes",
+        "weather": [
+          "dry-sun",
+          "dust-haze",
+          "rare-rain"
+        ],
+        "vegetation": [
+          "date-palm",
+          "acacia",
+          "desert-grass"
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "sunvault",
+          "name": "Sunvault Tower",
+          "kind": "solar",
+          "contentLabel": "world-city-saffron-landmark-sunvault",
+          "position": {
+            "x": -48,
+            "z": -75
+          }
+        },
+        {
+          "id": "grand-souk",
+          "name": "Grand Souk",
+          "kind": "market",
+          "contentLabel": "world-city-saffron-landmark-grand-souk",
+          "position": {
+            "x": 0,
+            "z": 75
+          }
+        },
+        {
+          "id": "oasis-court",
+          "name": "Oasis Court",
+          "kind": "public-garden",
+          "contentLabel": "world-city-saffron-landmark-oasis-court",
+          "position": {
+            "x": 48,
+            "z": -75
+          }
         }
       ]
     },
@@ -261,24 +765,108 @@
       },
       "districts": [
         {
-          "id": "downtown",
-          "name": "Downtown",
-          "contentLabel": "world-city-monsoon-downtown"
+          "id": "harbourworks",
+          "name": "Harbourworks",
+          "role": "port",
+          "layout": "elevated-grid-and-canals",
+          "contentLabel": "world-city-monsoon-harbourworks",
+          "center": {
+            "x": -150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "waterfront",
-          "name": "Waterfront",
-          "contentLabel": "world-city-monsoon-waterfront"
+          "id": "canal-quarter",
+          "name": "Canal Quarter",
+          "role": "commercial",
+          "layout": "elevated-grid-and-canals",
+          "contentLabel": "world-city-monsoon-canal-quarter",
+          "center": {
+            "x": 150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "residential",
-          "name": "Residential",
-          "contentLabel": "world-city-monsoon-residential"
+          "id": "raised-homes",
+          "name": "Raised Homes",
+          "role": "residential",
+          "layout": "elevated-grid-and-canals",
+          "contentLabel": "world-city-monsoon-raised-homes",
+          "center": {
+            "x": -150,
+            "z": 150
+          },
+          "radius": 130
         },
         {
-          "id": "culture",
-          "name": "Culture",
-          "contentLabel": "world-city-monsoon-culture"
+          "id": "mangrove-reserve",
+          "name": "Mangrove Reserve",
+          "role": "ecology",
+          "layout": "elevated-grid-and-canals",
+          "contentLabel": "world-city-monsoon-mangrove-reserve",
+          "center": {
+            "x": 150,
+            "z": 150
+          },
+          "radius": 130
+        }
+      ],
+      "layout": {
+        "pattern": "elevated-grid-and-canals",
+        "blockMeters": 105,
+        "roadHierarchy": [
+          "flood-safe-viaduct",
+          "covered-market-street",
+          "canal-walk"
+        ],
+        "water": "tidal-canals-and-retention-basin"
+      },
+      "environment": {
+        "biome": "monsoon-coastal",
+        "terrain": "estuary-delta",
+        "weather": [
+          "heavy-rain",
+          "humid-cloud",
+          "coastal-wind"
+        ],
+        "vegetation": [
+          "mangrove",
+          "rain-tree",
+          "wetland-palm"
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "harbour-arc",
+          "name": "Harbour Arc",
+          "kind": "port",
+          "contentLabel": "world-city-monsoon-landmark-harbour-arc",
+          "position": {
+            "x": -48,
+            "z": -75
+          }
+        },
+        {
+          "id": "storm-garden",
+          "name": "Storm Garden",
+          "kind": "resilience-park",
+          "contentLabel": "world-city-monsoon-landmark-storm-garden",
+          "position": {
+            "x": 0,
+            "z": 75
+          }
+        },
+        {
+          "id": "tide-clock",
+          "name": "Tide Clock",
+          "kind": "maritime",
+          "contentLabel": "world-city-monsoon-landmark-tide-clock",
+          "position": {
+            "x": 48,
+            "z": -75
+          }
         }
       ]
     },
@@ -301,24 +889,108 @@
       },
       "districts": [
         {
-          "id": "downtown",
-          "name": "Downtown",
-          "contentLabel": "world-city-eclipse-downtown"
+          "id": "lumen-centre",
+          "name": "Lumen Centre",
+          "role": "commercial",
+          "layout": "entertainment-superblocks",
+          "contentLabel": "world-city-eclipse-lumen-centre",
+          "center": {
+            "x": -150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "waterfront",
-          "name": "Waterfront",
-          "contentLabel": "world-city-eclipse-waterfront"
+          "id": "festival-mile",
+          "name": "Festival Mile",
+          "role": "entertainment",
+          "layout": "entertainment-superblocks",
+          "contentLabel": "world-city-eclipse-festival-mile",
+          "center": {
+            "x": 150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "residential",
-          "name": "Residential",
-          "contentLabel": "world-city-eclipse-residential"
+          "id": "midnight-residences",
+          "name": "Midnight Residences",
+          "role": "residential",
+          "layout": "entertainment-superblocks",
+          "contentLabel": "world-city-eclipse-midnight-residences",
+          "center": {
+            "x": -150,
+            "z": 150
+          },
+          "radius": 130
         },
         {
-          "id": "culture",
-          "name": "Culture",
-          "contentLabel": "world-city-eclipse-culture"
+          "id": "signal-arts",
+          "name": "Signal Arts",
+          "role": "culture",
+          "layout": "entertainment-superblocks",
+          "contentLabel": "world-city-eclipse-signal-arts",
+          "center": {
+            "x": 150,
+            "z": 150
+          },
+          "radius": 130
+        }
+      ],
+      "layout": {
+        "pattern": "entertainment-superblocks",
+        "blockMeters": 80,
+        "roadHierarchy": [
+          "night-boulevard",
+          "festival-street",
+          "service-alley"
+        ],
+        "water": "reflecting-lakes-and-fountains"
+      },
+      "environment": {
+        "biome": "temperate-urban",
+        "terrain": "urban-basin",
+        "weather": [
+          "clear-night",
+          "neon-rain",
+          "overcast"
+        ],
+        "vegetation": [
+          "plane-tree",
+          "ornamental-maple",
+          "urban-vine"
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "lumen-tower",
+          "name": "Lumen Tower",
+          "kind": "media",
+          "contentLabel": "world-city-eclipse-landmark-lumen-tower",
+          "position": {
+            "x": -48,
+            "z": -75
+          }
+        },
+        {
+          "id": "midnight-bowl",
+          "name": "Midnight Bowl",
+          "kind": "entertainment",
+          "contentLabel": "world-city-eclipse-landmark-midnight-bowl",
+          "position": {
+            "x": 0,
+            "z": 75
+          }
+        },
+        {
+          "id": "signal-museum",
+          "name": "Signal Museum",
+          "kind": "culture",
+          "contentLabel": "world-city-eclipse-landmark-signal-museum",
+          "position": {
+            "x": 48,
+            "z": -75
+          }
         }
       ]
     },
@@ -341,24 +1013,108 @@
       },
       "districts": [
         {
-          "id": "downtown",
-          "name": "Downtown",
-          "contentLabel": "world-city-origin-downtown"
+          "id": "knowledge-campus",
+          "name": "Knowledge Campus",
+          "role": "education",
+          "layout": "garden-city-radial",
+          "contentLabel": "world-city-origin-knowledge-campus",
+          "center": {
+            "x": -150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "waterfront",
-          "name": "Waterfront",
-          "contentLabel": "world-city-origin-waterfront"
+          "id": "harvest-quarter",
+          "name": "Harvest Quarter",
+          "role": "agritech",
+          "layout": "garden-city-radial",
+          "contentLabel": "world-city-origin-harvest-quarter",
+          "center": {
+            "x": 150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "residential",
-          "name": "Residential",
-          "contentLabel": "world-city-origin-residential"
+          "id": "family-gardens",
+          "name": "Family Gardens",
+          "role": "residential",
+          "layout": "garden-city-radial",
+          "contentLabel": "world-city-origin-family-gardens",
+          "center": {
+            "x": -150,
+            "z": 150
+          },
+          "radius": 130
         },
         {
-          "id": "culture",
-          "name": "Culture",
-          "contentLabel": "world-city-origin-culture"
+          "id": "unity-commons",
+          "name": "Unity Commons",
+          "role": "civic",
+          "layout": "garden-city-radial",
+          "contentLabel": "world-city-origin-unity-commons",
+          "center": {
+            "x": 150,
+            "z": 150
+          },
+          "radius": 130
+        }
+      ],
+      "layout": {
+        "pattern": "garden-city-radial",
+        "blockMeters": 120,
+        "roadHierarchy": [
+          "shaded-parkway",
+          "school-greenway",
+          "neighbourhood-street"
+        ],
+        "water": "farm-reservoir-and-creek"
+      },
+      "environment": {
+        "biome": "west-african-savanna",
+        "terrain": "rolling-savanna-plain",
+        "weather": [
+          "dry-season-sun",
+          "harmattan-haze",
+          "wet-season-rain"
+        ],
+        "vegetation": [
+          "baobab",
+          "oil-palm",
+          "savanna-grass"
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "knowledge-tree",
+          "name": "Knowledge Tree",
+          "kind": "education",
+          "contentLabel": "world-city-origin-landmark-knowledge-tree",
+          "position": {
+            "x": -48,
+            "z": -75
+          }
+        },
+        {
+          "id": "harvest-exchange",
+          "name": "Harvest Exchange",
+          "kind": "agritech",
+          "contentLabel": "world-city-origin-landmark-harvest-exchange",
+          "position": {
+            "x": 0,
+            "z": 75
+          }
+        },
+        {
+          "id": "unity-commons",
+          "name": "Unity Commons",
+          "kind": "civic",
+          "contentLabel": "world-city-origin-landmark-unity-commons",
+          "position": {
+            "x": 48,
+            "z": -75
+          }
         }
       ]
     },
@@ -381,24 +1137,108 @@
       },
       "districts": [
         {
-          "id": "downtown",
-          "name": "Downtown",
-          "contentLabel": "world-city-atlas-downtown"
+          "id": "grand-terminal",
+          "name": "Grand Terminal",
+          "role": "transit",
+          "layout": "rail-spoke-industrial",
+          "contentLabel": "world-city-atlas-grand-terminal",
+          "center": {
+            "x": -150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "waterfront",
-          "name": "Waterfront",
-          "contentLabel": "world-city-atlas-waterfront"
+          "id": "maker-quarter",
+          "name": "Maker Quarter",
+          "role": "industry",
+          "layout": "rail-spoke-industrial",
+          "contentLabel": "world-city-atlas-maker-quarter",
+          "center": {
+            "x": 150,
+            "z": -150
+          },
+          "radius": 130
         },
         {
-          "id": "residential",
-          "name": "Residential",
-          "contentLabel": "world-city-atlas-residential"
+          "id": "horizon-homes",
+          "name": "Horizon Homes",
+          "role": "residential",
+          "layout": "rail-spoke-industrial",
+          "contentLabel": "world-city-atlas-horizon-homes",
+          "center": {
+            "x": -150,
+            "z": 150
+          },
+          "radius": 130
         },
         {
-          "id": "culture",
-          "name": "Culture",
-          "contentLabel": "world-city-atlas-culture"
+          "id": "frontier-park",
+          "name": "Frontier Park",
+          "role": "public-space",
+          "layout": "rail-spoke-industrial",
+          "contentLabel": "world-city-atlas-frontier-park",
+          "center": {
+            "x": 150,
+            "z": 150
+          },
+          "radius": 130
+        }
+      ],
+      "layout": {
+        "pattern": "rail-spoke-industrial",
+        "blockMeters": 115,
+        "roadHierarchy": [
+          "freight-arterial",
+          "transit-concourse",
+          "maker-lane"
+        ],
+        "water": "industrial-cooling-lake"
+      },
+      "environment": {
+        "biome": "continental-temperate",
+        "terrain": "broad-inland-plain",
+        "weather": [
+          "clear",
+          "wind",
+          "winter-frost"
+        ],
+        "vegetation": [
+          "oak",
+          "windbreak-pine",
+          "prairie-grass"
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "atlas-terminal",
+          "name": "Atlas Grand Terminal",
+          "kind": "transport",
+          "contentLabel": "world-city-atlas-landmark-atlas-terminal",
+          "position": {
+            "x": -48,
+            "z": -75
+          }
+        },
+        {
+          "id": "maker-vault",
+          "name": "Maker Vault",
+          "kind": "industry",
+          "contentLabel": "world-city-atlas-landmark-maker-vault",
+          "position": {
+            "x": 0,
+            "z": 75
+          }
+        },
+        {
+          "id": "horizon-gateway",
+          "name": "Horizon Gateway",
+          "kind": "spaceport",
+          "contentLabel": "world-city-atlas-landmark-horizon-gateway",
+          "position": {
+            "x": 48,
+            "z": -75
+          }
         }
       ]
     }
