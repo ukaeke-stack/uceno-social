@@ -1,10 +1,11 @@
-name: UCENO nine-city architecture source discovery
+name: UCENO nine-city architecture source discovery and acquisition
 on:
   workflow_dispatch:
   push:
     branches: [feature/uceno-unity-foundation]
     paths:
       - "scripts/discover-city-architecture.py"
+      - "scripts/acquire-city-architecture.py"
       - ".github/workflows/uceno-city-architecture-discovery.yml"
 permissions:
   contents: read
@@ -12,9 +13,9 @@ concurrency:
   group: uceno-city-architecture-discovery
   cancel-in-progress: true
 jobs:
-  discover:
+  discover-and-acquire:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -22,10 +23,14 @@ jobs:
           python-version: "3.12"
       - name: Query live realistic CC0 architecture catalogue
         run: python scripts/discover-city-architecture.py
-      - name: Publish candidate records for review
+      - name: Download and verify first-batch city architecture GLBs
+        run: python scripts/acquire-city-architecture.py
+      - name: Publish candidate records and acquired model binaries
         uses: actions/upload-artifact@v4
         with:
-          name: uceno-nine-city-architecture-candidates
-          path: artifacts/city-architecture-candidates/
+          name: uceno-nine-city-architecture-acquisition
+          path: |
+            artifacts/city-architecture-candidates/
+            artifacts/city-architecture-models/
           if-no-files-found: error
           retention-days: 30
