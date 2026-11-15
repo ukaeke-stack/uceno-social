@@ -227,6 +227,32 @@ namespace UCENO.VirtualWorld.Editor
                         new Vector3(0.055f, 2.25f, 0.10f), metal, false);
                 }
 
+                // Side-facade mullions keep the curtain wall articulated from
+                // oblique camera angles instead of reading as a flat glass slab.
+                for (int bay = -2; bay <= 2; bay++)
+                {
+                    float pz = bay * (d / 5f);
+                    Box(root.transform, "Left facade mullion",
+                        new Vector3(-w * 0.5f + 0.16f, mullionY, pz),
+                        new Vector3(0.10f, 2.25f, 0.055f), metal, false);
+                    Box(root.transform, "Right facade mullion",
+                        new Vector3(w * 0.5f - 0.16f, mullionY, pz),
+                        new Vector3(0.10f, 2.25f, 0.055f), metal, false);
+                }
+
+                // Subtle alternating shadow fins add depth and reduce the
+                // repetitive appearance across the generated tower family.
+                if ((floor + seed) % 3 == 0)
+                {
+                    for (int fin = -1; fin <= 1; fin++)
+                    {
+                        float finX = fin * (w * 0.31f);
+                        Box(root.transform, "Front vertical solar shade fin",
+                            new Vector3(finX, windowY, d * 0.5f + 0.015f),
+                            new Vector3(0.16f, 2.45f, 0.22f), stone, false);
+                    }
+                }
+
                 if (floor % 4 == 0 && floor > 1)
                 {
                     Box(root.transform, "Front balcony", new Vector3(0f, y + 0.32f, d * 0.5f + 0.72f),
