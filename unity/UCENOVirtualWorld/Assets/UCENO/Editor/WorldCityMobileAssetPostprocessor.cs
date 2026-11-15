@@ -34,6 +34,13 @@ namespace UCENO.VirtualWorld.Editor
         {
             if (!assetPath.StartsWith(CityAssetRoot, System.StringComparison.Ordinal)) return;
             if (!(assetImporter is TextureImporter importer)) return;
+            if (assetPath.EndsWith(".hdr", System.StringComparison.OrdinalIgnoreCase) ||
+                assetPath.EndsWith(".exr", System.StringComparison.OrdinalIgnoreCase))
+            {
+                importer.mipmapEnabled = true;
+                importer.maxTextureSize = 1024;
+                return;
+            }
 
             bool foliageOrSmallDetail = assetPath.Contains("/Environment/") ||
                 assetPath.Contains("/Vegetation/");
