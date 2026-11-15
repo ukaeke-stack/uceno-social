@@ -101,3 +101,18 @@ test("catalogue rejects missing landmark and duplicated urban-form profiles", ()
   duplicateLayout.cities[1].layout.pattern = duplicateLayout.cities[0].layout.pattern;
   assert.throws(() => parseWorldCityCatalog(JSON.stringify(duplicateLayout), 10), /design data/);
 });
+
+test("district rectangles do not overlap and own each city's spawn exactly once", () => {
+  const cities = parseWorldCityCatalog(fixture, 10);
+  for (const city of cities) {
+    const owners = city.districts.filter(district =>
+      city.spawn.x >= district.center.x - district.radius &&
+      city.spawn.x < district.center.x + district.radius &&
+      city.spawn.z >= district.center.z - district.radius &&
+      city.spawn.z < district.center.z + district.radius);
+    assert.equal(owners.length, 1);
+  }
+  const overlapping = JSON.parse(fixture);
+  overlapping.cities[0].districts[0].center.x = overlapping.cities[0].districts[1].center.x;
+  assert.throws(() => parseWorldCityCatalog(JSON.stringify(overlapping), 10), /overlapping district layouts/);
+});
