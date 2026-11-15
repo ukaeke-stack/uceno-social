@@ -44,6 +44,9 @@ jobs:
           grep -q 'sourceAvatar != baseAvatar' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
           grep -q 'CreateHumanoidController' unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs
           grep -q 'AddGestureState' unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs
+          grep -q 'LODGroup' unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs
+          grep -q 'ETC2_RGBA8' unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityMobileAssetPostprocessor.cs
+          grep -q 'meshCompression = ModelImporterMeshCompression.Medium' unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityMobileAssetPostprocessor.cs
           grep -q 'runtimeAnimatorController == null' unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs
           ! grep -q 'Mathf.Sin(cycle)' unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs
           for clip in idle walk run talk turn wave cheer dance interact sit; do
