@@ -25,12 +25,13 @@ jobs:
         run: python scripts/discover-city-architecture.py
       - name: Download and verify first-batch city architecture GLBs
         run: python scripts/acquire-city-architecture.py
-      - name: Publish candidate records and acquired model binaries
+      - name: Preserve discovery and partial acquisition evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: uceno-nine-city-architecture-acquisition
           path: |
             artifacts/city-architecture-candidates/
             artifacts/city-architecture-models/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
