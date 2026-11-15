@@ -38,11 +38,13 @@ namespace UCENO.VirtualWorld.Editor
         [MenuItem("UCENO/World/Validate Imported City Art Packs", false, 29)]
         public static void Validate()
         {
-            if (!File.Exists(ProfilePath) || !File.Exists(CatalogPath))
-                throw new InvalidOperationException("City catalogue or city asset profile is missing.");
+            string profileFile = AssetAbsolutePath(ProfilePath);
+            string catalogFile = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", CatalogPath));
+            if (!File.Exists(profileFile) || !File.Exists(catalogFile))
+                throw new InvalidOperationException("City catalogue or city asset profile is missing. Checked: " + catalogFile);
 
-            var profiles = JsonUtility.FromJson<Profiles>(File.ReadAllText(ProfilePath));
-            var catalog = JsonUtility.FromJson<CityCatalog>(File.ReadAllText(CatalogPath));
+            var profiles = JsonUtility.FromJson<Profiles>(File.ReadAllText(profileFile));
+            var catalog = JsonUtility.FromJson<CityCatalog>(File.ReadAllText(catalogFile));
             if (profiles?.cities == null || profiles.cities.Length != 9 ||
                 catalog?.cities == null || catalog.cities.Length != 10)
                 throw new InvalidOperationException("Expected nine city asset packs plus Meridian Prime.");
@@ -75,7 +77,7 @@ namespace UCENO.VirtualWorld.Editor
                     city.cityId + " landmark prefab IDs must exactly match its city catalogue.");
 
                 string cityRoot = "Assets/UCENO/Cities/" + city.cityId;
-                string manifestPath = cityRoot + "/" + ManifestName;
+                string manifestPath = AssetAbsolutePath(cityRoot + "/" + ManifestName);
                 Require(File.Exists(manifestPath), city.cityId + " is missing its imported source/licence manifest.");
                 var manifest = JsonUtility.FromJson<SourceManifest>(File.ReadAllText(manifestPath));
                 Require(manifest?.assets != null && manifest.assets.Length == 12,
@@ -141,6 +143,13 @@ namespace UCENO.VirtualWorld.Editor
             Require(seenCities.SetEquals(expectedCities), "Not all nine non-Meridian cities have profiles.");
             Debug.Log("Imported city art gate passed: " + checkedPrefabs +
                 " unique textured imported prefabs, exact catalogue landmarks, nine provenance manifests and nine HDRI panoramas.");
+        }
+
+        private static string AssetAbsolutePath(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath) || !assetPath.StartsWith("Assets/", StringComparison.Ordinal))
+                throw new InvalidOperationException("Expected a project-relative Assets path: " + assetPath);
+            return Path.GetFullPath(Path.Combine(Application.dataPath, assetPath.Substring("Assets/".Length)));
         }
 
         private static void Require(bool condition, string message)
