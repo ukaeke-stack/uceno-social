@@ -136,7 +136,7 @@ namespace UCENO.VirtualWorld.Editor
         }
 
         private static void CreatePrefab(string cityRoot, string cityId, string assetKey, string prefabPath,
-            Material material, int cityIndex, int kind, bool environment)
+            Material material, int architecturalStyle, int kind, bool environment)
         {
             string meshFolder = cityRoot + "/Meshes";
             var root = new GameObject(cityId + " " + assetKey);
@@ -145,7 +145,7 @@ namespace UCENO.VirtualWorld.Editor
             {
                 for (int lod = 0; lod < 3; lod++)
                 {
-                    Mesh mesh = BuildMesh(cityIndex, kind, lod, environment, assetKey);
+                    Mesh mesh = BuildMesh(architecturalStyle, kind, lod, environment, assetKey);
                     mesh.name = cityId + "_" + assetKey + "_LOD" + lod;
                     string meshPath = meshFolder + "/" + cityId + "_" + assetKey + "_LOD" + lod + ".asset";
                     UnityEngine.Object existing = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(meshPath);
@@ -177,11 +177,11 @@ namespace UCENO.VirtualWorld.Editor
             finally { UnityEngine.Object.DestroyImmediate(root); }
         }
 
-        private static Mesh BuildMesh(int cityIndex, int kind, int lod, bool environment, string key)
+        private static Mesh BuildMesh(int architecturalStyle, int kind, int lod, bool environment, string key)
         {
             var b = new MeshBuilder();
             float detail = lod == 0 ? 1f : lod == 1 ? .55f : .18f;
-            int style = cityIndex % 9;
+            int style = architecturalStyle;
             if (environment)
             {
                 switch (kind)
