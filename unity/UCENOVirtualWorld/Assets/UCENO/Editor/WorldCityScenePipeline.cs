@@ -398,7 +398,6 @@ namespace UCENO.VirtualWorld.Editor
                 EditorSceneManager.MarkSceneDirty(scene);
                 if (!EditorSceneManager.SaveScene(scene, scenePath))
                     throw new BuildFailedException("Could not save city district scene: " + scenePath);
-                RegisterAddressableScene(scenePath, district.contentLabel, settings, group);
                 builtScenePaths.Add(scenePath);
                 manifestDistricts.Add(new CitySceneManifestDistrict {
                     districtId = district.id,
@@ -408,6 +407,11 @@ namespace UCENO.VirtualWorld.Editor
                 });
                 EditorSceneManager.CloseScene(scene, true);
             }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            foreach (CitySceneManifestDistrict entry in manifestDistricts)
+                RegisterAddressableScene(entry.scenePath, entry.contentLabel, settings, group);
 
             var openedScenes = new List<Scene>();
             try
