@@ -45,6 +45,7 @@ const checks = [
   ["City catalogue tests cover duplicate IDs, bounds and incomplete districts", cityTests.includes("rejects fewer than ten cities") && cityTests.includes("invalid spawn bounds") && cityTests.includes("fewer than four districts")],
 
   ["Addressables package is declared", manifest.dependencies?.["com.unity.addressables"] === "2.7.6"],
+  ["Addressables catalog refreshes versioned remote content", /CheckForCatalogUpdates\(false\)/.test(delivery) && /UpdateCatalogs\(catalogCheck.Result, false\)/.test(delivery)],
   ["On-demand dependency size is checked", /GetDownloadSizeAsync\(label\)/.test(delivery)],
   ["Dependencies download asynchronously", /DownloadDependenciesAsync\(label, false\)/.test(delivery)],
   ["Remote Addressables catalogs are checked and updated before city labels resolve", /CheckForCatalogUpdates\(false\)/.test(delivery) && /UpdateCatalogs\(catalogCheck.Result, false\)/.test(delivery)],
@@ -59,6 +60,7 @@ const checks = [
   ["Concurrent resident labels are capped", /maxConcurrentResidentLabels/.test(delivery)],
   ["District labels load additive Addressables scenes", /IsDistrictSceneLabel/.test(delivery) && /LoadSceneAsync\(label, LoadSceneMode.Additive/.test(delivery)],
   ["District scene handles unload after final lease release", /UnloadSceneAsync\(handle, false\)/.test(delivery) && /residentSceneHandles/.test(delivery)],
+  ["Android pre-export requires all nine city packs, generated scenes, registry verification and remote catalog build", /ValidateRemainingCityPacks\(\)/.test(buildCommand) && /BuildRemainingCities\(\)/.test(buildCommand) && /VerifyNineCitySceneRegistries\(\)/.test(buildCommand) && /BuildRemoteAddressablesContent\(\)/.test(buildCommand)],
   ["Nine-city editor release gate verifies generated scenes, Addressables labels, district registries and collision maps", /VerifyNineCitySceneRegistries/.test(cityScenePipeline) && /world-districts-/.test(cityScenePipeline) && /world-interactables-/.test(cityScenePipeline) && /uceno-city-collision-boxes-/.test(cityScenePipeline)],
   ["Shutdown waits for pending additive scene loads before unloading them", /handle\.Completed \+= operation/.test(delivery) && /if \(handle\.IsDone\)/.test(delivery)],
   ["Editor builder partitions city geometry into four additive scenes", /BuildDistrictScenes\(worldRoot\)/.test(sceneBuilder) && /districtDefinitions/.test(sceneBuilder) && /ResolveDistrictName\(child\.position, districtDefinitions\)/.test(sceneBuilder) && /CreateOrMoveEntry/.test(sceneBuilder)],
