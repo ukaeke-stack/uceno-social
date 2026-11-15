@@ -51,7 +51,7 @@ require(len(all_paths) == len(set(all_paths)), "prefab paths must never be share
 generator = GENERATOR.read_text(encoding="utf-8")
 for token in ("Generate Nine City-Specific Asset Packs", "PrefabUtility.SaveAsPrefabAsset",
               "AssetDatabase.CreateAsset(mesh", "new LOD(", "LODGroup", "BuildMesh(",
-              "CreatePanorama(", "ArchitectureNames", "EnvironmentNames"):
+              "CreatePanorama(", "ArchitectureNames", "EnvironmentNames", "DetermineArchitecturalStyle"):
     require(token in generator, f"procedural asset generator is missing {token}")
 
 pipeline = SCENE_PIPELINE.read_text(encoding="utf-8")
@@ -60,4 +60,20 @@ for token in ("Build Remaining Nine City Scenes", "RegisterAddressableScene",
               "Verify Nine City Scene Registries"):
     require(token in pipeline, f"scene pipeline is missing {token}")
 
-print("UCENO city source contract passed: 10 catalogue cities, 9 city-specific packs, 45 architecture prefabs, 36 environment prefabs, 27 landmark prefabs, unique city-owned paths, three LODs, scene export and registry verification wiring.")
+style_rules = {
+    "solstice": "terraced waterfront",
+    "verdant": "biophilic",
+    "nexus": "parametric",
+    "aurora": "hillside",
+    "saffron": "shaded arcade",
+    "monsoon": "elevated",
+    "eclipse": "entertainment",
+    "origin": "campus",
+    "atlas": "industrial",
+}
+for city in remaining:
+    rule = style_rules[city["id"]]
+    require(rule in city["architecture"].lower(), f'{city["id"]} architecture specification no longer matches its geometry style rule')
+require("No city-specific architectural style rule matches" in generator, "unknown architecture must fail instead of silently using a generic city style")
+
+print("UCENO city source contract passed: 10 catalogue cities, 9 specification-driven geometry styles, 45 architecture prefabs, 36 environment prefabs, 27 landmark prefabs, unique city-owned paths, three LODs, scene export and registry verification wiring.")
