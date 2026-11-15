@@ -162,7 +162,82 @@ namespace UCENO.VirtualWorld.Editor
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            Debug.Log("UCENO generated nine distinct city scene sets. This is a scene-generation result, not final visual acceptance.");
+            VerifyNineCitySceneRegistries();
+            Debug.Log("UCENO generated and verified nine distinct city scene sets. This is a scene-generation result, not final visual acceptance.");
+        }
+
+        [MenuItem("UCENO/World/Validate Nine City Visual Quality (Release Gate)", false, 35)]
+        public static void ValidateNineCityVisualQuality()
+        {
+            CityPipelineCity[] cities = LoadRemainingCities();
+            CityPipelineProfiles profiles = LoadProfiles();
+            var failures = new List<string>();
+            foreach (CityPipelineCity city in cities)
+            {
+                CityPipelineAssetProfile profile = (profiles.cities ?? Array.Empty<CityPipelineAssetProfile>())
+                    .FirstOrDefault(item => item != null && item.cityId == city.id);
+                if (profile == null)
+                {
+                    failures.Add(city.id + ": missing visual-quality asset profile.");
+                    continue;
+                }
+                var assets = (profile.architecturePrefabs ?? Array.Empty<string>())
+                    .Select(path => new { path, category = "architecture", minimumTriangles = 3000 })
+                    .Concat((profile.environmentPrefabs ?? Array.Empty<string>())
+                        .Select(path => new { path, category = "environment", minimumTriangles = 500 }))
+                    .Concat((profile.landmarks ?? Array.Empty<CityPipelineLandmarkAsset>())
+                        .Where(item => item != null)
+                        .Select(item => new { path = item.prefab, category = "landmark", minimumTriangles = 3000 }));
+                foreach (var asset in assets)
+                {
+                    GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(asset.path);
+                    if (prefab == null)
+                    {
+                        failures.Add(city.id + ": missing " + asset.category + " prefab " + asset.path);
+                        continue;
+                    }
+                    LODGroup group = prefab.GetComponentInChildren<LODGroup>(true);
+                    LOD[] lods = group != null ? group.GetLODs() : Array.Empty<LOD>();
+                    if (lods.Length < 3 || lods[0].renderers == null)
+                    {
+                        failures.Add(city.id + ": " + asset.category + " prefab lacks three LODs: " + asset.path);
+                        continue;
+                    }
+                    int triangles = 0;
+                    bool hasAlbedo = false;
+                    bool hasNormal = false;
+                    foreach (Renderer renderer in lods[0].renderers)
+                    {
+                        if (renderer == null) continue;
+                        Mesh mesh = renderer is SkinnedMeshRenderer skin
+                            ? skin.sharedMesh
+                            : renderer.GetComponent<MeshFilter>()?.sharedMesh;
+                        if (mesh != null) triangles += mesh.triangles.Length / 3;
+                        foreach (Material material in renderer.sharedMaterials)
+                        {
+                            if (material == null) continue;
+                            Texture albedo = material.HasProperty("_BaseMap")
+                                ? material.GetTexture("_BaseMap")
+                                : material.HasProperty("_MainTex") ? material.GetTexture("_MainTex") : null;
+                            Texture normal = material.HasProperty("_BumpMap")
+                                ? material.GetTexture("_BumpMap")
+                                : material.HasProperty("_NormalMap") ? material.GetTexture("_NormalMap") : null;
+                            if (albedo != null && albedo.width >= 1024 && albedo.height >= 1024) hasAlbedo = true;
+                            if (normal != null && normal.width >= 1024 && normal.height >= 1024) hasNormal = true;
+                        }
+                    }
+                    if (triangles < asset.minimumTriangles)
+                        failures.Add(city.id + ": " + asset.category + " prefab has only " + triangles +
+                            " high-LOD triangles; requires " + asset.minimumTriangles + ": " + asset.path);
+                    if (!hasAlbedo || !hasNormal)
+                        failures.Add(city.id + ": " + asset.category +
+                            " prefab requires 1K+ albedo and normal maps on its high LOD: " + asset.path);
+                }
+            }
+            if (failures.Count > 0)
+                throw new BuildFailedException("Nine-city visual-quality release gate failed. Replace blockout assets with detailed, textured imported assets:\\n- " +
+                    string.Join("\\n- ", failures));
+            Debug.Log("UCENO: all nine city asset packs passed the automated geometry, texture and LOD visual-quality gate. Human visual review is still required.");
         }
 
         [MenuItem("UCENO/World/Build Android Remote City Addressables", false, 34)]
