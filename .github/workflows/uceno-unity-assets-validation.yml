@@ -40,7 +40,7 @@ jobs:
         run: |
           grep -q 'CopyFromOther' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
           grep -q 'RequiredClips' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
-          grep -q 'Assets/UCENO/Characters/Animations' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
+          grep -q 'Assets/UCENO/Animations/Imported' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
 
       - name: Check asset downloader syntax
         run: python -m py_compile scripts/download_polyhaven_assets.py
