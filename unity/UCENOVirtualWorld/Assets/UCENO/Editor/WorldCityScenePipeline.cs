@@ -595,19 +595,33 @@ namespace UCENO.VirtualWorld.Editor
                         new Vector3(span, .08f, width * .62f), road);
                 }
             }
-            else if (layout == "oasis-radial-courtyards" || layout == "garden-city-radial")
+            else if (layout == "oasis-radial-courtyards")
             {
-                CreateRoad(parent, "Central Market Spine", new Vector3(district.center.x, .04f, district.center.z),
+                CreateRoad(parent, "Central Souk Spine", new Vector3(district.center.x, .04f, district.center.z),
                     new Vector3(width, .08f, span), road);
-                CreateRoad(parent, "Courtyard Cross Axis", new Vector3(district.center.x, .04f, district.center.z),
+                CreateRoad(parent, "Shaded Courtyard Cross Axis", new Vector3(district.center.x, .04f, district.center.z),
                     new Vector3(span, .08f, width), road);
                 foreach (float offset in new[] { -75f, 75f })
                 {
-                    CreateRoad(parent, "Radial Garden Ring", new Vector3(district.center.x, .05f, district.center.z + offset),
+                    CreateRoad(parent, "Oasis Garden Ring", new Vector3(district.center.x, .05f, district.center.z + offset),
                         new Vector3(span * .78f, .09f, width * .55f), road);
-                    CreateRoad(parent, "Radial Courtyard Link", new Vector3(district.center.x + offset, .05f, district.center.z),
+                    CreateRoad(parent, "Courtyard Walk", new Vector3(district.center.x + offset, .05f, district.center.z),
                         new Vector3(width * .55f, .09f, span * .78f), road);
                 }
+            }
+            else if (layout == "garden-city-radial")
+            {
+                CreateRoad(parent, "Garden City Central Boulevard", new Vector3(district.center.x, .04f, district.center.z),
+                    new Vector3(width, .08f, span), road);
+                CreateRoad(parent, "Parkland Cross Avenue", new Vector3(district.center.x, .04f, district.center.z),
+                    new Vector3(span, .08f, width), road);
+                CreateRoad(parent, "Diagonal Greenway North-East", new Vector3(district.center.x, .05f, district.center.z),
+                    new Vector3(span * .82f, .09f, width * .55f), road, 45f);
+                CreateRoad(parent, "Diagonal Greenway North-West", new Vector3(district.center.x, .05f, district.center.z),
+                    new Vector3(span * .82f, .09f, width * .55f), road, -45f);
+                foreach (float offset in new[] { -82f, 82f })
+                    CreateRoad(parent, "Neighbourhood Garden Loop", new Vector3(district.center.x + offset, .05f, district.center.z),
+                        new Vector3(width * .5f, .09f, span * .7f), road);
             }
             else if (layout == "elevated-grid-and-canals")
             {
@@ -764,10 +778,14 @@ namespace UCENO.VirtualWorld.Editor
             else if (layout == "contour-terraces")
                 offsets = new[] { new[] { -100f, -85f }, new[] { -70f, -20f }, new[] { -35f, 55f },
                     new[] { 35f, -55f }, new[] { 70f, 20f }, new[] { 100f, 85f } };
-            else if (layout == "oasis-radial-courtyards" || layout == "garden-city-radial")
+            else if (layout == "oasis-radial-courtyards")
                 offsets = new[] { new[] { -105f, 0f }, new[] { -74f, -74f }, new[] { 0f, -105f },
                     new[] { 74f, -74f }, new[] { 105f, 0f }, new[] { 74f, 74f },
                     new[] { 0f, 105f }, new[] { -74f, 74f } };
+            else if (layout == "garden-city-radial")
+                offsets = new[] { new[] { -100f, -35f }, new[] { -35f, -100f }, new[] { 35f, -100f },
+                    new[] { 100f, -35f }, new[] { 100f, 35f }, new[] { 35f, 100f },
+                    new[] { -35f, 100f }, new[] { -100f, 35f } };
             else if (layout == "elevated-grid-and-canals")
                 offsets = new[] { new[] { -105f, -70f }, new[] { -35f, -70f }, new[] { 35f, -70f },
                     new[] { 105f, -70f }, new[] { -105f, 70f }, new[] { -35f, 70f },
