@@ -13,6 +13,7 @@ namespace UCENO.VirtualWorld
     {
         private static readonly int MoveSpeedHash = Animator.StringToHash("MoveSpeed");
         private static readonly int IsSeatedHash = Animator.StringToHash("IsSeated");
+        private static readonly int IsTalkingHash = Animator.StringToHash("IsTalking");
 
         [SerializeField, Min(0.01f)] private float dampTime = 0.12f;
 
@@ -23,6 +24,9 @@ namespace UCENO.VirtualWorld
         private bool networkSeated;
         private int receivedGestureSequence;
         private float gestureUntil;
+        private float lastYaw;
+        private float accumulatedTurn;
+        private float nextTurnAt;
 
         public int GestureSequence { get; private set; }
         public string GestureName { get; private set; } = "none";
@@ -48,9 +52,12 @@ namespace UCENO.VirtualWorld
 
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            lastYaw = motor != null ? motor.transform.eulerAngles.y : transform.eulerAngles.y;
+            if (motor != null) WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking;
             RequireParameter("MoveSpeed", AnimatorControllerParameterType.Float);
             RequireParameter("IsSeated", AnimatorControllerParameterType.Bool);
-            foreach (string trigger in new[] { "Talk", "Turn", "Wave", "Cheer", "Dance", "Interact" })
+            RequireParameter("IsTalking", AnimatorControllerParameterType.Bool);
+            foreach (string trigger in new[] { "Turn", "Wave", "Cheer", "Dance", "Interact" })
                 RequireParameter(trigger, AnimatorControllerParameterType.Trigger);
         }
 
@@ -61,12 +68,16 @@ namespace UCENO.VirtualWorld
             bool seated = motor != null ? motor.IsSeated : networkSeated;
             animator.SetFloat(MoveSpeedHash, Mathf.Clamp01(speed), dampTime, Time.deltaTime);
             animator.SetBool(IsSeatedHash, seated);
+            if (motor != null) DetectTurn(speed);
         }
 
         private void LateUpdate()
         {
             if (Time.time >= gestureUntil && GestureName != "none")
+            {
+                if (GestureName == "talk") SetTalking(false);
                 GestureName = "none";
+            }
         }
 
         public void ApplyRemoteState(float speed, bool seated, bool sprinting, string gesture, int sequence)
@@ -82,16 +93,47 @@ namespace UCENO.VirtualWorld
         public void TriggerWave() { PlayGesture("wave", true); }
         public void TriggerCheer() { PlayGesture("cheer", true); }
         public void TriggerDance() { PlayGesture("dance", true); }
-        public void TriggerTalk() { PlayGesture("talk", true); }
+        public void TriggerTalk() { SetTalking(true); GestureName = "talk"; gestureUntil = Time.time + 3.5f; }
         public void TriggerTurn() { PlayGesture("turn", true); }
         public void TriggerInteract() { PlayGesture("interact", true); }
+
+        public void SetTalking(bool talking)
+        {
+            if (animator == null || animator.runtimeAnimatorController == null) return;
+            if (HasParameter("IsTalking", AnimatorControllerParameterType.Bool))
+                animator.SetBool(IsTalkingHash, talking);
+            if (talking)
+            {
+                GestureName = "talk";
+                gestureUntil = Time.time + 3.5f;
+            }
+        }
+
+        private void DetectTurn(float speed)
+        {
+            float yaw = motor.transform.eulerAngles.y;
+            float delta = Mathf.DeltaAngle(lastYaw, yaw);
+            lastYaw = yaw;
+            if (Mathf.Abs(delta) < 0.15f) return;
+            accumulatedTurn += delta;
+            if (Mathf.Abs(accumulatedTurn) >= 70f && speed < 0.35f && Time.time >= nextTurnAt)
+            {
+                PlayGesture("turn", true);
+                accumulatedTurn = 0f;
+                nextTurnAt = Time.time + 1.25f;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (motor != null) WorldSpatialVoiceClient.LocalTransmitChanged -= SetTalking;
+        }
 
         private void PlayGesture(string gesture, bool local)
         {
             if (animator == null || animator.runtimeAnimatorController == null) return;
             string trigger = (gesture ?? string.Empty).Trim().ToLowerInvariant() switch
             {
-                "talk" => "Talk",
                 "turn" => "Turn",
                 "wave" => "Wave",
                 "cheer" => "Cheer",
