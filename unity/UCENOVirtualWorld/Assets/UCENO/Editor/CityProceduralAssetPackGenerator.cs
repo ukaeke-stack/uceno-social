@@ -78,7 +78,8 @@ namespace UCENO.VirtualWorld.Editor
                 EnsureFolder(cityRoot + "/Textures");
                 EnsureFolder(cityRoot + "/Textures/Skybox");
 
-                int architecturalStyle = DetermineArchitecturalStyle(city.architecture);\n                Material material = CreateCityMaterial(city.id, cityIndex);
+                int architecturalStyle = DetermineArchitecturalStyle(city.architecture);
+                Material material = CreateCityMaterial(city.id, cityIndex);
                 var profile = new GeneratedCityProfile
                 {
                     cityId = city.id,
