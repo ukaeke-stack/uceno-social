@@ -22,3 +22,17 @@ export function districtsForCity(city: WorldCity): WorldDistrict[] {
 export function findCityById(cities: WorldCity[], cityId: string): WorldCity | null {
   return cities.find(city => city.id === cityId) ?? null;
 }
+
+/**
+ * Resolve an authoritative city ID into the exact district set used by the
+ * simulation. Unknown IDs fail closed; callers must never fall back to the
+ * Meridian district file for a different city.
+ */
+export function resolveCityRuntime(cities: WorldCity[], cityId: string): {
+  city: WorldCity;
+  districts: WorldDistrict[];
+} | null {
+  const city = findCityById(cities, cityId);
+  if (!city) return null;
+  return { city, districts: districtsForCity(city) };
+}
