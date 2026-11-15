@@ -36,3 +36,17 @@ A city is not release-ready until its city-specific imported asset pack is prese
 The generated per-city runtime files are `world-districts-<city-id>.json`, `world-interactables-<city-id>.json`, and `data/uceno-city-collision-boxes-<city-id>.json`. The gateway deployment for each city must point `WORLD_DISTRICTS_FILE`, `WORLD_INTERACTABLES_FILE`, and `WORLD_COLLISION_BOXES_FILE` at that city's files. The current gateway loads one active district/interactable/collision configuration per process; multi-city routing across those configurations still needs explicit deployment/runtime wiring.
 
 The Android APK remains blocked until all nine cities and the existing Meridian city pass the same scene, asset, registry, Addressables and runtime acceptance gates.
+
+## Addressables and Android release gate
+
+The Android pre-export method now runs the following in order:
+
+1. Validate all nine city-specific prefab packs, including imported geometry, multi-level LOD groups, dedicated landmarks and unique mesh dependency fingerprints across cities.
+2. Build the Meridian starter scene and its registry using the existing starter-scene pipeline.
+3. Generate the nine additional city scene sets (36 additive district scenes).
+4. Verify each generated scene manifest, Addressables label, district registry, non-empty interactable registry, collision map and exact district geometry.
+5. Build Android Addressables content and require a real HTTPS remote catalog load path plus a remote build path. The build must produce both remote catalog JSON and hash artifacts before Android player export can continue.
+
+The generated Addressables output is not automatically published to a CDN by this validation step. Publish the remote catalog JSON, hash and all generated bundles to the configured HTTPS host, then verify the catalog and bundle URLs are reachable from an Android device. A successful local Addressables build is not proof of remote publication or runtime loading.
+
+The nine-city editor menu also exposes **UCENO > World > Verify Nine City Scene Registries** so the exported scene manifests and gateway files can be checked independently before the APK build.
