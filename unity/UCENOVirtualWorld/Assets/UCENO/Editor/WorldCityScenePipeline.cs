@@ -322,8 +322,8 @@ namespace UCENO.VirtualWorld.Editor
             string path = Path.Combine(RepositoryRoot(), CityCatalogRelative);
             if (!File.Exists(path)) throw new BuildFailedException("Missing city catalogue: " + path);
             CityPipelineCatalog document = JsonUtility.FromJson<CityPipelineCatalog>(File.ReadAllText(path));
-            if (document?.cities == null || document.cities.Length < 10)
-                throw new BuildFailedException("City catalogue must contain ten cities before scene generation.");
+            if (document?.cities == null || document.cities.Length != 10)
+                throw new BuildFailedException("The scene pipeline requires exactly ten catalogue cities: Meridian plus nine distinct cities.");
             var ids = new HashSet<string>(StringComparer.Ordinal);
             foreach (CityPipelineCity city in document.cities)
             {
@@ -344,6 +344,38 @@ namespace UCENO.VirtualWorld.Editor
                         !districtIds.Contains(landmark.districtId))
                         throw new BuildFailedException(city.id + ": landmark has no valid districtId: " + landmark?.id);
             }
+            if (document.cities.Select(city => city.layout.pattern).Distinct(StringComparer.Ordinal).Count() != 10 ||
+                document.cities.Select(city => city.environment.biome).Distinct(StringComparer.Ordinal).Count() != 10 ||
+                document.cities.Select(city => city.environment.terrain).Distinct(StringComparer.Ordinal).Count() != 10 ||
+                document.cities.Select(city => city.architecture).Distinct(StringComparer.Ordinal).Count() != 10)
+                throw new BuildFailedException("Each of the ten cities must have a distinct urban form, biome, terrain and architecture identity.");
+
+            foreach (CityPipelineCity city in document.cities)
+            {
+                for (int i = 0; i < city.districts.Length; i++)
+                for (int j = i + 1; j < city.districts.Length; j++)
+                {
+                    CityPipelineDistrict a = city.districts[i], b = city.districts[j];
+                    bool overlap = a.center.x - a.radius < b.center.x + b.radius &&
+                        a.center.x + a.radius > b.center.x - b.radius &&
+                        a.center.z - a.radius < b.center.z + b.radius &&
+                        a.center.z + a.radius > b.center.z - b.radius;
+                    if (overlap)
+                        throw new BuildFailedException(city.id + ": district bounds overlap: " + a.id + " / " + b.id);
+                }
+                foreach (CityPipelineLandmark landmark in city.landmarks)
+                {
+                    CityPipelineDistrict[] owners = city.districts.Where(d =>
+                        landmark.position.x >= d.center.x - d.radius &&
+                        landmark.position.x < d.center.x + d.radius &&
+                        landmark.position.z >= d.center.z - d.radius &&
+                        landmark.position.z < d.center.z + d.radius).ToArray();
+                    if (owners.Length != 1 || owners[0].id != landmark.districtId)
+                        throw new BuildFailedException(city.id + ": landmark " + landmark.id +
+                            " must be inside exactly its declared district.");
+                }
+            }
+
             return document.cities.Where(city => city.id != "meridian").ToArray();
         }
 
