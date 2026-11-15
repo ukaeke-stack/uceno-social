@@ -11,7 +11,6 @@ import json
 import re
 import urllib.request
 from collections import defaultdict
-from pathlib import Path
 
 API = "https://api.polyhaven.com"
 UA = "UCENO-Virtual-World-AssetAudit/1.0 (+https://github.com/ukaeke-stack/uceno-social)"
