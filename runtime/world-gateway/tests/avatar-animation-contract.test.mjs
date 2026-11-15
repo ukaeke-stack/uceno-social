@@ -4,12 +4,12 @@ import { readFileSync } from "node:fs";
 
 const read = (relative) => readFileSync(new URL(relative, import.meta.url), "utf8");
 const server = read("../src/server.ts");
-const driver = read("../../../../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs");
-const builder = read("../../../../unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs");
-const importer = read("../../../../unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetModelPostprocessor.cs");
-const voice = read("../../../../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldSpatialVoiceClient.cs");
-const presence = read("../../../../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldPresenceClient.cs");
-const validator = read("../../../../unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs");
+const driver = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs");
+const builder = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs");
+const importer = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetModelPostprocessor.cs");
+const voice = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldSpatialVoiceClient.cs");
+const presence = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldPresenceClient.cs");
+const validator = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs");
 
 test("gateway accepts only the supported imported humanoid gesture states", () => {
   for (const gesture of ["none", "wave", "cheer", "dance", "talk", "turn", "interact"])
