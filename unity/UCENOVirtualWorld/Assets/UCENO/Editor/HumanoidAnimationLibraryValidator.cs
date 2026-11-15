@@ -87,7 +87,8 @@ namespace UCENO.VirtualWorld.Editor
         private static bool IsLoopingClip(string clipName)
         {
             string name = clipName.ToLowerInvariant();
-            return name.Contains("idle") || name.Contains("walk") || name.Contains("run");
+            return name.Contains("idle") || name.Contains("walk") ||
+                name.Contains("run") || name.Contains("talk");
         }
     }
 }

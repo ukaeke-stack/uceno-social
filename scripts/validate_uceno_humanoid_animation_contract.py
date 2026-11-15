@@ -26,6 +26,7 @@ for token in (
     'OfType<AnimationClip>()',
     'clip.length <= 0f',
     'clip.isLooping',
+    'name.Contains("talk")',
     'idle', 'walk', 'run', 'talk', 'turn', 'wave', 'cheer', 'dance', 'interact', 'sit',
 ):
     require(token in source, "validator is missing requirement: " + token)
