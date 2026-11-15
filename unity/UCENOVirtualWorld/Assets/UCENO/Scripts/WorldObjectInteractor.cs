@@ -14,6 +14,7 @@ namespace UCENO.VirtualWorld
         [SerializeField] private LayerMask interactionMask = ~0;
 
         private WorldInteractable currentTarget;
+        private AvatarLocomotionDriver localAvatarAnimation;
         private GUIStyle buttonStyle;
         private const float ButtonHeight = 52f;
 
@@ -31,6 +32,7 @@ namespace UCENO.VirtualWorld
         {
             if (viewCamera == null) viewCamera = Camera.main;
             if (gateway == null) gateway = GetComponent<WorldGatewayClient>();
+            localAvatarAnimation = GetComponentInChildren<AvatarLocomotionDriver>();
         }
 
         private void Update()
@@ -60,6 +62,7 @@ namespace UCENO.VirtualWorld
             string action = currentTarget.Kind == "door" ? "toggle" :
                 currentTarget.Kind == "seat" ? (currentTarget.OccupantId == "" || currentTarget.OccupantId == GetLocalUserId() ?
                     (currentTarget.OccupantId == "" ? "sit" : "stand") : "sit") : "use";
+            localAvatarAnimation?.TriggerInteract();
             gateway.RequestInteraction(currentTarget.ObjectId, action);
         }
 
