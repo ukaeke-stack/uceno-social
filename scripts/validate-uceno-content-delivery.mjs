@@ -7,6 +7,7 @@ const manifest = JSON.parse(read("unity/UCENOVirtualWorld/Packages/manifest.json
 const delivery = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldContentDelivery.cs");
 const sceneBuilder = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs");
 const cityScenePipeline = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs");
+const buildCommand = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/BuildCommand.cs");
 const cityMobileImporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityMobileAssetPostprocessor.cs");
 const cityRegistryExporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableRegistryExporter.cs");
 const cityCollisionExporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs");
