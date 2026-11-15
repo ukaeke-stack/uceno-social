@@ -872,16 +872,21 @@ namespace UCENO.VirtualWorld.Editor
         private static void BuildDistrictScenes(Transform worldRoot)
         {
             const string districtFolder = "Assets/UCENO/Scenes/Districts";
+            // This builder currently authors the Meridian Prime starter city.
+            // Other catalogue cities need their own authored scene profiles and
+            // asset sets; never label this same geometry as ten different cities.
+            const string cityId = "meridian";
             EnsureFolder(districtFolder);
 
-            string[] districtNames = { "south", "central-south", "central-north", "north" };
+            // These IDs intentionally match runtime/world-gateway/config/world-cities.json.
+            string[] districtNames = { "waterfront", "residential", "downtown", "culture" };
             Dictionary<string, Scene> districtScenes = new Dictionary<string, Scene>(StringComparer.Ordinal);
             Dictionary<string, Transform> districtRoots = new Dictionary<string, Transform>(StringComparer.Ordinal);
 
             foreach (string districtName in districtNames)
             {
                 Scene districtScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
-                string sceneObjectName = "UCENO District " + ToTitle(districtName);
+                string sceneObjectName = "UCENO " + ToTitle(cityId) + " " + ToTitle(districtName);
                 GameObject districtRoot = new GameObject(sceneObjectName);
                 SceneManager.MoveGameObjectToScene(districtRoot, districtScene);
                 districtScenes.Add(districtName, districtScene);
@@ -905,7 +910,8 @@ namespace UCENO.VirtualWorld.Editor
             foreach (string districtName in districtNames)
             {
                 Scene districtScene = districtScenes[districtName];
-                string scenePath = districtFolder + "/UCENO_District_" + ToTitle(districtName).Replace(" ", "_") + ".unity";
+                string scenePath = districtFolder + "/UCENO_" + ToTitle(cityId) + "_" +
+                    ToTitle(districtName).Replace(" ", "_") + ".unity";
                 if (!EditorSceneManager.SaveScene(districtScene, scenePath))
                     throw new BuildFailedException("Could not save additive district scene: " + scenePath);
             }
@@ -936,12 +942,13 @@ namespace UCENO.VirtualWorld.Editor
 
             foreach (string districtName in districtNames)
             {
-                string scenePath = districtFolder + "/UCENO_District_" + ToTitle(districtName).Replace(" ", "_") + ".unity";
+                string scenePath = districtFolder + "/UCENO_" + ToTitle(cityId) + "_" +
+                    ToTitle(districtName).Replace(" ", "_") + ".unity";
                 string guid = AssetDatabase.AssetPathToGUID(scenePath);
                 if (string.IsNullOrEmpty(guid))
                     throw new BuildFailedException("Addressables could not resolve generated district scene: " + scenePath);
 
-                string label = "world-city-district-" + districtName;
+                string label = "world-city-" + cityId + "-" + districtName;
                 AddressableAssetEntry entry = settings.CreateOrMoveEntry(guid, group, false, false);
                 entry.address = label;
                 entry.SetLabel(label, true, true);
@@ -967,10 +974,12 @@ namespace UCENO.VirtualWorld.Editor
 
         private static string ResolveDistrictName(float worldZ)
         {
-            if (worldZ < -120f) return "south";
-            if (worldZ < 0f) return "central-south";
-            if (worldZ < 120f) return "central-north";
-            return "north";
+            // Map the generated starter-city quadrants to the four public
+            // district identities advertised by the Meridian catalogue.
+            if (worldZ < -120f) return "waterfront";
+            if (worldZ < 0f) return "residential";
+            if (worldZ < 120f) return "downtown";
+            return "culture";
         }
 
         private static string ToTitle(string value)
