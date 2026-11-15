@@ -105,10 +105,123 @@ namespace UCENO.VirtualWorld.Editor
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
             CollisionMap map = new CollisionMap { boxes = boxes.ToArray(), interactables = interactables.ToArray() };
             File.WriteAllText(outputPath, JsonUtility.ToJson(map, true), new UTF8Encoding(false));
+            File.WriteAllText(outputPath, JsonUtility.ToJson(map, true), new UTF8Encoding(false));
+            ExportCityDistrictMaps(cityId, includeScenePaths, repositoryRoot);
             AssetDatabase.Refresh();
             Debug.Log("Exported " + boxes.Count + " colliders and " + interactables.Count +
                 " interactables for city " + cityId + " to " + outputPath);
             return outputPath;
+        }
+
+        private static void ExportCityDistrictMaps(string cityId, string[] includeScenePaths, string repositoryRoot)
+        {
+            string catalogPath = Path.Combine(repositoryRoot, "runtime", "world-gateway", "config", "world-cities.json");
+            if (!File.Exists(catalogPath))
+                throw new InvalidOperationException("Missing authoritative city catalogue: " + catalogPath);
+            CityPipelineCatalog catalog = JsonUtility.FromJson<CityPipelineCatalog>(File.ReadAllText(catalogPath));
+            CityPipelineCity city = catalog?.cities?.SingleOrDefault(item => item != null && item.id == cityId);
+            if (city == null || city.districts == null || city.districts.Length < 4)
+                throw new InvalidOperationException("City " + cityId + " has no complete district catalogue.");
+
+            var include = new HashSet<string>(includeScenePaths, StringComparer.Ordinal);
+            var scenes = new List<Scene>();
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                Scene scene = SceneManager.GetSceneAt(i);
+                if (scene.IsValid() && scene.isLoaded && include.Contains(scene.path)) scenes.Add(scene);
+            }
+            if (scenes.Count != include.Count)
+                throw new InvalidOperationException("City collision export must use every explicitly selected generated scene and no others.");
+
+            string outputDirectory = Path.Combine(repositoryRoot, "runtime", "world-gateway", "data", "city-districts");
+            Directory.CreateDirectory(outputDirectory);
+            string manifestPath = Path.Combine(outputDirectory, "manifest.json");
+            DistrictManifest existing = File.Exists(manifestPath)
+                ? JsonUtility.FromJson<DistrictManifest>(File.ReadAllText(manifestPath))
+                : null;
+            var entries = (existing?.districts ?? Array.Empty<DistrictMapEntry>())
+                .Where(item => item != null && item.cityId != cityId).ToList();
+            var filenames = new HashSet<string>(entries.Select(item => item.file), StringComparer.Ordinal);
+            var allInteractableIds = new HashSet<string>(StringComparer.Ordinal);
+            var newEntries = new List<DistrictMapEntry>();
+
+            foreach (CityPipelineDistrict district in city.districts)
+            {
+                float minX = district.center.x - district.radius;
+                float maxX = district.center.x + district.radius;
+                float minZ = district.center.z - district.radius;
+                float maxZ = district.center.z + district.radius;
+                var districtBoxes = new List<Box>();
+                var districtInteractables = new List<Interactable>();
+                foreach (Scene scene in scenes)
+                foreach (GameObject root in scene.GetRootGameObjects())
+                {
+                    foreach (Collider collider in root.GetComponentsInChildren<Collider>(true))
+                    {
+                        if (collider == null || !collider.enabled || collider.isTrigger ||
+                            !collider.gameObject.activeInHierarchy ||
+                            collider.GetComponentInParent<PlayerMotor>() != null) continue;
+                        Bounds bounds = collider.bounds;
+                        if (bounds.size.sqrMagnitude < 0.0001f ||
+                            bounds.min.x >= maxX || bounds.max.x <= minX ||
+                            bounds.min.z >= maxZ || bounds.max.z <= minZ) continue;
+                        districtBoxes.Add(new Box {
+                            minX = Round(bounds.min.x), maxX = Round(bounds.max.x),
+                            minY = Round(bounds.min.y), maxY = Round(bounds.max.y),
+                            minZ = Round(bounds.min.z), maxZ = Round(bounds.max.z)
+                        });
+                    }
+                    foreach (WorldInteractable item in root.GetComponentsInChildren<WorldInteractable>(true))
+                    {
+                        if (item == null || !item.gameObject.activeInHierarchy) continue;
+                        Vector3 position = item.transform.position;
+                        if (position.x < minX || position.x >= maxX || position.z < minZ || position.z >= maxZ) continue;
+                        string id = item.ObjectId;
+                        if (string.IsNullOrWhiteSpace(id) || id.Length > 80 ||
+                            !id.All(ch => char.IsLetterOrDigit(ch) || "._:-".IndexOf(ch) >= 0) ||
+                            !allInteractableIds.Add(id))
+                            throw new InvalidOperationException("Invalid or duplicate interactable ID in city " + cityId + ": " + id);
+                        districtInteractables.Add(new Interactable {
+                            id = id, kind = item.Kind,
+                            x = Round(position.x), y = Round(position.y), z = Round(position.z),
+                            yaw = Round(item.transform.eulerAngles.y * Mathf.Deg2Rad)
+                        });
+                    }
+                }
+                if (districtBoxes.Count == 0)
+                    throw new InvalidOperationException("City " + cityId + " district " + district.id + " has no collision geometry; manifest was not updated.");
+                if (districtBoxes.Count > 500 || districtInteractables.Count > 500)
+                    throw new InvalidOperationException("City " + cityId + " district " + district.id + " exceeds the 500-item gateway limit.");
+                string fileName = cityId + "-" + district.id + ".json";
+                if (!filenames.Add(fileName))
+                    throw new InvalidOperationException("City district collision filename conflicts with another city: " + fileName);
+                string filePath = Path.Combine(outputDirectory, fileName);
+                string mapJson = JsonUtility.ToJson(new CollisionMap {
+                    boxes = districtBoxes.ToArray(), interactables = districtInteractables.ToArray()
+                }, true);
+                string tempMapPath = filePath + ".tmp";
+                File.WriteAllText(tempMapPath, mapJson, new UTF8Encoding(false));
+                if (File.Exists(filePath)) File.Replace(tempMapPath, filePath, null);
+                else File.Move(tempMapPath, filePath);
+                newEntries.Add(new DistrictMapEntry {
+                    cityId = cityId, id = district.id, contentLabel = district.contentLabel,
+                    file = fileName, minX = minX, maxX = maxX, minZ = minZ, maxZ = maxZ,
+                    colliderCount = districtBoxes.Count, interactableCount = districtInteractables.Count
+                });
+            }
+
+            entries.AddRange(newEntries);
+            var identities = new HashSet<string>(StringComparer.Ordinal);
+            foreach (DistrictMapEntry entry in entries)
+                if (!identities.Add(entry.cityId + ":" + entry.id))
+                    throw new InvalidOperationException("Duplicate city district identity in collision manifest.");
+            string manifestJson = JsonUtility.ToJson(new DistrictManifest { districts = entries.ToArray() }, true);
+            string tempManifestPath = manifestPath + ".tmp";
+            File.WriteAllText(tempManifestPath, manifestJson, new UTF8Encoding(false));
+            if (File.Exists(manifestPath)) File.Replace(tempManifestPath, manifestPath, null);
+            else File.Move(tempManifestPath, manifestPath);
+            Debug.Log("Updated city-scoped collision manifest with " + newEntries.Count +
+                " districts for " + cityId + "; retained " + (entries.Count - newEntries.Count) + " districts from other cities.");
         }
 
         public static string Export(Scene scene)
@@ -195,6 +308,7 @@ namespace UCENO.VirtualWorld.Editor
         [Serializable]
         private sealed class DistrictMapEntry
         {
+            public string cityId;
             public string id;
             public string contentLabel;
             public string file;
