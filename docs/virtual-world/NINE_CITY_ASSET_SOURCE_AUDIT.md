@@ -208,3 +208,42 @@ Before any candidate is marked acquired, record a downloadable archive URL, retr
 ### Evidence boundary
 
 This pass identifies specific model pages and licence/technical claims; it does not establish that any archive has been downloaded. No asset was imported or visually accepted. City-specific HDRIs, 108 accepted prefabs, 36 district scenes, animation import/retargeting and runtime acceptance remain outstanding.
+
+
+## Seventh sourcing pass — city-matched HDRI candidate matrix
+
+The official Poly Haven HDRI catalogue was inspected on 2026-11-15. Its current filters expose relevant environment classes including Coast & Water, Desert & Arid, Industrial, Mountains & Hills, Parks & Gardens, Streets & Town, plus time-of-day and weather filters. Poly Haven states that its HDRIs, models and textures are CC0 and usable commercially. This makes it a low-licensing-risk candidate source, but the panorama still has to be downloaded and inspected for each city. See the official [HDRI catalogue](https://polyhaven.com/hdris) and [licence](https://polyhaven.com/license).
+
+| City | Catalogue category/filter target | Candidate HDRI lead | Acceptance purpose |
+|---|---|---|---|
+| Solstice Bay | Coast & Water; outdoor; sunrise/sunset | Alkantstrand Breakwater Beach; Small Harbour Sunset | Coastal horizon, water reflection and warm waterfront lighting; verify whether the panorama has enough open sky and no mismatched real-world structures |
+| Verdant Reach | Parks & Gardens / Forest & Woodland; daylight | Suburban Garden; Sunny Rose Garden | Soft daylight and vegetation ambience; HDRI is only lighting/background, not a substitute for the city's vertical gardens |
+| Nexus Delta | Streets & Town; clear daylight | Modern Buildings; Modern Buildings 2 | Contemporary glass/concrete reflections and urban daylight; compare against the campus architecture |
+| Aurora Heights | Mountains & Hills; clear daylight | Alps Field; Lilienstein | Mountain atmosphere and high-altitude sky; confirm visible terrain does not conflict with the modeled skyline |
+| Saffron Dunes | Desert & Arid; clear/sunset | Valley of Desolation; Goegap Road | Arid horizon and warm desert illumination; reject if vegetation or terrain is inconsistent with the oasis setting |
+| Monsoon Harbour | Coast & Water; overcast | Durban Pier Dawn; Salt Rock Beach Cloudy | Cloudy maritime light; verify the selected capture actually supports wet-season mood without implying rain effects that are not rendered |
+| Eclipse Central | Streets & Town; dusk/night; artificial/mixed light | Modern Evening Street; Rogland Clear Night | Nighttime city ambience; verify exposure and lighting balance, then use authored city lights for the actual skyline |
+| Origin Plains | Fields & Countryside / Parks & Gardens; daylight | Grasslands Sunset; Suburban Garden | Open, green campus/countryside ambience; ensure horizon composition suits a garden-city environment |
+| Atlas Frontier | Industrial; overcast/sunset | Overcast Industrial Courtyard; Industrial Sunset (Pure Sky) | Industrial daylight or sunset reflection environment; do not treat the panorama as the industrial terminal geometry |
+
+These are **shortlist leads**, not a final nine-HDRI selection. The names are surfaced by the official catalogue, but their individual asset pages, downloadable file sizes, panorama dimensions, projection, exposure and Unity import behavior have not yet been validated in this repository. Avoid assuming that a matching category guarantees a good 360-degree environment.
+
+### HDRI import and runtime acceptance checklist
+
+For each selected city panorama:
+1. Open its exact Poly Haven asset page and record the immutable asset ID, author and source URL.
+2. Confirm CC0 status from the official licence and preserve the source metadata.
+3. Download the HDR/EXR panorama and record SHA-256, file size, pixel dimensions and projection.
+4. Inspect the full 360-degree image for horizon seams, exposure, unwanted landmarks, clipped highlights and city-direction mismatch.
+5. Import as an HDR cubemap/environment texture in Unity; verify color space, mipmaps, compression and lighting/reflection use.
+6. Generate the required optimized runtime representation; keep the high-resolution source outside the Android runtime bundle unless profiling justifies it.
+7. Test the panorama with the actual city scene and authored sky/lighting, then record Android memory and GPU impact.
+8. Add the exact file to the city's source manifest only after visual acceptance.
+
+### Runtime distinction
+
+A single HDRI is not the city's sky system, skyline, weather simulation or lighting design. It supplies an environment capture for image-based lighting/reflections and possibly a background. Each city still needs its own authored sky, atmospheric conditions, geometry, local lights and time/weather behavior. A beautiful HDRI cannot be counted as a completed city scene.
+
+### Evidence boundary
+
+No HDRI was downloaded or imported during this pass. The PR still contains one general HDRI and no nine-city asset folders. The matrix does not satisfy the nine-HDRI requirement. All nine panoramas remain to be acquired, processed, imported and visually/runtime accepted.
