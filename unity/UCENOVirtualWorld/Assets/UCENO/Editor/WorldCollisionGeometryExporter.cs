@@ -140,7 +140,7 @@ namespace UCENO.VirtualWorld.Editor
                 ? JsonUtility.FromJson<DistrictManifest>(File.ReadAllText(manifestPath))
                 : null;
             var entries = (existing?.districts ?? Array.Empty<DistrictMapEntry>())
-                .Where(item => item != null && item.cityId != cityId).ToList();
+                .Where(item => item != null && !string.IsNullOrWhiteSpace(item.cityId) && item.cityId != cityId).ToList();
             var filenames = new HashSet<string>(entries.Select(item => item.file), StringComparer.Ordinal);
             var allInteractableIds = new HashSet<string>(StringComparer.Ordinal);
             var newEntries = new List<DistrictMapEntry>();
