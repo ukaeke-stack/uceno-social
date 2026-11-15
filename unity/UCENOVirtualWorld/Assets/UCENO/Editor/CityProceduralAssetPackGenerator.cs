@@ -117,7 +117,15 @@ namespace UCENO.VirtualWorld.Editor
             File.WriteAllText(Path.Combine(root, ProfilePath), JsonUtility.ToJson(document, true));
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            Debug.Log("Generated " + generated.Count + " city-owned asset packs. Run Validate Remaining Nine City Asset Packs next; scene completion is not claimed.");
+
+            // Validate the actual imported Unity assets immediately, rather than
+            // treating successful file generation as proof that the scene pipeline
+            // can consume them. This checks prefab geometry, all three LODs,
+            // city-unique asset ownership, panorama imports and landmark targeting.
+            WorldCityScenePipeline.ValidateRemainingCityPacks();
+
+            Debug.Log("Generated and validated " + generated.Count +
+                " city-owned asset packs. District scene generation and visual acceptance remain separate steps.");
         }
 
         private static int DetermineArchitecturalStyle(string architecture)

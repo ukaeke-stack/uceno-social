@@ -89,6 +89,8 @@ require('root.AddComponent<WorldInteractable>()' in generator,
         "generated landmark prefabs must carry a real WorldInteractable marker")
 require("root.AddComponent<BoxCollider>()" in generator and "collider.isTrigger = false;" in generator,
         "generated landmarks must have non-trigger targeting colliders derived from mesh bounds")
+require("WorldCityScenePipeline.ValidateRemainingCityPacks();" in generator,
+        "generation must validate imported Unity assets immediately after import")
 require('File.WriteAllText(Path.Combine(root, ProfilePath)' in generator,
         "Unity Editor generation must emit the asset profile consumed by the scene pipeline")
 
