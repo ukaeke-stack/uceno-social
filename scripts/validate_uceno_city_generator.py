@@ -76,7 +76,7 @@ for token in ("Build Remaining Nine City Scenes", "RegisterAddressableScene",
     require(token in pipeline, f"scene pipeline is missing {token}")
 require("VerifyNineCitySceneRegistries();" in pipeline,
         "scene generation must automatically verify exported scene and registry data")
-require("ValidateNineCityVisualQuality();" in pipeline,
+require("ImportedCityAssetPackGate.Validate();" in pipeline,\n        "scene generation must enforce real imported-art provenance and geometry before proceeding")\nrequire("ValidateNineCityVisualQuality();" in pipeline,
         "city scene generation must enforce its visual-quality release gate")
 
 doc = PIPELINE_DOC.read_text(encoding="utf-8")
