@@ -31,6 +31,8 @@ namespace UCENO.VirtualWorld.Editor
         {
             public string prefab, sourceName, sourceUrl, license, attribution;
         }
+        [Serializable] private sealed class CityCatalog { public CatalogCity[] cities; }
+        [Serializable] private sealed class CatalogCity { public string id; }
 
         [MenuItem("UCENO/World/Validate Imported City Art Packs", false, 29)]
         public static void Validate()
@@ -95,7 +97,7 @@ namespace UCENO.VirtualWorld.Editor
                         .Concat(skinned.Where(x => x.sharedMesh != null).Select(x => x.sharedMesh)).ToArray();
                     Require(meshes.Length > 0 && renderers.Length > 0,
                         path + " contains no imported renderable mesh geometry.");
-                    Require(meshes.Any(m => m.vertexCount >= 100 && m.triangles.Length >= 300),
+                    Require(meshes.Any(m => m.vertexCount >= 100 && m.subMeshCount > 0 && m.GetIndexCount(0) >= 300),
                         path + " is only a primitive/blockout mesh; imported detailed geometry is required.");
                     Require(renderers.SelectMany(r => r.sharedMaterials).Any(m =>
                         m != null && m.mainTexture != null),
@@ -106,9 +108,12 @@ namespace UCENO.VirtualWorld.Editor
                         path + " must include at least two valid LOD levels.");
 
                     if (path.Contains("/Landmarks/"))
-                        Require(prefab.GetComponent<WorldInteractable>() != null &&
-                            prefab.GetComponent<Collider>() != null && !prefab.GetComponent<Collider>().isTrigger,
+                    {
+                        var marker = prefab.GetComponent<WorldInteractable>();
+                        var collider = prefab.GetComponent<Collider>();
+                        Require(marker != null && collider != null && !collider.isTrigger,
                             path + " must have a root WorldInteractable and solid collider.");
+                    }
 
                     string fingerprint = AssetDatabase.GetAssetDependencyHash(path).ToString();
                     if (crossCityFingerprints.TryGetValue(fingerprint, out string owner))
@@ -131,9 +136,6 @@ namespace UCENO.VirtualWorld.Editor
         {
             if (!condition) throw new InvalidOperationException("Imported city art gate failed: " + message);
         }
-
-        [Serializable] private sealed class CityCatalog { public CatalogCity[] cities; }
-        [Serializable] private sealed class CatalogCity { public string id; }
     }
 }
 #endif
