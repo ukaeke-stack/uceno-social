@@ -3,7 +3,7 @@ export type WorldCityDistrict = {
   center: { x: number; z: number }; radius: number;
 };
 export type WorldCityLandmark = {
-  id: string; name: string; kind: string; contentLabel: string;
+  id: string; name: string; kind: string; contentLabel: string; districtId: string;
   position: { x: number; z: number };
 };
 export type WorldCity = {
@@ -120,11 +120,24 @@ export function parseWorldCityCatalog(raw: string, minimumCities = 10): WorldCit
           landmarkIds.has(landmark.id) || !text(landmark.name, 3, 90) ||
           !text(landmark.kind, 3, 48) ||
           landmark.contentLabel !== `world-city-${id}-landmark-${landmark.id}` ||
+          !text(landmark.districtId, 2, 48) || !districtIds.has(landmark.districtId) ||
           !landmark.position || !finite(landmark.position.x) || !finite(landmark.position.z))
         throw new Error(`City ${id} landmark ${landmarkIndex} is invalid`);
       landmarkIds.add(landmark.id);
+      const owner = parsedDistricts.find(district => district.id === landmark.districtId)!;
+      const insideOwner = landmark.position.x >= owner.center.x - owner.radius &&
+        landmark.position.x < owner.center.x + owner.radius &&
+        landmark.position.z >= owner.center.z - owner.radius &&
+        landmark.position.z < owner.center.z + owner.radius;
+      const otherOwners = parsedDistricts.filter(district => district.id !== landmark.districtId &&
+        landmark.position.x >= district.center.x - district.radius &&
+        landmark.position.x < district.center.x + district.radius &&
+        landmark.position.z >= district.center.z - district.radius &&
+        landmark.position.z < district.center.z + district.radius);
+      if (!insideOwner || otherOwners.length !== 0)
+        throw new Error(`City ${id} landmark ${landmark.id} must belong to exactly its declared district`);
       return { id: landmark.id, name: landmark.name.trim(), kind: landmark.kind,
-        contentLabel: landmark.contentLabel,
+        contentLabel: landmark.contentLabel, districtId: landmark.districtId,
         position: { x: landmark.position.x, z: landmark.position.z } };
     });
     return {
