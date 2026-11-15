@@ -14,6 +14,7 @@ namespace UCENO.VirtualWorld
         private static readonly int MoveSpeedHash = Animator.StringToHash("MoveSpeed");
         private static readonly int IsSeatedHash = Animator.StringToHash("IsSeated");
         private static readonly int IsTalkingHash = Animator.StringToHash("IsTalking");
+        private static readonly int IsTalkingHash = Animator.StringToHash("IsTalking");
 
         [SerializeField, Min(0.01f)] private float dampTime = 0.12f;
 
