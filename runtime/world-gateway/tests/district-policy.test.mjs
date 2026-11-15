@@ -55,10 +55,10 @@ test("canonical gateway config matches the four generated Unity district scenes"
   const districts = parseWorldDistricts(fixture, 10000);
   assert.deepEqual(districts.map(d => d.id), ["south", "central-south", "central-north", "north"]);
   assert.deepEqual(districts.map(d => d.contentLabel), [
-    "world-city-district-south",
-    "world-city-district-central-south",
-    "world-city-district-central-north",
-    "world-city-district-north"
+    "world-city-meridian-south",
+    "world-city-meridian-central-south",
+    "world-city-meridian-central-north",
+    "world-city-meridian-north"
   ]);
   assert.equal(findWorldDistrict(districts, 0, -90)?.id, "south");
   assert.equal(findWorldDistrict(districts, 0, -30)?.id, "central-south");
