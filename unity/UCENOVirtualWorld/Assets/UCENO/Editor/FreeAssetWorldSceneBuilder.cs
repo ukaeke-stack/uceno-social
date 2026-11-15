@@ -339,6 +339,9 @@ namespace UCENO.VirtualWorld.Editor
             if (model.GetComponent<AvatarSocialExpressionDriver>() == null)
                 model.AddComponent<AvatarSocialExpressionDriver>();
 
+            if (wrapper.GetComponent<AvatarCrowdLod>() == null)
+                wrapper.AddComponent<AvatarCrowdLod>();
+
             string prefabPath = PrefabRoot + "/Characters/UCENO_Default_Avatar.prefab";
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(wrapper, prefabPath);
             UnityEngine.Object.DestroyImmediate(wrapper);
