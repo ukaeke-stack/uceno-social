@@ -324,6 +324,12 @@ namespace UCENO.VirtualWorld.Editor
             animator.runtimeAnimatorController = controller;
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            LODGroup avatarLodGroup = model.GetComponentInChildren<LODGroup>(true);
+            if (avatarLodGroup == null || avatarLodGroup.GetLODs().Length < 3 ||
+                avatarLodGroup.GetLODs().Any(lod => lod.renderers == null || lod.renderers.Length == 0))
+                throw new BuildFailedException(
+                    "UCENO humanoid requires an authored three-level mesh LODGroup in the imported base avatar. " +
+                    "Do not substitute one full-detail mesh for all crowd distances.");
 
             if (model.GetComponent<AvatarAppearanceProfile>() == null)
                 model.AddComponent<AvatarAppearanceProfile>();
