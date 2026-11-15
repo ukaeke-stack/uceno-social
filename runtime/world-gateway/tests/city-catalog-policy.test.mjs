@@ -274,12 +274,14 @@ test("city readiness keys are city-scoped; matching district IDs from another ci
   assert.equal(evaluateCityRuntimeReadiness(solstice, meridianKeys, meridianKeys).ready, false);
   assert.equal(evaluateCityRuntimeReadiness(solstice, new Set(solstice.districts.map(d => 'solstice:' + d.id)), meridianKeys).ready, false);
 });
-test("gateway derives readiness only from city-matching exported content labels", () => {
+test("gateway derives readiness only from city-scoped collision and interactable exports", () => {
   const server = readFileSync(new URL("../src/server.ts", import.meta.url), "utf8");
   assert.match(server, /function cityRuntimeCollisionKeys\(\)/);
-  assert.match(server, /item\.contentLabel === district\.contentLabel/);
-  assert.match(server, /keys\.add\(city\.id \+ .:/);
+  assert.match(server, /DISTRICT_COLLISION_BOXES\.has\(city\.id \+ ":" \+ district\.id\)/);
   assert.match(server, /function cityRuntimeInteractableKeys\(\)/);
+  assert.match(server, /item\.cityId === city\.id && item\.districtId === district\.id/);
+  assert.match(server, /parseCityInteractableManifest\(manifest!, cityDistricts/);
+  assert.match(server, /WORLD_INTERACTABLES_MANIFEST_FILE/);
 });
 test("interaction authorization and durable object broadcasts cannot use the legacy global district map", () => {
   const server = readFileSync(new URL("../src/server.ts", import.meta.url), "utf8");
