@@ -35,7 +35,7 @@ namespace UCENO.VirtualWorld.Editor
     [Serializable]
     internal sealed class WorldInteractableDistrictEntry
     {
-        public string id;
+        public string id, name, contentLabel;
         public float minX, maxX, minZ, maxZ;
     }
 
@@ -117,6 +117,8 @@ namespace UCENO.VirtualWorld.Editor
                         throw new InvalidOperationException("Invalid district geometry or content label in city " + activeCity.id);
                     return new WorldInteractableDistrictEntry {
                         id = district.id,
+                        name = district.name,
+                        contentLabel = district.contentLabel,
                         minX = district.center.x - district.radius,
                         maxX = district.center.x + district.radius,
                         minZ = district.center.z - district.radius,
