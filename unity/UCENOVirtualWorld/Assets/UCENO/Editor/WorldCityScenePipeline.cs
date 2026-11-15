@@ -221,13 +221,14 @@ namespace UCENO.VirtualWorld.Editor
             {
                 string folder = "Assets/UCENO/Scenes/Cities/" + city.id;
                 string manifestPath = folder + "/city-scene-manifest.json";
-                if (!File.Exists(manifestPath))
+                string manifestAbsolutePath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", manifestPath));
+                if (!File.Exists(manifestAbsolutePath))
                 {
                     failures.Add(city.id + ": generated city scene manifest is missing.");
                     continue;
                 }
                 CitySceneManifestDocument manifest =
-                    JsonUtility.FromJson<CitySceneManifestDocument>(File.ReadAllText(manifestPath));
+                    JsonUtility.FromJson<CitySceneManifestDocument>(File.ReadAllText(manifestAbsolutePath));
                 if (manifest == null || manifest.cityId != city.id || manifest.districts == null ||
                     manifest.districts.Length != city.districts.Length)
                 {
@@ -572,7 +573,8 @@ namespace UCENO.VirtualWorld.Editor
                 biome = city.environment.biome, districts = manifestDistricts.ToArray()
             };
             string manifestPath = cityFolder + "/city-scene-manifest.json";
-            File.WriteAllText(manifestPath, JsonUtility.ToJson(manifest, true));
+            string manifestAbsolutePath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", manifestPath));
+            File.WriteAllText(manifestAbsolutePath, JsonUtility.ToJson(manifest, true));
             AssetDatabase.ImportAsset(manifestPath, ImportAssetOptions.ForceUpdate);
             AssetDatabase.SaveAssets();
         }
