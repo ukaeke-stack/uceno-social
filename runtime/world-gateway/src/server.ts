@@ -1045,7 +1045,7 @@ const server = createServer(async (req, res) => {
   res.writeHead(404); res.end();
 });
 const wss = new WebSocketServer({ noServer: true, maxPayload: 16384, perMessageDeflate: false });
-const upgradeIdentity = new WeakMap<WebSocket, { userId: string; worldId: string; token: string; sessionId: string; sessionGeneration: number; clientType: string; isTransfer: boolean }>();
+const upgradeIdentity = new WeakMap<WebSocket, { userId: string; worldId: string; cityId: string; token: string; sessionId: string; sessionGeneration: number; clientType: string; isTransfer: boolean }>();
 
 server.on("upgrade", async (req, socket, head) => {
   try {
