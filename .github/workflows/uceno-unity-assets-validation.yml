@@ -41,6 +41,14 @@ jobs:
           grep -q 'CopyFromOther' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
           grep -q 'RequiredClips' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
           grep -q 'Assets/UCENO/Animations/Imported' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
+          grep -q 'sourceAvatar != baseAvatar' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
+          grep -q 'CreateHumanoidController' unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs
+          grep -q 'AddGestureState' unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs
+          grep -q 'runtimeAnimatorController == null' unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs
+          ! grep -q 'Mathf.Sin(cycle)' unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs
+          for clip in idle walk run talk turn wave cheer dance interact sit; do
+            grep -q '\"'"$clip"'\"' unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs 2>/dev/null || true
+          done
 
       - name: Check asset downloader syntax
         run: python -m py_compile scripts/download_polyhaven_assets.py
