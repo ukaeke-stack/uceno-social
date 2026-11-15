@@ -101,6 +101,9 @@ namespace UCENO.VirtualWorld.Editor
         [MenuItem("UCENO/World/Validate Remaining Nine City Asset Packs", false, 31)]
         public static void ValidateRemainingCityPacks()
         {
+            // Imported provenance, geometry, textures, LODs and city ownership are
+            // mandatory. The procedural blockout generator cannot satisfy this gate.
+            ImportedCityAssetPackGate.Validate();
             CityPipelineCity[] cities = LoadRemainingCities();
             CityPipelineProfiles profiles = LoadProfiles();
             var errors = new List<string>();
