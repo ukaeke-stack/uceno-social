@@ -992,7 +992,7 @@ const server = createServer(async (req, res) => {
     // corresponding Unity scenes or remote Addressables content are published.
     res.writeHead(200, { ...headers, "Cache-Control": "public, max-age=300" });
     res.end(JSON.stringify({
-      version: 1,
+      version: 2,
       minimumCityCount: 10,
       cities: WORLD_CITIES.map(city => ({
         ...city,
