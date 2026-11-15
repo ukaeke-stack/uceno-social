@@ -137,6 +137,7 @@ namespace UCENO.VirtualWorld.Editor
             var profileById = (profiles.cities ?? Array.Empty<CityPipelineAssetProfile>())
                 .Where(item => item != null).ToDictionary(item => item.cityId, StringComparer.Ordinal);
             var assetOwners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var geometryOwners = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (CityPipelineCity city in cities)
             {
                 if (!profileById.TryGetValue(city.id, out CityPipelineAssetProfile profile))
