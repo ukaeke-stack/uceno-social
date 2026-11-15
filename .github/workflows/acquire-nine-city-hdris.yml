@@ -1,0 +1,35 @@
+name: Acquire nine city HDR panoramas
+on:
+  push:
+    branches: [feature/uceno-unity-foundation]
+    paths:
+      - "scripts/acquire-nine-city-hdris.py"
+      - ".github/workflows/acquire-nine-city-hdris.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: uceno-nine-city-hdri-acquisition
+  cancel-in-progress: false
+jobs:
+  acquire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/uceno-unity-foundation
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download nine distinct CC0 HDR panoramas and verify hashes
+        run: python scripts/acquire-nine-city-hdris.py
+      - name: Commit acquired panorama files and provenance
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add unity/UCENOVirtualWorld/Assets/UCENO/Cities
+          git diff --cached --quiet && { echo "No new panorama files to commit"; exit 1; }
+          git commit -m "Acquire nine city-specific CC0 HDR panoramas"
+          git push origin HEAD:feature/uceno-unity-foundation
