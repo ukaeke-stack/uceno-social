@@ -184,8 +184,21 @@ namespace UCENO.VirtualWorld
 
         private static bool IsDistrictSceneLabel(string label)
         {
-            return !string.IsNullOrWhiteSpace(label) &&
-                label.StartsWith("world-city-district-", StringComparison.Ordinal);
+            if (string.IsNullOrWhiteSpace(label))
+                return false;
+
+            // City catalogue labels follow:
+            //   world-city-{cityId}                 (catalogue/root content)
+            //   world-city-{cityId}-{districtId}     (additive district scene)
+            // Keep the legacy explicit prefix compatible, but do not mistake
+            // the three-part city root label for an additive scene address.
+            if (label.StartsWith("world-city-district-", StringComparison.Ordinal))
+                return true;
+
+            string[] parts = label.Split('-');
+            return parts.Length >= 4 &&
+                string.Equals(parts[0], "world", StringComparison.Ordinal) &&
+                string.Equals(parts[1], "city", StringComparison.Ordinal);
         }
 
         private IEnumerator UnloadSceneRoutine(string label, AsyncOperationHandle<SceneInstance> handle)
