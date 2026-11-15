@@ -879,7 +879,7 @@ namespace UCENO.VirtualWorld.Editor
             EnsureFolder(districtFolder);
 
             // These IDs intentionally match runtime/world-gateway/config/world-cities.json.
-            string[] districtNames = { "waterfront", "residential", "downtown", "culture" };
+            string[] districtNames = { "south", "central-south", "central-north", "north" };
             Dictionary<string, Scene> districtScenes = new Dictionary<string, Scene>(StringComparer.Ordinal);
             Dictionary<string, Transform> districtRoots = new Dictionary<string, Transform>(StringComparer.Ordinal);
 
@@ -976,10 +976,10 @@ namespace UCENO.VirtualWorld.Editor
         {
             // Map the generated starter-city quadrants to the four public
             // district identities advertised by the Meridian catalogue.
-            if (worldZ < -120f) return "waterfront";
-            if (worldZ < 0f) return "residential";
-            if (worldZ < 120f) return "downtown";
-            return "culture";
+            if (worldZ < -120f) return "south";
+            if (worldZ < 0f) return "central-south";
+            if (worldZ < 120f) return "central-north";
+            return "north";
         }
 
         private static string ToTitle(string value)
