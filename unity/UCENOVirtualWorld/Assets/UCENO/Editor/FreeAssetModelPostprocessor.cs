@@ -13,6 +13,8 @@ namespace UCENO.VirtualWorld.Editor
     {
         private const string CharacterRoot = "Assets/UCENO/Characters/Imported/";
         private const string EnvironmentRoot = "Assets/UCENO/Environment/Imported/";
+        private const string ImportedAnimationRoot = "Assets/UCENO/Animations/Imported/";
+        private const string AvatarPath = "Assets/UCENO/Characters/Imported/UCENO_Default_Avatar.fbx";
 
         private void OnPreprocessModel()
         {
@@ -41,6 +43,47 @@ namespace UCENO.VirtualWorld.Editor
                 importer.meshCompression = ModelImporterMeshCompression.Medium;
                 importer.importCameras = false;
                 importer.importLights = false;
+                return;
+            }
+
+            if (assetPath.StartsWith(ImportedAnimationRoot, System.StringComparison.Ordinal))
+            {
+                // Animation FBXs use the exact same Humanoid Avatar definition as
+                // the production character, so Unity retargets motion onto its rig.
+                Avatar sourceAvatar = null;
+                foreach (Object asset in AssetDatabase.LoadAllAssetsAtPath(AvatarPath))
+                {
+                    if (asset is Avatar candidate && candidate.isHuman)
+                    {
+                        sourceAvatar = candidate;
+                        break;
+                    }
+                }
+
+                if (sourceAvatar == null)
+                    Debug.LogError("UCENO animation import cannot find the source Humanoid Avatar at " + AvatarPath);
+
+                importer.animationType = ModelImporterAnimationType.Human;
+                importer.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
+                importer.sourceAvatar = sourceAvatar;
+                importer.importAnimation = true;
+                importer.importBlendShapes = false;
+                importer.optimizeMesh = false;
+                importer.meshCompression = ModelImporterMeshCompression.Off;
+                importer.importCameras = false;
+                importer.importLights = false;
+
+                ModelImporterClipAnimation[] animationClips = importer.defaultClipAnimations;
+                for (int i = 0; i < animationClips.Length; i++)
+                {
+                    string clipName = animationClips[i].name.ToLowerInvariant();
+                    bool looping = clipName.Contains("idle") || clipName.Contains("walk") ||
+                        clipName.Contains("run") || clipName.Contains("jog") ||
+                        clipName.Contains("strafe") || clipName.Contains("dance");
+                    animationClips[i].loopTime = looping;
+                    animationClips[i].loopPose = looping;
+                }
+                importer.clipAnimations = animationClips;
                 return;
             }
 
