@@ -190,6 +190,25 @@ namespace UCENO.VirtualWorld.Editor
             Box(root.transform, "Lobby glazing", new Vector3(0f, 1.55f, depth * 0.5f + 2.53f),
                 new Vector3(width + 1f, 1.9f, 0.12f), glass, false);
 
+            // A legible, human-scale entrance portal gives the tower podium
+            // a designed arrival point instead of an uninterrupted blank base.
+            float portalZ = depth * 0.5f + 2.62f;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Box(root.transform, "Lobby portal stone jamb",
+                    new Vector3(side * (width * 0.28f), 2.15f, portalZ),
+                    new Vector3(0.42f, 3.1f, 0.42f), concrete, false);
+                Box(root.transform, "Lobby portal metal reveal",
+                    new Vector3(side * (width * 0.28f - 0.28f), 2.15f, portalZ + 0.22f),
+                    new Vector3(0.075f, 2.65f, 0.08f), metal, false);
+            }
+            Box(root.transform, "Lobby portal header",
+                new Vector3(0f, 3.72f, portalZ),
+                new Vector3(width * 0.58f, 0.38f, 0.48f), stone, false);
+            Box(root.transform, "Lobby entrance threshold",
+                new Vector3(0f, 0.12f, portalZ + 0.18f),
+                new Vector3(width * 0.58f, 0.16f, 1.05f), metal, false);
+
             // Recessed floor bands, curtain-wall glazing, structural piers,
             // and metal fins create a varied high-rise facade rather than a
             // single repeated solid box.
