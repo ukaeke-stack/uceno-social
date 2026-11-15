@@ -80,7 +80,13 @@ Do not deploy this manifest until all ten city exports have been generated and
 validated. A partial manifest intentionally prevents full city readiness.
 The old global collision-map setting is retained only for compatibility with
 other legacy code paths; it is not a substitute for city-scoped maps in the
-assigned-city movement simulation.
+assigned-city movement simulation. Collision maps use content-addressed,
+immutable filenames so a failed regeneration cannot corrupt the currently
+published manifest; the manifest is switched only after all new map files exist.
+
+The assigned-city movement path pauses horizontal movement if the player is
+outside a configured district or its collision map is unavailable. It does not
+fall back to a global collision map.
 
 At a district boundary, the authoritative simulation pauses the player's
 horizontal movement and sends `district_content_required` with the server-chosen
