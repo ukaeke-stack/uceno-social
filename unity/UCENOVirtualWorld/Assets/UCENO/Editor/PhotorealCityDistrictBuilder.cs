@@ -22,6 +22,10 @@ namespace UCENO.VirtualWorld.Editor
             Material stone = CreateMaterial("UCENO_Tower_Dark_Stone", DarkStone, 0.18f, 0.34f);
             Material glass = CreateMaterial("UCENO_Tower_Curtain_Glass", Glass, 0.82f, 0.94f);
             Material litGlass = CreateMaterial("UCENO_Tower_Interior_Lit_Glass", LitGlass, 0.58f, 0.88f);
+            // Give selected occupied floors a warm, low-intensity interior glow at dusk/night.
+            // This is authored into the saved city materials, not a runtime light per window.
+            litGlass.EnableKeyword("_EMISSION");
+            litGlass.SetColor("_EmissionColor", new Color(0.48f, 0.29f, 0.16f) * 0.72f);
             Material metal = CreateMaterial("UCENO_Tower_Brushed_Metal", new Color(0.34f, 0.39f, 0.42f), 0.78f, 0.72f);
 
             int[,] layout =
