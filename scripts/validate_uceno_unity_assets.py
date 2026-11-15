@@ -163,6 +163,18 @@ def main():
 
     imported_city_gate = read_text(ASSETS / "Editor/ImportedCityAssetPackGate.cs")
     for required in (
+        "manifest.assets.Select(a => a.prefab).Distinct(StringComparer.Ordinal).Count() != 12",
+        "SetEquals(paths)",
+        "Uri.TryCreate(source.sourceUrl, UriKind.Absolute, out Uri sourceUri)",
+        "sourceUri.Scheme == Uri.UriSchemeHttps",
+        '"CC0 1.0", "CC-BY 4.0", "CC-BY 3.0"',
+        '"CC-BY-SA 4.0", "CC-BY-SA 3.0"',
+        'city.skyboxTexture.StartsWith("Assets/UCENO/Cities/" + city.cityId',
+    ):
+        if required not in imported_city_gate:
+            fail("Imported city art provenance/reuse gate is missing: " + required)
+
+    for required in (
         "AssetAbsolutePath(ProfilePath)",
         'Path.Combine(Application.dataPath, "..", "..", "..", CatalogPath)',
         "AssetAbsolutePath(cityRoot + \"/\" + ManifestName)",
