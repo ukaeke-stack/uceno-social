@@ -6,6 +6,8 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 const manifest = JSON.parse(read("unity/UCENOVirtualWorld/Packages/manifest.json"));
 const delivery = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldContentDelivery.cs");
 const sceneBuilder = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs");
+const cityScenePipeline = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs");
+const cityAssetProfiles = JSON.parse(read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json"));
 const areaBinding = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldAreaContentBinding.cs");
 const gateway = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs");
 const gatewayServer = read("runtime/world-gateway/src/server.ts");
@@ -23,7 +25,12 @@ const checks = [
   ["Each city has its own root and four distinct district content labels", cityCatalog.cities?.every(city => city.contentLabel === "world-city-" + city.id && city.districts?.length >= 4 && new Set(city.districts.map(district => district.contentLabel)).size === city.districts.length && city.landmarks?.length >= 3)],
   ["City catalogue policy enforces minimum count and city-specific labels", cityPolicy.includes("minimumCities") && cityPolicy.includes("world-city-${id}")],
   ["Every city has a unique climate, biome, terrain and urban layout pattern", new Set(cityCatalog.cities.map(city => city.climate)).size === 10 && new Set(cityCatalog.cities.map(city => city.environment?.biome)).size === 10 && new Set(cityCatalog.cities.map(city => city.environment?.terrain)).size === 10 && new Set(cityCatalog.cities.map(city => city.layout?.pattern)).size === 10],
-  ["Each city has three or more named landmark content labels", cityCatalog.cities.every(city => city.landmarks.length >= 3 && city.landmarks.every(landmark => landmark.contentLabel.startsWith("world-city-" + city.id + "-landmark-")))],
+  ["Each city has three or more named landmark content labels", cityCatalog.cities.every(city => city.landmarks.length >= 3 && city.landmarks.every(landmark => landmark.contentLabel.startsWith("world-city-" + city.id + "-landmark-") && landmark.districtId))],
+  ["Every city landmark is assigned to exactly one district", cityCatalog.cities.every(city => city.landmarks.every(landmark => city.districts.filter(d => d.id === landmark.districtId && landmark.position.x >= d.center.x - d.radius && landmark.position.x < d.center.x + d.radius && landmark.position.z >= d.center.z - d.radius && landmark.position.z < d.center.z + d.radius).length === 1))],
+  ["Nine non-Meridian cities have independent imported asset profiles", cityAssetProfiles.cities.length === 9 && new Set(cityAssetProfiles.cities.map(profile => profile.cityId)).size === 9 && !cityAssetProfiles.cities.some(profile => profile.cityId === "meridian")],
+  ["Each remaining city requires distinct architecture, environment and landmark prefabs", cityAssetProfiles.cities.every(profile => profile.architecturePrefabs.length >= 3 && profile.environmentPrefabs.length >= 3 && profile.landmarks.length === 3 && new Set([...profile.architecturePrefabs, ...profile.environmentPrefabs, ...profile.landmarks.map(item => item.prefab)]).size === 9)],
+  ["Nine-city Unity pipeline validates city-specific assets before scene generation", /ValidateRemainingCityPacks/.test(cityScenePipeline) && /BuildRemainingCities/.test(cityScenePipeline) && /checkAssets: true/.test(cityScenePipeline) && /city-specific imported asset errors/.test(cityScenePipeline)],
+  ["Nine-city scene pipeline generates separate district scenes and remote Addressables labels", /BuildCity\(/.test(cityScenePipeline) && /district.contentLabel/.test(cityScenePipeline) && /RegisterAddressableScene/.test(cityScenePipeline) && /PackSeparately/.test(cityScenePipeline)],
   ["Districts contain role, centre, radius and city-specific layout metadata", cityCatalog.cities.every(city => city.districts.every(district => district.role && district.center && Number.isFinite(district.radius) && district.layout === city.layout.pattern))],
   ["City catalogue tests cover duplicate IDs, bounds and incomplete districts", cityTests.includes("rejects fewer than ten cities") && cityTests.includes("invalid spawn bounds") && cityTests.includes("fewer than four districts")],
 
@@ -65,7 +72,7 @@ const checks = [
   ["Client loads server-selected district labels before acknowledgement", /district_content_required/.test(gateway) && /AcquireContent\(label/.test(gateway) && /district_content_ready/.test(gateway)],
   ["Client can retry and clears cancelled district transitions", /RetryPendingDistrictContent/.test(gateway) && /district_content_cancelled/.test(gateway)],
   ["District policy tests cover bounds and overlaps", /rejects overlapping district rectangles/.test(districtTests) && /rejects malformed JSON/.test(districtTests)],
-  ["Canonical gateway district config has four matching Unity scene labels", districtConfig.districts?.length === 4 && ["civic-core", "exchange-quarter", "garden-ring", "old-port"].every(id => districtConfig.districts.some(d => d.id === id && d.contentLabel === "world-city-district-" + id))],
+  ["Canonical gateway district config has four matching Unity scene labels", districtConfig.districts?.length === 4 && ["civic-core", "exchange-quarter", "garden-ring", "old-port"].every(id => districtConfig.districts.some(d => d.id === id && d.contentLabel === "world-city-meridian-" + id))],
   ["Gateway tests exercise canonical district geometry fixture", /canonical gateway config matches the four generated Unity district scenes/.test(districtTests)],
   ["Architecture documents automatic loading and persistent cache", /automatically|on demand|preflight/i.test(architecture) && /persistent.*cache/i.test(architecture)],
   ["Acceptance tests cover interrupted downloads and district boundary gates", /Interrupt the connection mid-download/.test(tests) && /district boundary/.test(tests)]
