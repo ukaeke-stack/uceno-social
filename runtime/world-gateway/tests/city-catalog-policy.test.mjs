@@ -57,3 +57,18 @@ test("gateway loads the catalogue at startup and labels unpublished scenes hones
   assert.match(server, /contentStatus: "catalogue_only"/);
   assert.match(dockerfile, /COPY config \.\/config/);
 });
+
+test("Meridian catalogue labels match the gateway's district admission configuration", () => {
+  const cities = parseWorldCityCatalog(fixture, 10);
+  const meridian = cities.find(city => city.id === "meridian");
+  assert.ok(meridian, "Meridian must exist in the city catalogue");
+  const districtFixture = readFileSync(new URL("../config/world-districts.json", import.meta.url), "utf8");
+  const gatewayDistricts = JSON.parse(districtFixture).districts;
+  assert.deepEqual(
+    gatewayDistricts.map(district => [district.id, district.contentLabel]),
+    meridian.districts.map(district => [district.id, district.contentLabel])
+  );
+  assert.ok(gatewayDistricts.every(district =>
+    district.contentLabel === `world-city-meridian-${district.id}`
+  ));
+});
