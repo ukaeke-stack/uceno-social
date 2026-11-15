@@ -41,6 +41,14 @@ test("catalogue rejects invalid spawn bounds and mismatched content labels", () 
   assert.throws(() => parseWorldCityCatalog(JSON.stringify(mismatched), 10), /district .* invalid or duplicate/);
 });
 
+test("catalogue rejects districts whose full radius extends beyond city bounds", () => {
+  const outside = JSON.parse(fixture);
+  const city = outside.cities[0];
+  const district = city.districts[0];
+  district.center.x = city.bounds.minX + district.radius - 1;
+  assert.throws(() => parseWorldCityCatalog(JSON.stringify(outside), 10), /extends outside city bounds/);
+});
+
 test("catalogue rejects duplicate district IDs and fewer than four districts", () => {
   const duplicate = JSON.parse(fixture);
   duplicate.cities[0].districts[1].id = duplicate.cities[0].districts[0].id;
