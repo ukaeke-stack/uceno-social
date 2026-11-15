@@ -76,6 +76,8 @@ namespace UCENO.VirtualWorld.Editor
         public float minX, maxX, minZ, maxZ;
     }
     [Serializable] internal sealed class CityInteractableRegistryDocument { public CityInteractableRegistryEntry[] interactables; }
+    [Serializable] internal sealed class CityCollisionMapDocument { public CityCollisionBoxEntry[] boxes; public CityInteractableRegistryEntry[] interactables; }
+    [Serializable] internal sealed class CityCollisionBoxEntry { public float minX, maxX, minY, maxY, minZ, maxZ; }
     [Serializable] internal sealed class CityInteractableRegistryEntry
     {
         public string id, kind;
@@ -229,6 +231,21 @@ namespace UCENO.VirtualWorld.Editor
                         registered.minZ != district.center.z - district.radius ||
                         registered.maxZ != district.center.z + district.radius)
                         failures.Add(city.id + ": exported district geometry differs for " + district.id);
+                }
+                string collisionMapPath = Path.Combine(config, "..", "data",
+                    "uceno-city-collision-boxes-" + city.id + ".json");
+                if (!File.Exists(collisionMapPath))
+                    failures.Add(city.id + ": exported collision map is missing.");
+                else
+                {
+                    CityCollisionMapDocument collisionMap =
+                        JsonUtility.FromJson<CityCollisionMapDocument>(File.ReadAllText(collisionMapPath));
+                    if (collisionMap?.boxes == null || collisionMap.boxes.Length == 0)
+                        failures.Add(city.id + ": exported collision map contains no collider geometry.");
+                    if (collisionMap?.interactables == null || interactableRegistry?.interactables == null ||
+                        !collisionMap.interactables.Select(item => item.id).OrderBy(id => id, StringComparer.Ordinal)
+                            .SequenceEqual(interactableRegistry.interactables.Select(item => item.id).OrderBy(id => id, StringComparer.Ordinal)))
+                        failures.Add(city.id + ": collision map interactables do not match the authoritative scene registry.");
                 }
                 if (interactableRegistry?.interactables == null || interactableRegistry.interactables.Length == 0)
                     failures.Add(city.id + ": exported interactable registry is empty.");
@@ -419,6 +436,7 @@ namespace UCENO.VirtualWorld.Editor
                 foreach (string scenePath in builtScenePaths)
                     openedScenes.Add(EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive));
                 WorldInteractableRegistryExporter.Export(false, city.id, builtScenePaths.ToArray());
+                WorldCollisionGeometryExporter.Export(city.id, builtScenePaths.ToArray());
             }
             finally
             {
