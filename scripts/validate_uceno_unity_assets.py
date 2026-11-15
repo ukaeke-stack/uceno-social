@@ -161,6 +161,21 @@ def main():
         if required not in builder:
             fail(f"Scene builder is missing required integration marker: {required}")
 
+    city_pipeline = read_text(ASSETS / "Editor/WorldCityScenePipeline.cs")
+    for required in ("ValidateRemainingCityPacks", "BuildRemainingCities",
+                     "VerifyNineCitySceneRegistries", "BuildRemoteAddressablesContent",
+                     "CheckForCatalogUpdates", "UpdateCatalogs(catalogCheck.Result, false)",
+                     "BuildPlayerContent(out AddressablesPlayerBuildResult result)",
+                     "RemoteCatalogJsonFilePath", "RemoteCatalogHashFilePath"):
+        if required not in city_pipeline and required not in read_text(ASSETS / "Scripts/WorldContentDelivery.cs"):
+            fail("Nine-city/remote Addressables release pipeline is missing: " + required)
+
+    build_command = read_text(ASSETS / "Editor/BuildCommand.cs")
+    for required in ("ValidateRemainingCityPacks()", "BuildRemainingCities()",
+                     "VerifyNineCitySceneRegistries()", "BuildRemoteAddressablesContent()"):
+        if required not in build_command:
+            fail("Android pre-export does not enforce the complete city content gate: " + required)
+
     starter = read_text(ASSETS / "Editor/StarterSceneBuilder.cs")
     if "FreeAssetWorldSceneBuilder.CreateStarterScene()" not in starter:
         fail("StarterSceneBuilder does not invoke the realistic city scene builder.")
