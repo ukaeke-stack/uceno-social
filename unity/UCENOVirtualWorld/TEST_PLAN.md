@@ -257,3 +257,18 @@ possible.
 7. Invalid signal types, missing/oversized SDP, oversized ICE candidates and signaling floods are rejected/rate-limited.
 8. Verify signaling with two Unity clients and an actual WebRTC implementation before attempting audio tests.
 9. Add and test microphone permission, audio capture/playback, STUN/TURN connectivity, 3D attenuation, mute/block/report and Android background/foreground behavior. No audio-media acceptance is passed by signaling tests alone.
+
+## Human-motion and social-avatar acceptance checks
+
+- [ ] Verify both locally controlled players and AI-controlled citizens use the same Humanoid rig, locomotion controller, facial-expression layer and crowd LOD policy.
+- [ ] Verify idle avatars show subtle breathing, natural head movement and non-identical blink timing; no avatar should remain frozen while present in the active scene.
+- [ ] Verify walk and run include alternating upper/lower-leg motion, opposing arm swing, torso counter-rotation and ankle articulation without visible foot sliding or knee snapping.
+- [ ] Verify wave, cheer, dance and seated states blend without permanently overwriting the base pose; all gestures return to locomotion/idle when their server state expires.
+- [ ] Verify remote avatars receive the same movement and gesture state from authoritative snapshots and remain animated at crowd distances where they are still visible.
+- [ ] Verify face blink blendshapes are optional and that avatars without facial blendshapes still animate safely without console errors.
+- [ ] Import at least one properly licensed animation-only Humanoid FBX for each required motion family (idle, walk, run, turn/strafe, wave, conversation and dance); verify clips retarget onto the selected production avatar rather than assuming procedural motion is equivalent to motion capture.
+- [ ] For talking avatars, connect voice activity/audio amplitude to jaw and mouth blendshapes only when the imported face rig exposes compatible channels; verify speech animation stops when voice activity ends. A talking animation must not be claimed complete until this is wired and tested.
+- [ ] Test avatar animation at 30, 60 and 90 FPS, with 1, 10, 30 and 100 visible humanoids; record CPU/GPU frame time, memory and animation update cost on a representative Android device.
+- [ ] Verify all 10 required cities are distinct selectable city entries, not merely districts or additive scenes within one city. Each city must have its own identity, world bounds, spawn/arrival point, content manifest and remotely deliverable area set.
+
+Procedural motion is a fallback layer, not a substitute for authored motion-capture-quality animation. Imported clips, facial speech/lip-sync, inverse-kinematics contact, and physical-device visual acceptance remain separate gates.
