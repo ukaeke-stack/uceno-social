@@ -63,6 +63,8 @@ for token in ("Build Remaining Nine City Scenes", "RegisterAddressableScene",
               "WorldInteractableRegistryExporter.Export", "WorldCollisionGeometryExporter.Export",
               "Verify Nine City Scene Registries"):
     require(token in pipeline, f"scene pipeline is missing {token}")
+require("VerifyNineCitySceneRegistries();" in pipeline,
+        "scene generation must automatically verify exported manifests, Addressables labels, collision maps and interactable registries")
 
 style_rules = {
     "solstice": "terraced waterfront",

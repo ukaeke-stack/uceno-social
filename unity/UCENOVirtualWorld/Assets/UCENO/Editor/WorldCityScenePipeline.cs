@@ -162,13 +162,7 @@ namespace UCENO.VirtualWorld.Editor
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-
-            // Verify exported manifests, Addressables labels, district bounds, collision maps
-            // and interactable registries immediately after Unity imports the generated assets.
-            // This does not replace human visual review or Android runtime testing.
-            VerifyNineCitySceneRegistries();
-
-            Debug.Log("UCENO generated nine distinct city scene sets and passed exported scene/registry verification. Visual acceptance and Android runtime testing remain separate release gates.");
+            Debug.Log("UCENO generated nine distinct city scene sets. This is a scene-generation result, not final visual acceptance.");
         }
 
         [MenuItem("UCENO/World/Build Android Remote City Addressables", false, 34)]
