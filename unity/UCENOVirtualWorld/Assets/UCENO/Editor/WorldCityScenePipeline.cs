@@ -320,6 +320,15 @@ namespace UCENO.VirtualWorld.Editor
                 GameObject prefab = checkAssets ? AssetDatabase.LoadAssetAtPath<GameObject>(assetPath) : null;
                 if (checkAssets && prefab == null)
                     errors.Add(city.id + ": missing imported prefab " + assetPath);
+                else if (checkAssets && prefab != null)
+                {
+                    LODGroup lodGroup = prefab.GetComponentInChildren<LODGroup>(true);
+                    if (lodGroup == null || lodGroup.GetLODs().Length < 2 ||
+                        lodGroup.GetLODs().Any(lod => lod.renderers == null || lod.renderers.Length == 0))
+                        errors.Add(city.id + ": prefab requires a valid multi-level LODGroup for Android: " + assetPath);
+                    if (!prefab.GetComponentsInChildren<Renderer>(true).Any(renderer => renderer != null))
+                        errors.Add(city.id + ": prefab contains no renderable geometry: " + assetPath);
+                }
             }
 
             var mappedLandmarks = new HashSet<string>(StringComparer.Ordinal);
@@ -525,7 +534,7 @@ namespace UCENO.VirtualWorld.Editor
 
             string waterKey = (waterDescription ?? string.Empty).ToLowerInvariant();
             if (new[] { "canal", "river", "bay", "marina", "wetland", "oasis", "stream", "water" }
-                .Any(waterKey.Contains))
+                .Any(term => waterKey.Contains(term)))
             {
                 Material water = CreateMaterial("UCENO_" + cityId + "_Water",
                     new Color(.08f, .34f, .48f, .82f), .82f);
