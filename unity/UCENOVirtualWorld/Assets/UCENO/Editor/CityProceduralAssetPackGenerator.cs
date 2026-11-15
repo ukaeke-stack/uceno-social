@@ -53,6 +53,10 @@ namespace UCENO.VirtualWorld.Editor
         [MenuItem("UCENO/World/Generate Nine City-Specific Asset Packs", false, 30)]
         public static void GenerateAll()
         {
+            // This legacy generator creates synthetic meshes and flat materials. It is not an imported-art pipeline.
+            // Keep it disabled so it cannot overwrite city profiles or create blockouts that look like finished assets.
+            throw new InvalidOperationException(
+                "Procedural city asset generation is disabled for release work. Import licensed, city-specific FBX/prefab packs, 1K+ PBR textures and HDRI panoramas, record source-manifest.json for each city, then run UCENO > World > Validate Imported City Art Packs. The nine-city scene pipeline will remain blocked until that gate passes.");
             string root = RepositoryRoot();
             string catalogPath = Path.Combine(root, CatalogPath);
             if (!File.Exists(catalogPath)) throw new InvalidOperationException("Missing city catalogue: " + catalogPath);
