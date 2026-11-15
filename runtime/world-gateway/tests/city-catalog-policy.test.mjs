@@ -287,3 +287,10 @@ test("interaction authorization and durable object broadcasts cannot use the leg
   assert.match(server, /findPlayerDistrict\(player, player\.x, player\.z\)/);
   assert.match(server, /findPlayerDistrict\(peer, peer\.x, peer\.z\)/);
 });
+test("gateway movement refuses to use legacy or cross-city collision fallbacks", () => {
+  const server = readFileSync(new URL("../src/server.ts", import.meta.url), "utf8");
+  assert.match(server, /DISTRICT_COLLISION_BOXES\.get\(player\.cityId \+ ":" \+ currentDistrict\.id\)/);
+  assert.match(server, /if \(!collisionBoxes\) return/);
+  assert.doesNotMatch(server, /DISTRICT_COLLISION_BOXES\.has\(player\.activeDistrictId\)/);
+  assert.match(server, /parseCityDistrictCollisionManifest\(raw, cityDistricts/);
+});
