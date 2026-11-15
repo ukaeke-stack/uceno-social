@@ -116,3 +116,20 @@ test("district rectangles do not overlap and own each city's spawn exactly once"
   overlapping.cities[0].districts[0].center.x = overlapping.cities[0].districts[1].center.x;
   assert.throws(() => parseWorldCityCatalog(JSON.stringify(overlapping), 10), /overlapping district layouts/);
 });
+
+test("each landmark declares one district and is geometrically inside only that district", () => {
+  const cities = parseWorldCityCatalog(fixture, 10);
+  for (const city of cities) {
+    for (const landmark of city.landmarks) {
+      const owners = city.districts.filter(district =>
+        landmark.position.x >= district.center.x - district.radius &&
+        landmark.position.x < district.center.x + district.radius &&
+        landmark.position.z >= district.center.z - district.radius &&
+        landmark.position.z < district.center.z + district.radius);
+      assert.deepEqual(owners.map(owner => owner.id), [landmark.districtId]);
+    }
+  }
+  const misplaced = JSON.parse(fixture);
+  misplaced.cities[1].landmarks[0].districtId = misplaced.cities[1].districts[1].id;
+  assert.throws(() => parseWorldCityCatalog(JSON.stringify(misplaced), 10), /must belong to exactly its declared district/);
+});
