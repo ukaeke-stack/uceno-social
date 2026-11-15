@@ -406,10 +406,10 @@ namespace UCENO.VirtualWorld.Editor
             string expectedSkyboxRoot = "Assets/UCENO/Cities/" + city.id + "/Textures/Skybox/";
             if (string.IsNullOrWhiteSpace(profile.skyboxTexture) ||
                 !profile.skyboxTexture.StartsWith(expectedSkyboxRoot, StringComparison.Ordinal))
-                errors.Add(city.id + ": requires a unique city HDRI under " + expectedSkyboxRoot);
+                errors.Add(city.id + ": requires a unique imported city panorama texture under " + expectedSkyboxRoot);
             if (checkAssets && !string.IsNullOrWhiteSpace(profile.skyboxTexture) &&
                 AssetDatabase.LoadAssetAtPath<Texture2D>(profile.skyboxTexture) == null)
-                errors.Add(city.id + ": missing imported city HDRI " + profile.skyboxTexture);
+                errors.Add(city.id + ": missing imported city panorama texture " + profile.skyboxTexture);
             if (!string.IsNullOrWhiteSpace(profile.skyboxTexture))
             {
                 if (assetOwners.TryGetValue(profile.skyboxTexture, out string skyboxOwner) && skyboxOwner != city.id)
