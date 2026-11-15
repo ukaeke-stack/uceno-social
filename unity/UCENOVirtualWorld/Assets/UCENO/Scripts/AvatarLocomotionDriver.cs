@@ -31,6 +31,16 @@ namespace UCENO.VirtualWorld
         public int GestureSequence { get; private set; }
         public string GestureName { get; private set; } = "none";
 
+        private void OnEnable()
+        {
+            WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking;
+        }
+
+        private void OnDisable()
+        {
+            WorldSpatialVoiceClient.LocalTransmitChanged -= SetTalking;
+        }
+
         private void Awake()
         {
             animator = GetComponent<Animator>();
