@@ -212,13 +212,13 @@ namespace UCENO.VirtualWorld.Editor
                 }
 
                 AssetDatabase.SaveAssets();
-                string districtOutput = Path.Combine(config, "world-districts-" + activeCity.id + ".json");
+                string districtOutput = activeCity.id == "meridian" ? Path.Combine(config, "world-districts.json") : Path.Combine(config, "world-districts-" + activeCity.id + ".json");
                 string districtTemporary = districtOutput + ".tmp";
                 File.WriteAllText(districtTemporary, JsonUtility.ToJson(districtDocument, true));
                 File.Copy(districtTemporary, districtOutput, true);
                 File.Delete(districtTemporary);
 
-                string output = Path.Combine(config, "world-interactables-" + activeCity.id + ".json");
+                string output = activeCity.id == "meridian" ? Path.Combine(config, "world-interactables.json") : Path.Combine(config, "world-interactables-" + activeCity.id + ".json");
                 string temporary = output + ".tmp";
                 string json = JsonUtility.ToJson(new WorldInteractableRegistryDocument {
                     interactables = entries.ToArray()
