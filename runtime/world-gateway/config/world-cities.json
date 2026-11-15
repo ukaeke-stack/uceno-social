@@ -21,24 +21,24 @@
       },
       "districts": [
         {
-          "id": "downtown",
-          "name": "Downtown",
-          "contentLabel": "world-city-meridian-downtown"
+          "id": "south",
+          "name": "South District",
+          "contentLabel": "world-city-meridian-south"
         },
         {
-          "id": "waterfront",
-          "name": "Waterfront",
-          "contentLabel": "world-city-meridian-waterfront"
+          "id": "central-south",
+          "name": "Central South",
+          "contentLabel": "world-city-meridian-central-south"
         },
         {
-          "id": "residential",
-          "name": "Residential",
-          "contentLabel": "world-city-meridian-residential"
+          "id": "central-north",
+          "name": "Central North",
+          "contentLabel": "world-city-meridian-central-north"
         },
         {
-          "id": "culture",
-          "name": "Culture",
-          "contentLabel": "world-city-meridian-culture"
+          "id": "north",
+          "name": "North District",
+          "contentLabel": "world-city-meridian-north"
         }
       ]
     },
