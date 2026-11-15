@@ -59,6 +59,29 @@ namespace UCENO.VirtualWorld.Editor
         public string landmarkId, prefab;
     }
 
+    [Serializable] internal sealed class CitySceneManifestDocument
+    {
+        public string cityId, cityName, architecture, biome;
+        public CitySceneManifestDistrict[] districts;
+    }
+    [Serializable] internal sealed class CitySceneManifestDistrict
+    {
+        public string districtId, contentLabel, scenePath;
+        public string[] landmarkIds;
+    }
+    [Serializable] internal sealed class CityDistrictRegistryDocument { public CityDistrictRegistryEntry[] districts; }
+    [Serializable] internal sealed class CityDistrictRegistryEntry
+    {
+        public string id, name, contentLabel;
+        public float minX, maxX, minZ, maxZ;
+    }
+    [Serializable] internal sealed class CityInteractableRegistryDocument { public CityInteractableRegistryEntry[] interactables; }
+    [Serializable] internal sealed class CityInteractableRegistryEntry
+    {
+        public string id, kind;
+        public float x, y, z, yaw;
+    }
+
     /// <summary>
     /// Data-driven scene pipeline for the nine cities other than Meridian Prime.
     /// It refuses to substitute Meridian assets or primitive buildings for missing
@@ -102,6 +125,7 @@ namespace UCENO.VirtualWorld.Editor
         [MenuItem("UCENO/World/Build Remaining Nine City Scenes", false, 32)]
         public static void BuildRemainingCities()
         {
+            ValidateRemainingCityPacks();
             CityPipelineCity[] cities = LoadRemainingCities();
             CityPipelineProfiles profiles = LoadProfiles();
             var errors = new List<string>();
@@ -133,6 +157,99 @@ namespace UCENO.VirtualWorld.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("UCENO generated nine distinct city scene sets. This is a scene-generation result, not final visual acceptance.");
+        }
+
+        [MenuItem("UCENO/World/Verify Nine City Scene Registries", false, 33)]
+        public static void VerifyNineCitySceneRegistries()
+        {
+            CityPipelineCity[] cities = LoadRemainingCities();
+            AddressableAssetSettings settings = AddressableAssetSettingsDefaultObject.GetSettings(false);
+            if (settings == null) throw new BuildFailedException("Addressables settings are missing.");
+            string config = Path.Combine(RepositoryRoot(), "runtime", "world-gateway", "config");
+            var failures = new List<string>();
+            foreach (CityPipelineCity city in cities)
+            {
+                string folder = "Assets/UCENO/Scenes/Cities/" + city.id;
+                string manifestPath = folder + "/city-scene-manifest.json";
+                if (!File.Exists(manifestPath))
+                {
+                    failures.Add(city.id + ": generated city scene manifest is missing.");
+                    continue;
+                }
+                CitySceneManifestDocument manifest =
+                    JsonUtility.FromJson<CitySceneManifestDocument>(File.ReadAllText(manifestPath));
+                if (manifest == null || manifest.cityId != city.id || manifest.districts == null ||
+                    manifest.districts.Length != city.districts.Length)
+                {
+                    failures.Add(city.id + ": scene manifest identity or district count is invalid.");
+                    continue;
+                }
+                var seenLandmarks = new HashSet<string>(StringComparer.Ordinal);
+                foreach (CityPipelineDistrict district in city.districts)
+                {
+                    CitySceneManifestDistrict entry = manifest.districts.FirstOrDefault(item =>
+                        item != null && item.districtId == district.id);
+                    if (entry == null || entry.contentLabel != district.contentLabel ||
+                        !File.Exists(Path.Combine(RepositoryRoot(), entry.scenePath)))
+                    {
+                        failures.Add(city.id + ": missing scene or wrong content label for district " + district.id);
+                        continue;
+                    }
+                    string guid = AssetDatabase.AssetPathToGUID(entry.scenePath);
+                    AddressableAssetEntry addressable = string.IsNullOrEmpty(guid) ? null : settings.FindAssetEntry(guid);
+                    if (addressable == null || !addressable.labels.Contains(district.contentLabel))
+                        failures.Add(city.id + ": Addressables entry/label is missing for " + district.id);
+                    foreach (string landmarkId in entry.landmarkIds ?? Array.Empty<string>())
+                        if (!seenLandmarks.Add(landmarkId))
+                            failures.Add(city.id + ": landmark appears in multiple district scenes: " + landmarkId);
+                }
+                if (seenLandmarks.Count != city.landmarks.Length ||
+                    city.landmarks.Any(landmark => !seenLandmarks.Contains(landmark.id)))
+                    failures.Add(city.id + ": generated scenes do not contain every landmark exactly once.");
+
+                string districtRegistryPath = Path.Combine(config, "world-districts-" + city.id + ".json");
+                string interactableRegistryPath = Path.Combine(config, "world-interactables-" + city.id + ".json");
+                if (!File.Exists(districtRegistryPath) || !File.Exists(interactableRegistryPath))
+                {
+                    failures.Add(city.id + ": exported district/interactable registry files are missing.");
+                    continue;
+                }
+                CityDistrictRegistryDocument districtRegistry =
+                    JsonUtility.FromJson<CityDistrictRegistryDocument>(File.ReadAllText(districtRegistryPath));
+                CityInteractableRegistryDocument interactableRegistry =
+                    JsonUtility.FromJson<CityInteractableRegistryDocument>(File.ReadAllText(interactableRegistryPath));
+                if (districtRegistry?.districts == null || districtRegistry.districts.Length != city.districts.Length)
+                    failures.Add(city.id + ": exported district registry does not match the city catalogue.");
+                else foreach (CityPipelineDistrict district in city.districts)
+                {
+                    CityDistrictRegistryEntry registered = districtRegistry.districts.FirstOrDefault(item =>
+                        item.id == district.id && item.contentLabel == district.contentLabel);
+                    if (registered == null || registered.minX != district.center.x - district.radius ||
+                        registered.maxX != district.center.x + district.radius ||
+                        registered.minZ != district.center.z - district.radius ||
+                        registered.maxZ != district.center.z + district.radius)
+                        failures.Add(city.id + ": exported district geometry differs for " + district.id);
+                }
+                if (interactableRegistry?.interactables == null || interactableRegistry.interactables.Length == 0)
+                    failures.Add(city.id + ": exported interactable registry is empty.");
+                else
+                {
+                    var ids = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (CityInteractableRegistryEntry item in interactableRegistry.interactables)
+                    {
+                        if (item == null || string.IsNullOrWhiteSpace(item.id) || !ids.Add(item.id))
+                            failures.Add(city.id + ": exported interactable IDs are missing or duplicated.");
+                        if (item == null || city.districts.Count(d =>
+                            item.x >= d.center.x - d.radius && item.x < d.center.x + d.radius &&
+                            item.z >= d.center.z - d.radius && item.z < d.center.z + d.radius) != 1)
+                            failures.Add(city.id + ": exported interactable is not inside exactly one district.");
+                    }
+                }
+            }
+            if (failures.Count > 0)
+                throw new BuildFailedException("Nine-city scene/Addressables/registry verification failed:\n- " +
+                    string.Join("\n- ", failures));
+            Debug.Log("UCENO verified nine city scene manifests, Addressables labels, district bounds and interactable registries.");
         }
 
         private static CityPipelineCity[] LoadRemainingCities()
@@ -200,7 +317,8 @@ namespace UCENO.VirtualWorld.Editor
                 if (assetOwners.TryGetValue(assetPath, out string owner) && owner != city.id)
                     errors.Add(city.id + ": asset is shared with " + owner + "; each city needs its own visual identity: " + assetPath);
                 else assetOwners[assetPath] = city.id;
-                if (checkAssets && AssetDatabase.LoadAssetAtPath<GameObject>(assetPath) == null)
+                GameObject prefab = checkAssets ? AssetDatabase.LoadAssetAtPath<GameObject>(assetPath) : null;
+                if (checkAssets && prefab == null)
                     errors.Add(city.id + ": missing imported prefab " + assetPath);
             }
 
@@ -211,8 +329,27 @@ namespace UCENO.VirtualWorld.Editor
                     !city.landmarks.Any(item => item.id == asset.landmarkId))
                     errors.Add(city.id + ": invalid or duplicate landmark prefab mapping.");
             foreach (CityPipelineLandmark landmark in city.landmarks)
-                if (!mappedLandmarks.Contains(landmark.id))
+            {
+                CityPipelineLandmarkAsset mapping = (profile.landmarks ?? Array.Empty<CityPipelineLandmarkAsset>())
+                    .FirstOrDefault(item => item != null && item.landmarkId == landmark.id);
+                if (mapping == null)
+                {
                     errors.Add(city.id + ": missing imported landmark prefab for " + landmark.id);
+                    continue;
+                }
+                if (checkAssets)
+                {
+                    GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(mapping.prefab);
+                    if (prefab != null)
+                    {
+                        if (prefab.GetComponentInChildren<WorldInteractable>(true) == null)
+                            errors.Add(city.id + ": landmark prefab must contain a WorldInteractable marker: " + landmark.id);
+                        if (!prefab.GetComponentsInChildren<Collider>(true).Any(collider =>
+                            collider != null && collider.enabled && !collider.isTrigger))
+                            errors.Add(city.id + ": landmark prefab must contain a non-trigger targeting collider: " + landmark.id);
+                    }
+                }
+            }
         }
 
         private static void BuildCity(CityPipelineCity city, CityPipelineAssetProfile profile,
@@ -233,6 +370,8 @@ namespace UCENO.VirtualWorld.Editor
             Material ground = CreateCityGroundMaterial(city);
             Material road = CreateCityRoadMaterial(city);
 
+            var manifestDistricts = new List<CitySceneManifestDistrict>();
+            var builtScenePaths = new List<string>();
             foreach (CityPipelineDistrict district in city.districts)
             {
                 Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
@@ -242,7 +381,8 @@ namespace UCENO.VirtualWorld.Editor
                 BuildDistrictGround(root.transform, district, ground, road, city.layout.pattern, city.layout.water, city.id);
                 BuildArchitecture(root.transform, district, architecture, city.layout.pattern);
                 BuildEnvironment(root.transform, district, environment, city.environment.biome);
-                foreach (CityPipelineLandmark landmark in city.landmarks.Where(item => item.districtId == district.id))
+                CityPipelineLandmark[] districtLandmarks = city.landmarks.Where(item => item.districtId == district.id).ToArray();
+                foreach (CityPipelineLandmark landmark in districtLandmarks)
                     BuildLandmark(root.transform, landmark, landmarkPrefabs[landmark.id]);
 
                 string scenePath = cityFolder + "/Districts/" + city.id + "_" + district.id + ".unity";
@@ -250,8 +390,37 @@ namespace UCENO.VirtualWorld.Editor
                 if (!EditorSceneManager.SaveScene(scene, scenePath))
                     throw new BuildFailedException("Could not save city district scene: " + scenePath);
                 RegisterAddressableScene(scenePath, district.contentLabel, settings, group);
+                builtScenePaths.Add(scenePath);
+                manifestDistricts.Add(new CitySceneManifestDistrict {
+                    districtId = district.id,
+                    contentLabel = district.contentLabel,
+                    scenePath = scenePath,
+                    landmarkIds = districtLandmarks.Select(item => item.id).ToArray()
+                });
                 EditorSceneManager.CloseScene(scene, true);
             }
+
+            var openedScenes = new List<Scene>();
+            try
+            {
+                foreach (string scenePath in builtScenePaths)
+                    openedScenes.Add(EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive));
+                WorldInteractableRegistryExporter.Export(false, city.id, builtScenePaths.ToArray());
+            }
+            finally
+            {
+                foreach (Scene scene in openedScenes)
+                    if (scene.IsValid() && scene.isLoaded) EditorSceneManager.CloseScene(scene, true);
+            }
+
+            var manifest = new CitySceneManifestDocument {
+                cityId = city.id, cityName = city.name, architecture = city.architecture,
+                biome = city.environment.biome, districts = manifestDistricts.ToArray()
+            };
+            string manifestPath = cityFolder + "/city-scene-manifest.json";
+            File.WriteAllText(manifestPath, JsonUtility.ToJson(manifest, true));
+            AssetDatabase.ImportAsset(manifestPath, ImportAssetOptions.ForceUpdate);
+            AssetDatabase.SaveAssets();
         }
 
         private static void BuildDistrictGround(Transform parent, CityPipelineDistrict district,
