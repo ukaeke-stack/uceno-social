@@ -878,8 +878,19 @@ namespace UCENO.VirtualWorld.Editor
             const string cityId = "meridian";
             EnsureFolder(districtFolder);
 
-            // These IDs intentionally match runtime/world-gateway/config/world-cities.json.
-            string[] districtNames = { "south", "central-south", "central-north", "north" };
+            string repositoryRoot = Path.GetFullPath(Path.Combine(
+                Directory.GetParent(Application.dataPath).FullName, "..", ".."));
+            string cityCatalogPath = Path.Combine(repositoryRoot, "runtime", "world-gateway",
+                "config", "world-cities.json");
+            if (!File.Exists(cityCatalogPath))
+                throw new BuildFailedException("Missing authored city catalogue: " + cityCatalogPath);
+            WorldCityCatalogDocument catalog =
+                JsonUtility.FromJson<WorldCityCatalogDocument>(File.ReadAllText(cityCatalogPath));
+            WorldCityCatalogEntry city = catalog?.cities?.FirstOrDefault(item => item != null && item.id == cityId);
+            if (city == null || city.districts == null || city.districts.Length != 4)
+                throw new BuildFailedException("Meridian must define exactly four authored districts in world-cities.json.");
+            WorldCityCatalogDistrict[] districtDefinitions = city.districts;
+            string[] districtNames = districtDefinitions.Select(district => district.id).ToArray();
             Dictionary<string, Scene> districtScenes = new Dictionary<string, Scene>(StringComparer.Ordinal);
             Dictionary<string, Transform> districtRoots = new Dictionary<string, Transform>(StringComparer.Ordinal);
 
@@ -899,7 +910,7 @@ namespace UCENO.VirtualWorld.Editor
 
             foreach (Transform child in streamedRoots)
             {
-                string districtName = ResolveDistrictName(child.position.z);
+                string districtName = ResolveDistrictName(child.position, districtDefinitions);
                 Scene districtScene = districtScenes[districtName];
                 Transform districtRoot = districtRoots[districtName];
                 child.SetParent(null, true);
@@ -972,14 +983,25 @@ namespace UCENO.VirtualWorld.Editor
                 objectName == "City Sun";
         }
 
-        private static string ResolveDistrictName(float worldZ)
+        private static string ResolveDistrictName(Vector3 worldPosition,
+            WorldCityCatalogDistrict[] districts)
         {
-            // Map the generated starter-city quadrants to the four public
-            // district identities advertised by the Meridian catalogue.
-            if (worldZ < -120f) return "south";
-            if (worldZ < 0f) return "central-south";
-            if (worldZ < 120f) return "central-north";
-            return "north";
+            WorldCityCatalogDistrict match = null;
+            foreach (WorldCityCatalogDistrict district in districts)
+            {
+                if (district == null || district.center == null) continue;
+                bool inside = worldPosition.x >= district.center.x - district.radius &&
+                    worldPosition.x < district.center.x + district.radius &&
+                    worldPosition.z >= district.center.z - district.radius &&
+                    worldPosition.z < district.center.z + district.radius;
+                if (!inside) continue;
+                if (match != null)
+                    throw new BuildFailedException("City district layout overlaps at scene object position " + worldPosition);
+                match = district;
+            }
+            if (match == null)
+                throw new BuildFailedException("City scene object is outside every authored district: " + worldPosition);
+            return match.id;
         }
 
         private static string ToTitle(string value)
