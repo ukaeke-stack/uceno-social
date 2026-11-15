@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -8,37 +9,63 @@ using UnityEngine;
 namespace UCENO.VirtualWorld.Editor
 {
     /// <summary>
-    /// Release gate for imported, retargeted humanoid animation FBXs.
-    /// The city/avatar pipeline must not count procedural bone posing as an animation library.
+    /// Release gate for imported, retargeted Humanoid motion clips.
+    /// Procedural posing, static imagery and generic non-humanoid clips do not qualify.
     /// </summary>
     public static class HumanoidAnimationLibraryValidator
     {
         private const string AnimationRoot = "Assets/UCENO/Animations/Imported";
         private const string BaseAvatarPath = "Assets/UCENO/Characters/Imported/UCENO_Default_Avatar.fbx";
+        private const string ProvenancePath = AnimationRoot + "/animation-source-manifest.json";
         private static readonly string[] RequiredClips =
         {
             "idle", "walk", "run", "talk", "turn", "wave", "cheer", "dance", "interact", "sit"
         };
+
+        [Serializable] private sealed class SourceManifest { public SourceRecord[] assets; }
+        [Serializable] private sealed class SourceRecord
+        {
+            public string sourceFbx, sourceName, sourceUrl, license, attribution;
+        }
 
         [MenuItem("UCENO/Validate Imported Humanoid Animation Library")]
         public static void Validate()
         {
             string[] modelGuids = AssetDatabase.FindAssets("t:Model", new[] { AnimationRoot });
             if (modelGuids.Length == 0)
-                throw new InvalidOperationException(
-                    "No imported animation FBXs found. Add licensed Humanoid animation FBXs under " +
-                    AnimationRoot + " and retarget them to the UCENO base Avatar before validation.");
+                throw new InvalidOperationException("No imported animation FBXs found. Add licensed Humanoid FBXs under " + AnimationRoot + ".");
 
             Avatar baseAvatar = AssetDatabase.LoadAllAssetsAtPath(BaseAvatarPath).OfType<Avatar>()
                 .FirstOrDefault(candidate => candidate != null && candidate.isHuman);
             if (baseAvatar == null)
                 throw new InvalidOperationException("The UCENO base Humanoid Avatar is missing: " + BaseAvatarPath);
 
+            if (!File.Exists(ProvenancePath))
+                throw new InvalidOperationException("Animation source/licence manifest is missing: " + ProvenancePath);
+            SourceManifest manifest = JsonUtility.FromJson<SourceManifest>(File.ReadAllText(ProvenancePath));
+            if (manifest?.assets == null || manifest.assets.Length != modelGuids.Length)
+                throw new InvalidOperationException("Animation source manifest must contain exactly one record per imported FBX.");
+
+            var provenance = new Dictionary<string, SourceRecord>(StringComparer.Ordinal);
+            foreach (SourceRecord record in manifest.assets)
+            {
+                if (record == null || string.IsNullOrWhiteSpace(record.sourceFbx) ||
+                    string.IsNullOrWhiteSpace(record.sourceName) || string.IsNullOrWhiteSpace(record.sourceUrl) ||
+                    string.IsNullOrWhiteSpace(record.license) || string.IsNullOrWhiteSpace(record.attribution))
+                    throw new InvalidOperationException("Animation source manifest contains an incomplete provenance record.");
+                if (provenance.ContainsKey(record.sourceFbx))
+                    throw new InvalidOperationException("Duplicate animation provenance record: " + record.sourceFbx);
+                provenance.Add(record.sourceFbx, record);
+            }
+
             var clips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var errors = new List<string>();
             foreach (string guid in modelGuids)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!provenance.ContainsKey(path))
+                    errors.Add(path + ": source URL, licence and attribution are not recorded.");
+
                 var importer = AssetImporter.GetAtPath(path) as ModelImporter;
                 if (importer == null) { errors.Add(path + ": not a ModelImporter asset."); continue; }
                 if (importer.animationType != ModelImporterAnimationType.Human)
@@ -46,9 +73,6 @@ namespace UCENO.VirtualWorld.Editor
                 if (importer.avatarSetup != ModelImporterAvatarSetup.CopyFromOther || importer.sourceAvatar != baseAvatar)
                     errors.Add(path + ": Rig > Avatar Definition must reference the exact UCENO base Avatar.");
 
-                // Importer clip definitions alone are not proof that Unity has
-                // produced usable AnimationClip sub-assets. Validate the actual
-                // imported clips that an Animator can reference.
                 AnimationClip[] importedClips = AssetDatabase.LoadAllAssetsAtPath(path)
                     .OfType<AnimationClip>()
                     .Where(clip => clip != null && !clip.name.StartsWith("__preview__", StringComparison.OrdinalIgnoreCase))
@@ -63,10 +87,15 @@ namespace UCENO.VirtualWorld.Editor
                 foreach (AnimationClip clip in importedClips)
                 {
                     string clipName = clip.name == null ? string.Empty : clip.name.Trim();
-                    if (clipName.Length == 0) continue;
+                    if (clipName.Length == 0) { errors.Add(path + ": an imported clip has an empty name."); continue; }
                     clips.Add(clipName);
                     if (clip.length <= 0f)
                         errors.Add(path + ": " + clipName + " has no playable duration.");
+                    if (!clip.humanMotion)
+                        errors.Add(path + ": " + clipName + " does not contain imported Humanoid motion.");
+                    if (AnimationUtility.GetCurveBindings(clip).Length == 0 &&
+                        AnimationUtility.GetObjectReferenceCurveBindings(clip).Length == 0)
+                        errors.Add(path + ": " + clipName + " has no animation curves.");
                     if (IsLoopingClip(clipName) && !clip.isLooping)
                         errors.Add(path + ": " + clipName + " is not imported as a looping clip.");
                 }
@@ -80,15 +109,15 @@ namespace UCENO.VirtualWorld.Editor
                 throw new InvalidOperationException("Humanoid animation library is not release-ready:\n- " +
                     string.Join("\n- ", errors));
             Debug.Log("UCENO imported Humanoid animation library validated: " +
-                modelGuids.Length + " FBX files, " + clips.Count +
-                " actual imported AnimationClip sub-assets. Retargeting points to the UCENO base Avatar.");
+                modelGuids.Length + " licensed FBX files, " + clips.Count +
+                " actual clips with Humanoid motion, curves and exact base-Avatar retargeting.");
         }
 
         private static bool IsLoopingClip(string clipName)
         {
             string name = clipName.ToLowerInvariant();
             return name.Contains("idle") || name.Contains("walk") ||
-                name.Contains("run") || name.Contains("talk");
+                name.Contains("run") || name.Contains("talk") || name.Contains("dance");
         }
     }
 }
