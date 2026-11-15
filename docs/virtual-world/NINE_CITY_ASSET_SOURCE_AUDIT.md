@@ -56,3 +56,29 @@ A source page or a downloadable archive is not proof of acquisition, import, lic
 ## Current status
 
 The PR inventory previously audited contains no files under `Assets/UCENO/Cities/`, only one general HDRI, and no imported city-specific prefab sets or nine-city source manifests. This register does not change that inventory. All nine city art packs, nine city HDRIs, Unity imports/LODs and scene visual acceptance remain outstanding.
+
+
+## Second sourcing pass — 2026-11-15
+
+This pass widened the search beyond the initial Poly Haven-oriented shortlist. It adds leads, not accepted art:
+
+| Lead | Public listing evidence | Appropriate use | Decision / caveat |
+|---|---|---|---|
+| [Poly Haven](https://polyhaven.com/) | Its library describes hyperreal 3D models, HDRIs and photoscanned PBR textures, all CC0 | First-choice source to inspect for hero props, natural assets, PBR surfaces and HDRIs | Query the actual catalogue by asset; do not assume it contains nine complete city kits or 108 suitable buildings |
+| [Grab3D — City Block](https://grab3d.com/models/buildings/city-block-filler/) | CC0 listing; 20,642 triangles, 2K PBR maps, downloadable GLB/FBX/BLEND/OBJ | Possible mid-distance street filler or mixed-use block | Listing labels it stylized; not a photoreal hero building. Verify the downloaded archive and actual LODs; the listing alone does not prove two LODs |
+| [Grab3D — Skyscraper](https://grab3d.com/models/buildings/skyscraper/) | CC0 listing; 22,928 triangles, 2K textures, GLB/FBX/BLEND/OBJ | Possible skyline silhouette / distant tower | Stylized art direction; not sufficient as a hero asset and no two-LOD proof on the listing |
+| [3DAssets.dev — realistic buildings](https://3dassets.dev/assets?category=buildings&style=realistic) | Catalogue claims 1,418 self-contained realistic GLB models under 25 MB, free commercial use | Candidate pool for screening distinct architecture and landmarks | Catalogue-wide statement is not model-level provenance. Every selected asset needs an individual licence/source record and geometry/material/LOD inspection |
+| [FPS Buildings Environment Kit](https://github.com/petroulacl/fps-buildings-env-kit) | Repository describes Kenney modular buildings, Quaternius vegetation, Poly Haven HDRIs and ambientCG PBR textures as CC0 | Possible source bundle for low-priority background props and surfaces | Mostly modular/stylized kit assets; do not use as the primary realistic city architecture. Verify original source licences and each file before reuse |
+| [ModKit modular building kit](https://github.com/JaronKBragg7337/asset-pack-ue-threejs-blender-unity) | Repository describes 38 CC0 modular building/prop pieces in FBX/GLB/Blend | Architectural kitbash parts for original buildings | Procedural/modular parts are not finished detailed city buildings; use only as components if visual quality is acceptable |
+
+### Sourcing decision
+
+1. Prioritize individual high-quality Poly Haven models and PBR materials where catalogue inspection confirms the needed subject and quality. Its CC0 terms are the cleanest licensing baseline for embedded assets.
+2. Screen 3DAssets.dev model-by-model for realistic architecture, but do not bulk-import on the strength of its catalogue claim.
+3. Treat Grab3D city block/skyscraper as supporting assets only unless Unity inspection demonstrates they meet the intended visual tier.
+4. Keep low-poly and modular CC0 kits out of the hero-architecture count. They may support distant silhouettes, utility props or hidden structural components, but cannot be counted as finished city-specific hero prefabs.
+5. For each of the nine HDRIs, require an actual downloaded panorama with recorded source URL, licence, dimensions, projection and hash. A search result or generic HDRI is not a city-specific environment asset.
+
+### Evidence boundary
+
+No source archive was downloaded or imported by this audit. No asset is promoted to acquired, imported, LOD-complete or visually accepted. The next real delivery step is to obtain the actual model files and licence evidence, then run Unity import and visual inspection against the existing release gate. If a source cannot supply suitable assets under compatible terms, the correct action is to commission/create that asset—not lower the realism requirement or count a placeholder.
