@@ -9,8 +9,8 @@ using UnityEngine;
 namespace UCENO.VirtualWorld.Editor
 {
     /// <summary>
-    /// Hard release gate for real, imported city art. Procedurally generated
-    /// primitives, flat-color blockouts and unlicensed assets cannot satisfy it.
+    /// Hard release gate for real, imported city art. Procedural primitives,
+    /// flat-color blockouts, reused city packs and unlicensed assets cannot pass.
     /// </summary>
     public static class ImportedCityAssetPackGate
     {
@@ -32,7 +32,8 @@ namespace UCENO.VirtualWorld.Editor
             public string prefab, sourceName, sourceUrl, license, attribution;
         }
         [Serializable] private sealed class CityCatalog { public CatalogCity[] cities; }
-        [Serializable] private sealed class CatalogCity { public string id; }
+        [Serializable] private sealed class CatalogCity { public string id; public CatalogLandmark[] landmarks; }
+        [Serializable] private sealed class CatalogLandmark { public string id; }
 
         [MenuItem("UCENO/World/Validate Imported City Art Packs", false, 29)]
         public static void Validate()
@@ -46,6 +47,7 @@ namespace UCENO.VirtualWorld.Editor
                 catalog?.cities == null || catalog.cities.Length != 10)
                 throw new InvalidOperationException("Expected nine city asset packs plus Meridian Prime.");
 
+            var catalogById = catalog.cities.ToDictionary(c => c.id, StringComparer.Ordinal);
             var expectedCities = new HashSet<string>(catalog.cities.Select(c => c.id)
                 .Where(id => !string.Equals(id, "meridian", StringComparison.OrdinalIgnoreCase)));
             var seenCities = new HashSet<string>();
@@ -56,12 +58,21 @@ namespace UCENO.VirtualWorld.Editor
             {
                 Require(city != null && expectedCities.Contains(city.cityId) && seenCities.Add(city.cityId),
                     "Unknown or duplicate city profile: " + (city == null ? "<null>" : city.cityId));
+                Require(city.assetRoot == "Assets/UCENO/Cities/" + city.cityId + "/Prefabs",
+                    city.cityId + " asset root must be its exact city-owned Prefabs folder.");
                 Require(city.architecturePrefabs != null && city.architecturePrefabs.Length == 5,
                     city.cityId + " must have five architecture prefabs.");
                 Require(city.environmentPrefabs != null && city.environmentPrefabs.Length == 4,
                     city.cityId + " must have four environment prefabs.");
                 Require(city.landmarks != null && city.landmarks.Length == 3,
                     city.cityId + " must have three dedicated landmark prefabs.");
+
+                var expectedLandmarks = new HashSet<string>(
+                    catalogById[city.cityId].landmarks.Select(x => x.id), StringComparer.Ordinal);
+                var actualLandmarks = new HashSet<string>(
+                    city.landmarks.Select(x => x.landmarkId), StringComparer.Ordinal);
+                Require(expectedLandmarks.SetEquals(actualLandmarks),
+                    city.cityId + " landmark prefab IDs must exactly match its city catalogue.");
 
                 string cityRoot = "Assets/UCENO/Cities/" + city.cityId;
                 string manifestPath = cityRoot + "/" + ManifestName;
@@ -129,7 +140,7 @@ namespace UCENO.VirtualWorld.Editor
 
             Require(seenCities.SetEquals(expectedCities), "Not all nine non-Meridian cities have profiles.");
             Debug.Log("Imported city art gate passed: " + checkedPrefabs +
-                " unique textured imported prefabs, nine city provenance manifests and nine HDRI panoramas.");
+                " unique textured imported prefabs, exact catalogue landmarks, nine provenance manifests and nine HDRI panoramas.");
         }
 
         private static void Require(bool condition, string message)
