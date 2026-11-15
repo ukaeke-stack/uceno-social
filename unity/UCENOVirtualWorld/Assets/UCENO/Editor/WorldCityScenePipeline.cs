@@ -228,7 +228,7 @@ namespace UCENO.VirtualWorld.Editor
                 SceneManager.SetActiveScene(scene);
                 GameObject root = new GameObject("UCENO " + city.name + " - " + district.name);
                 SceneManager.MoveGameObjectToScene(root, scene);
-                BuildDistrictGround(root.transform, district, ground, road, city.layout.pattern);
+                BuildDistrictGround(root.transform, district, ground, road, city.layout.pattern, city.layout.water, city.id);
                 BuildArchitecture(root.transform, district, architecture, city.layout.pattern);
                 BuildEnvironment(root.transform, district, environment, city.environment.biome);
                 foreach (CityPipelineLandmark landmark in city.landmarks.Where(item => item.districtId == district.id))
@@ -244,7 +244,7 @@ namespace UCENO.VirtualWorld.Editor
         }
 
         private static void BuildDistrictGround(Transform parent, CityPipelineDistrict district,
-            Material ground, Material road, string layout)
+            Material ground, Material road, string layout, string waterDescription, string cityId)
         {
             GameObject terrain = GameObject.CreatePrimitive(PrimitiveType.Plane);
             terrain.name = "District Ground - " + district.name;
@@ -255,24 +255,107 @@ namespace UCENO.VirtualWorld.Editor
             GameObjectUtility.SetStaticEditorFlags(terrain, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccludeeStatic);
 
             float width = Mathf.Clamp(district.radius * 0.10f, 10f, 22f);
-            bool linear = layout.Contains("linear") || layout.Contains("rail") || layout.Contains("waterfront");
-            CreateRoad(parent, "Primary " + (linear ? "Spine" : "Boulevard"),
-                new Vector3(district.center.x, 0.035f, district.center.z), linear
-                    ? new Vector3(width, 0.07f, district.radius * 1.75f)
-                    : new Vector3(district.radius * 1.75f, 0.07f, width), road);
-            CreateRoad(parent, "Secondary Street",
-                new Vector3(district.center.x, 0.04f, district.center.z),
-                linear ? new Vector3(district.radius * 1.4f, 0.08f, width * 0.55f)
-                       : new Vector3(width * 0.55f, 0.08f, district.radius * 1.4f), road);
-
-            if (layout.Contains("radial") || layout.Contains("courtyard") || layout.Contains("garden"))
+            float span = district.radius * 1.65f;
+            if (layout == "linear-waterfront")
             {
-                CreateRoad(parent, "Civic Ring North",
-                    new Vector3(district.center.x, 0.045f, district.center.z + district.radius * 0.58f),
-                    new Vector3(district.radius * 1.35f, 0.09f, width * 0.65f), road);
-                CreateRoad(parent, "Civic Ring South",
-                    new Vector3(district.center.x, 0.045f, district.center.z - district.radius * 0.58f),
-                    new Vector3(district.radius * 1.35f, 0.09f, width * 0.65f), road);
+                CreateRoad(parent, "Coastal Esplanade", new Vector3(district.center.x, .04f, district.center.z),
+                    new Vector3(width, .08f, span), road);
+                CreateRoad(parent, "Terrace Promenade", new Vector3(district.center.x + 58f, .04f, district.center.z),
+                    new Vector3(width * .55f, .08f, span), road);
+                CreateRoad(parent, "Beach Access", new Vector3(district.center.x, .04f, district.center.z - 58f),
+                    new Vector3(span, .08f, width * .55f), road);
+            }
+            else if (layout == "multi-level-green-corridors")
+            {
+                foreach (float offset in new[] { -65f, 0f, 65f })
+                    CreateRoad(parent, "Garden Mobility Corridor", new Vector3(district.center.x + offset, .04f, district.center.z),
+                        new Vector3(width * .55f, .08f, span), road);
+                CreateRoad(parent, "Elevated Canopy Skyway", new Vector3(district.center.x, 4.5f, district.center.z),
+                    new Vector3(span, .65f, width * .55f), road);
+            }
+            else if (layout == "river-island-campus")
+            {
+                CreateRoad(parent, "Island Bridge North", new Vector3(district.center.x, .04f, district.center.z + 48f),
+                    new Vector3(span, .08f, width), road);
+                CreateRoad(parent, "Island Bridge South", new Vector3(district.center.x, .04f, district.center.z - 48f),
+                    new Vector3(span, .08f, width), road);
+                CreateRoad(parent, "Campus Spine", new Vector3(district.center.x, .04f, district.center.z),
+                    new Vector3(width, .08f, span), road);
+            }
+            else if (layout == "contour-terraces")
+            {
+                int tier = 0;
+                foreach (float offset in new[] { -75f, -25f, 25f, 75f })
+                {
+                    float elevation = tier++ * 1.15f;
+                    CreateRoad(parent, "Mountain Switchback " + tier,
+                        new Vector3(district.center.x, .04f + elevation, district.center.z + offset),
+                        new Vector3(span, .08f, width * .62f), road);
+                }
+            }
+            else if (layout == "oasis-radial-courtyards" || layout == "garden-city-radial")
+            {
+                CreateRoad(parent, "Central Market Spine", new Vector3(district.center.x, .04f, district.center.z),
+                    new Vector3(width, .08f, span), road);
+                CreateRoad(parent, "Courtyard Cross Axis", new Vector3(district.center.x, .04f, district.center.z),
+                    new Vector3(span, .08f, width), road);
+                foreach (float offset in new[] { -75f, 75f })
+                {
+                    CreateRoad(parent, "Radial Garden Ring", new Vector3(district.center.x, .05f, district.center.z + offset),
+                        new Vector3(span * .78f, .09f, width * .55f), road);
+                    CreateRoad(parent, "Radial Courtyard Link", new Vector3(district.center.x + offset, .05f, district.center.z),
+                        new Vector3(width * .55f, .09f, span * .78f), road);
+                }
+            }
+            else if (layout == "elevated-grid-and-canals")
+            {
+                foreach (float offset in new[] { -70f, 0f, 70f })
+                {
+                    CreateRoad(parent, "Raised Harbour Street", new Vector3(district.center.x + offset, .08f, district.center.z),
+                        new Vector3(width * .55f, .16f, span), road);
+                    CreateRoad(parent, "Covered Market Street", new Vector3(district.center.x, .08f, district.center.z + offset),
+                        new Vector3(span, .16f, width * .55f), road);
+                }
+            }
+            else if (layout == "entertainment-superblocks")
+            {
+                foreach (float offset in new[] { -82f, 82f })
+                {
+                    CreateRoad(parent, "Superblock Perimeter", new Vector3(district.center.x, .04f, district.center.z + offset),
+                        new Vector3(span, .08f, width * .6f), road);
+                    CreateRoad(parent, "Festival Avenue", new Vector3(district.center.x + offset, .04f, district.center.z),
+                        new Vector3(width * .6f, .08f, span), road);
+                }
+            }
+            else if (layout == "rail-spoke-industrial")
+            {
+                CreateRoad(parent, "Regional Rail Spine", new Vector3(district.center.x, .04f, district.center.z),
+                    new Vector3(width * 1.25f, .08f, span), road);
+                foreach (float offset in new[] { -70f, 0f, 70f })
+                    CreateRoad(parent, "Logistics Spoke", new Vector3(district.center.x + offset, .04f, district.center.z),
+                        new Vector3(width * .5f, .08f, span * .72f), road);
+            }
+            else
+            {
+                CreateRoad(parent, "Primary Boulevard", new Vector3(district.center.x, .04f, district.center.z),
+                    new Vector3(span, .08f, width), road);
+                CreateRoad(parent, "Secondary Street", new Vector3(district.center.x, .045f, district.center.z),
+                    new Vector3(width, .09f, span), road);
+            }
+
+            string waterKey = (waterDescription ?? string.Empty).ToLowerInvariant();
+            if (new[] { "canal", "river", "bay", "marina", "wetland", "oasis", "stream", "water" }
+                .Any(waterKey.Contains))
+            {
+                Material water = CreateMaterial("UCENO_" + cityId + "_Water",
+                    new Color(.08f, .34f, .48f, .82f), .82f);
+                GameObject channel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                channel.name = "Water Feature - " + waterDescription;
+                channel.transform.SetParent(parent, false);
+                channel.transform.position = new Vector3(district.center.x - district.radius * .36f, .025f,
+                    district.center.z + district.radius * .34f);
+                channel.transform.localScale = new Vector3(width * .72f, .05f, district.radius * 1.25f);
+                channel.GetComponent<Renderer>().sharedMaterial = water;
             }
         }
 
@@ -321,13 +404,14 @@ namespace UCENO.VirtualWorld.Editor
             instance.isStatic = true;
         }
 
-        private static void CreateRoad(Transform parent, string name, Vector3 position, Vector3 scale, Material material)
+        private static void CreateRoad(Transform parent, string name, Vector3 position, Vector3 scale, Material material, float rotationY = 0f)
         {
             GameObject road = GameObject.CreatePrimitive(PrimitiveType.Cube);
             road.name = name;
             road.transform.SetParent(parent, false);
             road.transform.position = position;
             road.transform.localScale = scale;
+            road.transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
             road.GetComponent<Renderer>().sharedMaterial = material;
             GameObjectUtility.SetStaticEditorFlags(road, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccludeeStatic);
         }
