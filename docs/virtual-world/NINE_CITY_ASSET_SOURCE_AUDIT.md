@@ -119,3 +119,31 @@ For each HDRI, record the exact asset ID, source page, licence evidence, file fo
 ### Acquisition status
 
 This screening added no downloaded files to the repository. No source archive has been imported, and no candidate is accepted. The current nine-city art gate remains the authority for acceptance; the asset list must not be padded with low-detail models to make the counts appear complete.
+
+
+## Fourth sourcing pass — exact Poly Haven architecture inventory
+
+The official Poly Haven architecture category was inspected rather than relying on the overall model count. It currently lists **14 architecture assets**, including only three entries categorized as facades/modules. This is a much smaller architecture pool than the overall 522-model catalogue suggests.
+
+Exact candidate models relevant to the existing city pipeline:
+
+| Asset | Listing facts | Potential UCENO use | Import risk |
+|---|---|---|---|
+| [Modular Urban Apartments Facade](https://polyhaven.com/a/modular_urban_apartments_facade) | CC0; 118K triangles; 51.5m wide; 147 parts; download package listed at 663.38 MB | Meridian-style contemporary residential facade modules; could support Verdant Reach or Origin Plains only if the architecture is adapted and not simply duplicated | Very large source package. Needs selective map/resolution reduction, mesh partitioning, LOD generation and mobile profiling. One model does not satisfy a 12-prefab city pack. |
+| [Modular Factory Facade](https://polyhaven.com/a/modular_factory_facade) | CC0; 175K triangles; 53.3m wide; 26.9 px/cm; download package listed at 900.83 MB | Atlas Frontier industrial district; possibly Monsoon Harbour service/port buildings after art review | Extremely large package. Must be selectively processed and LOD'd; not a ready-to-ship mobile asset. |
+| [Modular Fort 01](https://polyhaven.com/a/modular_fort_01) | CC0; 28K triangles; 71.4m wide; download package listed at 646.68 MB | Possible heritage landmark or fortified civic feature only if a city brief requires it | Architecture style is colonial/fortification and does not fit most city identities. Heavy source archive; use only if visual direction explicitly supports it. |
+
+The official category also includes small architectural components such as chainlink fencing, fire escapes, doors, shutters and gates. Those can become supporting props, but they are not substitutes for complete high-rise, waterfront, alpine, desert, research-campus or entertainment-district buildings.
+
+### Revised acquisition strategy
+
+- Use Poly Haven as a high-quality source for selected hero props, modular facade source geometry, materials and lighting—not as the sole provider of nine complete city architecture libraries.
+- Download source archives only after assigning a specific city and prefab role. Large 600–900 MB archives must not be imported wholesale into the Android project.
+- Create a processing stage outside the runtime build: retain original source files and provenance, extract only required components/maps, generate optimized meshes and multiple LODs, compress textures for Android, and record resulting hashes.
+- Keep original source archive size separate from installed Addressables bundle size. The runtime package should contain only optimized deliverables.
+- Build remaining distinctive landmarks and complete city silhouettes from a combination of individually licensed source assets and purpose-built authored models. Do not stretch a facade kit into nine different architectural identities by simple recolouring.
+- The official Poly Haven API may be used for development-time catalogue metadata. The assets themselves are CC0, but live API use in a shipped product carries a separate visible attribution requirement. Do not make the game depend on the live API at runtime; ship versioned, locally manifested asset bundles instead.
+
+### Status remains unchanged
+
+These exact catalogue entries have not been downloaded, imported or visually accepted in Unity. They are acquisition candidates only. The existing release gate remains mandatory, including LODs, textured materials, collision/interactable validation, unique city assignment and Android profiling.
