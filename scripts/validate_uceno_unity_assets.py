@@ -409,7 +409,7 @@ def main():
         fail("Player seated/rest state or desktop toggle is missing.")
     if "motor != null ? motor.IsSeated" not in avatar or "IsSeatedHash" not in avatar or "SetBool(IsSeatedHash, seated)" not in avatar:
         fail("Imported Humanoid seated/rest animation state is missing.")
-    if "WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking" not in avatar or "IsTalkingHash" not in avatar:
+    if "if (motor != null) WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking" not in avatar or "IsTalkingHash" not in avatar:
         fail("Humanoid talking animation is not connected to the actual microphone transmit state.")
     if "Mathf.Sin(cycle)" in avatar or "ApplyProcedural" in avatar:
         fail("Procedural humanoid gait fallback is not allowed.")
