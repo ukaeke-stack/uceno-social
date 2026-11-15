@@ -263,3 +263,21 @@ test("gateway movement, district snapshots and proximity routing use each player
   assert.match(server, /cityRuntime\.city\.spawn\.x/);
   assert.match(server, /findWorldDistrict\(cityRuntime\.districts, p\.x, p\.z\)/);
 });
+
+test("city readiness keys are city-scoped; matching district IDs from another city cannot unlock admission", () => {
+  const cities = parseWorldCityCatalog(fixture, 10);
+  const meridian = cities.find(city => city.id === "meridian");
+  const solstice = cities.find(city => city.id === "solstice");
+  assert.ok(meridian && solstice);
+  const meridianKeys = new Set(meridian.districts.map(district => 'meridian:' + district.id));
+  assert.equal(evaluateCityRuntimeReadiness(meridian, meridianKeys, meridianKeys).ready, true);
+  assert.equal(evaluateCityRuntimeReadiness(solstice, meridianKeys, meridianKeys).ready, false);
+  assert.equal(evaluateCityRuntimeReadiness(solstice, new Set(solstice.districts.map(d => 'solstice:' + d.id)), meridianKeys).ready, false);
+});
+test("gateway derives readiness only from city-matching exported content labels", () => {
+  const server = readFileSync(new URL("../src/server.ts", import.meta.url), "utf8");
+  assert.match(server, /function cityRuntimeCollisionKeys\(\)/);
+  assert.match(server, /item\.contentLabel === district\.contentLabel/);
+  assert.match(server, /keys\.add\(city\.id \+ .:/);
+  assert.match(server, /function cityRuntimeInteractableKeys\(\)/);
+});
