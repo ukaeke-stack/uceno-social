@@ -792,7 +792,7 @@ namespace UCENO.VirtualWorld.Editor
                     district.center.z + offsets[i][1]);
                 instance.transform.rotation = Quaternion.Euler(0f, (i * 53f) % 360f, 0f);
                 float scale = 0.88f + (i % 4) * 0.08f;
-                instance.transform.localScale = Vector3.one * scale;
+                instance.transform.localScale *= scale;
                 instance.isStatic = true;
             }
         }
