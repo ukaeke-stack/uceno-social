@@ -46,12 +46,29 @@ namespace UCENO.VirtualWorld.Editor
                 if (importer.avatarSetup != ModelImporterAvatarSetup.CopyFromOther || importer.sourceAvatar != baseAvatar)
                     errors.Add(path + ": Rig > Avatar Definition must reference the exact UCENO base Avatar.");
 
-                foreach (var clip in importer.defaultClipAnimations)
+                // Importer clip definitions alone are not proof that Unity has
+                // produced usable AnimationClip sub-assets. Validate the actual
+                // imported clips that an Animator can reference.
+                AnimationClip[] importedClips = AssetDatabase.LoadAllAssetsAtPath(path)
+                    .OfType<AnimationClip>()
+                    .Where(clip => clip != null && !clip.name.StartsWith("__preview__", StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+
+                if (importedClips.Length == 0)
                 {
-                    if (string.IsNullOrWhiteSpace(clip.name)) continue;
-                    clips.Add(clip.name.Trim());
-                    if (IsLoopingClip(clip.name) && !clip.loopTime)
-                        errors.Add(path + ": " + clip.name + " must have Loop Time enabled.");
+                    errors.Add(path + ": no usable imported AnimationClip sub-assets were found.");
+                    continue;
+                }
+
+                foreach (AnimationClip clip in importedClips)
+                {
+                    string clipName = clip.name == null ? string.Empty : clip.name.Trim();
+                    if (clipName.Length == 0) continue;
+                    clips.Add(clipName);
+                    if (clip.length <= 0f)
+                        errors.Add(path + ": " + clipName + " has no playable duration.");
+                    if (IsLoopingClip(clipName) && !clip.isLooping)
+                        errors.Add(path + ": " + clipName + " is not imported as a looping clip.");
                 }
             }
 
@@ -63,7 +80,8 @@ namespace UCENO.VirtualWorld.Editor
                 throw new InvalidOperationException("Humanoid animation library is not release-ready:\n- " +
                     string.Join("\n- ", errors));
             Debug.Log("UCENO imported Humanoid animation library validated: " +
-                modelGuids.Length + " FBX files, " + clips.Count + " clips.");
+                modelGuids.Length + " FBX files, " + clips.Count +
+                " actual imported AnimationClip sub-assets. Retargeting points to the UCENO base Avatar.");
         }
 
         private static bool IsLoopingClip(string clipName)
