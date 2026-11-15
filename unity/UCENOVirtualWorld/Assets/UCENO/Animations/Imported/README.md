@@ -15,8 +15,9 @@ The Editor release gate searches imported FBX clip names for:
 - Cheer
 - Dance
 - Interact
+- Sit
 
-Idle, walk and run must be loopable. Gesture and interaction clips should be authored as one-shot actions unless their source explicitly requires looping.
+Idle, walk, run and talk must be loopable. Wave, cheer, turn and interaction clips should be authored as one-shot actions. Dance may loop. Sit is used by the seated state and should hold a stable seated pose.
 
 ## Import and retarget procedure
 
@@ -27,7 +28,7 @@ Idle, walk and run must be loopable. Gesture and interaction clips should be aut
 5. Apply the import settings. Open **Animation** and confirm the clip names, frame ranges, loop settings and root transform settings.
 6. Preview each clip on the UCENO base Avatar. Reject foot sliding, twisted wrists, shoulder collapse, hip drift, incorrect facing, and broken hand/head motion.
 7. Run **UCENO > Validate Imported Humanoid Animation Library**. The check fails until all required retargeted clips exist.
-8. Test the clips on the actual human avatar and at least one AI citizen rig. Review idle, walk, run, talk, turn, wave, dance and object interaction in motion, not only in a still frame.
+8. Test the clips on the actual human avatar and at least one AI citizen rig. Review idle, walk, run, talk, turn, wave, cheer, dance, sit/stand and object interaction in motion, not only in a still frame. Local talk state follows actual microphone transmission; remote talk state follows the replicated animation snapshot.
 
 ## Acceptance boundary
 
