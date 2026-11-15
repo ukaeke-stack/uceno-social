@@ -32,6 +32,7 @@ REQUIRED_FILES = [
     ASSETS / "Scripts/PlayerMotor.cs",
     ASSETS / "Scripts/FollowCamera.cs",
     ASSETS / "Scripts/AvatarLocomotionDriver.cs",
+    ASSETS / "Scripts/AvatarCrowdLod.cs",
     ASSETS / "Scripts/WorldStatusHud.cs",
     ASSETS / "Scripts/WorldSessionClient.cs",
     ASSETS / "Scripts/WorldHomeClient.cs",
@@ -177,6 +178,15 @@ def main():
     avatar = read_text(ASSETS / "Scripts/AvatarLocomotionDriver.cs")
     if "TriggerWave" not in avatar or "TriggerCheer" not in avatar:
         fail("Avatar wave/cheer gesture actions are missing.")
+
+    crowd_lod = read_text(ASSETS / "Scripts/AvatarCrowdLod.cs")
+    for required in ("animator.enabled = visible", "AnimatorCullingMode.AlwaysAnimate",
+                     "AnimatorCullingMode.CullUpdateTransforms", "locomotion.enabled = animate",
+                     "expressions.enabled = facial"):
+        if required not in crowd_lod:
+            fail("Mobile avatar crowd LOD is missing required tier behavior: " + required)
+    if "wrapper.AddComponent<AvatarCrowdLod>()" not in builder:
+        fail("Generated avatar prefab is missing the shared human/AI crowd LOD controller.")
 
     hud = read_text(ASSETS / "Scripts/WorldStatusHud.cs")
     if "GUI.Button" not in hud or "Position:" not in hud or '"JUMP"' not in hud or '"RUN"' not in hud or '"WAVE"' not in hud or '"CHEER"' not in hud:
