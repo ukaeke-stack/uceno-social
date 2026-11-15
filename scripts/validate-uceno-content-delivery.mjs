@@ -42,7 +42,7 @@ const checks = [
   ["District labels load additive Addressables scenes", /IsDistrictSceneLabel/.test(delivery) && /LoadSceneAsync\(label, LoadSceneMode.Additive/.test(delivery)],
   ["District scene handles unload after final lease release", /UnloadSceneAsync\(handle, false\)/.test(delivery) && /residentSceneHandles/.test(delivery)],
   ["Shutdown waits for pending additive scene loads before unloading them", /handle\.Completed \+= operation/.test(delivery) && /if \(handle\.IsDone\)/.test(delivery)],
-  ["Editor builder partitions city geometry into four additive scenes", /BuildDistrictScenes\(worldRoot\)/.test(sceneBuilder) && /central-south/.test(sceneBuilder) && /central-north/.test(sceneBuilder)],
+  ["Editor builder partitions city geometry into four additive scenes", /BuildDistrictScenes\(worldRoot\)/.test(sceneBuilder) && /districtDefinitions/.test(sceneBuilder) && /ResolveDistrictName\(child\.position, districtDefinitions\)/.test(sceneBuilder) && /CreateOrMoveEntry/.test(sceneBuilder)],
   ["District scenes are separately packed remote Addressables entries", /PackSeparately/.test(sceneBuilder) && /CreateOrMoveEntry/.test(sceneBuilder) && /kRemoteLoadPath/.test(sceneBuilder)],
   ["Collision geometry is exported before district partitioning", /WorldCollisionGeometryExporter\.Export\(scene\)[\s\S]*?BuildDistrictScenes\(worldRoot\)/.test(sceneBuilder)],
   ["District transitions retain the new area and release the previous area", /activeDistrictLabel/.test(gateway) && /ReleaseContent\(activeDistrictLabel\)/.test(gateway)],
