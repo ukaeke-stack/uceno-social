@@ -78,7 +78,7 @@ namespace UCENO.VirtualWorld.Editor
                 {
                     string clipName = animationClips[i].name.ToLowerInvariant();
                     bool looping = clipName.Contains("idle") || clipName.Contains("walk") ||
-                        clipName.Contains("run") || clipName.Contains("jog") ||
+                        clipName.Contains("run") || clipName.Contains("talk") || clipName.Contains("jog") ||
                         clipName.Contains("strafe") || clipName.Contains("dance");
                     animationClips[i].loopTime = looping;
                     animationClips[i].loopPose = looping;
