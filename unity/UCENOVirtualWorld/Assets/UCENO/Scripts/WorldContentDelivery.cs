@@ -289,11 +289,43 @@ namespace UCENO.VirtualWorld
             yield return init;
             if (init.Status != AsyncOperationStatus.Succeeded)
             {
+                if (init.IsValid()) Addressables.Release(init);
                 initializing = false;
                 StatusChanged?.Invoke("Content service unavailable. Retry when connected.");
                 completed?.Invoke(false, "Addressables initialization failed.");
                 yield break;
             }
+            Addressables.Release(init);
+
+            // Refresh the remote catalog before resolving any city/district labels.
+            // Addressables caches downloaded bundles; catalog updates let existing
+            // installs discover newly published or versioned district content.
+            var catalogCheck = Addressables.CheckForCatalogUpdates(false);
+            yield return catalogCheck;
+            if (catalogCheck.Status != AsyncOperationStatus.Succeeded)
+            {
+                if (catalogCheck.IsValid()) Addressables.Release(catalogCheck);
+                initializing = false;
+                StatusChanged?.Invoke("Remote world catalog could not be checked. Retry when connected.");
+                completed?.Invoke(false, "Remote catalog update check failed.");
+                yield break;
+            }
+            if (catalogCheck.Result != null && catalogCheck.Result.Count > 0)
+            {
+                var catalogUpdate = Addressables.UpdateCatalogs(catalogCheck.Result, false);
+                yield return catalogUpdate;
+                Addressables.Release(catalogCheck);
+                if (catalogUpdate.Status != AsyncOperationStatus.Succeeded)
+                {
+                    if (catalogUpdate.IsValid()) Addressables.Release(catalogUpdate);
+                    initializing = false;
+                    StatusChanged?.Invoke("Remote world catalog update failed. Retry when connected.");
+                    completed?.Invoke(false, "Remote catalog update failed.");
+                    yield break;
+                }
+                Addressables.Release(catalogUpdate);
+            }
+            else Addressables.Release(catalogCheck);
 
             if (!string.IsNullOrWhiteSpace(remoteCatalogUrl))
             {
