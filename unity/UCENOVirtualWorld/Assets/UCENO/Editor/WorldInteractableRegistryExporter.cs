@@ -90,7 +90,7 @@ namespace UCENO.VirtualWorld.Editor
             Export(true);
         }
 
-        public static void Export(bool showDialog)
+        public static void Export(bool showDialog, string cityId = null, string[] includeScenePaths = null)
         {
             try
             {
@@ -102,7 +102,8 @@ namespace UCENO.VirtualWorld.Editor
                     throw new InvalidOperationException("Missing authored city catalogue: " + cityCatalogPath);
                 WorldCityCatalogDocument cityCatalog =
                     JsonUtility.FromJson<WorldCityCatalogDocument>(File.ReadAllText(cityCatalogPath));
-                string activeCityId = EditorPrefs.GetString(ActiveCityPreference, "meridian");
+                string activeCityId = string.IsNullOrWhiteSpace(cityId)
+                    ? EditorPrefs.GetString(ActiveCityPreference, "meridian") : cityId;
                 WorldCityCatalogEntry activeCity = cityCatalog?.cities?.FirstOrDefault(city =>
                     city != null && string.Equals(city.id, activeCityId, StringComparison.Ordinal));
                 if (activeCity == null || activeCity.districts == null || activeCity.districts.Length < 4)
@@ -135,17 +136,21 @@ namespace UCENO.VirtualWorld.Editor
                 }
                 var districtDocument = new WorldInteractableDistrictDocument { districts = districtEntries };
 
+                var include = includeScenePaths != null
+                    ? new HashSet<string>(includeScenePaths, StringComparer.Ordinal)
+                    : null;
                 var loadedScenes = new List<Scene>();
                 for (int i = 0; i < SceneManager.sceneCount; i++)
                 {
                     Scene scene = SceneManager.GetSceneAt(i);
-                    if (scene.IsValid() && scene.isLoaded)
-                    {
-                        if (string.IsNullOrWhiteSpace(scene.path))
-                            throw new InvalidOperationException("Save every scene before exporting its interactables.");
-                        loadedScenes.Add(scene);
-                    }
+                    if (!scene.IsValid() || !scene.isLoaded) continue;
+                    if (include != null && !include.Contains(scene.path)) continue;
+                    if (string.IsNullOrWhiteSpace(scene.path))
+                        throw new InvalidOperationException("Save every selected scene before exporting its interactables.");
+                    loadedScenes.Add(scene);
                 }
+                if (include != null && loadedScenes.Count != include.Count)
+                    throw new InvalidOperationException("Not all selected city district scenes are loaded for registry export.");
 
                 // Saving first gives GlobalObjectId stable scene GUIDs, including
                 // objects that were just moved into generated additive district scenes.
