@@ -370,6 +370,27 @@ type Player = {
   activeDistrictId: string | null;
   pendingDistrict: { id: string; contentLabel: string; nonce: string; createdAt: number } | null;
 };
+function cityRuntimeCollisionKeys(): Set<string> {
+  const keys = new Set<string>();
+  for (const city of WORLD_CITIES) {
+    for (const district of city.districts) {
+      const configured = WORLD_DISTRICTS.find(item => item.id === district.id && item.contentLabel === district.contentLabel);
+      if (configured && DISTRICT_COLLISION_BOXES.has(configured.id)) keys.add(city.id + ':' + district.id);
+    }
+  }
+  return keys;
+}
+
+function cityRuntimeInteractableKeys(): Set<string> {
+  const keys = new Set<string>();
+  for (const city of WORLD_CITIES) {
+    for (const district of city.districts) {
+      const configured = WORLD_DISTRICTS.find(item => item.id === district.id && item.contentLabel === district.contentLabel);
+      if (configured && [...INTERACTABLES.values()].some(item => item.districtId === configured.id)) keys.add(city.id + ':' + district.id);
+    }
+  }
+  return keys;
+}
 function findPlayerDistrict(player: Pick<Player, "cityId">, x: number, z: number): WorldDistrict | null {
   const runtime = resolveCityRuntime(WORLD_CITIES, player.cityId);
   return runtime ? findWorldDistrict(runtime.districts, x, z) : null;
@@ -810,8 +831,8 @@ async function authenticate(token: string, allowActivityTransfer = false) {
   const row = rows[0];
   if (!row || !resolveReadyCityRuntime(
         WORLD_CITIES, String(row.cityId ?? ""),
-        new Set(DISTRICT_COLLISION_BOXES.keys()),
-        new Set([...INTERACTABLES.values()].map(item => item.districtId))
+        cityRuntimeCollisionKeys(),
+        cityRuntimeInteractableKeys()
       ) || row.moderationStatus === "disabled" ||
       (row.moderationStatus === "suspended" &&
        (!row.suspendedUntil || new Date(row.suspendedUntil).getTime() > Date.now())) ||
@@ -832,8 +853,8 @@ async function loadPlayer(userId: string, worldId: string, cityId: string, token
   `;
   const cityRuntime = resolveReadyCityRuntime(
     WORLD_CITIES, cityId,
-    new Set(DISTRICT_COLLISION_BOXES.keys()),
-    new Set([...INTERACTABLES.values()].map(item => item.districtId))
+    cityRuntimeCollisionKeys(),
+    cityRuntimeInteractableKeys()
   );
   if (!cityRuntime) throw new Error("city_runtime_not_ready");
   const p = rows[0]?.position || {
