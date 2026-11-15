@@ -11,6 +11,7 @@ using UnityEditor.Build;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Rendering;
 
 namespace UCENO.VirtualWorld.Editor
 {
@@ -50,7 +51,7 @@ namespace UCENO.VirtualWorld.Editor
     [Serializable] internal sealed class CityPipelineProfiles { public CityPipelineAssetProfile[] cities; }
     [Serializable] internal sealed class CityPipelineAssetProfile
     {
-        public string cityId, assetRoot;
+        public string cityId, assetRoot, skyboxTexture;
         public string[] architecturePrefabs, environmentPrefabs;
         public CityPipelineLandmarkAsset[] landmarks;
     }
@@ -321,6 +322,19 @@ namespace UCENO.VirtualWorld.Editor
             string expectedRoot = "Assets/UCENO/Cities/" + city.id + "/Prefabs";
             if (!string.Equals(profile.assetRoot, expectedRoot, StringComparison.Ordinal))
                 errors.Add(city.id + ": assetRoot must be " + expectedRoot);
+            string expectedSkyboxRoot = "Assets/UCENO/Cities/" + city.id + "/Textures/Skybox/";
+            if (string.IsNullOrWhiteSpace(profile.skyboxTexture) ||
+                !profile.skyboxTexture.StartsWith(expectedSkyboxRoot, StringComparison.Ordinal))
+                errors.Add(city.id + ": requires a unique city HDRI under " + expectedSkyboxRoot);
+            if (checkAssets && !string.IsNullOrWhiteSpace(profile.skyboxTexture) &&
+                AssetDatabase.LoadAssetAtPath<Texture2D>(profile.skyboxTexture) == null)
+                errors.Add(city.id + ": missing imported city HDRI " + profile.skyboxTexture);
+            if (!string.IsNullOrWhiteSpace(profile.skyboxTexture))
+            {
+                if (assetOwners.TryGetValue(profile.skyboxTexture, out string skyboxOwner) && skyboxOwner != city.id)
+                    errors.Add(city.id + ": HDRI is shared with " + skyboxOwner);
+                else assetOwners[profile.skyboxTexture] = city.id;
+            }
             var paths = (profile.architecturePrefabs ?? Array.Empty<string>())
                 .Concat(profile.environmentPrefabs ?? Array.Empty<string>())
                 .Concat((profile.landmarks ?? Array.Empty<CityPipelineLandmarkAsset>())
@@ -395,6 +409,7 @@ namespace UCENO.VirtualWorld.Editor
                 StringComparer.Ordinal);
             Material ground = CreateCityGroundMaterial(city);
             Material road = CreateCityRoadMaterial(city);
+            Material skybox = CreateCitySkybox(city, profile.skyboxTexture);
 
             var manifestDistricts = new List<CitySceneManifestDistrict>();
             var builtScenePaths = new List<string>();
@@ -404,6 +419,7 @@ namespace UCENO.VirtualWorld.Editor
                 SceneManager.SetActiveScene(scene);
                 GameObject root = new GameObject("UCENO " + city.name + " - " + district.name);
                 SceneManager.MoveGameObjectToScene(root, scene);
+                ConfigureCityEnvironment(city, skybox, root.transform);
                 BuildDistrictGround(root.transform, district, ground, road, city.layout.pattern, city.layout.water, city.id);
                 BuildArchitecture(root.transform, district, architecture, city.layout.pattern);
                 BuildEnvironment(root.transform, district, environment, city.environment.biome);
@@ -628,6 +644,61 @@ namespace UCENO.VirtualWorld.Editor
             road.transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
             road.GetComponent<Renderer>().sharedMaterial = material;
             GameObjectUtility.SetStaticEditorFlags(road, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccludeeStatic);
+        }
+
+        private static Material CreateCitySkybox(CityPipelineCity city, string texturePath)
+        {
+            Texture2D hdri = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+            if (hdri == null) throw new BuildFailedException(city.id + ": city HDRI could not be loaded: " + texturePath);
+            EnsureFolder("Assets/UCENO/Materials/Cities");
+            string materialPath = "Assets/UCENO/Materials/Cities/UCENO_" + city.id + "_Skybox.mat";
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+            Shader shader = Shader.Find("Skybox/Panoramic");
+            if (shader == null) throw new BuildFailedException("Skybox/Panoramic shader is unavailable.");
+            if (material == null)
+            {
+                material = new Material(shader);
+                AssetDatabase.CreateAsset(material, materialPath);
+            }
+            material.shader = shader;
+            material.SetTexture("_MainTex", hdri);
+            material.SetFloat("_Exposure", 1f);
+            material.SetFloat("_Rotation", 0f);
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
+        private static void ConfigureCityEnvironment(CityPipelineCity city, Material skybox, Transform parent)
+        {
+            RenderSettings.skybox = skybox;
+            RenderSettings.ambientMode = AmbientMode.Skybox;
+            RenderSettings.ambientIntensity = city.environment.biome.Contains("desert") ? 1.15f : 1f;
+            RenderSettings.reflectionIntensity = 0.72f;
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogDensity = city.environment.biome.Contains("alpine") ? 0.0022f :
+                city.environment.biome.Contains("coastal") || city.environment.biome.Contains("delta") ? 0.0012f :
+                city.environment.biome.Contains("desert") ? 0.00035f : 0.0008f;
+            RenderSettings.fogColor = city.environment.biome.Contains("desert")
+                ? new Color(0.72f, 0.59f, 0.42f)
+                : city.environment.biome.Contains("alpine")
+                    ? new Color(0.58f, 0.66f, 0.72f)
+                    : city.environment.biome.Contains("forest") || city.environment.biome.Contains("savanna")
+                        ? new Color(0.48f, 0.58f, 0.48f)
+                        : new Color(0.55f, 0.64f, 0.69f);
+
+            GameObject sunObject = new GameObject("UCENO " + city.name + " Directional Sun");
+            sunObject.transform.SetParent(parent, false);
+            sunObject.transform.rotation = Quaternion.Euler(48f, -28f, 0f);
+            Light sun = sunObject.AddComponent<Light>();
+            sun.type = LightType.Directional;
+            sun.intensity = city.environment.biome.Contains("desert") ? 1.25f : 1.05f;
+            sun.color = city.environment.biome.Contains("coastal")
+                ? new Color(1f, 0.94f, 0.82f)
+                : new Color(1f, 0.97f, 0.91f);
+            sun.shadows = LightShadows.Soft;
+            sun.shadowStrength = 0.72f;
+            sun.cullingMask = -1;
         }
 
         private static Material CreateCityGroundMaterial(CityPipelineCity city)
