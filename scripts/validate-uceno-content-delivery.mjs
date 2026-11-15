@@ -12,10 +12,18 @@ const gatewayServer = read("runtime/world-gateway/src/server.ts");
 const districtPolicy = read("runtime/world-gateway/src/district-policy.ts");
 const districtConfig = JSON.parse(read("runtime/world-gateway/config/world-districts.json"));
 const districtTests = read("runtime/world-gateway/tests/district-policy.test.mjs");
+const cityCatalog = JSON.parse(read("runtime/world-gateway/config/world-cities.json"));
+const cityPolicy = read("runtime/world-gateway/src/city-catalog-policy.ts");
+const cityTests = read("runtime/world-gateway/tests/city-catalog-policy.test.mjs");
 const architecture = read("docs/virtual-world/REMOTE_CONTENT_DELIVERY.md");
 const tests = read("docs/virtual-world/REMOTE_CONTENT_DELIVERY_TESTS.md");
 
 const checks = [
+  ["Ten distinct city catalogue entries are defined (not counted from districts)", Array.isArray(cityCatalog.cities) && cityCatalog.cities.length >= 10 && new Set(cityCatalog.cities.map(city => city.id)).size === cityCatalog.cities.length],
+  ["Each city has its own root and four distinct district content labels", cityCatalog.cities?.every(city => city.contentLabel === "world-city-" + city.id && city.districts?.length >= 4 && new Set(city.districts.map(district => district.contentLabel)).size === city.districts.length)],
+  ["City catalogue policy enforces minimum count and city-specific labels", cityPolicy.includes("minimumCities") && cityPolicy.includes("world-city-${id}")],
+  ["City catalogue tests cover duplicate IDs, bounds and incomplete districts", cityTests.includes("rejects fewer than ten cities") && cityTests.includes("invalid spawn bounds") && cityTests.includes("fewer than four districts")],
+
   ["Addressables package is declared", manifest.dependencies?.["com.unity.addressables"] === "2.7.6"],
   ["On-demand dependency size is checked", /GetDownloadSizeAsync\(label\)/.test(delivery)],
   ["Dependencies download asynchronously", /DownloadDependenciesAsync\(label, false\)/.test(delivery)],
