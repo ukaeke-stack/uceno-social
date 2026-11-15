@@ -172,20 +172,58 @@ def main():
                      if city.get("id") == "meridian"), None)
     if meridian is None:
         fail("The Meridian starter city is missing from the gateway city catalogue.")
-    meridian_labels = {district.get("contentLabel") for district in meridian.get("districts", [])}
+    meridian_districts = meridian.get("districts", [])
     gateway_districts = json.loads(
         (Path("runtime/world-gateway/config/world-districts.json")).read_text(encoding="utf-8")
     ).get("districts", [])
-    gateway_labels = {district.get("contentLabel") for district in gateway_districts}
     district_builder = builder[builder.index("private static void BuildDistrictScenes"):]
-    for district_id in ("south", "central-south", "central-north", "north"):
-        expected_label = "world-city-meridian-" + district_id
-        if expected_label not in meridian_labels or expected_label not in gateway_labels or expected_label not in district_builder:
-            fail("Meridian Addressables label is not consistent across the city catalogue, gateway admission config, and Unity scene builder: " + expected_label)
+    if len(meridian_districts) != 4 or len(gateway_districts) != 4:
+        fail("Meridian catalogue and gateway must each define exactly four districts.")
+    for authored in meridian_districts:
+        gateway = next((item for item in gateway_districts if item.get("id") == authored.get("id")), None)
+        if gateway is None or gateway.get("contentLabel") != authored.get("contentLabel"):
+            fail("Meridian gateway district is missing or has a different content label: " + str(authored.get("id")))
+        center = authored.get("center") or {}
+        radius = authored.get("radius")
+        expected_bounds = {
+            "minX": center.get("x", 0) - radius,
+            "maxX": center.get("x", 0) + radius,
+            "minZ": center.get("z", 0) - radius,
+            "maxZ": center.get("z", 0) + radius,
+        }
+        for key, value in expected_bounds.items():
+            if gateway.get(key) != value:
+                fail("Meridian gateway district geometry differs from the city catalogue: " + authored["id"] + "." + key)
     if 'const string cityId = "meridian"' not in district_builder:
         fail("Starter district scene generation must identify its actual city instead of generic district labels.")
+    if '"world-city-" + cityId + "-" + districtName' not in district_builder:
+        fail("Meridian Addressables labels must be generated from the actual city and district IDs.")
     if "world-city-district-" in district_builder:
         fail("Newly generated city district scenes must not use the obsolete generic Addressables label.")
+
+    profiles = json.loads(
+        (ASSETS / "Editor/city-scene-asset-profiles.json").read_text(encoding="utf-8")
+    ).get("cities", [])
+    remaining_cities = [city for city in city_catalog.get("cities", []) if city.get("id") != "meridian"]
+    if len(city_catalog.get("cities", [])) != 10 or len(remaining_cities) != 9:
+        fail("The world catalogue must contain Meridian plus nine distinct additional cities.")
+    if len(profiles) != 9 or {item.get("cityId") for item in profiles} != {item.get("id") for item in remaining_cities}:
+        fail("Nine distinct non-Meridian city asset profiles are required.")
+    roots = [item.get("assetRoot") for item in profiles]
+    if len(set(roots)) != 9:
+        fail("Each remaining city must have its own unique imported asset root.")
+    for city in remaining_cities:
+        profile = next(item for item in profiles if item.get("cityId") == city["id"])
+        if len(profile.get("architecturePrefabs", [])) < 3 or len(profile.get("environmentPrefabs", [])) < 3:
+            fail("City-specific architecture and environment prefab contracts are incomplete: " + city["id"])
+        landmark_ids = {item.get("id") for item in city.get("landmarks", [])}
+        profile_landmarks = {item.get("landmarkId") for item in profile.get("landmarks", [])}
+        if len(landmark_ids) < 3 or profile_landmarks != landmark_ids:
+            fail("City-specific landmark prefab mapping is incomplete: " + city["id"])
+        if any(not landmark.get("districtId") or not any(
+            district.get("id") == landmark.get("districtId") for district in city.get("districts", [])
+        ) for landmark in city.get("landmarks", [])):
+            fail("A city landmark has no valid owning district: " + city["id"])
 
     motor = read_text(ASSETS / "Scripts/PlayerMotor.cs")
     if "AnimationSpeed" not in motor or "SetSprinting" not in motor:
