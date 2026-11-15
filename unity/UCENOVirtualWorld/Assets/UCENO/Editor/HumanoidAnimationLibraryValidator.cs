@@ -32,22 +32,30 @@ namespace UCENO.VirtualWorld.Editor
         public static void Validate()
         {
             string[] modelGuids = AssetDatabase.FindAssets("t:Model", new[] { AnimationRoot });
-            if (modelGuids.Length == 0)
-                throw new InvalidOperationException("No imported animation FBXs found. Add licensed Humanoid FBXs under " + AnimationRoot + ".");
-
             Avatar baseAvatar = AssetDatabase.LoadAllAssetsAtPath(BaseAvatarPath).OfType<Avatar>()
                 .FirstOrDefault(candidate => candidate != null && candidate.isHuman);
             if (baseAvatar == null)
                 throw new InvalidOperationException("The UCENO base Humanoid Avatar is missing: " + BaseAvatarPath);
 
-            if (!File.Exists(ProvenancePath))
-                throw new InvalidOperationException("Animation source/licence manifest is missing: " + ProvenancePath);
-            SourceManifest manifest = JsonUtility.FromJson<SourceManifest>(File.ReadAllText(ProvenancePath));
-            if (manifest?.assets == null || manifest.assets.Length != modelGuids.Length)
-                throw new InvalidOperationException("Animation source manifest must contain exactly one record per imported FBX.");
+            AnimationClip[] baseAvatarClips = AssetDatabase.LoadAllAssetsAtPath(BaseAvatarPath)
+                .OfType<AnimationClip>()
+                .Where(clip => clip != null && !clip.name.StartsWith("__preview__", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (modelGuids.Length == 0 && baseAvatarClips.Length == 0)
+                throw new InvalidOperationException("No imported Humanoid motion clips found in the base avatar or " + AnimationRoot + ".");
+
+            SourceManifest manifest = null;
+            if (modelGuids.Length > 0)
+            {
+                if (!File.Exists(ProvenancePath))
+                    throw new InvalidOperationException("Animation source/licence manifest is missing: " + ProvenancePath);
+                manifest = JsonUtility.FromJson<SourceManifest>(File.ReadAllText(ProvenancePath));
+                if (manifest?.assets == null || manifest.assets.Length != modelGuids.Length)
+                    throw new InvalidOperationException("Animation source manifest must contain exactly one record per imported FBX.");
+            }
 
             var provenance = new Dictionary<string, SourceRecord>(StringComparer.Ordinal);
-            foreach (SourceRecord record in manifest.assets)
+            foreach (SourceRecord record in manifest?.assets ?? Array.Empty<SourceRecord>())
             {
                 if (record == null || string.IsNullOrWhiteSpace(record.sourceFbx) ||
                     string.IsNullOrWhiteSpace(record.sourceName) ||
@@ -70,6 +78,19 @@ namespace UCENO.VirtualWorld.Editor
 
             var clips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var errors = new List<string>();
+            foreach (AnimationClip clip in baseAvatarClips)
+            {
+                clips.Add(clip.name);
+                if (clip.length <= 0f || !clip.humanMotion ||
+                    (AnimationUtility.GetCurveBindings(clip).Length == 0 &&
+                     AnimationUtility.GetObjectReferenceCurveBindings(clip).Length == 0))
+                    errors.Add(BaseAvatarPath + ": embedded clip " + clip.name +
+                        " has no playable Humanoid motion curves.");
+                if (IsLoopingClip(clip.name) && !clip.isLooping)
+                    errors.Add(BaseAvatarPath + ": embedded locomotion clip " + clip.name +
+                        " is not imported as a looping clip.");
+            }
+
             foreach (string guid in modelGuids)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -119,8 +140,9 @@ namespace UCENO.VirtualWorld.Editor
                 throw new InvalidOperationException("Humanoid animation library is not release-ready:\n- " +
                     string.Join("\n- ", errors));
             Debug.Log("UCENO imported Humanoid animation library validated: " +
-                modelGuids.Length + " licensed FBX files, " + clips.Count +
-                " actual clips with Humanoid motion, curves and exact base-Avatar retargeting.");
+                baseAvatarClips.Length + " embedded base-avatar clips plus " +
+                modelGuids.Length + " licensed retargeted FBX files, " + clips.Count +
+                " actual clips with Humanoid motion and curves.");
         }
 
         private static bool IsLoopingClip(string clipName)
