@@ -57,10 +57,16 @@ namespace UCENO.VirtualWorld
 
             if (animator != null)
             {
-                animator.enabled = true;
-                animator.cullingMode = tier == 0
-                    ? AnimatorCullingMode.AlwaysAnimate
-                    : AnimatorCullingMode.CullUpdateTransforms;
+                // Do not keep invisible distant crowds evaluating full Animator
+                // graphs. Re-enable immediately when they return inside the
+                // render horizon so both human and AI avatars recover normally.
+                animator.enabled = visible;
+                if (visible)
+                {
+                    animator.cullingMode = tier == 0
+                        ? AnimatorCullingMode.AlwaysAnimate
+                        : AnimatorCullingMode.CullUpdateTransforms;
+                }
             }
             if (locomotion != null) locomotion.enabled = animate;
             if (expressions != null) expressions.enabled = facial;
