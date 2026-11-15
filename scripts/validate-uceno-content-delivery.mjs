@@ -40,6 +40,7 @@ const checks = [
   ["City registry exporter writes district names and content labels", /contentLabel = district.contentLabel/.test(cityRegistryExporter) && /name = district.name/.test(cityRegistryExporter)],
   ["City prefabs require Android LOD groups", /LODGroup/.test(cityScenePipeline) && /GetLODs/.test(cityScenePipeline)],
   ["City asset importer applies Android ETC2 textures and compressed meshes", /ETC2_RGBA8/.test(cityMobileImporter) && /ETC2_RGB4/.test(cityMobileImporter) && /ModelImporterMeshCompression.Medium/.test(cityMobileImporter)],
+  ["Every city requires and applies a distinct HDRI skybox and atmospheric lighting", /skyboxTexture/.test(cityScenePipeline) && /CreateCitySkybox/.test(cityScenePipeline) && /ConfigureCityEnvironment/.test(cityScenePipeline) && /Skybox\/Panoramic/.test(cityScenePipeline)],
   ["Districts contain role, centre, radius and city-specific layout metadata", cityCatalog.cities.every(city => city.districts.every(district => district.role && district.center && Number.isFinite(district.radius) && district.layout === city.layout.pattern))],
   ["City catalogue tests cover duplicate IDs, bounds and incomplete districts", cityTests.includes("rejects fewer than ten cities") && cityTests.includes("invalid spawn bounds") && cityTests.includes("fewer than four districts")],
 
