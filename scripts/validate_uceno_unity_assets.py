@@ -166,7 +166,8 @@ def main():
                      "VerifyNineCitySceneRegistries", "BuildRemoteAddressablesContent",
                      "CheckForCatalogUpdates", "UpdateCatalogs(catalogCheck.Result, false)",
                      "BuildPlayerContent(out AddressablesPlayerBuildResult result)",
-                     "RemoteCatalogJsonFilePath", "RemoteCatalogHashFilePath"):
+                     "RemoteCatalogJsonFilePath", "RemoteCatalogHashFilePath",
+                     "geometryOwners", "GetAssetDependencyHash", "LODGroup"):
         if required not in city_pipeline and required not in read_text(ASSETS / "Scripts/WorldContentDelivery.cs"):
             fail("Nine-city/remote Addressables release pipeline is missing: " + required)
 
