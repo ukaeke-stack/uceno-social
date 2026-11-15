@@ -297,9 +297,36 @@ namespace UCENO.VirtualWorld
             }
             Addressables.Release(init);
 
-            // Refresh the remote catalog before resolving any city/district labels.
-            // Addressables caches downloaded bundles; catalog updates let existing
-            // installs discover newly published or versioned district content.
+            // Load the explicitly configured remote world catalog before checking
+            // for updates. Checking first only inspects the built-in catalog and can
+            // miss every district entry published in this remote catalog.
+            if (!string.IsNullOrWhiteSpace(remoteCatalogUrl))
+            {
+                string catalogUrl = remoteCatalogUrl.Trim();
+                if (!Uri.TryCreate(catalogUrl, UriKind.Absolute, out Uri parsedCatalogUrl) ||
+                    (parsedCatalogUrl.Scheme != Uri.UriSchemeHttps && parsedCatalogUrl.Scheme != Uri.UriSchemeHttp))
+                {
+                    initializing = false;
+                    StatusChanged?.Invoke("Remote world catalog URL is invalid.");
+                    completed?.Invoke(false, "Remote catalog URL must be an absolute HTTP or HTTPS URL.");
+                    yield break;
+                }
+
+                AsyncOperationHandle<IResourceLocator> catalog =
+                    Addressables.LoadContentCatalogAsync(catalogUrl, true);
+                yield return catalog;
+                if (catalog.Status != AsyncOperationStatus.Succeeded)
+                {
+                    initializing = false;
+                    StatusChanged?.Invoke("World content catalog could not be reached.");
+                    completed?.Invoke(false, "Remote catalog load failed.");
+                    yield break;
+                }
+            }
+
+            // Refresh the loaded remote catalog before resolving any city/district
+            // labels. Addressables caches downloaded bundles; catalog updates let
+            // existing installs discover newly published or versioned content.
             var catalogCheck = Addressables.CheckForCatalogUpdates(false);
             yield return catalogCheck;
             if (catalogCheck.Status != AsyncOperationStatus.Succeeded)
@@ -326,19 +353,6 @@ namespace UCENO.VirtualWorld
                 Addressables.Release(catalogUpdate);
             }
             else Addressables.Release(catalogCheck);
-
-            if (!string.IsNullOrWhiteSpace(remoteCatalogUrl))
-            {
-                AsyncOperationHandle<IResourceLocator> catalog = Addressables.LoadContentCatalogAsync(remoteCatalogUrl.Trim(), true);
-                yield return catalog;
-                if (catalog.Status != AsyncOperationStatus.Succeeded)
-                {
-                    initializing = false;
-                    StatusChanged?.Invoke("World content catalog could not be reached.");
-                    completed?.Invoke(false, "Remote catalog load failed.");
-                    yield break;
-                }
-            }
 
             initialized = true;
             initializing = false;
