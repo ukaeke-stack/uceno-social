@@ -2,51 +2,49 @@
 
 ## Scope
 
-Meridian Prime remains the existing starter-city pipeline. The other nine cities are generated from `runtime/world-gateway/config/world-cities.json` by the Unity Editor tool `UCENO/World/Build Remaining Nine City Scenes`.
+Meridian Prime remains the starter city. Nine additional cities are specified in `runtime/world-gateway/config/world-cities.json`: Solstice, Verdant, Nexus, Aurora, Saffron, Monsoon, Eclipse, Origin and Atlas. A catalogue entry or procedural blockout is not a finished city.
 
-The city catalogue supplies identity, architecture description, biome, terrain, weather, vegetation, road hierarchy, water description, district geometry and named landmarks. Each city asset profile also requires its own HDRI skybox; the scene pipeline applies city-specific fog, ambient lighting and directional daylight. Each landmark explicitly names its owning district and must lie inside that district's bounds.
+The catalogue defines each city's identity, architecture language, biome, terrain, weather, road hierarchy, water, districts and named landmarks. Those specifications guide scene composition; they are not substitutes for imported art.
 
-## City-specific imported asset contract
+## Non-negotiable imported-art requirement
 
-`unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json` defines nine independent asset packs. Each city must provide:
+Do not use `CityProceduralAssetPackGenerator` to manufacture buildings, trees, landmarks or skyboxes from primitive meshes and flat-color materials. That generator is a blockout utility only and its output does not meet the visual-quality target. Do not treat its generated profiles as imported assets.
 
-- Five unique architecture prefabs: signature skyline anchor, residential typology, commercial/civic typology, transit/industrial structure, and public-realm structure
-- Four unique environment prefabs: biome tree, ground cover, street furniture, and a signature landscape prop
-- One dedicated imported prefab for each of the city's three named landmarks; each landmark prefab must include a `WorldInteractable` marker and an enabled non-trigger collider
+Each of the nine city packs must contain 12 distinct, licensed imported prefabs:
 
-The expected paths are under `Assets/UCENO/Cities/<city-id>/Prefabs`. This is 12 unique imported prefabs plus one city-specific HDRI per city (117 unique assets across nine cities). Paths must be unique within a city and across all nine cities. Reusing Meridian or another city's signature architecture is rejected. The validator also rejects missing prefabs and incomplete landmark mappings.
+- Five architecture assets: signature skyline anchor, residential typology, commercial/civic typology, transit/industrial structure and public-realm structure
+- Four environment assets: biome-specific tree, ground cover, street furniture and signature landscape prop
+- Three dedicated landmark assets matching the city's catalogue landmark IDs
 
-## Build procedure
+That is 108 imported prefabs across the nine cities, plus nine city-specific HDRI panoramas. Each prefab must have detailed mesh geometry, textured PBR materials, at least two valid LOD levels and a city-owned path under `Assets/UCENO/Cities/<city-id>/Prefabs`. Each landmark must have a root `WorldInteractable` marker and a solid collider. Do not reuse another city's signature architecture or landmark mesh.
 
-1. Import licensed, optimized source models for each city's architecture, vegetation, public realm and landmarks into its own asset folder.
-2. Create Unity prefabs at the exact paths in the asset profile. Keep original source files and licence/attribution records.
-3. Confirm scale, pivots, materials, LOD groups, colliders and mobile texture budgets. Do not use a generic placeholder prefab as a city landmark.
-4. Add at least two valid LOD levels to every city architecture, environment and landmark prefab. City model/texture imports receive Android mesh compression, mipmaps, and ETC2 platform texture overrides. In Unity, run **UCENO > World > Validate Remaining Nine City Asset Packs**. It must pass before generation.
-5. Run **UCENO > World > Build Remaining Nine City Scenes**. The generator creates four additive district scenes per city, places that city's imported architecture/environment/landmark prefabs, generates layout-specific road geometry and water features where specified, registers each scene as a separately packed remote Addressables entry using its city/district content label, writes a city scene manifest, exports city-specific district/interactable registries from only those four scenes, and exports a matching city collision map.
-6. Build the Addressables content for the Android target and publish the remote catalog and bundles to the configured content host.
-7. Run **UCENO > World > Verify Nine City Scene Registries**. It checks each generated scene manifest, actual scene files, Addressables labels, landmark-to-district placement, exported district bounds, unique interactable IDs/locations, and collision-map/interactable parity. Then run the gateway parser and integration tests against the exported registry files.
-8. Inspect every city in motion at Android quality settings. Check terrain transitions, roads, water, landmark silhouettes, occlusion, lighting, vegetation density, LOD transitions, frame time and memory.
+Every city folder must contain `source-manifest.json` with exactly 12 asset records. Each record must identify `prefab`, `sourceName`, `sourceUrl`, `license` and `attribution`. Keep the original downloaded source files and licence text alongside the imported assets. A filename or generated mesh is not proof of provenance.
+
+The Editor gate `UCENO > World > Validate Imported City Art Packs` inspects the actual Unity prefab assets, mesh detail, textured materials, LOD groups, landmark interaction components, city-specific dependency fingerprints, provenance manifests and HDRI dimensions. It must pass before scene generation. A source-contract test cannot substitute for running this Editor gate.
+
+## Humanoid animation requirement
+
+The avatar must use imported motion-capture or professionally authored Humanoid clips, retargeted to the UCENO base Avatar. The required library covers idle, walk, run, talk, turn, wave, cheer, dance, interact and sit. Procedural bone posing, static portraits, generated stills and short image-to-video clips are not substitutes for skeletal animation clips.
+
+Import licensed FBXs under `Assets/UCENO/Animations/Imported`, set Rig > Animation Type to Humanoid and Avatar Definition to Copy From Other Avatar, and select the UCENO base Avatar. Preview every clip on the base rig and reject foot sliding, twisted wrists, shoulder collapse, hip drift, incorrect facing or broken hand/head motion. Run `UCENO > Validate Imported Humanoid Animation Library`; then inspect human-controlled and AI-controlled avatars performing the full set of motions in Unity and on Android.
+
+## Scene generation and registry procedure
+
+1. Import the nine city-specific source packs and create the prefabs at the exact paths in `Assets/UCENO/Editor/city-scene-asset-profiles.json`. Create the nine provenance manifests and import real HDRI panoramas. Do not use the procedural blockout generator as an asset source.
+2. Run **UCENO > World > Validate Imported City Art Packs**. Fix every failure; do not bypass the gate.
+3. Run **UCENO > World > Build Remaining Nine City Scenes**. The scene pipeline composes four additive district scenes per city (36 total) from the imported city prefabs, city-specific roads/terrain/water and the catalogue layout. It registers remote Addressables entries with city/district labels and exports city-specific district, interactable and collision registries.
+4. Run **UCENO > World > Verify Nine City Scene Registries**. Check each scene manifest, scene file, Addressables label, landmark-to-district placement, district bounds, stable interactable IDs and collision/interactable parity. Run the gateway parser and integration tests against the exported registry files.
+5. Build Android Addressables content. Publish the remote catalog JSON, hash and all bundles to the configured HTTPS content host. A local Addressables build is not proof of publication. Verify catalog and bundle reachability and actual loading from an Android device.
+6. Inspect all nine cities in motion at Android quality settings. Review architectural identity, landmarks, terrain transitions, roads, water, lighting, vegetation, occlusion, LOD transitions, frame time, memory and thermal behavior.
 
 ## Honest completion criteria
 
-A city catalogue entry is not a completed city. A generated district blockout is not a completed city either.
+A city is not complete until its real imported pack passes the Editor gate, all four additive scenes compile and load through Addressables, exported registries and collision maps validate, gateway integration passes, and visual/performance review is accepted. The city catalogue and source-level CI checks do not prove any of those runtime outcomes.
 
-A city is not release-ready until its city-specific imported asset pack is present, its four additive scenes compile and load through Addressables, its scene registry and collision map validate, and its visual/performance review is accepted. The current generator creates a data-driven scene layout layer and registry handoff; it does not invent missing high-quality architectural source models or prove photorealistic quality.
-
-The generated per-city runtime files are `world-districts-<city-id>.json`, `world-interactables-<city-id>.json`, and `data/uceno-city-collision-boxes-<city-id>.json`. The gateway deployment for each city must point `WORLD_DISTRICTS_FILE`, `WORLD_INTERACTABLES_FILE`, and `WORLD_COLLISION_BOXES_FILE` at that city's files. The current gateway loads one active district/interactable/collision configuration per process; multi-city routing across those configurations still needs explicit deployment/runtime wiring.
-
-The Android APK remains blocked until all nine cities and the existing Meridian city pass the same scene, asset, registry, Addressables and runtime acceptance gates.
+The generated per-city runtime files are `world-districts-<city-id>.json`, `world-interactables-<city-id>.json` and `data/uceno-city-collision-boxes-<city-id>.json`. The gateway currently loads one active district/interactable/collision configuration per process; multi-city routing across those configurations still requires explicit deployment/runtime wiring.
 
 ## Addressables and Android release gate
 
-The Android pre-export method now runs the following in order:
+The Android pre-export gate must validate the imported city packs, build Meridian's starter scene and registry, generate the 36 additive city scenes, verify all scene manifests and gateway registries, and build Android Addressables content with a real HTTPS remote catalog and remote build path. The build must produce remote catalog JSON and hash artifacts.
 
-1. Validate all nine city-specific prefab packs, including imported geometry, multi-level LOD groups, dedicated landmarks and unique mesh dependency fingerprints across cities.
-2. Build the Meridian starter scene and its registry using the existing starter-scene pipeline.
-3. Generate the nine additional city scene sets (36 additive district scenes).
-4. Verify each generated scene manifest, Addressables label, district registry, non-empty interactable registry, collision map and exact district geometry.
-5. Build Android Addressables content and require a real HTTPS remote catalog load path plus a remote build path. The build must produce both remote catalog JSON and hash artifacts before Android player export can continue.
-
-The generated Addressables output is not automatically published to a CDN by this validation step. Publish the remote catalog JSON, hash and all generated bundles to the configured HTTPS host, then verify the catalog and bundle URLs are reachable from an Android device. A successful local Addressables build is not proof of remote publication or runtime loading.
-
-The nine-city editor menu also exposes **UCENO > World > Verify Nine City Scene Registries** so the exported scene manifests and gateway files can be checked independently before the APK build.
+The output must then be published to the configured HTTPS host and loaded from an Android device. The APK remains blocked until Meridian and all nine additional cities pass the same imported-asset, scene, registry, Addressables, gateway, visual and performance acceptance gates. No APK build is authorized by this pipeline update.
