@@ -50,19 +50,23 @@ test("supports an unconfigured gateway without district streaming", () => {
   assert.deepEqual(parseWorldDistricts(undefined, 1000), []);
 });
 
-test("canonical gateway config matches the four generated Unity district scenes", () => {
+test("canonical gateway config matches Meridian catalogue geometry and streamed scene labels", () => {
   const fixture = readFileSync(new URL("../config/world-districts.json", import.meta.url), "utf8");
+  const cities = JSON.parse(readFileSync(new URL("../config/world-cities.json", import.meta.url), "utf8")).cities;
+  const meridian = cities.find(city => city.id === "meridian");
   const districts = parseWorldDistricts(fixture, 10000);
-  assert.deepEqual(districts.map(d => d.id), ["south", "central-south", "central-north", "north"]);
-  assert.deepEqual(districts.map(d => d.contentLabel), [
-    "world-city-meridian-south",
-    "world-city-meridian-central-south",
-    "world-city-meridian-central-north",
-    "world-city-meridian-north"
-  ]);
-  assert.equal(findWorldDistrict(districts, 0, -90)?.id, "south");
-  assert.equal(findWorldDistrict(districts, 0, -30)?.id, "central-south");
-  assert.equal(findWorldDistrict(districts, 0, 30)?.id, "central-north");
-  assert.equal(findWorldDistrict(districts, 0, 90)?.id, "north");
-  assert.equal(findWorldDistrict(districts, 0, 120), null);
+  assert.deepEqual(districts.map(d => d.id), meridian.districts.map(d => d.id));
+  assert.deepEqual(districts.map(d => d.contentLabel), meridian.districts.map(d => d.contentLabel));
+  for (const cityDistrict of meridian.districts) {
+    const gateway = districts.find(d => d.id === cityDistrict.id);
+    assert.equal(gateway.minX, cityDistrict.center.x - cityDistrict.radius);
+    assert.equal(gateway.maxX, cityDistrict.center.x + cityDistrict.radius);
+    assert.equal(gateway.minZ, cityDistrict.center.z - cityDistrict.radius);
+    assert.equal(gateway.maxZ, cityDistrict.center.z + cityDistrict.radius);
+  }
+  assert.equal(findWorldDistrict(districts, -150, -150)?.id, "civic-core");
+  assert.equal(findWorldDistrict(districts, 150, -150)?.id, "exchange-quarter");
+  assert.equal(findWorldDistrict(districts, -150, 150)?.id, "garden-ring");
+  assert.equal(findWorldDistrict(districts, 150, 150)?.id, "old-port");
+  assert.equal(findWorldDistrict(districts, 300, 300), null);
 });
