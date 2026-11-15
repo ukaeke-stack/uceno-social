@@ -83,11 +83,17 @@ namespace UCENO.VirtualWorld.Editor
                 Require(manifest?.assets != null && manifest.assets.Length == 12,
                     city.cityId + " source manifest must account for all 12 imported prefabs.");
 
-                var manifestByPrefab = manifest.assets.ToDictionary(a => a.prefab, StringComparer.Ordinal);
                 var paths = city.architecturePrefabs.Concat(city.environmentPrefabs)
                     .Concat(city.landmarks.Select(l => l.prefab)).ToArray();
                 Require(paths.Distinct(StringComparer.Ordinal).Count() == 12,
                     city.cityId + " reuses a prefab path inside its pack.");
+                Require(manifest.assets.All(a => a != null && !string.IsNullOrWhiteSpace(a.prefab)) &&
+                    manifest.assets.Select(a => a.prefab).Distinct(StringComparer.Ordinal).Count() == 12,
+                    city.cityId + " source manifest contains missing or duplicate prefab records.");
+                var manifestByPrefab = manifest.assets.ToDictionary(a => a.prefab, StringComparer.Ordinal);
+                Require(new HashSet<string>(manifestByPrefab.Keys, StringComparer.Ordinal)
+                    .SetEquals(paths),
+                    city.cityId + " source manifest must cover exactly the 12 configured imported prefabs.");
 
                 foreach (string path in paths)
                 {
@@ -96,10 +102,17 @@ namespace UCENO.VirtualWorld.Editor
                     Require(manifestByPrefab.TryGetValue(path, out SourceAsset source),
                         city.cityId + " has no provenance record for " + path);
                     Require(!string.IsNullOrWhiteSpace(source.sourceName) &&
-                        !string.IsNullOrWhiteSpace(source.sourceUrl) &&
-                        !string.IsNullOrWhiteSpace(source.license) &&
+                        Uri.TryCreate(source.sourceUrl, UriKind.Absolute, out Uri sourceUri) &&
+                        sourceUri.Scheme == Uri.UriSchemeHttps &&
                         !string.IsNullOrWhiteSpace(source.attribution),
-                        city.cityId + " has incomplete source/licence attribution for " + path);
+                        city.cityId + " has incomplete or non-HTTPS source attribution for " + path);
+                    string license = (source.license ?? string.Empty).Trim();
+                    string[] redistributableDerivativeLicenses = {
+                        "CC0 1.0", "CC-BY 4.0", "CC-BY 3.0",
+                        "CC-BY-SA 4.0", "CC-BY-SA 3.0"
+                    };
+                    Require(redistributableDerivativeLicenses.Contains(license, StringComparer.OrdinalIgnoreCase),
+                        city.cityId + " uses an unapproved, non-commercial, no-derivatives or unverified licence for " + path);
 
                     GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                     Require(prefab != null, city.cityId + " imported prefab is missing: " + path);
@@ -135,6 +148,10 @@ namespace UCENO.VirtualWorld.Editor
                     checkedPrefabs++;
                 }
 
+                Require(!string.IsNullOrWhiteSpace(city.skyboxTexture) &&
+                    city.skyboxTexture.StartsWith("Assets/UCENO/Cities/" + city.cityId + "/Textures/Skybox/", StringComparison.Ordinal) &&
+                    city.skyboxTexture.EndsWith(".hdr", StringComparison.OrdinalIgnoreCase),
+                    city.cityId + " HDRI must be stored in its own city-specific Skybox folder.");
                 Texture2D skybox = AssetDatabase.LoadAssetAtPath<Texture2D>(city.skyboxTexture);
                 Require(skybox != null && skybox.width >= 1024 && skybox.height >= 512,
                     city.cityId + " needs a real imported HDRI panorama (minimum 1024x512).");
