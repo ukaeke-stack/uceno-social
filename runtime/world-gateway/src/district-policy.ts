@@ -31,7 +31,7 @@ export function parseWorldDistricts(raw: string | undefined, worldBounds: number
     const item = value as Record<string, unknown>;
     if (typeof item.id !== "string" || !/^[a-zA-Z0-9_-]{1,64}$/.test(item.id) ||
         ids.has(item.id) || typeof item.name !== "string" || !item.name.trim() || item.name.length > 80 ||
-        typeof item.contentLabel !== "string" || !/^world-city-district-[a-z0-9-]{1,48}$/.test(item.contentLabel) ||
+        typeof item.contentLabel !== "string" || !/^world-city-(?:district|[a-z0-9-]{2,48})-[a-z0-9-]{1,48}$/.test(item.contentLabel) ||
         !finiteBounded(item.minX, worldBounds) || !finiteBounded(item.maxX, worldBounds) ||
         !finiteBounded(item.minZ, worldBounds) || !finiteBounded(item.maxZ, worldBounds) ||
         item.minX >= item.maxX || item.minZ >= item.maxZ)
