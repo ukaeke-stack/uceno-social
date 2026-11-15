@@ -175,3 +175,36 @@ The next batch should be a small pilot, not a bulk import: select one candidate 
 ### Evidence boundary
 
 This fifth pass is catalogue inspection and sourcing policy only. No model files or HDRIs were downloaded, no Unity imports were made, and no city prefab is accepted. The nine city packs, nine HDRIs, 36 district scenes and visual/runtime acceptance remain outstanding. The release gate must not be weakened to turn catalogue entries into a false completion count.
+
+
+## Sixth sourcing pass — individual CC0 and CC-BY building candidates
+
+A further pass inspected individual downloadable models rather than relying only on catalogue totals. These are still candidates, not imported or accepted assets.
+
+| Candidate | Listing evidence | Potential city role | Decision |
+|---|---|---|---|
+| [Grab3D Modern House](https://grab3d.com/models/buildings/modern-house/) | CC0; 20,376 triangles; 2K textures; GLB/FBX; 1.4 MB GLB | Solstice Bay low-rise waterfront residential or Origin Plains housing, subject to style fit | Candidate supporting/low-rise building. The listing calls it lightweight/cozy; do not count as a hero tower or landmark. |
+| [Grab3D Colonial House](https://grab3d.com/models/buildings/colonial-house/) | CC0; 39,867 triangles; 2K textures; 2.9 MB GLB | Heritage/low-rise district only where the city's architectural brief supports it | Candidate only; colonial style is not a universal fit and needs direct preview. |
+| [Grab3D Adobe House](https://grab3d.com/models/buildings/adobe-house/) | CC0; 17,758 triangles; 2K textures; 1.2 MB GLB | Saffron Dunes low-rise oasis/residential cluster | Candidate for a supporting low-rise asset; does not satisfy desert megastructure/hero architecture. |
+| [Grab3D Mansion](https://grab3d.com/models/buildings/mansion/) | CC0; 37,922 triangles; 4K textures; light version 20,785 triangles | Possible Origin Plains estate/civic compound | Candidate only; architecture and 4K texture cost require inspection and mobile profiling. |
+| [Innerscene Four-storey Apartment Block](https://www.innerscene.com/tools/library/3d-parts/four-storey-apartment-block-331e1924) | CC0; 16.8 MB GLB; real-world dimensions and materials stated | Residential district building for a city where its design fits | Stronger candidate for Unity import inspection, but source page does not prove LODs, collider setup, or Android suitability. |
+| [Innerscene Three-storey Office Building](https://www.innerscene.com/tools/library/3d-parts/three-storey-office-building-16b33ce5) | CC0; 13 MB GLB; real-world dimensions and materials stated | Origin Plains campus or Nexus Delta supporting office building | Candidate for import inspection; no listing proof of LODs or mobile budget. |
+| [Sketchfab — Modular Russian Panel House](https://sketchfab.com/3d-models/modular-russian-panel-house-7bef9b27b4c54a03b64e2f395fef3d7f) | CC BY; 28.6K triangles; 2K textures; modular building and separate components | Residential background architecture if style matches | Licence is compatible in principle only if attribution and derivative obligations are recorded. Inspect the actual downloadable archive and confirm the exact licence at acquisition. |
+| [Sketchfab — Realistic Building](https://sketchfab.com/3d-models/realistic-building-bcd30b0c7aef41c98b204d2a5d622cce) | Creator description claims 4K/2K PBR maps and game-ready optimized mesh; page displays Free Standard licence | Potential Asian-architecture street scene candidate | **Do not import under the current gate.** Free Standard is not the same as CC0/CC-BY/CC-BY-SA and redistribution rights need legal review plus an explicit gate policy change. |
+| [Monuments open-source building models](https://github.com/bilol-makhmudov/monuments) | GLB models of real historic buildings under CC BY-SA 4.0 | Distinctive civic/heritage landmarks, potentially where a city's brief calls for them | **Hold for licence review.** Share-alike applies to derivatives; do not mix into the main game asset pack until legal review confirms acceptable treatment. |
+
+### Pilot selection refinement
+
+For the first two-city pilot, use the following candidates for inspection rather than claiming them as selected final art:
+- **Solstice Bay:** inspect the Modern House as a low-rise residential support asset; separately source a convincing waterfront tower, marina structures and coastal landmark.
+- **Atlas Frontier:** inspect Poly Haven Modular Factory Facade as an industrial source, but do not import its nearly 901 MB source archive wholesale; extract only required modules and generate optimized LODs. A separate logistics terminal/rail landmark still needs to be sourced or authored.
+
+This deliberately leaves both cities short of their required 12 accepted prefabs. The missing assets must be filled with appropriate architecture, not duplicate houses or props.
+
+### Acquisition rule
+
+Before any candidate is marked acquired, record a downloadable archive URL, retrieval date, file hash, licence file or exact licence statement, creator, model dimensions, triangle count, texture inventory/resolution, source LOD availability and import target. If a candidate is available only as a viewer preview, it is not acquired. After import, run the Unity gate and inspect the actual model and LOD transitions on Android.
+
+### Evidence boundary
+
+This pass identifies specific model pages and licence/technical claims; it does not establish that any archive has been downloaded. No asset was imported or visually accepted. City-specific HDRIs, 108 accepted prefabs, 36 district scenes, animation import/retargeting and runtime acceptance remain outstanding.
