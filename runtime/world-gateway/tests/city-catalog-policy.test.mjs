@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseWorldCityCatalog } from "../dist/city-catalog-policy.js";
+import { evaluateCityRuntimeReadiness, resolveReadyCityRuntime } from "../dist/city-runtime-policy.js";
 
 const fixture = readFileSync(new URL("../config/world-cities.json", import.meta.url), "utf8");
 
@@ -211,4 +212,43 @@ test("city runtime resolution fails closed for unknown city IDs", async () => {
   assert.equal(resolved?.city.id, "solstice");
   assert.equal(resolved?.districts.length, 4);
   assert.equal(resolveCityRuntime(cities, "not-a-city"), null);
+});
+
+
+test("city admission fails closed until every district has collision and interactable exports", () => {
+  const cities = parseWorldCityCatalog(fixture, 10);
+  const meridian = cities.find(city => city.id === "meridian");
+  assert.ok(meridian);
+  const districts = new Set(meridian.districts.map(district => district.id));
+  const noAssets = evaluateCityRuntimeReadiness(meridian, new Set(), new Set());
+  assert.equal(noAssets.ready, false);
+  assert.equal(noAssets.missingCollisionDistrictIds.length, 4);
+  assert.equal(noAssets.missingInteractableDistrictIds.length, 4);
+  assert.equal(resolveReadyCityRuntime(cities, "meridian", new Set(), new Set()), null);
+  assert.equal(resolveReadyCityRuntime(cities, "unknown-city", districts, districts), null);
+});
+
+test("city admission requires complete collision and interactable coverage for the assigned city", () => {
+  const cities = parseWorldCityCatalog(fixture, 10);
+  const meridian = cities.find(city => city.id === "meridian");
+  const solstice = cities.find(city => city.id === "solstice");
+  assert.ok(meridian && solstice);
+  const meridianIds = new Set(meridian.districts.map(district => district.id));
+  const solsticeIds = new Set(solstice.districts.map(district => district.id));
+  assert.equal(evaluateCityRuntimeReadiness(meridian, meridianIds, meridianIds).ready, true);
+  assert.ok(resolveReadyCityRuntime(cities, "meridian", meridianIds, meridianIds));
+  assert.equal(resolveReadyCityRuntime(cities, "solstice", meridianIds, meridianIds), null);
+  const partialCollision = new Set([...meridianIds].slice(1));
+  assert.equal(evaluateCityRuntimeReadiness(meridian, partialCollision, meridianIds).ready, false);
+  const partialInteractables = new Set([...meridianIds].slice(1));
+  assert.equal(evaluateCityRuntimeReadiness(meridian, meridianIds, partialInteractables).ready, false);
+});
+
+test("gateway authentication binds the database city assignment and rechecks it during the session", () => {
+  const server = readFileSync(new URL("../src/server.ts", import.meta.url), "utf8");
+  assert.match(server, /w\.city_id AS "cityId"/);
+  assert.match(server, /resolveReadyCityRuntime\(\s*WORLD_CITIES/);
+  assert.match(server, /id: userId, worldId, cityId, token/);
+  assert.match(server, /currentIdentity\.cityId !== player\.cityId/);
+  assert.match(server, /city_assignment_changed/);
 });
