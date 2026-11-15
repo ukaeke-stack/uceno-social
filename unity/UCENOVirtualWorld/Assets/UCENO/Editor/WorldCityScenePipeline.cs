@@ -148,7 +148,13 @@ namespace UCENO.VirtualWorld.Editor
                 if (city == null || string.IsNullOrWhiteSpace(city.id) || !ids.Add(city.id) ||
                     city.districts == null || city.districts.Length < 4 ||
                     city.landmarks == null || city.landmarks.Length < 3 ||
-                    city.layout == null || city.environment == null)
+                    city.layout == null || city.environment == null ||
+                    city.districts.Any(d => d == null || d.center == null || d.radius < 40f ||
+                        d.contentLabel != "world-city-" + city.id + "-" + d.id) ||
+                    city.districts.Select(d => d.id).Distinct(StringComparer.Ordinal).Count() != city.districts.Length ||
+                    city.landmarks.Any(l => l == null || l.position == null ||
+                        l.contentLabel != "world-city-" + city.id + "-landmark-" + l.id) ||
+                    city.landmarks.Select(l => l.id).Distinct(StringComparer.Ordinal).Count() != city.landmarks.Length)
                     throw new BuildFailedException("City catalogue contains incomplete or duplicate city data.");
                 var districtIds = new HashSet<string>(city.districts.Select(item => item.id), StringComparer.Ordinal);
                 foreach (CityPipelineLandmark landmark in city.landmarks)
@@ -178,6 +184,9 @@ namespace UCENO.VirtualWorld.Editor
             if (profile.landmarks == null || profile.landmarks.Length != city.landmarks.Length)
                 errors.Add(city.id + ": every authored landmark must have one dedicated imported prefab.");
 
+            string expectedRoot = "Assets/UCENO/Cities/" + city.id + "/Prefabs";
+            if (!string.Equals(profile.assetRoot, expectedRoot, StringComparison.Ordinal))
+                errors.Add(city.id + ": assetRoot must be " + expectedRoot);
             var paths = (profile.architecturePrefabs ?? Array.Empty<string>())
                 .Concat(profile.environmentPrefabs ?? Array.Empty<string>())
                 .Concat((profile.landmarks ?? Array.Empty<CityPipelineLandmarkAsset>())
@@ -186,6 +195,8 @@ namespace UCENO.VirtualWorld.Editor
                 errors.Add(city.id + ": asset paths must be non-empty and unique within the city.");
             foreach (string assetPath in paths)
             {
+                if (!string.IsNullOrEmpty(assetPath) && !assetPath.StartsWith(expectedRoot + "/", StringComparison.Ordinal))
+                    errors.Add(city.id + ": prefab must live under its city-specific asset root: " + assetPath);
                 if (assetOwners.TryGetValue(assetPath, out string owner) && owner != city.id)
                     errors.Add(city.id + ": asset is shared with " + owner + "; each city needs its own visual identity: " + assetPath);
                 else assetOwners[assetPath] = city.id;
