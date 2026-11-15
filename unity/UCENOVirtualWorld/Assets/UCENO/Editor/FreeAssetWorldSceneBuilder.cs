@@ -266,54 +266,50 @@ namespace UCENO.VirtualWorld.Editor
 
         private static GameObject CreateAvatarPrefab()
         {
-            List<AnimationClip> importedClips = AssetDatabase.LoadAllAssetsAtPath(AvatarPath)
-                .OfType<AnimationClip>()
-                .Where(clip => clip != null && clip.length > 0.01f)
-                .ToList();
+            // Do not accept the base model's still pose or procedural bone posing as
+            // an animation system. All required motion must be imported and retargeted.
+            HumanoidAnimationLibraryValidator.Validate();
 
-            // Animation-only FBXs are retargeted to the avatar's Humanoid rig by
-            // FreeAssetModelPostprocessor and imported from this dedicated folder.
-            if (AssetDatabase.IsValidFolder(ImportedAnimationRoot))
+            List<AnimationClip> importedClips = new List<AnimationClip>();
+            foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { ImportedAnimationRoot }))
             {
-                foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { ImportedAnimationRoot }))
-                {
-                    string animationPath = AssetDatabase.GUIDToAssetPath(guid);
-                    importedClips.AddRange(AssetDatabase.LoadAllAssetsAtPath(animationPath)
-                        .OfType<AnimationClip>()
-                        .Where(clip => clip != null && clip.length > 0.01f));
-                }
+                string animationPath = AssetDatabase.GUIDToAssetPath(guid);
+                importedClips.AddRange(AssetDatabase.LoadAllAssetsAtPath(animationPath)
+                    .OfType<AnimationClip>()
+                    .Where(clip => clip != null && clip.length > 0.01f));
             }
-
             AnimationClip[] clips = importedClips
                 .GroupBy(clip => clip.name + "|" + AssetDatabase.GetAssetPath(clip), StringComparer.OrdinalIgnoreCase)
-                .Select(group => group.First())
-                .ToArray();
+                .Select(group => group.First()).ToArray();
 
-            AnimationClip idle = FindClip(clips, "idle", "stand");
+            AnimationClip idle = FindClip(clips, "idle");
             AnimationClip walk = FindClip(clips, "walk");
             AnimationClip run = FindClip(clips, "run");
+            AnimationClip talk = FindClip(clips, "talk");
+            AnimationClip turn = FindClip(clips, "turn");
+            AnimationClip wave = FindClip(clips, "wave");
+            AnimationClip cheer = FindClip(clips, "cheer");
+            AnimationClip dance = FindClip(clips, "dance");
+            AnimationClip interact = FindClip(clips, "interact");
+            AnimationClip sit = FindClip(clips, "sit");
+            var required = new Dictionary<string, AnimationClip>
+            {
+                { "idle", idle }, { "walk", walk }, { "run", run }, { "talk", talk },
+                { "turn", turn }, { "wave", wave }, { "cheer", cheer }, { "dance", dance },
+                { "interact", interact }, { "sit", sit }
+            };
+            string[] missing = required.Where(pair => pair.Value == null).Select(pair => pair.Key).ToArray();
+            if (missing.Length > 0)
+                throw new BuildFailedException("Imported retargeted Humanoid animation set is incomplete: " +
+                    string.Join(", ", missing));
+
             Avatar avatar = AssetDatabase.LoadAllAssetsAtPath(AvatarPath)
-                .OfType<Avatar>()
-                .FirstOrDefault(candidate => candidate != null && candidate.isHuman);
+                .OfType<Avatar>().FirstOrDefault(candidate => candidate != null && candidate.isHuman);
             if (avatar == null)
                 throw new BuildFailedException("UCENO_Default_Avatar.fbx did not import as a valid Unity Humanoid.");
 
-            // Some FBX exporters include a valid skinned Humanoid but omit
-            // embedded animation takes. Keep the real character usable: use
-            // imported clips when all three exist, otherwise the locomotion
-            // driver animates the imported Humanoid skeleton procedurally.
-            AnimatorController controller = null;
-            if (idle != null && walk != null && run != null)
-            {
-                controller = CreateLocomotionController(idle, walk, run);
-            }
-            else
-            {
-                string names = string.Join(", ", clips.Select(clip => AssetDatabase.GetAssetPath(clip) + ":" + clip.name));
-                Debug.LogWarning(
-                    "UCENO avatar FBX has no complete Idle/Walk/Run clip set. " +
-                    "Using skeletal locomotion fallback. Imported clips: " + names);
-            }
+            AnimatorController controller = CreateHumanoidController(
+                idle, walk, run, talk, turn, wave, cheer, dance, interact, sit);
             GameObject source = AssetDatabase.LoadAssetAtPath<GameObject>(AvatarPath);
             GameObject wrapper = new GameObject("UCENO Default Humanoid");
             GameObject model = UnityEngine.Object.Instantiate(source);
@@ -323,8 +319,7 @@ namespace UCENO.VirtualWorld.Editor
             model.transform.localPosition = new Vector3(0f, -avatarBounds.min.y, 0f);
 
             Animator animator = model.GetComponent<Animator>();
-            if (animator == null)
-                animator = model.AddComponent<Animator>();
+            if (animator == null) animator = model.AddComponent<Animator>();
             animator.avatar = avatar;
             animator.runtimeAnimatorController = controller;
             animator.applyRootMotion = false;
@@ -332,13 +327,10 @@ namespace UCENO.VirtualWorld.Editor
 
             if (model.GetComponent<AvatarAppearanceProfile>() == null)
                 model.AddComponent<AvatarAppearanceProfile>();
-
             if (model.GetComponent<AvatarLocomotionDriver>() == null)
                 model.AddComponent<AvatarLocomotionDriver>();
-
             if (model.GetComponent<AvatarSocialExpressionDriver>() == null)
                 model.AddComponent<AvatarSocialExpressionDriver>();
-
             if (wrapper.GetComponent<AvatarCrowdLod>() == null)
                 wrapper.AddComponent<AvatarCrowdLod>();
 
@@ -361,10 +353,10 @@ namespace UCENO.VirtualWorld.Editor
                 });
         }
 
-        private static AnimatorController CreateLocomotionController(
-            AnimationClip idle,
-            AnimationClip walk,
-            AnimationClip run)
+        private static AnimatorController CreateHumanoidController(
+            AnimationClip idle, AnimationClip walk, AnimationClip run, AnimationClip talk,
+            AnimationClip turn, AnimationClip wave, AnimationClip cheer, AnimationClip dance,
+            AnimationClip interact, AnimationClip sit)
         {
             string controllerPath = AnimationRoot + "/UCENO_Humanoid_Locomotion.controller";
             if (AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath) != null)
@@ -372,10 +364,13 @@ namespace UCENO.VirtualWorld.Editor
 
             AnimatorController controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
             controller.AddParameter("MoveSpeed", AnimatorControllerParameterType.Float);
+            controller.AddParameter("IsSeated", AnimatorControllerParameterType.Bool);
+            foreach (string trigger in new[] { "Talk", "Turn", "Wave", "Cheer", "Dance", "Interact" })
+                controller.AddParameter(trigger, AnimatorControllerParameterType.Trigger);
 
             BlendTree tree = new BlendTree
             {
-                name = "UCENO Locomotion",
+                name = "UCENO Imported Locomotion",
                 blendType = BlendTreeType.Simple1D,
                 blendParameter = "MoveSpeed",
                 useAutomaticThresholds = false
@@ -385,12 +380,47 @@ namespace UCENO.VirtualWorld.Editor
             tree.AddChild(run, 1f);
             AssetDatabase.AddObjectToAsset(tree, controller);
 
-            AnimatorState state = controller.layers[0].stateMachine.AddState("Locomotion");
-            state.motion = tree;
-            controller.layers[0].stateMachine.defaultState = state;
+            AnimatorStateMachine machine = controller.layers[0].stateMachine;
+            AnimatorState locomotion = machine.AddState("Locomotion");
+            locomotion.motion = tree;
+            machine.defaultState = locomotion;
+
+            AddGestureState(controller, machine, locomotion, "Talk", talk);
+            AddGestureState(controller, machine, locomotion, "Turn", turn);
+            AddGestureState(controller, machine, locomotion, "Wave", wave);
+            AddGestureState(controller, machine, locomotion, "Cheer", cheer);
+            AddGestureState(controller, machine, locomotion, "Dance", dance);
+            AddGestureState(controller, machine, locomotion, "Interact", interact);
+
+            AnimatorState seated = machine.AddState("Seated");
+            seated.motion = sit;
+            AnimatorStateTransition enterSeat = machine.AddAnyStateTransition(seated);
+            enterSeat.AddCondition(AnimatorConditionMode.If, 0f, "IsSeated");
+            enterSeat.hasExitTime = false;
+            enterSeat.duration = 0.18f;
+            AnimatorStateTransition leaveSeat = seated.AddTransition(locomotion);
+            leaveSeat.AddCondition(AnimatorConditionMode.IfNot, 0f, "IsSeated");
+            leaveSeat.hasExitTime = false;
+            leaveSeat.duration = 0.18f;
+
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
             return controller;
+        }
+
+        private static void AddGestureState(AnimatorController controller, AnimatorStateMachine machine,
+            AnimatorState locomotion, string trigger, AnimationClip clip)
+        {
+            AnimatorState state = machine.AddState(trigger);
+            state.motion = clip;
+            AnimatorStateTransition enter = machine.AddAnyStateTransition(state);
+            enter.AddCondition(AnimatorConditionMode.If, 0f, trigger);
+            enter.hasExitTime = false;
+            enter.duration = 0.12f;
+            AnimatorStateTransition exit = state.AddTransition(locomotion);
+            exit.hasExitTime = true;
+            exit.exitTime = 0.92f;
+            exit.duration = 0.16f;
         }
 
         private static GameObject CreateModelPrefab(string relativeModelPath, string prefabName, bool addCollider)
