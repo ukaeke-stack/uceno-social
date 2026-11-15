@@ -94,6 +94,25 @@ export function parseWorldCityCatalog(raw: string, minimumCities = 10): WorldCit
         layout: district.layout, contentLabel: district.contentLabel,
         center: { x: district.center.x, z: district.center.z }, radius: district.radius };
     });
+    for (let i = 0; i < parsedDistricts.length; i++) {
+      const a = parsedDistricts[i];
+      const aMinX = a.center.x - a.radius, aMaxX = a.center.x + a.radius;
+      const aMinZ = a.center.z - a.radius, aMaxZ = a.center.z + a.radius;
+      for (let j = i + 1; j < parsedDistricts.length; j++) {
+        const b = parsedDistricts[j];
+        const overlaps = aMinX < b.center.x + b.radius && aMaxX > b.center.x - b.radius &&
+          aMinZ < b.center.z + b.radius && aMaxZ > b.center.z - b.radius;
+        if (overlaps) throw new Error(`City ${id} has overlapping district layouts`);
+      }
+    }
+    const spawnDistrictCount = parsedDistricts.filter(district =>
+      spawn.x >= district.center.x - district.radius &&
+      spawn.x < district.center.x + district.radius &&
+      spawn.z >= district.center.z - district.radius &&
+      spawn.z < district.center.z + district.radius).length;
+    if (spawnDistrictCount !== 1)
+      throw new Error(`City ${id} spawn must belong to exactly one district`);
+
     const landmarkIds = new Set<string>();
     const parsedLandmarks = landmarks.map((landmark: any, landmarkIndex: number): WorldCityLandmark => {
       if (!landmark || typeof landmark !== "object" ||
