@@ -141,12 +141,14 @@ namespace UCENO.VirtualWorld.Editor
             string meshFolder = cityRoot + "/Meshes";
             var root = new GameObject(cityId + " " + assetKey);
             var lodRenderers = new Renderer[3];
+            Mesh highestDetailMesh = null;
             try
             {
                 for (int lod = 0; lod < 3; lod++)
                 {
                     Mesh mesh = BuildMesh(architecturalStyle, kind, lod, environment, assetKey);
                     mesh.name = cityId + "_" + assetKey + "_LOD" + lod;
+                    if (lod == 0) highestDetailMesh = mesh;
                     string meshPath = meshFolder + "/" + cityId + "_" + assetKey + "_LOD" + lod + ".asset";
                     UnityEngine.Object existing = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(meshPath);
                     if (existing != null) AssetDatabase.DeleteAsset(meshPath);
@@ -172,6 +174,23 @@ namespace UCENO.VirtualWorld.Editor
                     new LOD(.012f, new[] { lodRenderers[2] })
                 });
                 group.RecalculateBounds();
+
+                // The city scene pipeline rejects decorative landmark prefabs that
+                // cannot be targeted by the interaction raycaster. Give each
+                // generated landmark a real root marker and a collider derived
+                // from its highest-detail mesh bounds. The scene registry exporter
+                // assigns the final stable scene ID after the prefab is placed.
+                if (assetKey.StartsWith("landmark-", StringComparison.Ordinal))
+                {
+                    root.AddComponent<WorldInteractable>();
+                    if (highestDetailMesh == null || highestDetailMesh.bounds.size.sqrMagnitude < 0.0001f)
+                        throw new InvalidOperationException("Landmark mesh has no usable collider bounds: " + assetKey);
+                    BoxCollider collider = root.AddComponent<BoxCollider>();
+                    collider.center = highestDetailMesh.bounds.center;
+                    collider.size = highestDetailMesh.bounds.size;
+                    collider.isTrigger = false;
+                }
+
                 PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }

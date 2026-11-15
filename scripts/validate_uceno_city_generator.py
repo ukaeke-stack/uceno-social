@@ -85,6 +85,10 @@ require("BuildMesh(architecturalStyle, kind, lod, environment, assetKey)" in gen
         "city-specific architecture style must drive the actual generated mesh geometry")
 require("int style = architecturalStyle;" in generator,
         "mesh generation must not substitute catalogue index for the authored architecture style")
+require('root.AddComponent<WorldInteractable>()' in generator,
+        "generated landmark prefabs must carry a real WorldInteractable marker")
+require("root.AddComponent<BoxCollider>()" in generator and "collider.isTrigger = false;" in generator,
+        "generated landmarks must have non-trigger targeting colliders derived from mesh bounds")
 require('File.WriteAllText(Path.Combine(root, ProfilePath)' in generator,
         "Unity Editor generation must emit the asset profile consumed by the scene pipeline")
 
