@@ -328,8 +328,8 @@ namespace UCENO.VirtualWorld.Editor
             foreach (CityPipelineCity city in document.cities)
             {
                 if (city == null || string.IsNullOrWhiteSpace(city.id) || !ids.Add(city.id) ||
-                    city.districts == null || city.districts.Length < 4 ||
-                    city.landmarks == null || city.landmarks.Length < 3 ||
+                    city.districts == null || city.districts.Length != 4 ||
+                    city.landmarks == null || city.landmarks.Length != 3 ||
                     city.layout == null || city.environment == null ||
                     city.districts.Any(d => d == null || d.center == null || d.radius < 40f ||
                         d.contentLabel != "world-city-" + city.id + "-" + d.id) ||
