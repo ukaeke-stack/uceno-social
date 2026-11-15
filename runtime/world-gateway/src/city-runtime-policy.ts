@@ -54,7 +54,7 @@ export function evaluateCityRuntimeReadiness(
   collisionDistrictIds: ReadonlySet<string>,
   interactableDistrictIds: ReadonlySet<string>
 ): CityRuntimeReadiness {
-  const districtIds = city.districts.map(district => district.id);
+  const districtIds = city.districts.map(district => city.id + ':' + district.id);
   const missingCollisionDistrictIds = districtIds.filter(id => !collisionDistrictIds.has(id));
   const missingInteractableDistrictIds = districtIds.filter(id => !interactableDistrictIds.has(id));
   return {
