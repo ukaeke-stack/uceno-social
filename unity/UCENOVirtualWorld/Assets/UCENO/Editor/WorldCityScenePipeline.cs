@@ -497,7 +497,7 @@ namespace UCENO.VirtualWorld.Editor
                 ConfigureCityEnvironment(city, skybox, root.transform);
                 BuildDistrictGround(root.transform, district, ground, road, city.layout.pattern, city.layout.water, city.id);
                 BuildArchitecture(root.transform, district, architecture, city.layout.pattern);
-                BuildEnvironment(root.transform, district, environment, city.environment.biome);
+                BuildEnvironment(root.transform, district, environment, city.environment.biome, city.layout.pattern);
                 CityPipelineLandmark[] districtLandmarks = city.landmarks.Where(item => item.districtId == district.id).ToArray();
                 foreach (CityPipelineLandmark landmark in districtLandmarks)
                     BuildLandmark(root.transform, landmark, landmarkPrefabs[landmark.id]);
@@ -664,30 +664,125 @@ namespace UCENO.VirtualWorld.Editor
         private static void BuildArchitecture(Transform parent, CityPipelineDistrict district,
             GameObject[] prefabs, string layout)
         {
-            float[][] offsets = layout.Contains("linear")
-                ? new[] { new[] { -78f, -72f }, new[] { 0f, -82f }, new[] { 78f, -72f },
-                    new[] { -78f, 72f }, new[] { 0f, 82f }, new[] { 78f, 72f } }
-                : layout.Contains("terrace") || layout.Contains("contour")
-                    ? new[] { new[] { -82f, -72f }, new[] { -30f, -35f }, new[] { 35f, 5f },
-                        new[] { 82f, 72f }, new[] { -55f, 78f }, new[] { 55f, -78f } }
-                    : new[] { new[] { -78f, -72f }, new[] { 0f, -82f }, new[] { 78f, -72f },
-                        new[] { -78f, 72f }, new[] { 0f, 82f }, new[] { 78f, 72f } };
+            float[][] offsets;
+            float[] elevations;
+            if (layout == "linear-waterfront")
+            {
+                offsets = new[] { new[] { -82f, -68f }, new[] { -24f, -82f }, new[] { 42f, -68f },
+                    new[] { 82f, 12f }, new[] { 22f, 72f }, new[] { -48f, 68f } };
+                elevations = new[] { 0f, 0f, 0f, 0f, 0f, 0f };
+            }
+            else if (layout == "multi-level-green-corridors")
+            {
+                offsets = new[] { new[] { -82f, -72f }, new[] { -28f, -88f }, new[] { 28f, -72f },
+                    new[] { 82f, -88f }, new[] { -82f, 72f }, new[] { -28f, 88f },
+                    new[] { 28f, 72f }, new[] { 82f, 88f } };
+                elevations = new[] { 0f, 4f, 0f, 4f, 0f, 4f, 0f, 4f };
+            }
+            else if (layout == "river-island-campus")
+            {
+                offsets = new[] { new[] { -88f, -52f }, new[] { -55f, -82f }, new[] { -24f, -48f },
+                    new[] { -55f, 8f }, new[] { 24f, 48f }, new[] { 55f, 82f },
+                    new[] { 88f, 52f }, new[] { 55f, -8f } };
+                elevations = new[] { 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+            }
+            else if (layout == "contour-terraces")
+            {
+                offsets = new[] { new[] { -88f, -72f }, new[] { -54f, -34f }, new[] { -18f, 4f },
+                    new[] { 22f, 38f }, new[] { 58f, 72f }, new[] { 88f, 88f } };
+                elevations = new[] { 0f, 3f, 6f, 9f, 12f, 15f };
+            }
+            else if (layout == "oasis-radial-courtyards")
+            {
+                offsets = new[] { new[] { -78f, 0f }, new[] { -55f, -55f }, new[] { 0f, -82f },
+                    new[] { 55f, -55f }, new[] { 78f, 0f }, new[] { 55f, 55f },
+                    new[] { 0f, 82f }, new[] { -55f, 55f } };
+                elevations = new[] { 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+            }
+            else if (layout == "elevated-grid-and-canals")
+            {
+                offsets = new[] { new[] { -88f, -82f }, new[] { -28f, -82f }, new[] { 32f, -82f },
+                    new[] { 88f, -82f }, new[] { -88f, 82f }, new[] { -28f, 82f },
+                    new[] { 32f, 82f }, new[] { 88f, 82f } };
+                elevations = new[] { 2f, 0f, 2f, 0f, 2f, 0f, 2f, 0f };
+            }
+            else if (layout == "entertainment-superblocks")
+            {
+                offsets = new[] { new[] { -78f, -78f }, new[] { -48f, -78f }, new[] { 48f, -78f },
+                    new[] { 78f, -78f }, new[] { -78f, 78f }, new[] { -48f, 78f },
+                    new[] { 48f, 78f }, new[] { 78f, 78f } };
+                elevations = new[] { 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+            }
+            else if (layout == "rail-spoke-industrial")
+            {
+                offsets = new[] { new[] { -88f, -72f }, new[] { -88f, -20f }, new[] { -88f, 38f },
+                    new[] { -88f, 82f }, new[] { 88f, -72f }, new[] { 88f, -20f },
+                    new[] { 88f, 38f }, new[] { 88f, 82f } };
+                elevations = new[] { 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+            }
+            else if (layout == "garden-city-radial")
+            {
+                offsets = new[] { new[] { -88f, 0f }, new[] { -62f, -62f }, new[] { 0f, -88f },
+                    new[] { 62f, -62f }, new[] { 88f, 0f }, new[] { 62f, 62f },
+                    new[] { 0f, 88f }, new[] { -62f, 62f } };
+                elevations = new[] { 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+            }
+            else
+            {
+                offsets = new[] { new[] { -78f, -72f }, new[] { 0f, -82f }, new[] { 78f, -72f },
+                    new[] { -78f, 72f }, new[] { 0f, 82f }, new[] { 78f, 72f } };
+                elevations = new[] { 0f, 0f, 0f, 0f, 0f, 0f };
+            }
+
             for (int i = 0; i < offsets.Length; i++)
             {
                 GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefabs[i % prefabs.Length]);
                 instance.name = "City Architecture " + (i + 1);
                 instance.transform.SetParent(parent, true);
-                instance.transform.position = new Vector3(district.center.x + offsets[i][0], 0f,
-                    district.center.z + offsets[i][1]);
-                instance.transform.rotation = Quaternion.Euler(0f, (i * 90f + (layout.Contains("linear") ? 90f : 0f)) % 360f, 0f);
+                instance.transform.position = new Vector3(district.center.x + offsets[i][0],
+                    elevations[i], district.center.z + offsets[i][1]);
+                float yaw = (i * 47f + (layout.Contains("linear") ? 90f : 0f)) % 360f;
+                instance.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
                 instance.isStatic = true;
             }
         }
 
         private static void BuildEnvironment(Transform parent, CityPipelineDistrict district,
-            GameObject[] prefabs, string biome)
+            GameObject[] prefabs, string biome, string layout)
         {
-            float[][] offsets = { new[] { -95f, 0f }, new[] { 95f, 0f }, new[] { 0f, 95f }, new[] { 0f, -95f }, new[] { -75f, 75f }, new[] { 75f, -75f } };
+            float[][] offsets;
+            if (layout == "linear-waterfront")
+                offsets = new[] { new[] { -105f, -35f }, new[] { -65f, 82f }, new[] { 0f, 102f },
+                    new[] { 65f, 82f }, new[] { 105f, -35f }, new[] { 0f, -102f } };
+            else if (layout == "multi-level-green-corridors")
+                offsets = new[] { new[] { -96f, -96f }, new[] { -32f, -96f }, new[] { 32f, -96f },
+                    new[] { 96f, -96f }, new[] { -96f, 96f }, new[] { -32f, 96f },
+                    new[] { 32f, 96f }, new[] { 96f, 96f } };
+            else if (layout == "river-island-campus")
+                offsets = new[] { new[] { -102f, -30f }, new[] { -72f, 72f }, new[] { -42f, -88f },
+                    new[] { 42f, 88f }, new[] { 72f, -72f }, new[] { 102f, 30f } };
+            else if (layout == "contour-terraces")
+                offsets = new[] { new[] { -100f, -85f }, new[] { -70f, -20f }, new[] { -35f, 55f },
+                    new[] { 35f, -55f }, new[] { 70f, 20f }, new[] { 100f, 85f } };
+            else if (layout == "oasis-radial-courtyards" || layout == "garden-city-radial")
+                offsets = new[] { new[] { -105f, 0f }, new[] { -74f, -74f }, new[] { 0f, -105f },
+                    new[] { 74f, -74f }, new[] { 105f, 0f }, new[] { 74f, 74f },
+                    new[] { 0f, 105f }, new[] { -74f, 74f } };
+            else if (layout == "elevated-grid-and-canals")
+                offsets = new[] { new[] { -105f, -70f }, new[] { -35f, -70f }, new[] { 35f, -70f },
+                    new[] { 105f, -70f }, new[] { -105f, 70f }, new[] { -35f, 70f },
+                    new[] { 35f, 70f }, new[] { 105f, 70f } };
+            else if (layout == "entertainment-superblocks")
+                offsets = new[] { new[] { -105f, -105f }, new[] { -105f, 105f },
+                    new[] { 105f, -105f }, new[] { 105f, 105f }, new[] { 0f, -105f },
+                    new[] { 0f, 105f } };
+            else if (layout == "rail-spoke-industrial")
+                offsets = new[] { new[] { -108f, -80f }, new[] { -108f, 0f }, new[] { -108f, 80f },
+                    new[] { 108f, -80f }, new[] { 108f, 0f }, new[] { 108f, 80f } };
+            else
+                offsets = new[] { new[] { -95f, 0f }, new[] { 95f, 0f }, new[] { 0f, 95f },
+                    new[] { 0f, -95f }, new[] { -75f, 75f }, new[] { 75f, -75f } };
+
             for (int i = 0; i < offsets.Length; i++)
             {
                 GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefabs[i % prefabs.Length]);
@@ -695,7 +790,9 @@ namespace UCENO.VirtualWorld.Editor
                 instance.transform.SetParent(parent, true);
                 instance.transform.position = new Vector3(district.center.x + offsets[i][0], 0f,
                     district.center.z + offsets[i][1]);
-                instance.transform.rotation = Quaternion.Euler(0f, (i * 57f) % 360f, 0f);
+                instance.transform.rotation = Quaternion.Euler(0f, (i * 53f) % 360f, 0f);
+                float scale = 0.88f + (i % 4) * 0.08f;
+                instance.transform.localScale = Vector3.one * scale;
                 instance.isStatic = true;
             }
         }
