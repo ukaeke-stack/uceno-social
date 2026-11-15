@@ -29,6 +29,7 @@ namespace UCENO.VirtualWorld.Editor
         private const string PrefabRoot = "Assets/UCENO/Prefabs";
         private const string MaterialRoot = "Assets/UCENO/Materials";
         private const string AnimationRoot = "Assets/UCENO/Animations";
+        private const string ImportedAnimationRoot = "Assets/UCENO/Animations/Imported";
 
         private static readonly string[] RequiredModels =
         {
@@ -265,9 +266,27 @@ namespace UCENO.VirtualWorld.Editor
 
         private static GameObject CreateAvatarPrefab()
         {
-            AnimationClip[] clips = AssetDatabase.LoadAllAssetsAtPath(AvatarPath)
+            List<AnimationClip> importedClips = AssetDatabase.LoadAllAssetsAtPath(AvatarPath)
                 .OfType<AnimationClip>()
                 .Where(clip => clip != null && clip.length > 0.01f)
+                .ToList();
+
+            // Animation-only FBXs are retargeted to the avatar's Humanoid rig by
+            // FreeAssetModelPostprocessor and imported from this dedicated folder.
+            if (AssetDatabase.IsValidFolder(ImportedAnimationRoot))
+            {
+                foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { ImportedAnimationRoot }))
+                {
+                    string animationPath = AssetDatabase.GUIDToAssetPath(guid);
+                    importedClips.AddRange(AssetDatabase.LoadAllAssetsAtPath(animationPath)
+                        .OfType<AnimationClip>()
+                        .Where(clip => clip != null && clip.length > 0.01f));
+                }
+            }
+
+            AnimationClip[] clips = importedClips
+                .GroupBy(clip => clip.name + "|" + AssetDatabase.GetAssetPath(clip), StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
                 .ToArray();
 
             AnimationClip idle = FindClip(clips, "idle", "stand");
@@ -290,7 +309,7 @@ namespace UCENO.VirtualWorld.Editor
             }
             else
             {
-                string names = string.Join(", ", clips.Select(clip => clip.name));
+                string names = string.Join(", ", clips.Select(clip => AssetDatabase.GetAssetPath(clip) + ":" + clip.name));
                 Debug.LogWarning(
                     "UCENO avatar FBX has no complete Idle/Walk/Run clip set. " +
                     "Using skeletal locomotion fallback. Imported clips: " + names);
