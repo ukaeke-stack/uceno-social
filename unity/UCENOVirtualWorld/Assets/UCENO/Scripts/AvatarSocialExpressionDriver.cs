@@ -38,7 +38,11 @@ namespace UCENO.VirtualWorld
 
         public void SetLookTarget(Transform target)
         {
-            lookTarget = target == transform ? null : target;
+            // A social gaze target must be another avatar or a world object, never
+            // one of this avatar's own bones/attachments (which creates unstable neck tracking).
+            lookTarget = target == null || target == transform || target.IsChildOf(transform)
+                ? null
+                : target;
         }
 
         public void ClearLookTarget()
