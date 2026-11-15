@@ -19,6 +19,19 @@ namespace UCENO.VirtualWorld.Editor
     }
 
     [Serializable]
+    internal sealed class WorldCityInteractableManifestDocument
+    {
+        public WorldCityInteractableManifestEntry[] cities;
+    }
+
+    [Serializable]
+    internal sealed class WorldCityInteractableManifestEntry
+    {
+        public string cityId;
+        public string file;
+    }
+
+    [Serializable]
     internal sealed class WorldInteractableRegistryEntry
     {
         public string id;
@@ -225,20 +238,44 @@ namespace UCENO.VirtualWorld.Editor
                 File.Copy(districtTemporary, districtOutput, true);
                 File.Delete(districtTemporary);
 
-                string output = activeCity.id == "meridian" ? Path.Combine(config, "world-interactables.json") : Path.Combine(config, "world-interactables-" + activeCity.id + ".json");
+                string output = Path.Combine(config, "world-interactables-" + activeCity.id + ".json");
                 string temporary = output + ".tmp";
                 string json = JsonUtility.ToJson(new WorldInteractableRegistryDocument {
                     interactables = entries.ToArray()
                 }, true);
-                File.WriteAllText(temporary, json);
-                File.Copy(temporary, output, true);
-                File.Delete(temporary);
+                File.WriteAllText(temporary, json, new UTF8Encoding(false));
+                if (File.Exists(output)) File.Replace(temporary, output, null);
+                else File.Move(temporary, output);
+
+                // Update only this city's entry. The gateway will reject an
+                // incomplete manifest rather than treating one city as global.
+                string manifestPath = Path.Combine(config, "world-interactables-manifest.json");
+                WorldCityInteractableManifestDocument existingManifest = File.Exists(manifestPath)
+                    ? JsonUtility.FromJson<WorldCityInteractableManifestDocument>(File.ReadAllText(manifestPath))
+                    : null;
+                var manifestEntries = (existingManifest?.cities ?? Array.Empty<WorldCityInteractableManifestEntry>())
+                    .Where(item => item != null && !string.IsNullOrWhiteSpace(item.cityId) && item.cityId != activeCity.id)
+                    .ToList();
+                manifestEntries.Add(new WorldCityInteractableManifestEntry {
+                    cityId = activeCity.id, file = Path.GetFileName(output)
+                });
+                var manifestCities = new HashSet<string>(StringComparer.Ordinal);
+                var manifestFiles = new HashSet<string>(StringComparer.Ordinal);
+                foreach (WorldCityInteractableManifestEntry item in manifestEntries)
+                    if (!manifestCities.Add(item.cityId) || !manifestFiles.Add(item.file))
+                        throw new InvalidOperationException("Duplicate city or file in interactable manifest.");
+                string manifestTemp = manifestPath + ".tmp";
+                File.WriteAllText(manifestTemp, JsonUtility.ToJson(new WorldCityInteractableManifestDocument {
+                    cities = manifestEntries.OrderBy(item => item.cityId, StringComparer.Ordinal).ToArray()
+                }, true), new UTF8Encoding(false));
+                if (File.Exists(manifestPath)) File.Replace(manifestTemp, manifestPath, null);
+                else File.Move(manifestTemp, manifestPath);
                 AssetDatabase.Refresh();
 
                 if (showDialog)
                     EditorUtility.DisplayDialog("UCENO gateway registry",
                         "Exported " + entries.Count + " scene interactables to:\n" + output +
-                        "\n\nConfigure WORLD_DISTRICTS_FILE to " + districtOutput + " and WORLD_INTERACTABLES_FILE to this file in the gateway runtime.",
+                        "\n\nConfigure WORLD_DISTRICTS_FILE to " + districtOutput + " and WORLD_INTERACTABLES_MANIFEST_FILE to " + manifestPath + " in the gateway runtime.",
                         "OK");
                 Debug.Log("UCENO exported " + entries.Count + " scene interactables for " + activeCity.name + " to " + output);
             }
