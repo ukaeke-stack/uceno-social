@@ -36,6 +36,7 @@ test("talk animation follows real local microphone transmit state", () => {
   assert.match(voice, /LocalTransmitChanged/);
   assert.match(voice, /shouldTransmit != lastLocalTransmit/);
   assert.match(driver, /WorldSpatialVoiceClient\.LocalTransmitChanged \+= SetTalking/);
+  assert.match(driver, /if \(motor != null\) WorldSpatialVoiceClient\.LocalTransmitChanged \+= SetTalking/);
   assert.match(driver, /WorldSpatialVoiceClient\.LocalTransmitChanged -= SetTalking/);
   assert.match(presence, /ApplyRemoteState\(normalizedSpeed/);
 });
