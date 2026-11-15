@@ -47,3 +47,13 @@ test("catalogue rejects duplicate district IDs and fewer than four districts", (
   incomplete.cities[0].districts = incomplete.cities[0].districts.slice(0, 3);
   assert.throws(() => parseWorldCityCatalog(JSON.stringify(incomplete), 10), /invalid or duplicate/);
 });
+
+test("gateway loads the catalogue at startup and labels unpublished scenes honestly", () => {
+  const server = readFileSync(new URL("../src/server.ts", import.meta.url), "utf8");
+  const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
+  assert.match(server, /parseWorldCityCatalog\(raw, 10\)/);
+  assert.match(server, /process\.cwd\(\), "config\/world-cities\.json"/);
+  assert.match(server, /req\.url === "\/cities"/);
+  assert.match(server, /contentStatus: "catalogue_only"/);
+  assert.match(dockerfile, /COPY config \.\/config/);
+});
