@@ -36,3 +36,42 @@ export function resolveCityRuntime(cities: WorldCity[], cityId: string): {
   if (!city) return null;
   return { city, districts: districtsForCity(city) };
 }
+
+
+export type CityRuntimeReadiness = {
+  ready: boolean;
+  missingCollisionDistrictIds: string[];
+  missingInteractableDistrictIds: string[];
+};
+
+/**
+ * A city is admissible only when every configured district has both a
+ * validated collision map and at least one exported interactable. City
+ * catalogue metadata alone is never treated as a playable runtime.
+ */
+export function evaluateCityRuntimeReadiness(
+  city: WorldCity,
+  collisionDistrictIds: ReadonlySet<string>,
+  interactableDistrictIds: ReadonlySet<string>
+): CityRuntimeReadiness {
+  const districtIds = city.districts.map(district => district.id);
+  const missingCollisionDistrictIds = districtIds.filter(id => !collisionDistrictIds.has(id));
+  const missingInteractableDistrictIds = districtIds.filter(id => !interactableDistrictIds.has(id));
+  return {
+    ready: missingCollisionDistrictIds.length === 0 && missingInteractableDistrictIds.length === 0,
+    missingCollisionDistrictIds,
+    missingInteractableDistrictIds
+  };
+}
+
+export function resolveReadyCityRuntime(
+  cities: WorldCity[],
+  cityId: string,
+  collisionDistrictIds: ReadonlySet<string>,
+  interactableDistrictIds: ReadonlySet<string>
+): { city: WorldCity; districts: WorldDistrict[] } | null {
+  const runtime = resolveCityRuntime(cities, cityId);
+  if (!runtime || !evaluateCityRuntimeReadiness(runtime.city, collisionDistrictIds, interactableDistrictIds).ready)
+    return null;
+  return runtime;
+}
