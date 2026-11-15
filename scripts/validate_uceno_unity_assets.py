@@ -165,6 +165,24 @@ def main():
     if "FreeAssetWorldSceneBuilder.CreateStarterScene()" not in starter:
         fail("StarterSceneBuilder does not invoke the realistic city scene builder.")
 
+    city_catalog = json.loads(
+        (Path("runtime/world-gateway/config/world-cities.json")).read_text(encoding="utf-8")
+    )
+    meridian = next((city for city in city_catalog.get("cities", [])
+                     if city.get("id") == "meridian"), None)
+    if meridian is None:
+        fail("The Meridian starter city is missing from the gateway city catalogue.")
+    meridian_labels = {district.get("contentLabel") for district in meridian.get("districts", [])}
+    district_builder = builder[builder.index("private static void BuildDistrictScenes"):]
+    for district_id in ("waterfront", "residential", "downtown", "culture"):
+        expected_label = "world-city-meridian-" + district_id
+        if expected_label not in meridian_labels or expected_label not in district_builder:
+            fail("Meridian Addressables scene label is not aligned with the city catalogue: " + expected_label)
+    if 'const string cityId = "meridian"' not in district_builder:
+        fail("Starter district scene generation must identify its actual city instead of generic district labels.")
+    if "world-city-district-" in district_builder:
+        fail("Newly generated city district scenes must not use the obsolete generic Addressables label.")
+
     motor = read_text(ASSETS / "Scripts/PlayerMotor.cs")
     if "AnimationSpeed" not in motor or "SetSprinting" not in motor:
         fail("PlayerMotor is missing animation/sprint integration.")
