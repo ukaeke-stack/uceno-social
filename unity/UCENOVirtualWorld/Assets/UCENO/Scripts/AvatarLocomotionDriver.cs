@@ -25,6 +25,9 @@ namespace UCENO.VirtualWorld
         private Transform hips;
         private Transform chest;
         private Transform head;
+        private Transform spine;
+        private Transform leftFoot;
+        private Transform rightFoot;
         private Transform leftUpperLeg;
         private Transform rightUpperLeg;
         private Transform leftLowerLeg;
@@ -37,6 +40,9 @@ namespace UCENO.VirtualWorld
         private Quaternion hipsBase;
         private Quaternion chestBase;
         private Quaternion headBase;
+        private Quaternion spineBase;
+        private Quaternion leftFootBase;
+        private Quaternion rightFootBase;
         private Quaternion leftUpperLegBase;
         private Quaternion rightUpperLegBase;
         private Quaternion leftLowerLegBase;
@@ -114,6 +120,9 @@ namespace UCENO.VirtualWorld
             chest = Bone(HumanBodyBones.Chest);
             if (chest == null) chest = Bone(HumanBodyBones.UpperChest);
             head = Bone(HumanBodyBones.Head);
+            spine = Bone(HumanBodyBones.Spine);
+            leftFoot = Bone(HumanBodyBones.LeftFoot);
+            rightFoot = Bone(HumanBodyBones.RightFoot);
             leftUpperLeg = Bone(HumanBodyBones.LeftUpperLeg);
             rightUpperLeg = Bone(HumanBodyBones.RightUpperLeg);
             leftLowerLeg = Bone(HumanBodyBones.LeftLowerLeg);
@@ -126,6 +135,9 @@ namespace UCENO.VirtualWorld
             hipsBase = BaseRotation(hips);
             chestBase = BaseRotation(chest);
             headBase = BaseRotation(head);
+            spineBase = BaseRotation(spine);
+            leftFootBase = BaseRotation(leftFoot);
+            rightFootBase = BaseRotation(rightFoot);
             leftUpperLegBase = BaseRotation(leftUpperLeg);
             rightUpperLegBase = BaseRotation(rightUpperLeg);
             leftLowerLegBase = BaseRotation(leftLowerLeg);
@@ -204,16 +216,23 @@ namespace UCENO.VirtualWorld
             float kneeLeft = Mathf.Max(0f, -Mathf.Sin(cycle)) * amplitude * 0.65f;
             float kneeRight = Mathf.Max(0f, Mathf.Sin(cycle)) * amplitude * 0.65f;
             float armSwing = swing * armSwingFactor;
-            // Keep the root/hips stable; exaggerated vertical bob causes a floating look.
+            // Small pelvis/torso counter-rotation and ankle articulation break the
+            // rigid pendulum look without adding root bob or foot sliding.
             float idleBreath = Mathf.Sin(Time.time * 1.35f) * 1.1f * (1f - speed);
+            float torsoCounter = Mathf.Sin(cycle + 0.35f) * Mathf.Lerp(1.2f, 3.2f, speed);
+            float footRollLeft = Mathf.Clamp(-Mathf.Sin(cycle + 0.55f) * 10f, -10f, 10f) * speed;
+            float footRollRight = Mathf.Clamp(Mathf.Sin(cycle + 0.55f) * 10f, -10f, 10f) * speed;
 
-            SetRotation(hips, hipsBase, new Vector3(0f, 0f, idleBreath));
-            SetRotation(chest, chestBase, new Vector3(0f, 0f, -idleBreath));
+            SetRotation(hips, hipsBase, new Vector3(0f, torsoCounter * 0.55f, idleBreath));
+            SetRotation(spine, spineBase, new Vector3(0f, -torsoCounter * 0.7f, 0f));
+            SetRotation(chest, chestBase, new Vector3(0f, -torsoCounter * 0.3f, -idleBreath));
             SetRotation(head, headBase, new Vector3(0f, 0f, idleBreath * -0.35f));
             SetRotation(leftUpperLeg, leftUpperLegBase, new Vector3(swing, 0f, 0f));
             SetRotation(rightUpperLeg, rightUpperLegBase, new Vector3(opposite, 0f, 0f));
             SetRotation(leftLowerLeg, leftLowerLegBase, new Vector3(kneeLeft, 0f, 0f));
             SetRotation(rightLowerLeg, rightLowerLegBase, new Vector3(kneeRight, 0f, 0f));
+            SetRotation(leftFoot, leftFootBase, new Vector3(footRollLeft, 0f, 0f));
+            SetRotation(rightFoot, rightFootBase, new Vector3(footRollRight, 0f, 0f));
             if (leftUpperArm != null)
                 leftUpperArm.localRotation = leftUpperArmBase *
                     Quaternion.Euler(-armSwing, 0f, -relaxedArmDrop);
@@ -233,6 +252,8 @@ namespace UCENO.VirtualWorld
                 SetRotation(rightUpperLeg, rightUpperLegBase, new Vector3(-82f, 0f, 8f));
                 SetRotation(leftLowerLeg, leftLowerLegBase, new Vector3(92f, 0f, 0f));
                 SetRotation(rightLowerLeg, rightLowerLegBase, new Vector3(92f, 0f, 0f));
+                SetRotation(leftFoot, leftFootBase, Vector3.zero);
+                SetRotation(rightFoot, rightFootBase, Vector3.zero);
                 SetRotation(leftUpperArm, leftUpperArmBase, new Vector3(-18f, 0f, -relaxedArmDrop));
                 SetRotation(rightUpperArm, rightUpperArmBase, new Vector3(-18f, 0f, relaxedArmDrop));
                 SetRotation(leftLowerArm, leftLowerArmBase, new Vector3(-35f, 0f, 0f));
