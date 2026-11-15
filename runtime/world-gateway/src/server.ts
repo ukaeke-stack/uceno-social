@@ -1582,7 +1582,7 @@ wss.on("connection", async (socket: WebSocket) => {
         if (!target) {
           send(socket, { type: "interaction_rejected", code: "unknown_or_invalid_object" }); return;
         }
-        const playerDistrictId = findWorldDistrict(WORLD_DISTRICTS, player.x, player.z)?.id ?? "unassigned";
+        const playerDistrictId = findPlayerDistrict(player, player.x, player.z)?.id ?? "unassigned";
         if (player.homeId || player.eventId || playerDistrictId !== target.districtId) {
           send(socket, { type: "interaction_rejected", code: "object_in_different_district" }); return;
         }
@@ -2193,7 +2193,7 @@ setInterval(async () => {
         const packet = { type: "object_state", objectId: target.id, objectState: target.state,
           actorId: row.updatedBy, occupantId: null, version: target.version };
         for (const peer of players.values()) {
-          const peerDistrictId = findWorldDistrict(WORLD_DISTRICTS, peer.x, peer.z)?.id ?? "unassigned";
+          const peerDistrictId = findPlayerDistrict(peer, peer.x, peer.z)?.id ?? "unassigned";
           if (peer.worldId === worldId && !peer.homeId && !peer.eventId && peerDistrictId === target.districtId)
             send(peer.socket, packet);
         }
