@@ -147,3 +147,31 @@ The official category also includes small architectural components such as chain
 ### Status remains unchanged
 
 These exact catalogue entries have not been downloaded, imported or visually accepted in Unity. They are acquisition candidates only. The existing release gate remains mandatory, including LODs, textured materials, collision/interactable validation, unique city assignment and Android profiling.
+
+
+
+## Fifth sourcing pass — catalogue-level realism claim checked against actual listings
+
+The 3DAssets.dev realistic-buildings catalogue was opened and its actual first-page entries inspected on 2026-11-15. This materially narrows the earlier shortlist assessment.
+
+- The page advertises 1,418 realistic building/architecture GLBs under 25 MB and commercial use, but the visible entries are largely small kit components (chapel wall/door/roof modules, floor tiles, stage components and gallery walls) with listed geometry commonly around 120–2,700 triangles.
+- Therefore, the catalogue count is not evidence of 1,418 complete, detailed city buildings. Its search index may still help find selected assets, but it cannot be treated as the principal source for the nine city architecture libraries.
+- A model's low triangle count is not automatically a defect for a small prop, but a 100–2,000-triangle wall module cannot be counted as a detailed high-rise, waterfront tower, research campus building or city landmark.
+- [Kenney City Kit 2.1](https://kenney.nl/assets/city-kit) and [Kenney Modular Buildings](https://kenney.nl/assets/modular-buildings) are CC0 and available in standard 3D formats, but their documented low-poly style makes them unsuitable for the required hero architecture. They remain excluded from the 108-prefab hero count.
+- [Quaternius Downtown City MegaKit](https://quaternius.itch.io/downtown-city-megakit) offers 300+ modular pieces and CC0 terms, but its modular city-kit format is not proof of photorealism or the required city-specific architectural identity. It may be assessed for distant/background massing only, not accepted as hero art.
+- [Grab3D City Block](https://grab3d.com/models/buildings/city-block-filler/) is a usable CC0 supporting candidate with 2K PBR maps and a listed 20,642-triangle full version, but the source describes it as lightweight/stylized. It remains background/supporting art only unless direct Unity review proves otherwise.
+
+### Updated sourcing priority
+
+1. **Primary realistic geometry:** individually selected Poly Haven architecture/props where suitable, supplemented by individually licensed realistic building models from sources whose model-level provenance and redistribution terms can be verified.
+2. **Purpose-built hero assets:** commission or author missing signature buildings and landmarks for each city rather than trying to manufacture nine architectural identities by recolouring generic low-poly kits.
+3. **Supporting environment:** CC0 modular kits may be used for distant silhouettes, road furniture, hidden structural parts and non-hero props only when the visual style is compatible.
+4. **HDRIs and PBR:** acquire nine distinct, city-matched panoramas and material sets as separate deliverables; do not count lighting assets as modeled city content.
+
+### Next acquisition batch — strict evidence required
+
+The next batch should be a small pilot, not a bulk import: select one candidate hero building and one environment/prop for each of two contrasting cities (for example, Atlas Frontier industrial and Solstice Bay waterfront). For every candidate, capture the original source URL, creator, exact licence text, redistribution rights, archive hash, dimensions, triangle count, texture maps/resolution and whether real LOD source meshes exist. Import only after this evidence is complete. Reject the pilot if either city looks like a recoloured copy of the other or if the assets fail mobile LOD/texture budgets.
+
+### Evidence boundary
+
+This fifth pass is catalogue inspection and sourcing policy only. No model files or HDRIs were downloaded, no Unity imports were made, and no city prefab is accepted. The nine city packs, nine HDRIs, 36 district scenes and visual/runtime acceptance remain outstanding. The release gate must not be weakened to turn catalogue entries into a false completion count.
