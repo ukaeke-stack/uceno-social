@@ -46,6 +46,14 @@ namespace UCENO.VirtualWorld.Editor
     /// </summary>
     public static class WorldInteractableRegistryExporter
     {
+        private const string ActiveCityPreference = "UCENO.ActiveCityId";
+
+        [MenuItem("UCENO/World/Select City For Registry Export", false, 104)]
+        private static void OpenCitySelector()
+        {
+            WorldCityRegistrySettingsWindow.Open();
+        }
+
         [MenuItem("UCENO/World/Export Scene Interactables to Gateway Registry", false, 105)]
         private static void ExportFromMenu()
         {
@@ -59,15 +67,43 @@ namespace UCENO.VirtualWorld.Editor
                 string root = Path.GetFullPath(Path.Combine(
                     Directory.GetParent(Application.dataPath).FullName, "..", ".."));
                 string config = Path.Combine(root, "runtime", "world-gateway", "config");
-                string districtPath = Path.Combine(config, "world-districts.json");
-                if (!File.Exists(districtPath))
-                    throw new InvalidOperationException("Missing gateway district manifest: " + districtPath);
+                string cityCatalogPath = Path.Combine(config, "world-cities.json");
+                if (!File.Exists(cityCatalogPath))
+                    throw new InvalidOperationException("Missing authored city catalogue: " + cityCatalogPath);
+                WorldCityCatalogDocument cityCatalog =
+                    JsonUtility.FromJson<WorldCityCatalogDocument>(File.ReadAllText(cityCatalogPath));
+                string activeCityId = EditorPrefs.GetString(ActiveCityPreference, "meridian");
+                WorldCityCatalogEntry activeCity = cityCatalog?.cities?.FirstOrDefault(city =>
+                    city != null && string.Equals(city.id, activeCityId, StringComparison.Ordinal));
+                if (activeCity == null || activeCity.districts == null || activeCity.districts.Length < 4)
+                    throw new InvalidOperationException("The selected city has no valid district layout: " + activeCityId);
 
-                WorldInteractableDistrictDocument districtDocument =
-                    JsonUtility.FromJson<WorldInteractableDistrictDocument>(File.ReadAllText(districtPath));
-                if (districtDocument == null || districtDocument.districts == null ||
-                    districtDocument.districts.Length == 0)
-                    throw new InvalidOperationException("Gateway district manifest is empty.");
+                var districtEntries = activeCity.districts.Select(district =>
+                {
+                    if (district == null || district.center == null || district.radius < 40f ||
+                        string.IsNullOrWhiteSpace(district.id) ||
+                        district.contentLabel != "world-city-" + activeCity.id + "-" + district.id)
+                        throw new InvalidOperationException("Invalid district geometry or content label in city " + activeCity.id);
+                    return new WorldInteractableDistrictEntry {
+                        id = district.id,
+                        minX = district.center.x - district.radius,
+                        maxX = district.center.x + district.radius,
+                        minZ = district.center.z - district.radius,
+                        maxZ = district.center.z + district.radius
+                    };
+                }).ToArray();
+                if (districtEntries.Length == 0)
+                    throw new InvalidOperationException("Selected city district manifest is empty.");
+                for (int i = 0; i < districtEntries.Length; i++)
+                for (int j = i + 1; j < districtEntries.Length; j++)
+                {
+                    var a = districtEntries[i]; var b = districtEntries[j];
+                    bool overlaps = a.minX < b.maxX && a.maxX > b.minX &&
+                        a.minZ < b.maxZ && a.maxZ > b.minZ;
+                    if (overlaps)
+                        throw new InvalidOperationException("City district rectangles overlap: " + a.id + " / " + b.id);
+                }
+                var districtDocument = new WorldInteractableDistrictDocument { districts = districtEntries };
 
                 var loadedScenes = new List<Scene>();
                 for (int i = 0; i < SceneManager.sceneCount; i++)
@@ -146,7 +182,13 @@ namespace UCENO.VirtualWorld.Editor
                 }
 
                 AssetDatabase.SaveAssets();
-                string output = Path.Combine(config, "world-interactables.json");
+                string districtOutput = Path.Combine(config, "world-districts-" + activeCity.id + ".json");
+                string districtTemporary = districtOutput + ".tmp";
+                File.WriteAllText(districtTemporary, JsonUtility.ToJson(districtDocument, true));
+                File.Copy(districtTemporary, districtOutput, true);
+                File.Delete(districtTemporary);
+
+                string output = Path.Combine(config, "world-interactables-" + activeCity.id + ".json");
                 string temporary = output + ".tmp";
                 string json = JsonUtility.ToJson(new WorldInteractableRegistryDocument {
                     interactables = entries.ToArray()
