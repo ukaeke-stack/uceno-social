@@ -106,6 +106,7 @@ namespace UCENO.VirtualWorld.Editor
             var errors = new List<string>();
             var profileIds = new HashSet<string>(StringComparer.Ordinal);
             var assetOwners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var geometryOwners = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (CityPipelineAssetProfile profile in profiles.cities ?? Array.Empty<CityPipelineAssetProfile>())
             {
                 if (profile == null || string.IsNullOrWhiteSpace(profile.cityId) || !profileIds.Add(profile.cityId))
@@ -115,7 +116,7 @@ namespace UCENO.VirtualWorld.Editor
                 }
                 CityPipelineCity city = cities.FirstOrDefault(item => item.id == profile.cityId);
                 if (city == null) { errors.Add("Profile references unknown city: " + profile.cityId); continue; }
-                ValidateProfile(city, profile, errors, assetOwners, checkAssets: true);
+                ValidateProfile(city, profile, errors, assetOwners, geometryOwners, checkAssets: true);
             }
             foreach (CityPipelineCity city in cities)
                 if (!profileIds.Contains(city.id)) errors.Add("Missing city-specific asset profile: " + city.id);
@@ -140,7 +141,7 @@ namespace UCENO.VirtualWorld.Editor
             {
                 if (!profileById.TryGetValue(city.id, out CityPipelineAssetProfile profile))
                     errors.Add(city.id + ": missing asset profile");
-                else ValidateProfile(city, profile, errors, assetOwners, checkAssets: true);
+                else ValidateProfile(city, profile, errors, assetOwners, geometryOwners, checkAssets: true);
             }
             if (errors.Count > 0)
                 throw new BuildFailedException("No city scenes were generated. Resolve all city-specific imported asset errors first:\n- " +
@@ -355,7 +356,8 @@ namespace UCENO.VirtualWorld.Editor
         }
 
         private static void ValidateProfile(CityPipelineCity city, CityPipelineAssetProfile profile,
-            List<string> errors, Dictionary<string, string> assetOwners, bool checkAssets)
+            List<string> errors, Dictionary<string, string> assetOwners,
+            Dictionary<string, string> geometryOwners, bool checkAssets)
         {
             if (profile.architecturePrefabs == null || profile.architecturePrefabs.Length < 5)
                 errors.Add(city.id + ": requires five distinct architecture prefabs.");
@@ -404,6 +406,33 @@ namespace UCENO.VirtualWorld.Editor
                         errors.Add(city.id + ": prefab requires a valid multi-level LODGroup for Android: " + assetPath);
                     if (!prefab.GetComponentsInChildren<Renderer>(true).Any(renderer => renderer != null))
                         errors.Add(city.id + ": prefab contains no renderable geometry: " + assetPath);
+                    if (checkAssets && prefab != null)
+                    {
+                        var meshes = prefab.GetComponentsInChildren<MeshFilter>(true)
+                            .Where(item => item != null && item.sharedMesh != null)
+                            .Select(item => item.sharedMesh)
+                            .Concat(prefab.GetComponentsInChildren<SkinnedMeshRenderer>(true)
+                                .Where(item => item != null && item.sharedMesh != null)
+                                .Select(item => item.sharedMesh))
+                            .Distinct().ToArray();
+                        if (meshes.Length == 0)
+                            errors.Add(city.id + ": imported prefab contains no mesh geometry: " + assetPath);
+                        foreach (Mesh mesh in meshes)
+                        {
+                            string meshPath = AssetDatabase.GetAssetPath(mesh);
+                            if (string.IsNullOrWhiteSpace(meshPath))
+                            {
+                                errors.Add(city.id + ": mesh is not backed by an imported asset: " + assetPath);
+                                continue;
+                            }
+                            string fingerprint = AssetDatabase.GetAssetDependencyHash(meshPath).ToString();
+                            if (geometryOwners.TryGetValue(fingerprint, out string geometryOwner) &&
+                                geometryOwner != city.id)
+                                errors.Add(city.id + ": mesh geometry is shared with " + geometryOwner +
+                                    "; city architecture, landmarks and environment must have distinct imported geometry: " + meshPath);
+                            else geometryOwners[fingerprint] = city.id;
+                        }
+                    }
                 }
             }
 
