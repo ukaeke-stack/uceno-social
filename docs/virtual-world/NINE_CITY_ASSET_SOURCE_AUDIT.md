@@ -82,3 +82,40 @@ This pass widened the search beyond the initial Poly Haven-oriented shortlist. I
 ### Evidence boundary
 
 No source archive was downloaded or imported by this audit. No asset is promoted to acquired, imported, LOD-complete or visually accepted. The next real delivery step is to obtain the actual model files and licence evidence, then run Unity import and visual inspection against the existing release gate. If a source cannot supply suitable assets under compatible terms, the correct action is to commission/create that asset—not lower the realism requirement or count a placeholder.
+
+
+## Third sourcing pass — public-domain city packs screened
+
+Additional catalogue pages were inspected on 2026-11-15:
+
+| Candidate | Licence and technical facts shown by listing | Assessment |
+|---|---|---|
+| [3DAssets.dev — Voxel City Districts](https://3dassets.dev/packs/voxel-city-districts) | CC0; 171 GLB files, 4.2 MB total, 86,304 triangles; shared voxel palette | Reject for the realism target. The pack is explicitly voxel/cubic, not detailed photoreal architecture. It may be useful for a separate low-detail prototype only; do not count toward the 108 accepted city prefabs. |
+| [3DAssets.dev catalogue](https://3dassets.dev/) | Catalogue states CC0 and GLB delivery with embedded textures | Useful discovery index, but each asset must still be inspected for geometry, material quality, scale, UVs, LODs and visual fit. Catalogue-wide claims do not establish that a specific model meets UCENO's gate. |
+| [Grab3D — City Block](https://grab3d.com/models/buildings/city-block-filler/) | CC0; full model listed at 20,642 triangles with 2K textures; light version 10,800 triangles | Could be a supporting mid-distance street block after visual inspection. It is described as a lightweight cozy/stylized kit, so it is not accepted as a hero building. |
+| [Grab3D — Skyscraper](https://grab3d.com/models/buildings/skyscraper/) | CC0; 22,928 triangles, 2K base-colour/roughness/metallic/normal maps; light version 11,464 triangles | Potential skyline silhouette only. Stylized design and listing do not establish two genuine Unity LOD levels; do not count as accepted hero architecture. |
+| [Community Core Stack — City 01](https://github.com/lucrybpin/unity-community-core-city-01) | Repository claims CC0 and a Unity city built from Kenney assets | Candidate for evaluating workflow and background city assembly, not proof of photoreal quality. Inspect source pack composition and actual Unity scene before any reuse. |
+| [FPS Buildings Environment Kit](https://github.com/petroulacl/fps-buildings-env-kit) | Repository describes CC0 Kenney modular buildings, Quaternius stylized vegetation, four Poly Haven HDRIs and ambientCG PBR ground textures | Useful supporting environment source; stylized modular buildings/vegetation cannot be promoted as the requested hero architecture. |
+
+### Important correction to the sourcing strategy
+
+A large number of CC0 files is not equivalent to a realistic city asset library. Several apparently attractive "free city" packs are voxel, low-poly, stylized or modular. Those may help populate distant backgrounds, but they do not meet the user's stated requirement for convincing detailed city architecture and photoreal-looking environments. The asset gate must remain strict.
+
+### HDRI acquisition plan
+
+Poly Haven and ambientCG remain preferred CC0 sources for environment lighting. The nine HDRIs must be chosen by each city's actual environment, not assigned arbitrarily:
+- Solstice Bay — bright tropical coastal daylight / humid atmosphere.
+- Verdant Reach — soft daylight with lush green canopy context.
+- Nexus Delta — modern urban daylight / controlled research-campus lighting.
+- Aurora Heights — high-altitude clear sky and mountain atmosphere.
+- Saffron Dunes — desert sun, warm horizon and clear arid sky.
+- Monsoon Harbour — overcast tropical maritime sky / wet-weather option.
+- Eclipse Central — urban dusk or night city illumination.
+- Origin Plains — open-sky daylight with green rural/campus context.
+- Atlas Frontier — industrial daylight / overcast logistics-yard context.
+
+For each HDRI, record the exact asset ID, source page, licence evidence, file format, projection, pixel dimensions, download hash and Unity import settings. HDRIs provide lighting/reflections/background; they do not replace modeled city skylines or scene geometry.
+
+### Acquisition status
+
+This screening added no downloaded files to the repository. No source archive has been imported, and no candidate is accepted. The current nine-city art gate remains the authority for acceptance; the asset list must not be padded with low-detail models to make the counts appear complete.
