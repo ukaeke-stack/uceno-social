@@ -32,12 +32,15 @@ namespace UCENO.VirtualWorld
 
         private void OnEnable()
         {
-            WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking;
+            // Only the local player has a PlayerMotor. Remote humanoids receive
+            // their replicated talking state through ApplyRemoteState and must
+            // never mirror this device's microphone activity.
+            if (motor != null) WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking;
         }
 
         private void OnDisable()
         {
-            WorldSpatialVoiceClient.LocalTransmitChanged -= SetTalking;
+            if (motor != null) WorldSpatialVoiceClient.LocalTransmitChanged -= SetTalking;
         }
 
         private void Awake()
