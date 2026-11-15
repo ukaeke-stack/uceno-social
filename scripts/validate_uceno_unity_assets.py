@@ -161,6 +161,17 @@ def main():
         if required not in builder:
             fail(f"Scene builder is missing required integration marker: {required}")
 
+    imported_city_gate = read_text(ASSETS / "Editor/ImportedCityAssetPackGate.cs")
+    for required in (
+        "AssetAbsolutePath(ProfilePath)",
+        'Path.Combine(Application.dataPath, "..", "..", "..", CatalogPath)',
+        "AssetAbsolutePath(cityRoot + \"/\" + ManifestName)",
+        "AssetDatabase.LoadAssetAtPath<GameObject>(path)",
+        "GetAssetDependencyHash",
+    ):
+        if required not in imported_city_gate:
+            fail("Imported city art gate has an invalid project-root path or missing asset verification: " + required)
+
     city_pipeline = read_text(ASSETS / "Editor/WorldCityScenePipeline.cs")
     for required in ("ValidateRemainingCityPacks", "BuildRemainingCities",
                      "VerifyNineCitySceneRegistries", "BuildRemoteAddressablesContent",
