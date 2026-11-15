@@ -48,7 +48,7 @@ def main():
     report = {
         "source": BASE,
         "query_date_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "selection_policy": "focused realistic architecture search with unfiltered query fallback; candidates require separate binary and Unity validation",
+        "selection_policy": "focused realistic architecture search with unfiltered query fallback; shortlist ranked for Android geometry and file-size budgets; candidates still require separate binary and Unity validation",
         "cities": {},
     }
     globally_seen = set()
@@ -95,11 +95,35 @@ def main():
                 "source_url": f"https://3dassets.dev/assets/{slug}",
                 "raw_record": item,
             })
-        candidates.sort(key=lambda x: (
-            as_number(x["triangles"]) is None,
-            -(as_number(x["triangles"]) or 0),
-            x["slug"],
-        ))
+        # Rank for Android viability, not raw polygon density. Prefer assets
+        # with known metrics, modest geometry and compact files. Large/high-poly
+        # assets remain in the report but are not first-batch download targets.
+        def mobile_cost(candidate):
+            triangles = as_number(candidate["triangles"])
+            size = as_number(candidate["file_size_bytes"])
+            if triangles is None:
+                triangle_penalty = 100
+            elif triangles <= 100_000:
+                triangle_penalty = 0
+            elif triangles <= 250_000:
+                triangle_penalty = 20
+            elif triangles <= 500_000:
+                triangle_penalty = 55
+            else:
+                triangle_penalty = 120
+            if size is None:
+                size_penalty = 40
+            elif size <= 8 * 1024 * 1024:
+                size_penalty = 0
+            elif size <= 16 * 1024 * 1024:
+                size_penalty = 15
+            elif size <= 25 * 1024 * 1024:
+                size_penalty = 35
+            else:
+                size_penalty = 100
+            return (triangle_penalty + size_penalty, candidate["slug"])
+
+        candidates.sort(key=mobile_cost)
         chosen = candidates[:30]
         globally_seen.update(item["slug"] for item in chosen)
         report["cities"][city] = {
