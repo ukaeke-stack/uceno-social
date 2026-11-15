@@ -1,36 +1,36 @@
 {
   "districts": [
     {
-      "id": "south",
-      "name": "South District",
-      "contentLabel": "world-city-meridian-south",
+      "id": "civic-core",
+      "name": "Civic Core",
+      "contentLabel": "world-city-meridian-civic-core",
       "minX": -40,
       "maxX": 60,
       "minZ": -120,
       "maxZ": -60
     },
     {
-      "id": "central-south",
-      "name": "Central South",
-      "contentLabel": "world-city-meridian-central-south",
+      "id": "exchange-quarter",
+      "name": "Exchange Quarter",
+      "contentLabel": "world-city-meridian-exchange-quarter",
       "minX": -40,
       "maxX": 60,
       "minZ": -60,
       "maxZ": 0
     },
     {
-      "id": "central-north",
-      "name": "Central North",
-      "contentLabel": "world-city-meridian-central-north",
+      "id": "garden-ring",
+      "name": "Garden Ring",
+      "contentLabel": "world-city-meridian-garden-ring",
       "minX": -40,
       "maxX": 60,
       "minZ": 0,
       "maxZ": 60
     },
     {
-      "id": "north",
-      "name": "North District",
-      "contentLabel": "world-city-meridian-north",
+      "id": "old-port",
+      "name": "Old Port",
+      "contentLabel": "world-city-meridian-old-port",
       "minX": -40,
       "maxX": 60,
       "minZ": 60,
