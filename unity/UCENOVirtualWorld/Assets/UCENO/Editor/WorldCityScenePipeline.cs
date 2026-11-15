@@ -311,10 +311,10 @@ namespace UCENO.VirtualWorld.Editor
         private static void ValidateProfile(CityPipelineCity city, CityPipelineAssetProfile profile,
             List<string> errors, Dictionary<string, string> assetOwners, bool checkAssets)
         {
-            if (profile.architecturePrefabs == null || profile.architecturePrefabs.Length < 3)
-                errors.Add(city.id + ": requires at least three distinct architecture prefabs.");
-            if (profile.environmentPrefabs == null || profile.environmentPrefabs.Length < 3)
-                errors.Add(city.id + ": requires at least three environment prefabs.");
+            if (profile.architecturePrefabs == null || profile.architecturePrefabs.Length < 5)
+                errors.Add(city.id + ": requires five distinct architecture prefabs.");
+            if (profile.environmentPrefabs == null || profile.environmentPrefabs.Length < 4)
+                errors.Add(city.id + ": requires four environment prefabs.");
             if (profile.landmarks == null || profile.landmarks.Length != city.landmarks.Length)
                 errors.Add(city.id + ": every authored landmark must have one dedicated imported prefab.");
 
@@ -574,10 +574,13 @@ namespace UCENO.VirtualWorld.Editor
             GameObject[] prefabs, string layout)
         {
             float[][] offsets = layout.Contains("linear")
-                ? new[] { new[] { -65f, -55f }, new[] { 55f, 0f }, new[] { -65f, 55f }, new[] { 55f, 65f } }
+                ? new[] { new[] { -78f, -72f }, new[] { 0f, -82f }, new[] { 78f, -72f },
+                    new[] { -78f, 72f }, new[] { 0f, 82f }, new[] { 78f, 72f } }
                 : layout.Contains("terrace") || layout.Contains("contour")
-                    ? new[] { new[] { -65f, -55f }, new[] { -20f, 15f }, new[] { 45f, 65f }, new[] { 75f, -35f } }
-                    : new[] { new[] { -65f, -55f }, new[] { 65f, -55f }, new[] { -65f, 65f }, new[] { 65f, 65f } };
+                    ? new[] { new[] { -82f, -72f }, new[] { -30f, -35f }, new[] { 35f, 5f },
+                        new[] { 82f, 72f }, new[] { -55f, 78f }, new[] { 55f, -78f } }
+                    : new[] { new[] { -78f, -72f }, new[] { 0f, -82f }, new[] { 78f, -72f },
+                        new[] { -78f, 72f }, new[] { 0f, 82f }, new[] { 78f, 72f } };
             for (int i = 0; i < offsets.Length; i++)
             {
                 GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefabs[i % prefabs.Length]);
