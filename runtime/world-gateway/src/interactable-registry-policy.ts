@@ -4,6 +4,7 @@ import { defaultPersistentObjectState } from "./district-object-policy.js";
 export type RegisteredInteractableKind = "door" | "seat" | "object" | "furniture" | "vehicle";
 export type RegisteredInteractable = {
   id: string;
+  cityId: string;
   districtId: string;
   kind: RegisteredInteractableKind;
   x: number;
@@ -77,6 +78,7 @@ export function parseInteractableRegistry(
       throw new Error(`Interactable ${item.id} is outside every configured world district`);
     result.set(item.id, {
       id: item.id,
+      cityId: "",
       districtId: owningDistrict?.id ?? "unassigned",
       kind,
       x: item.x,
@@ -90,4 +92,52 @@ export function parseInteractableRegistry(
     });
   }
   return result;
+}
+
+
+export type CityInteractableManifestEntry = { cityId: string; file: string };
+
+/**
+ * Load one exported Unity interactable registry per city. Every entry is
+ * validated against that city's own district geometry; IDs must be globally
+ * unique across the aggregate manifest.
+ */
+export function parseCityInteractableManifest(
+  rawManifest: string,
+  cities: Array<{ id: string; districts: WorldDistrict[] }>,
+  worldBounds: number,
+  readRegistry: (file: string, cityId: string) => string
+): Map<string, RegisteredInteractable> {
+  let parsed: unknown;
+  try { parsed = JSON.parse(rawManifest); }
+  catch { throw new Error("City interactable manifest must be valid JSON"); }
+  const entries = parsed && typeof parsed === "object" &&
+    Array.isArray((parsed as { cities?: unknown }).cities)
+      ? (parsed as { cities: unknown[] }).cities : null;
+  if (!entries || entries.length !== cities.length)
+    throw new Error("City interactable manifest must contain exactly one registry for every configured city");
+  const expected = new Set(cities.map(city => city.id));
+  const seenCities = new Set<string>();
+  const seenFiles = new Set<string>();
+  const aggregate = new Map<string, RegisteredInteractable>();
+  for (const [index, value] of entries.entries()) {
+    if (!value || typeof value !== "object") throw new Error(`City interactable manifest entry ${index} is invalid`);
+    const entry = value as Record<string, unknown>;
+    if (typeof entry.cityId !== "string" || !expected.has(entry.cityId) ||
+        typeof entry.file !== "string" || !/^[a-zA-Z0-9_-]{1,80}\\.json$/.test(entry.file) ||
+        seenCities.has(entry.cityId) || seenFiles.has(entry.file))
+      throw new Error(`City interactable manifest entry ${index} has invalid or duplicate identity/file`);
+    seenCities.add(entry.cityId);
+    seenFiles.add(entry.file);
+    const city = cities.find(item => item.id === entry.cityId)!;
+    const raw = readRegistry(entry.file, entry.cityId);
+    const parsedRegistry = parseInteractableRegistry(raw, city.districts, worldBounds);
+    if (parsedRegistry.size === 0)
+      throw new Error(`City ${city.id} interactable registry is empty`);
+    for (const [id, item] of parsedRegistry) {
+      if (aggregate.has(id)) throw new Error(`Duplicate interactable ID across cities: ${id}`);
+      aggregate.set(id, { ...item, cityId: city.id });
+    }
+  }
+  return aggregate;
 }
