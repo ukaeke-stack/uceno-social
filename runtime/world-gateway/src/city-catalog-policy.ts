@@ -88,6 +88,11 @@ export function parseWorldCityCatalog(raw: string, minimumCities = 10): WorldCit
           !finite(district.center.x) || !finite(district.center.z) ||
           !finite(district.radius) || district.radius < 40 || district.radius > 500)
         throw new Error(`City ${id} district ${districtIndex} has invalid or duplicate fields`);
+      if (district.center.x - district.radius < bounds.minX ||
+          district.center.x + district.radius > bounds.maxX ||
+          district.center.z - district.radius < bounds.minZ ||
+          district.center.z + district.radius > bounds.maxZ)
+        throw new Error(`City ${id} district ${district.id} extends outside city bounds`);
       districtIds.add(district.id); districtLabels.add(district.contentLabel);
       districtNames.add(district.name.trim().toLowerCase());
       return { id: district.id, name: district.name.trim(), role: district.role,
