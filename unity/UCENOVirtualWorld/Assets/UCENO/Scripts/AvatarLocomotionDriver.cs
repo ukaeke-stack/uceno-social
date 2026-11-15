@@ -21,6 +21,7 @@ namespace UCENO.VirtualWorld
         private PlayerMotor motor;
         private float networkSpeed;
         private bool networkSeated;
+        private bool networkSprinting;
         private int receivedGestureSequence;
         private float gestureUntil;
         private float lastYaw;
@@ -65,17 +66,24 @@ namespace UCENO.VirtualWorld
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
             lastYaw = motor != null ? motor.transform.eulerAngles.y : transform.eulerAngles.y;
-            RequireParameter("MoveSpeed", AnimatorControllerParameterType.Float);
-            RequireParameter("IsSeated", AnimatorControllerParameterType.Bool);
-            RequireParameter("IsTalking", AnimatorControllerParameterType.Bool);
+            bool validController = true;
+            validController &= RequireParameter("MoveSpeed", AnimatorControllerParameterType.Float);
+            validController &= RequireParameter("IsSeated", AnimatorControllerParameterType.Bool);
+            validController &= RequireParameter("IsTalking", AnimatorControllerParameterType.Bool);
             foreach (string trigger in new[] { "Turn", "Wave", "Cheer", "Dance", "Interact" })
-                RequireParameter(trigger, AnimatorControllerParameterType.Trigger);
+                validController &= RequireParameter(trigger, AnimatorControllerParameterType.Trigger);
+            if (!validController)
+            {
+                Debug.LogError("UCENO imported Animator Controller does not satisfy the complete humanoid motion contract. Avatar animation is disabled.", this);
+                enabled = false;
+            }
         }
 
         private void Update()
         {
             if (!enabled || animator == null || animator.runtimeAnimatorController == null) return;
-            float speed = motor != null ? motor.AnimationSpeed : networkSpeed;
+            float speed = motor != null ? motor.AnimationSpeed :
+                networkSprinting ? Mathf.Max(networkSpeed, 0.75f) : Mathf.Min(networkSpeed, 0.7f);
             bool seated = motor != null ? motor.IsSeated : networkSeated;
             animator.SetFloat(MoveSpeedHash, Mathf.Clamp01(speed), dampTime, Time.deltaTime);
             animator.SetBool(IsSeatedHash, seated);
@@ -95,6 +103,7 @@ namespace UCENO.VirtualWorld
         {
             networkSpeed = Mathf.Clamp01(speed);
             networkSeated = seated;
+            networkSprinting = sprinting;
             if (sequence <= receivedGestureSequence) return;
             receivedGestureSequence = sequence;
             PlayGesture(gesture, false);
@@ -172,10 +181,11 @@ namespace UCENO.VirtualWorld
             if (local) GestureSequence++;
         }
 
-        private void RequireParameter(string parameterName, AnimatorControllerParameterType type)
+        private bool RequireParameter(string parameterName, AnimatorControllerParameterType type)
         {
-            if (!HasParameter(parameterName, type))
-                Debug.LogError("UCENO imported Animator Controller is missing " + type + " parameter " + parameterName, this);
+            if (HasParameter(parameterName, type)) return true;
+            Debug.LogError("UCENO imported Animator Controller is missing " + type + " parameter " + parameterName, this);
+            return false;
         }
 
         private bool HasParameter(string parameterName, AnimatorControllerParameterType type)
