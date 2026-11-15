@@ -31,7 +31,8 @@
           "landmarkId": "oceanarium",
           "prefab": "Assets/UCENO/Cities/solstice/Prefabs/Landmarks/oceanarium.prefab"
         }
-      ]
+      ],
+      "skyboxTexture": "Assets/UCENO/Cities/solstice/Textures/Skybox/solstice_environment.hdr"
     },
     {
       "cityId": "verdant",
@@ -62,7 +63,8 @@
           "landmarkId": "arboretum-dome",
           "prefab": "Assets/UCENO/Cities/verdant/Prefabs/Landmarks/arboretum-dome.prefab"
         }
-      ]
+      ],
+      "skyboxTexture": "Assets/UCENO/Cities/verdant/Textures/Skybox/verdant_environment.hdr"
     },
     {
       "cityId": "nexus",
@@ -93,7 +95,8 @@
           "landmarkId": "innovation-forum",
           "prefab": "Assets/UCENO/Cities/nexus/Prefabs/Landmarks/innovation-forum.prefab"
         }
-      ]
+      ],
+      "skyboxTexture": "Assets/UCENO/Cities/nexus/Textures/Skybox/nexus_environment.hdr"
     },
     {
       "cityId": "aurora",
@@ -124,7 +127,8 @@
           "landmarkId": "ridge-station",
           "prefab": "Assets/UCENO/Cities/aurora/Prefabs/Landmarks/ridge-station.prefab"
         }
-      ]
+      ],
+      "skyboxTexture": "Assets/UCENO/Cities/aurora/Textures/Skybox/aurora_environment.hdr"
     },
     {
       "cityId": "saffron",
@@ -155,7 +159,8 @@
           "landmarkId": "oasis-court",
           "prefab": "Assets/UCENO/Cities/saffron/Prefabs/Landmarks/oasis-court.prefab"
         }
-      ]
+      ],
+      "skyboxTexture": "Assets/UCENO/Cities/saffron/Textures/Skybox/saffron_environment.hdr"
     },
     {
       "cityId": "monsoon",
@@ -186,7 +191,8 @@
           "landmarkId": "tide-clock",
           "prefab": "Assets/UCENO/Cities/monsoon/Prefabs/Landmarks/tide-clock.prefab"
         }
-      ]
+      ],
+      "skyboxTexture": "Assets/UCENO/Cities/monsoon/Textures/Skybox/monsoon_environment.hdr"
     },
     {
       "cityId": "eclipse",
@@ -217,7 +223,8 @@
           "landmarkId": "signal-museum",
           "prefab": "Assets/UCENO/Cities/eclipse/Prefabs/Landmarks/signal-museum.prefab"
         }
-      ]
+      ],
+      "skyboxTexture": "Assets/UCENO/Cities/eclipse/Textures/Skybox/eclipse_environment.hdr"
     },
     {
       "cityId": "origin",
@@ -248,7 +255,8 @@
           "landmarkId": "unity-commons",
           "prefab": "Assets/UCENO/Cities/origin/Prefabs/Landmarks/unity-commons.prefab"
         }
-      ]
+      ],
+      "skyboxTexture": "Assets/UCENO/Cities/origin/Textures/Skybox/origin_environment.hdr"
     },
     {
       "cityId": "atlas",
@@ -279,7 +287,8 @@
           "landmarkId": "horizon-gateway",
           "prefab": "Assets/UCENO/Cities/atlas/Prefabs/Landmarks/horizon-gateway.prefab"
         }
-      ]
+      ],
+      "skyboxTexture": "Assets/UCENO/Cities/atlas/Textures/Skybox/atlas_environment.hdr"
     }
   ]
 }
