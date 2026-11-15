@@ -1,0 +1,406 @@
+{
+  "version": 1,
+  "minimumCityCount": 10,
+  "cities": [
+    {
+      "id": "meridian",
+      "name": "Meridian Prime",
+      "identity": "Global finance and civic capital",
+      "climate": "temperate-coastal",
+      "architecture": "Neo-classical megatowers, glass civic arcologies, elevated gardens",
+      "contentLabel": "world-city-meridian",
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -600,
+        "maxX": 600,
+        "minZ": -600,
+        "maxZ": 600
+      },
+      "districts": [
+        {
+          "id": "downtown",
+          "name": "Downtown",
+          "contentLabel": "world-city-meridian-downtown"
+        },
+        {
+          "id": "waterfront",
+          "name": "Waterfront",
+          "contentLabel": "world-city-meridian-waterfront"
+        },
+        {
+          "id": "residential",
+          "name": "Residential",
+          "contentLabel": "world-city-meridian-residential"
+        },
+        {
+          "id": "culture",
+          "name": "Culture",
+          "contentLabel": "world-city-meridian-culture"
+        }
+      ]
+    },
+    {
+      "id": "solstice",
+      "name": "Solstice Bay",
+      "identity": "Sunlit resort and oceanfront culture",
+      "climate": "tropical-coastal",
+      "architecture": "Terraced waterfront towers, white-stone promenades, floating marinas",
+      "contentLabel": "world-city-solstice",
+      "spawn": {
+        "x": 0,
+        "z": -120
+      },
+      "bounds": {
+        "minX": -600,
+        "maxX": 600,
+        "minZ": -600,
+        "maxZ": 600
+      },
+      "districts": [
+        {
+          "id": "downtown",
+          "name": "Downtown",
+          "contentLabel": "world-city-solstice-downtown"
+        },
+        {
+          "id": "waterfront",
+          "name": "Waterfront",
+          "contentLabel": "world-city-solstice-waterfront"
+        },
+        {
+          "id": "residential",
+          "name": "Residential",
+          "contentLabel": "world-city-solstice-residential"
+        },
+        {
+          "id": "culture",
+          "name": "Culture",
+          "contentLabel": "world-city-solstice-culture"
+        }
+      ]
+    },
+    {
+      "id": "verdant",
+      "name": "Verdant Reach",
+      "identity": "Vertical forest and clean-energy city",
+      "climate": "tropical-forest",
+      "architecture": "Biophilic towers, sky parks, botanical atriums, solar canopies",
+      "contentLabel": "world-city-verdant",
+      "spawn": {
+        "x": 0,
+        "z": 80
+      },
+      "bounds": {
+        "minX": -600,
+        "maxX": 600,
+        "minZ": -600,
+        "maxZ": 600
+      },
+      "districts": [
+        {
+          "id": "downtown",
+          "name": "Downtown",
+          "contentLabel": "world-city-verdant-downtown"
+        },
+        {
+          "id": "waterfront",
+          "name": "Waterfront",
+          "contentLabel": "world-city-verdant-waterfront"
+        },
+        {
+          "id": "residential",
+          "name": "Residential",
+          "contentLabel": "world-city-verdant-residential"
+        },
+        {
+          "id": "culture",
+          "name": "Culture",
+          "contentLabel": "world-city-verdant-culture"
+        }
+      ]
+    },
+    {
+      "id": "nexus",
+      "name": "Nexus Delta",
+      "identity": "Technology, research and innovation hub",
+      "climate": "river-delta",
+      "architecture": "Parametric research campuses, kinetic bridges, smart mobility corridors",
+      "contentLabel": "world-city-nexus",
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -600,
+        "maxX": 600,
+        "minZ": -600,
+        "maxZ": 600
+      },
+      "districts": [
+        {
+          "id": "downtown",
+          "name": "Downtown",
+          "contentLabel": "world-city-nexus-downtown"
+        },
+        {
+          "id": "waterfront",
+          "name": "Waterfront",
+          "contentLabel": "world-city-nexus-waterfront"
+        },
+        {
+          "id": "residential",
+          "name": "Residential",
+          "contentLabel": "world-city-nexus-residential"
+        },
+        {
+          "id": "culture",
+          "name": "Culture",
+          "contentLabel": "world-city-nexus-culture"
+        }
+      ]
+    },
+    {
+      "id": "aurora",
+      "name": "Aurora Heights",
+      "identity": "High-altitude culture and mountain living",
+      "climate": "highland",
+      "architecture": "Stepped hillside districts, alpine glass towers, cable transit",
+      "contentLabel": "world-city-aurora",
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -600,
+        "maxX": 600,
+        "minZ": -600,
+        "maxZ": 600
+      },
+      "districts": [
+        {
+          "id": "downtown",
+          "name": "Downtown",
+          "contentLabel": "world-city-aurora-downtown"
+        },
+        {
+          "id": "waterfront",
+          "name": "Waterfront",
+          "contentLabel": "world-city-aurora-waterfront"
+        },
+        {
+          "id": "residential",
+          "name": "Residential",
+          "contentLabel": "world-city-aurora-residential"
+        },
+        {
+          "id": "culture",
+          "name": "Culture",
+          "contentLabel": "world-city-aurora-culture"
+        }
+      ]
+    },
+    {
+      "id": "saffron",
+      "name": "Saffron Dunes",
+      "identity": "Desert trade and solar megacity",
+      "climate": "arid-desert",
+      "architecture": "Shaded arcades, solar megastructures, oasis courtyards",
+      "contentLabel": "world-city-saffron",
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -600,
+        "maxX": 600,
+        "minZ": -600,
+        "maxZ": 600
+      },
+      "districts": [
+        {
+          "id": "downtown",
+          "name": "Downtown",
+          "contentLabel": "world-city-saffron-downtown"
+        },
+        {
+          "id": "waterfront",
+          "name": "Waterfront",
+          "contentLabel": "world-city-saffron-waterfront"
+        },
+        {
+          "id": "residential",
+          "name": "Residential",
+          "contentLabel": "world-city-saffron-residential"
+        },
+        {
+          "id": "culture",
+          "name": "Culture",
+          "contentLabel": "world-city-saffron-culture"
+        }
+      ]
+    },
+    {
+      "id": "monsoon",
+      "name": "Monsoon Harbour",
+      "identity": "Rain-resilient port and maritime city",
+      "climate": "monsoon-coastal",
+      "architecture": "Elevated waterfront blocks, covered streets, resilient sea walls",
+      "contentLabel": "world-city-monsoon",
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -600,
+        "maxX": 600,
+        "minZ": -600,
+        "maxZ": 600
+      },
+      "districts": [
+        {
+          "id": "downtown",
+          "name": "Downtown",
+          "contentLabel": "world-city-monsoon-downtown"
+        },
+        {
+          "id": "waterfront",
+          "name": "Waterfront",
+          "contentLabel": "world-city-monsoon-waterfront"
+        },
+        {
+          "id": "residential",
+          "name": "Residential",
+          "contentLabel": "world-city-monsoon-residential"
+        },
+        {
+          "id": "culture",
+          "name": "Culture",
+          "contentLabel": "world-city-monsoon-culture"
+        }
+      ]
+    },
+    {
+      "id": "eclipse",
+      "name": "Eclipse Central",
+      "identity": "Nightlife, entertainment and media capital",
+      "climate": "urban-temperate",
+      "architecture": "Illuminated supertall skyline, entertainment plazas, media towers",
+      "contentLabel": "world-city-eclipse",
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -600,
+        "maxX": 600,
+        "minZ": -600,
+        "maxZ": 600
+      },
+      "districts": [
+        {
+          "id": "downtown",
+          "name": "Downtown",
+          "contentLabel": "world-city-eclipse-downtown"
+        },
+        {
+          "id": "waterfront",
+          "name": "Waterfront",
+          "contentLabel": "world-city-eclipse-waterfront"
+        },
+        {
+          "id": "residential",
+          "name": "Residential",
+          "contentLabel": "world-city-eclipse-residential"
+        },
+        {
+          "id": "culture",
+          "name": "Culture",
+          "contentLabel": "world-city-eclipse-culture"
+        }
+      ]
+    },
+    {
+      "id": "origin",
+      "name": "Origin Plains",
+      "identity": "Agritech, education and spacious family city",
+      "climate": "savanna",
+      "architecture": "Low-rise innovation campuses, shaded boulevards, civic gardens",
+      "contentLabel": "world-city-origin",
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -600,
+        "maxX": 600,
+        "minZ": -600,
+        "maxZ": 600
+      },
+      "districts": [
+        {
+          "id": "downtown",
+          "name": "Downtown",
+          "contentLabel": "world-city-origin-downtown"
+        },
+        {
+          "id": "waterfront",
+          "name": "Waterfront",
+          "contentLabel": "world-city-origin-waterfront"
+        },
+        {
+          "id": "residential",
+          "name": "Residential",
+          "contentLabel": "world-city-origin-residential"
+        },
+        {
+          "id": "culture",
+          "name": "Culture",
+          "contentLabel": "world-city-origin-culture"
+        }
+      ]
+    },
+    {
+      "id": "atlas",
+      "name": "Atlas Frontier",
+      "identity": "Industrial design, logistics and orbital gateway",
+      "climate": "continental",
+      "architecture": "Mega-rail terminals, advanced industrial parks, launch-view promenades",
+      "contentLabel": "world-city-atlas",
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -600,
+        "maxX": 600,
+        "minZ": -600,
+        "maxZ": 600
+      },
+      "districts": [
+        {
+          "id": "downtown",
+          "name": "Downtown",
+          "contentLabel": "world-city-atlas-downtown"
+        },
+        {
+          "id": "waterfront",
+          "name": "Waterfront",
+          "contentLabel": "world-city-atlas-waterfront"
+        },
+        {
+          "id": "residential",
+          "name": "Residential",
+          "contentLabel": "world-city-atlas-residential"
+        },
+        {
+          "id": "culture",
+          "name": "Culture",
+          "contentLabel": "world-city-atlas-culture"
+        }
+      ]
+    }
+  ]
+}
