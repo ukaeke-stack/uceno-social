@@ -30,6 +30,8 @@ namespace UCENO.VirtualWorld
     /// </summary>
     public sealed class WorldSpatialVoiceClient : MonoBehaviour
     {
+        public static event Action<bool> LocalTransmitChanged;
+        private bool lastLocalTransmit;
         [SerializeField] private WorldSessionClient session;
         [SerializeField] private WorldGatewayClient gateway;
         [SerializeField] private PlayerMotor localPlayer;
@@ -133,6 +135,7 @@ namespace UCENO.VirtualWorld
             voicePresenceRequested = false;
             StopAllPeerRooms();
             ClearAudioRoute();
+            ApplyMicrophoneGate();
             status = "VOICE OFF";
         }
 
@@ -245,6 +248,11 @@ namespace UCENO.VirtualWorld
             {
                 if (peer.microphone == null) continue;
                 peer.microphone.SetMute(!shouldTransmit);
+            }
+            if (shouldTransmit != lastLocalTransmit)
+            {
+                lastLocalTransmit = shouldTransmit;
+                LocalTransmitChanged?.Invoke(shouldTransmit);
             }
         }
 
