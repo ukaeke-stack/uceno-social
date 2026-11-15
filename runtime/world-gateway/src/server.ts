@@ -5,6 +5,7 @@ import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { createActivitySession, joinActivity, startActivity, recordCheckpoint, leaveActivity, cancelActivity, selectNextActivityHost, type ActivitySession } from "./activity-session.js";
 import { serializeActivitySession, restoreActivitySession } from "./activity-persistence.js";
 import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./district-policy.js";
+import { parseWorldCityCatalog, type WorldCity } from "./city-catalog-policy.js";
 import { matchesDistrictTransition, planDistrictTransition } from "./district-transition-policy.js";
 import { parseDistrictCollisionManifest } from "./district-collision-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
@@ -60,6 +61,21 @@ function loadWorldDistricts(): WorldDistrict[] {
 }
 
 const WORLD_DISTRICTS = loadWorldDistricts();
+
+function loadWorldCities(): WorldCity[] {
+  let raw = process.env.WORLD_CITIES;
+  const filePath = process.env.WORLD_CITIES_FILE || resolve(process.cwd(), "config/world-cities.json");
+  if (!raw) {
+    try { raw = readFileSync(filePath, "utf8"); }
+    catch (error) {
+      throw new Error("Could not read WORLD_CITIES_FILE: " +
+        (error instanceof Error ? error.message : "unknown file error"));
+    }
+  }
+  return parseWorldCityCatalog(raw, 10);
+}
+
+const WORLD_CITIES = loadWorldCities();
 
 function loadInteractables(): Map<string, Interactable> {
   const filePath = process.env.WORLD_INTERACTABLES_FILE;
@@ -971,10 +987,24 @@ const server = createServer(async (req, res) => {
     }
     return;
   }
+  if (req.url === "/cities") {
+    // This endpoint exposes the authored city catalogue, not a claim that
+    // corresponding Unity scenes or remote Addressables content are published.
+    res.writeHead(200, { ...headers, "Cache-Control": "public, max-age=300" });
+    res.end(JSON.stringify({
+      version: 1,
+      minimumCityCount: 10,
+      cities: WORLD_CITIES.map(city => ({
+        ...city,
+        contentStatus: "catalogue_only"
+      }))
+    }));
+    return;
+  }
   if (req.url === "/health") {
     // Liveness only: the process can answer even while PostgreSQL is unavailable.
     res.writeHead(200, headers);
-    res.end(JSON.stringify({ service: "uceno-world-gateway", status: "online", instanceId: INSTANCE_ID, players: players.size, capacity: MAX_CLIENTS }));
+    res.end(JSON.stringify({ service: "uceno-world-gateway", status: "online", instanceId: INSTANCE_ID, players: players.size, capacity: MAX_CLIENTS, cataloguedCities: WORLD_CITIES.length }));
     return;
   }
   if (req.url === "/ready") {
