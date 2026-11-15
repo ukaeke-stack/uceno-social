@@ -203,3 +203,12 @@ test("city runtime district namespaces cannot be confused across cities", async 
     solstice.map(item => [item.id, item.contentLabel])
   );
 });
+
+test("city runtime resolution fails closed for unknown city IDs", async () => {
+  const { resolveCityRuntime } = await import("../dist/city-runtime-policy.js");
+  const cities = parseWorldCityCatalog(fixture, 10);
+  const resolved = resolveCityRuntime(cities, "solstice");
+  assert.equal(resolved?.city.id, "solstice");
+  assert.equal(resolved?.districts.length, 4);
+  assert.equal(resolveCityRuntime(cities, "not-a-city"), null);
+});
