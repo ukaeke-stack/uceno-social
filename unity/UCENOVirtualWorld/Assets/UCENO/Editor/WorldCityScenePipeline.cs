@@ -402,9 +402,9 @@ namespace UCENO.VirtualWorld.Editor
                 else if (checkAssets && prefab != null)
                 {
                     LODGroup lodGroup = prefab.GetComponentInChildren<LODGroup>(true);
-                    if (lodGroup == null || lodGroup.GetLODs().Length < 2 ||
+                    if (lodGroup == null || lodGroup.GetLODs().Length < 3 ||
                         lodGroup.GetLODs().Any(lod => lod.renderers == null || lod.renderers.Length == 0))
-                        errors.Add(city.id + ": prefab requires a valid multi-level LODGroup for Android: " + assetPath);
+                        errors.Add(city.id + ": prefab requires at least three authored LOD levels for Android: " + assetPath);
                     if (!prefab.GetComponentsInChildren<Renderer>(true).Any(renderer => renderer != null))
                         errors.Add(city.id + ": prefab contains no renderable geometry: " + assetPath);
                     if (checkAssets && prefab != null)
