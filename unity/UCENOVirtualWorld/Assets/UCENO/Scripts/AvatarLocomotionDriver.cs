@@ -100,13 +100,13 @@ namespace UCENO.VirtualWorld
         public void SetTalking(bool talking)
         {
             if (animator == null || animator.runtimeAnimatorController == null) return;
-            if (HasParameter("IsTalking", AnimatorControllerParameterType.Bool))
-                animator.SetBool(IsTalkingHash, talking);
-            if (talking)
-            {
-                GestureName = "talk";
-                gestureUntil = Time.time + 3.5f;
-            }
+            bool previous = HasParameter("IsTalking", AnimatorControllerParameterType.Bool) &&
+                animator.GetBool(IsTalkingHash);
+            if (previous == talking) return;
+            animator.SetBool(IsTalkingHash, talking);
+            GestureName = talking ? "talk" : "none";
+            gestureUntil = talking ? Time.time + 3.5f : 0f;
+            GestureSequence++;
         }
 
         private void DetectTurn(float speed)
@@ -132,7 +132,10 @@ namespace UCENO.VirtualWorld
         private void PlayGesture(string gesture, bool local)
         {
             if (animator == null || animator.runtimeAnimatorController == null) return;
-            string trigger = (gesture ?? string.Empty).Trim().ToLowerInvariant() switch
+            string normalizedGesture = (gesture ?? string.Empty).Trim().ToLowerInvariant();
+            if (normalizedGesture == "talk") { SetTalking(true); return; }
+            if (normalizedGesture == "none") { SetTalking(false); return; }
+            string trigger = normalizedGesture switch
             {
                 "turn" => "Turn",
                 "wave" => "Wave",
