@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
+using UnityEditor.AddressableAssets.Build;
 using UnityEditor.AddressableAssets.Settings;
 using UnityEditor.AddressableAssets.Settings.GroupSchemas;
 using UnityEditor.Build;
@@ -160,6 +161,50 @@ namespace UCENO.VirtualWorld.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("UCENO generated nine distinct city scene sets. This is a scene-generation result, not final visual acceptance.");
+        }
+
+        [MenuItem("UCENO/World/Build Android Remote City Addressables", false, 34)]
+        public static void BuildRemoteAddressablesContent()
+        {
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
+                throw new BuildFailedException("Switch the Unity active build target to Android before building UCENO remote city content.");
+
+            AddressableAssetSettings settings = AddressableAssetSettingsDefaultObject.GetSettings(false);
+            if (settings == null)
+                throw new BuildFailedException("Addressables settings are missing.");
+
+            string remoteBuildPath = settings.RemoteCatalogBuildPath != null
+                ? settings.RemoteCatalogBuildPath.GetValue(settings) : null;
+            string remoteLoadPath = settings.RemoteCatalogLoadPath != null
+                ? settings.RemoteCatalogLoadPath.GetValue(settings) : null;
+            if (!settings.BuildRemoteCatalog || string.IsNullOrWhiteSpace(remoteBuildPath) ||
+                string.IsNullOrWhiteSpace(remoteLoadPath) ||
+                !remoteLoadPath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                throw new BuildFailedException(
+                    "Remote catalog release is not configured. Enable Build Remote Catalog and set a real HTTPS Remote Catalog Load Path plus a Remote Catalog Build Path in Addressables Settings.");
+
+            string groupLoadPath = settings.profileSettings.GetValueByName(
+                settings.activeProfileId, AddressableAssetSettings.kRemoteLoadPath);
+            if (string.IsNullOrWhiteSpace(groupLoadPath) ||
+                !groupLoadPath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                throw new BuildFailedException("The active Android profile RemoteLoadPath must be a real HTTPS URL.");
+
+            settings.UniqueBundleIds = true;
+            EditorUtility.SetDirty(settings);
+            AddressableAssetSettings.BuildPlayerContent(out AddressablesPlayerBuildResult result);
+            if (result == null || !string.IsNullOrEmpty(result.Error))
+                throw new BuildFailedException("Remote Android Addressables build failed: " +
+                    (result != null ? result.Error : "No build result was returned."));
+
+            if (string.IsNullOrWhiteSpace(result.RemoteCatalogJsonFilePath) ||
+                !File.Exists(result.RemoteCatalogJsonFilePath) ||
+                string.IsNullOrWhiteSpace(result.RemoteCatalogHashFilePath) ||
+                !File.Exists(result.RemoteCatalogHashFilePath))
+                throw new BuildFailedException("Addressables build completed without both remote catalog JSON and hash artifacts.");
+
+            Debug.Log("UCENO Android remote Addressables content built. Catalog: " +
+                result.RemoteCatalogJsonFilePath + " | Hash: " + result.RemoteCatalogHashFilePath +
+                " | Publish both files and all generated bundles to the configured HTTPS host before release.");
         }
 
         [MenuItem("UCENO/World/Verify Nine City Scene Registries", false, 33)]
