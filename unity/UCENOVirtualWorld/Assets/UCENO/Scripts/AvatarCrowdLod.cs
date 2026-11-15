@@ -1,10 +1,11 @@
+using System.Linq;
 using UnityEngine;
 
 namespace UCENO.VirtualWorld
 {
     /// <summary>
     /// Shared crowd-animation quality policy for player and AI humanoids.
-    /// Mesh LODGroup assets can be added later without changing avatar networking.
+    /// Authored three-level mesh LODGroups control geometry; this component controls animation and visibility tiers.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class AvatarCrowdLod : MonoBehaviour
@@ -18,6 +19,7 @@ namespace UCENO.VirtualWorld
         private AvatarLocomotionDriver locomotion;
         private AvatarSocialExpressionDriver expressions;
         private Renderer[] renderers;
+        private LODGroup meshLodGroup;
         private Camera targetCamera;
         private float nextEvaluation;
         private int currentTier = -1;
@@ -28,6 +30,10 @@ namespace UCENO.VirtualWorld
             locomotion = GetComponentInChildren<AvatarLocomotionDriver>(true);
             expressions = GetComponentInChildren<AvatarSocialExpressionDriver>(true);
             renderers = GetComponentsInChildren<Renderer>(true);
+            meshLodGroup = GetComponentInChildren<LODGroup>(true);
+            if (meshLodGroup == null || meshLodGroup.GetLODs().Length < 3 ||
+                meshLodGroup.GetLODs().Any(lod => lod.renderers == null || lod.renderers.Length == 0))
+                Debug.LogError("UCENO human/AI avatar is missing its authored three-level mesh LODGroup.", this);
             targetCamera = Camera.main;
             ApplyTier(0);
         }
