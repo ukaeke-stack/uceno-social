@@ -1,4 +1,4 @@
-name: UCENO Nine-City Procedural Asset Pipeline
+name: UCENO Nine-City Imported Art Release Gate
 
 on:
   push:
@@ -7,16 +7,20 @@ on:
     paths:
       - 'runtime/world-gateway/config/world-cities.json'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/CityProceduralAssetPackGenerator.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/ImportedCityAssetPackGate.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json'
+      - 'docs/virtual-world/NINE_CITY_SCENE_PIPELINE.md'
       - 'scripts/validate_uceno_city_generator.py'
       - '.github/workflows/uceno-city-generator-source.yml'
   pull_request:
     paths:
       - 'runtime/world-gateway/config/world-cities.json'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/CityProceduralAssetPackGenerator.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/ImportedCityAssetPackGate.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json'
+      - 'docs/virtual-world/NINE_CITY_SCENE_PIPELINE.md'
       - 'scripts/validate_uceno_city_generator.py'
       - '.github/workflows/uceno-city-generator-source.yml'
 
@@ -24,13 +28,13 @@ permissions:
   contents: read
 
 jobs:
-  city-generator-source:
-    name: Validate distinct city generation contract
+  city-art-source:
+    name: Validate imported city art release contract
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate catalogue, city-owned asset packs and scene pipeline
+      - name: Validate city catalogue, imported art gate and scene pipeline
         run: python scripts/validate_uceno_city_generator.py
