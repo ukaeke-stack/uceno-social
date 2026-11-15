@@ -47,7 +47,7 @@ jobs:
           grep -q 'runtimeAnimatorController == null' unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs
           ! grep -q 'Mathf.Sin(cycle)' unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs
           for clip in idle walk run talk turn wave cheer dance interact sit; do
-            grep -q '\"'"$clip"'\"' unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs 2>/dev/null || true
+            grep -q "FindClip(clips, \"$clip\")" unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs
           done
 
       - name: Check asset downloader syntax
