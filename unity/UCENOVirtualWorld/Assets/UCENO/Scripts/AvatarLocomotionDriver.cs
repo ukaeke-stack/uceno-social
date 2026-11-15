@@ -14,7 +14,6 @@ namespace UCENO.VirtualWorld
         private static readonly int MoveSpeedHash = Animator.StringToHash("MoveSpeed");
         private static readonly int IsSeatedHash = Animator.StringToHash("IsSeated");
         private static readonly int IsTalkingHash = Animator.StringToHash("IsTalking");
-        private static readonly int IsTalkingHash = Animator.StringToHash("IsTalking");
 
         [SerializeField, Min(0.01f)] private float dampTime = 0.12f;
 
@@ -63,7 +62,6 @@ namespace UCENO.VirtualWorld
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
             lastYaw = motor != null ? motor.transform.eulerAngles.y : transform.eulerAngles.y;
-            if (motor != null) WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking;
             RequireParameter("MoveSpeed", AnimatorControllerParameterType.Float);
             RequireParameter("IsSeated", AnimatorControllerParameterType.Bool);
             RequireParameter("IsTalking", AnimatorControllerParameterType.Bool);
@@ -102,7 +100,7 @@ namespace UCENO.VirtualWorld
         public void TriggerWave() { PlayGesture("wave", true); }
         public void TriggerCheer() { PlayGesture("cheer", true); }
         public void TriggerDance() { PlayGesture("dance", true); }
-        public void TriggerTalk() { SetTalking(true); GestureName = "talk"; gestureUntil = Time.time + 3.5f; }
+        public void TriggerTalk() { SetTalking(true); }
         public void TriggerTurn() { PlayGesture("turn", true); }
         public void TriggerInteract() { PlayGesture("interact", true); }
 
@@ -114,7 +112,7 @@ namespace UCENO.VirtualWorld
             if (previous == talking) return;
             animator.SetBool(IsTalkingHash, talking);
             GestureName = talking ? "talk" : "none";
-            gestureUntil = talking ? Time.time + 3.5f : 0f;
+            gestureUntil = talking ? float.PositiveInfinity : 0f;
             GestureSequence++;
         }
 
@@ -133,17 +131,22 @@ namespace UCENO.VirtualWorld
             }
         }
 
-        private void OnDestroy()
-        {
-            if (motor != null) WorldSpatialVoiceClient.LocalTransmitChanged -= SetTalking;
-        }
-
         private void PlayGesture(string gesture, bool local)
         {
             if (animator == null || animator.runtimeAnimatorController == null) return;
             string normalizedGesture = (gesture ?? string.Empty).Trim().ToLowerInvariant();
-            if (normalizedGesture == "talk") { SetTalking(true); return; }
-            if (normalizedGesture == "none") { SetTalking(false); return; }
+            if (normalizedGesture == "talk")
+            {
+                if (local) SetTalking(true);
+                else { animator.SetBool(IsTalkingHash, true); GestureName = "talk"; gestureUntil = float.PositiveInfinity; }
+                return;
+            }
+            if (normalizedGesture == "none")
+            {
+                if (local) SetTalking(false);
+                else { animator.SetBool(IsTalkingHash, false); GestureName = "none"; gestureUntil = 0f; }
+                return;
+            }
             string trigger = normalizedGesture switch
             {
                 "turn" => "Turn",
@@ -162,8 +165,7 @@ namespace UCENO.VirtualWorld
             animator.ResetTrigger(trigger);
             animator.SetTrigger(trigger);
             GestureName = gesture.ToLowerInvariant();
-            gestureUntil = Time.time + (trigger == "Dance" ? 8f :
-                trigger == "Talk" ? 3.5f : trigger == "Interact" ? 2.5f : 1.8f);
+            gestureUntil = Time.time + (trigger == "Dance" ? 8f : trigger == "Interact" ? 2.5f : 1.8f);
             if (local) GestureSequence++;
         }
 
