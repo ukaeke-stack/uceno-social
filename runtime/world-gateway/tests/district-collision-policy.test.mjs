@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseDistrictCollisionBoxes, parseDistrictCollisionManifest } from "../dist/district-collision-policy.js";
+import { parseDistrictCollisionBoxes, parseDistrictCollisionManifest, parseCityDistrictCollisionManifest } from "../dist/district-collision-policy.js";
 
 const districts = [
   { id: "south", contentLabel: "south-label", minX: -10, maxX: 0, minZ: -10, maxZ: 0 },
@@ -58,4 +58,32 @@ test("rejects empty, excessive and malformed collision maps", () => {
 });
 test("propagates missing map-file errors", () => {
   assert.throws(() => parseDistrictCollisionManifest(manifest(), districts, 100, () => { throw new Error("missing map file"); }), /missing map file/);
+});
+
+const cityDistricts = [
+  { cityId: "meridian", id: "civic", contentLabel: "world-city-meridian-civic", minX: -10, maxX: 0, minZ: -10, maxZ: 0 },
+  { cityId: "solstice", id: "civic", contentLabel: "world-city-solstice-civic", minX: 10, maxX: 20, minZ: 10, maxZ: 20 }
+];
+const cityManifest = entries => JSON.stringify({ districts: entries ?? cityDistricts.map(d => ({
+  cityId: d.cityId, id: d.id, contentLabel: d.contentLabel,
+  file: d.cityId + "-" + d.id + ".json",
+  minX: d.minX, maxX: d.maxX, minZ: d.minZ, maxZ: d.maxZ
+})) });
+test("city-scoped collision manifest separates identical district IDs across cities", () => {
+  const loaded = parseCityDistrictCollisionManifest(cityManifest(), cityDistricts, 100,
+    () => JSON.stringify({ boxes: [box] }));
+  assert.deepEqual([...loaded.keys()], ["meridian:civic", "solstice:civic"]);
+});
+test("city-scoped collision manifest rejects cross-city labels, geometry and incomplete exports", () => {
+  const entries = JSON.parse(cityManifest()).districts;
+  const wrongCity = entries.map(entry => ({ ...entry }));
+  wrongCity[1].cityId = "meridian";
+  assert.throws(() => parseCityDistrictCollisionManifest(cityManifest(wrongCity), cityDistricts, 100,
+    () => JSON.stringify({ boxes: [box] })), /duplicate identity|does not match/);
+  const wrongLabel = entries.map(entry => ({ ...entry }));
+  wrongLabel[1].contentLabel = "world-city-meridian-civic";
+  assert.throws(() => parseCityDistrictCollisionManifest(cityManifest(wrongLabel), cityDistricts, 100,
+    () => JSON.stringify({ boxes: [box] })), /does not match/);
+  assert.throws(() => parseCityDistrictCollisionManifest(cityManifest(entries.slice(0, 1)), cityDistricts, 100,
+    () => JSON.stringify({ boxes: [box] })), /every configured city district/);
 });
