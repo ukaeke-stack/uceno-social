@@ -50,13 +50,23 @@ namespace UCENO.VirtualWorld.Editor
             foreach (SourceRecord record in manifest.assets)
             {
                 if (record == null || string.IsNullOrWhiteSpace(record.sourceFbx) ||
-                    string.IsNullOrWhiteSpace(record.sourceName) || string.IsNullOrWhiteSpace(record.sourceUrl) ||
+                    string.IsNullOrWhiteSpace(record.sourceName) ||
+                    !Uri.TryCreate(record.sourceUrl, UriKind.Absolute, out Uri sourceUri) ||
+                    sourceUri.Scheme != Uri.UriSchemeHttps ||
                     string.IsNullOrWhiteSpace(record.license) || string.IsNullOrWhiteSpace(record.attribution))
-                    throw new InvalidOperationException("Animation source manifest contains an incomplete provenance record.");
+                    throw new InvalidOperationException("Animation source manifest contains an incomplete or non-HTTPS provenance record.");
+                if (!record.sourceFbx.StartsWith(AnimationRoot + "/", StringComparison.Ordinal) ||
+                    !record.sourceFbx.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Animation provenance path must point to an FBX under the imported animation folder: " + record.sourceFbx);
                 if (provenance.ContainsKey(record.sourceFbx))
                     throw new InvalidOperationException("Duplicate animation provenance record: " + record.sourceFbx);
                 provenance.Add(record.sourceFbx, record);
             }
+
+            var importedPaths = new HashSet<string>(
+                modelGuids.Select(AssetDatabase.GUIDToAssetPath), StringComparer.Ordinal);
+            if (!new HashSet<string>(provenance.Keys, StringComparer.Ordinal).SetEquals(importedPaths))
+                throw new InvalidOperationException("Animation provenance manifest must cover exactly the imported FBX files, with no missing or extra records.");
 
             var clips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var errors = new List<string>();
