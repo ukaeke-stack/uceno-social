@@ -6,6 +6,9 @@ on:
       - feature/uceno-unity-foundation
     paths:
       - 'unity/UCENOVirtualWorld/**'
+      - 'runtime/world-gateway/config/world-cities.json'
+      - 'runtime/world-gateway/src/city-catalog-policy.ts'
+      - 'runtime/world-gateway/tests/city-catalog-policy.test.mjs'
       - 'scripts/validate_uceno_unity_assets.py'
       - 'scripts/download_polyhaven_assets.py'
       - '.github/workflows/uceno-unity-assets-validation.yml'
@@ -32,6 +35,12 @@ jobs:
 
       - name: Validate CC0 asset manifests, file sizes and Unity source wiring
         run: python scripts/validate_uceno_unity_assets.py
+
+      - name: Require imported Humanoid animation release gate
+        run: |
+          grep -q 'CopyFromOther' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
+          grep -q 'RequiredClips' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
+          grep -q 'Assets/UCENO/Characters/Animations' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
 
       - name: Check asset downloader syntax
         run: python -m py_compile scripts/download_polyhaven_assets.py
