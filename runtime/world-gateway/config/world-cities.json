@@ -100,9 +100,10 @@
           "kind": "government",
           "contentLabel": "world-city-meridian-landmark-civic-spire",
           "position": {
-            "x": -48,
-            "z": -75
-          }
+            "x": -184,
+            "z": -178
+          },
+          "districtId": "civic-core"
         },
         {
           "id": "grand-exchange",
@@ -110,9 +111,10 @@
           "kind": "finance",
           "contentLabel": "world-city-meridian-landmark-grand-exchange",
           "position": {
-            "x": 0,
-            "z": 75
-          }
+            "x": -116,
+            "z": 122
+          },
+          "districtId": "garden-ring"
         },
         {
           "id": "founders-arcade",
@@ -120,9 +122,10 @@
           "kind": "culture",
           "contentLabel": "world-city-meridian-landmark-founders-arcade",
           "position": {
-            "x": 48,
-            "z": -75
-          }
+            "x": 116,
+            "z": -122
+          },
+          "districtId": "exchange-quarter"
         }
       ]
     },
@@ -224,9 +227,10 @@
           "kind": "maritime",
           "contentLabel": "world-city-solstice-landmark-lighthouse-pavilion",
           "position": {
-            "x": -48,
-            "z": -195
-          }
+            "x": -184,
+            "z": -298
+          },
+          "districtId": "marina-front"
         },
         {
           "id": "tidal-steps",
@@ -234,9 +238,10 @@
           "kind": "public-space",
           "contentLabel": "world-city-solstice-landmark-tidal-steps",
           "position": {
-            "x": 0,
-            "z": -45
-          }
+            "x": -116,
+            "z": 2
+          },
+          "districtId": "reef-gardens"
         },
         {
           "id": "oceanarium",
@@ -244,9 +249,10 @@
           "kind": "culture",
           "contentLabel": "world-city-solstice-landmark-oceanarium",
           "position": {
-            "x": 48,
-            "z": -195
-          }
+            "x": 116,
+            "z": -242
+          },
+          "districtId": "sunset-terraces"
         }
       ]
     },
@@ -348,9 +354,10 @@
           "kind": "biophilic-tower",
           "contentLabel": "world-city-verdant-landmark-canopy-crown",
           "position": {
-            "x": -48,
-            "z": 5
-          }
+            "x": -184,
+            "z": -98
+          },
+          "districtId": "canopy-centre"
         },
         {
           "id": "living-bridge",
@@ -358,9 +365,10 @@
           "kind": "infrastructure",
           "contentLabel": "world-city-verdant-landmark-living-bridge",
           "position": {
-            "x": 0,
-            "z": 155
-          }
+            "x": -116,
+            "z": 202
+          },
+          "districtId": "terrace-homes"
         },
         {
           "id": "arboretum-dome",
@@ -368,9 +376,10 @@
           "kind": "botanical",
           "contentLabel": "world-city-verdant-landmark-arboretum-dome",
           "position": {
-            "x": 48,
-            "z": 5
-          }
+            "x": 116,
+            "z": -42
+          },
+          "districtId": "arboretum-belt"
         }
       ]
     },
@@ -472,9 +481,10 @@
           "kind": "research",
           "contentLabel": "world-city-nexus-landmark-delta-helix",
           "position": {
-            "x": -48,
-            "z": -75
-          }
+            "x": -184,
+            "z": -178
+          },
+          "districtId": "research-island"
         },
         {
           "id": "kinetic-crossing",
@@ -482,9 +492,10 @@
           "kind": "bridge",
           "contentLabel": "world-city-nexus-landmark-kinetic-crossing",
           "position": {
-            "x": 0,
-            "z": 75
-          }
+            "x": -116,
+            "z": 122
+          },
+          "districtId": "delta-residences"
         },
         {
           "id": "innovation-forum",
@@ -492,9 +503,10 @@
           "kind": "civic",
           "contentLabel": "world-city-nexus-landmark-innovation-forum",
           "position": {
-            "x": 48,
-            "z": -75
-          }
+            "x": 116,
+            "z": -122
+          },
+          "districtId": "bridge-market"
         }
       ]
     },
@@ -596,9 +608,10 @@
           "kind": "science",
           "contentLabel": "world-city-aurora-landmark-summit-observatory",
           "position": {
-            "x": -48,
-            "z": -75
-          }
+            "x": -184,
+            "z": -178
+          },
+          "districtId": "summit-quarter"
         },
         {
           "id": "aurora-amphitheatre",
@@ -606,9 +619,10 @@
           "kind": "culture",
           "contentLabel": "world-city-aurora-landmark-aurora-amphitheatre",
           "position": {
-            "x": 0,
-            "z": 75
-          }
+            "x": -116,
+            "z": 122
+          },
+          "districtId": "alpine-commons"
         },
         {
           "id": "ridge-station",
@@ -616,9 +630,10 @@
           "kind": "transit",
           "contentLabel": "world-city-aurora-landmark-ridge-station",
           "position": {
-            "x": 48,
-            "z": -75
-          }
+            "x": 116,
+            "z": -122
+          },
+          "districtId": "switchback-village"
         }
       ]
     },
@@ -720,9 +735,10 @@
           "kind": "solar",
           "contentLabel": "world-city-saffron-landmark-sunvault",
           "position": {
-            "x": -48,
-            "z": -75
-          }
+            "x": -184,
+            "z": -178
+          },
+          "districtId": "sunvault-core"
         },
         {
           "id": "grand-souk",
@@ -730,9 +746,10 @@
           "kind": "market",
           "contentLabel": "world-city-saffron-landmark-grand-souk",
           "position": {
-            "x": 0,
-            "z": 75
-          }
+            "x": -116,
+            "z": 122
+          },
+          "districtId": "heritage-souk"
         },
         {
           "id": "oasis-court",
@@ -740,9 +757,10 @@
           "kind": "public-garden",
           "contentLabel": "world-city-saffron-landmark-oasis-court",
           "position": {
-            "x": 48,
-            "z": -75
-          }
+            "x": 116,
+            "z": -122
+          },
+          "districtId": "oasis-gardens"
         }
       ]
     },
@@ -844,9 +862,10 @@
           "kind": "port",
           "contentLabel": "world-city-monsoon-landmark-harbour-arc",
           "position": {
-            "x": -48,
-            "z": -75
-          }
+            "x": -184,
+            "z": -178
+          },
+          "districtId": "harbourworks"
         },
         {
           "id": "storm-garden",
@@ -854,9 +873,10 @@
           "kind": "resilience-park",
           "contentLabel": "world-city-monsoon-landmark-storm-garden",
           "position": {
-            "x": 0,
-            "z": 75
-          }
+            "x": -116,
+            "z": 122
+          },
+          "districtId": "raised-homes"
         },
         {
           "id": "tide-clock",
@@ -864,9 +884,10 @@
           "kind": "maritime",
           "contentLabel": "world-city-monsoon-landmark-tide-clock",
           "position": {
-            "x": 48,
-            "z": -75
-          }
+            "x": 116,
+            "z": -122
+          },
+          "districtId": "canal-quarter"
         }
       ]
     },
@@ -968,9 +989,10 @@
           "kind": "media",
           "contentLabel": "world-city-eclipse-landmark-lumen-tower",
           "position": {
-            "x": -48,
-            "z": -75
-          }
+            "x": -184,
+            "z": -178
+          },
+          "districtId": "lumen-centre"
         },
         {
           "id": "midnight-bowl",
@@ -978,9 +1000,10 @@
           "kind": "entertainment",
           "contentLabel": "world-city-eclipse-landmark-midnight-bowl",
           "position": {
-            "x": 0,
-            "z": 75
-          }
+            "x": -116,
+            "z": 122
+          },
+          "districtId": "midnight-residences"
         },
         {
           "id": "signal-museum",
@@ -988,9 +1011,10 @@
           "kind": "culture",
           "contentLabel": "world-city-eclipse-landmark-signal-museum",
           "position": {
-            "x": 48,
-            "z": -75
-          }
+            "x": 116,
+            "z": -122
+          },
+          "districtId": "festival-mile"
         }
       ]
     },
@@ -1092,9 +1116,10 @@
           "kind": "education",
           "contentLabel": "world-city-origin-landmark-knowledge-tree",
           "position": {
-            "x": -48,
-            "z": -75
-          }
+            "x": -184,
+            "z": -178
+          },
+          "districtId": "knowledge-campus"
         },
         {
           "id": "harvest-exchange",
@@ -1102,9 +1127,10 @@
           "kind": "agritech",
           "contentLabel": "world-city-origin-landmark-harvest-exchange",
           "position": {
-            "x": 0,
-            "z": 75
-          }
+            "x": -116,
+            "z": 122
+          },
+          "districtId": "family-gardens"
         },
         {
           "id": "unity-commons",
@@ -1112,9 +1138,10 @@
           "kind": "civic",
           "contentLabel": "world-city-origin-landmark-unity-commons",
           "position": {
-            "x": 48,
-            "z": -75
-          }
+            "x": 116,
+            "z": -122
+          },
+          "districtId": "harvest-quarter"
         }
       ]
     },
@@ -1216,9 +1243,10 @@
           "kind": "transport",
           "contentLabel": "world-city-atlas-landmark-atlas-terminal",
           "position": {
-            "x": -48,
-            "z": -75
-          }
+            "x": -184,
+            "z": -178
+          },
+          "districtId": "grand-terminal"
         },
         {
           "id": "maker-vault",
@@ -1226,9 +1254,10 @@
           "kind": "industry",
           "contentLabel": "world-city-atlas-landmark-maker-vault",
           "position": {
-            "x": 0,
-            "z": 75
-          }
+            "x": -116,
+            "z": 122
+          },
+          "districtId": "horizon-homes"
         },
         {
           "id": "horizon-gateway",
@@ -1236,9 +1265,10 @@
           "kind": "spaceport",
           "contentLabel": "world-city-atlas-landmark-horizon-gateway",
           "position": {
-            "x": 48,
-            "z": -75
-          }
+            "x": 116,
+            "z": -122
+          },
+          "districtId": "maker-quarter"
         }
       ]
     }
