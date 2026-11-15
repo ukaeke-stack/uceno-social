@@ -296,3 +296,12 @@ test("gateway movement refuses to use legacy or cross-city collision fallbacks",
   assert.doesNotMatch(server, /DISTRICT_COLLISION_BOXES\.has\(player\.activeDistrictId\)/);
   assert.match(server, /parseCityDistrictCollisionManifest\(raw, cityDistricts/);
 });
+
+
+test("gateway snapshots and interaction broadcasts stay inside the player's assigned city", () => {
+  const server = readFileSync(new URL("../src/server.ts", import.meta.url), "utf8");
+  assert.match(server, /target\.cityId === player\.cityId && target\.districtId === joiningDistrictId/);
+  assert.match(server, /target\.cityId !== player\.cityId \|\| player\.homeId/);
+  assert.match(server, /peer\.cityId === target\.cityId/);
+  assert.match(server, /item\.cityId === city\.id && item\.districtId === district\.id/);
+});
