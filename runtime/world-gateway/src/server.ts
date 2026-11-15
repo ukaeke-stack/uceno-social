@@ -6,6 +6,7 @@ import { createActivitySession, joinActivity, startActivity, recordCheckpoint, l
 import { serializeActivitySession, restoreActivitySession } from "./activity-persistence.js";
 import { parseWorldDistricts, findWorldDistrict, type WorldDistrict } from "./district-policy.js";
 import { parseWorldCityCatalog, type WorldCity } from "./city-catalog-policy.js";
+import { resolveReadyCityRuntime } from "./city-runtime-policy.js";
 import { matchesDistrictTransition, planDistrictTransition } from "./district-transition-policy.js";
 import { parseDistrictCollisionManifest } from "./district-collision-policy.js";
 import { sameSpatialVoiceRoom, isWithinVoiceRange, isWithinVoiceRangeWithHysteresis, isValidVoiceSignal } from "./voice-policy.js";
@@ -349,7 +350,7 @@ async function refreshDistrictObjectStates(worldId: string, districtId: string):
 }
 const secret = new TextEncoder().encode(TOKEN_SECRET);
 type Player = {
-  id: string; worldId: string; token: string; socket: WebSocket; sessionId: string; sessionGeneration: number; stateVersion: number; x: number; y: number; z: number;
+  id: string; worldId: string; cityId: string; token: string; socket: WebSocket; sessionId: string; sessionGeneration: number; stateVersion: number; x: number; y: number; z: number;
   vx: number; vy: number; vz: number; yaw: number; grounded: boolean;
   moveX: number; moveZ: number; sprint: boolean; seated: boolean; gesture: string; gestureSequence: number; jumpQueued: boolean;
   lastInputAt: number; inputCount: number; inputWindowAt: number;
@@ -778,7 +779,7 @@ async function authenticate(token: string, allowActivityTransfer = false) {
       (!transfer && payload.scope !== undefined)) throw new Error("invalid_scope");
 
   const rows = await sql`
-    SELECT u.id, u.moderation_status AS "moderationStatus",
+    SELECT u.id, w.city_id AS "cityId", u.moderation_status AS "moderationStatus",
       u.suspended_until AS "suspendedUntil",
       w.status AS "worldStatus", w.visibility, w.owner_user_id AS "ownerUserId",
       COALESCE(m.status, 'none') AS "membershipStatus",
@@ -803,17 +804,21 @@ async function authenticate(token: string, allowActivityTransfer = false) {
     WHERE u.id = ${payload.sub}::uuid LIMIT 1
   `;
   const row = rows[0];
-  if (!row || row.moderationStatus === "disabled" ||
+  if (!row || !resolveReadyCityRuntime(
+        WORLD_CITIES, String(row.cityId ?? ""),
+        new Set(DISTRICT_COLLISION_BOXES.keys()),
+        new Set([...INTERACTABLES.values()].map(item => item.districtId))
+      ) || row.moderationStatus === "disabled" ||
       (row.moderationStatus === "suspended" &&
        (!row.suspendedUntil || new Date(row.suspendedUntil).getTime() > Date.now())) ||
       row.worldStatus !== "published" || row.blocked || (!transfer && !row.leaseHealthy) ||
       row.membershipStatus === "banned" || row.membershipStatus === "suspended" ||
       (row.visibility === "private" && row.membershipStatus !== "active" && row.ownerUserId !== row.id))
     throw new Error("access_revoked");
-  return { userId: row.id as string, worldId: payload.world_id as string };
+  return { userId: row.id as string, worldId: payload.world_id as string, cityId: String(row.cityId) };
 }
 
-async function loadPlayer(userId: string, worldId: string, token: string, socket: WebSocket, sessionId: string, sessionGeneration: number): Promise<Player> {
+async function loadPlayer(userId: string, worldId: string, cityId: string, token: string, socket: WebSocket, sessionId: string, sessionGeneration: number): Promise<Player> {
   const rows = await sql`
     SELECT position, rotation, session_generation AS "sessionGeneration",
       state_version AS "stateVersion"
@@ -846,7 +851,7 @@ async function loadPlayer(userId: string, worldId: string, token: string, socket
   const yaw = finiteNumber(rotation.y, -1.01, 1.01) && finiteNumber(rotation.w, -1.01, 1.01)
     ? 2 * Math.atan2(rotation.y, rotation.w) : 0;
   return {
-    id: userId, worldId, token, socket, sessionId, sessionGeneration,
+    id: userId, worldId, cityId, token, socket, sessionId, sessionGeneration,
     stateVersion: checkpointVersionForSession(rows[0]?.sessionGeneration, rows[0]?.stateVersion, sessionGeneration),
     x, y, z, vx: 0, vy: 0, vz: 0, yaw, grounded: y <= GROUND_Y + 0.01,
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
@@ -1147,7 +1152,7 @@ wss.on("connection", async (socket: WebSocket) => {
   try {
     const old = players.get(identity.userId);
     if (old) { old.socket.close(4001, "replaced_by_reconnect"); players.delete(identity.userId); }
-    const player = await loadPlayer(identity.userId, identity.worldId, identity.token, socket, identity.sessionId, identity.sessionGeneration);
+    const player = await loadPlayer(identity.userId, identity.worldId, identity.cityId, identity.token, socket, identity.sessionId, identity.sessionGeneration);
     const currentFence = await sql`
       SELECT session_id AS "sessionId", generation
       FROM virtual_world_player_sessions
@@ -1761,7 +1766,10 @@ setInterval(() => {
     player.authorizationCheckInProgress = true;
     void (async () => {
       let failureCode = "";
-      try { await authenticate(player.token); }
+      try {
+        const currentIdentity = await authenticate(player.token);
+        if (currentIdentity.cityId !== player.cityId) failureCode = "city_assignment_changed";
+      }
       catch { failureCode = "access_revoked"; }
       if (!failureCode) {
         try {
