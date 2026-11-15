@@ -141,3 +141,34 @@ test("each landmark declares one district and is geometrically inside only that 
   misplaced.cities[1].landmarks[0].districtId = misplaced.cities[1].districts[1].id;
   assert.throws(() => parseWorldCityCatalog(JSON.stringify(misplaced), 10), /must belong to exactly its declared district/);
 });
+
+test("city runtime district resolver preserves city-specific district IDs and bounds", async () => {
+  const { districtsForCity, findCityById } = await import("../dist/city-runtime-policy.js");
+  const cities = parseWorldCityCatalog(fixture, 10);
+  for (const city of cities) {
+    const runtimeDistricts = districtsForCity(city);
+    assert.equal(runtimeDistricts.length, 4);
+    assert.deepEqual(runtimeDistricts.map(item => item.id), city.districts.map(item => item.id));
+    for (let i = 0; i < city.districts.length; i++) {
+      const source = city.districts[i], runtime = runtimeDistricts[i];
+      assert.equal(runtime.minX, source.center.x - source.radius);
+      assert.equal(runtime.maxX, source.center.x + source.radius);
+      assert.equal(runtime.minZ, source.center.z - source.radius);
+      assert.equal(runtime.maxZ, source.center.z + source.radius);
+      assert.ok(runtime.contentLabel.startsWith(`world-city-${city.id}-`));
+    }
+  }
+  assert.equal(findCityById(cities, "solstice")?.id, "solstice");
+  assert.equal(findCityById(cities, "missing"), null);
+});
+
+test("city runtime district namespaces cannot be confused across cities", async () => {
+  const { districtsForCity } = await import("../dist/city-runtime-policy.js");
+  const cities = parseWorldCityCatalog(fixture, 10);
+  const meridian = districtsForCity(cities.find(city => city.id === "meridian"));
+  const solstice = districtsForCity(cities.find(city => city.id === "solstice"));
+  assert.notDeepEqual(
+    meridian.map(item => [item.id, item.contentLabel]),
+    solstice.map(item => [item.id, item.contentLabel])
+  );
+});
