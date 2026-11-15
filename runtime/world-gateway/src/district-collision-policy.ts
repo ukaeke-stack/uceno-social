@@ -69,3 +69,47 @@ export function parseDistrictCollisionManifest(
     throw new Error("District collision manifest is missing configured districts");
   return result;
 }
+
+
+export type CityCollisionDistrict = CollisionDistrict & { cityId: string };
+
+export function parseCityDistrictCollisionManifest(
+  raw: string,
+  districts: CityCollisionDistrict[],
+  worldBounds: number,
+  readMap: (filename: string, cityId: string, districtId: string) => string
+): Map<string, DistrictCollisionBox[]> {
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); }
+  catch { throw new Error("City district collision manifest is not valid JSON"); }
+  const entries = record(parsed) && Array.isArray(parsed.districts) ? parsed.districts : null;
+  if (!entries || entries.length !== districts.length)
+    throw new Error("City district collision manifest must contain every configured city district exactly once");
+  const configured = new Map(districts.map(district => [district.cityId + ":" + district.id, district]));
+  const result = new Map<string, DistrictCollisionBox[]>();
+  const filenames = new Set<string>();
+  for (const [index, rawEntry] of entries.entries()) {
+    if (!record(rawEntry)) throw new Error("City district map entry " + index + " is invalid");
+    const entry = rawEntry;
+    if (typeof entry.cityId !== "string" || typeof entry.id !== "string" ||
+        typeof entry.contentLabel !== "string" || typeof entry.file !== "string" ||
+        !/^[a-zA-Z0-9_-]{1,128}\.json$/.test(entry.file)) {
+      throw new Error("City district map entry " + index + " has invalid fields");
+    }
+    const key = entry.cityId + ":" + entry.id;
+    if (result.has(key) || filenames.has(entry.file))
+      throw new Error("City district map entry " + index + " has duplicate identity or filename");
+    const district = configured.get(key);
+    if (!district || district.contentLabel !== entry.contentLabel ||
+        entry.minX !== district.minX || entry.maxX !== district.maxX ||
+        entry.minZ !== district.minZ || entry.maxZ !== district.maxZ)
+      throw new Error("City district map entry " + index + " does not match its city catalogue geometry");
+    filenames.add(entry.file);
+    result.set(key, parseDistrictCollisionBoxes(
+      readMap(entry.file, entry.cityId, entry.id), key, worldBounds
+    ));
+  }
+  if (result.size !== configured.size)
+    throw new Error("City district collision manifest is missing configured districts");
+  return result;
+}
