@@ -13,6 +13,10 @@ test("canonical catalogue defines ten distinct cities with independent content m
   assert.equal(new Set(cities.map(city => city.contentLabel)).size, 10);
   for (const city of cities) {
     assert.equal(city.districts.length, 4);
+    assert.equal(city.landmarks.length, 3);
+    assert.ok(city.environment.terrain.length >= 4);
+    assert.ok(city.layout.roadHierarchy.length >= 2);
+    assert.equal(new Set(city.districts.map(district => district.name.toLowerCase())).size, 4);
     assert.equal(new Set(city.districts.map(district => district.contentLabel)).size, 4);
     assert.ok(city.spawn.x >= city.bounds.minX && city.spawn.x < city.bounds.maxX);
     assert.ok(city.spawn.z >= city.bounds.minZ && city.spawn.z < city.bounds.maxZ);
@@ -71,4 +75,29 @@ test("Meridian catalogue labels match the gateway's district admission configura
   assert.ok(gatewayDistricts.every(district =>
     district.contentLabel === `world-city-meridian-${district.id}`
   ));
+});
+
+test("ten-city catalogue has ten different environment and urban-form profiles", () => {
+  const cities = parseWorldCityCatalog(fixture, 10);
+  assert.equal(new Set(cities.map(city => city.environment.biome)).size, 10);
+  assert.equal(new Set(cities.map(city => city.environment.terrain)).size, 10);
+  assert.equal(new Set(cities.map(city => city.layout.pattern)).size, 10);
+  assert.equal(new Set(cities.map(city => city.architecture)).size, 10);
+  for (const city of cities) {
+    assert.equal(new Set(city.landmarks.map(item => item.id)).size, city.landmarks.length);
+    assert.ok(city.landmarks.every(item => item.contentLabel.startsWith(`world-city-${city.id}-landmark-`)));
+    assert.ok(city.districts.every(item => item.layout === city.layout.pattern));
+    assert.ok(city.districts.every(item => item.center.x >= city.bounds.minX &&
+      item.center.x <= city.bounds.maxX && item.center.z >= city.bounds.minZ &&
+      item.center.z <= city.bounds.maxZ));
+  }
+});
+
+test("catalogue rejects missing landmark and duplicated urban-form profiles", () => {
+  const noLandmarks = JSON.parse(fixture);
+  noLandmarks.cities[0].landmarks = [];
+  assert.throws(() => parseWorldCityCatalog(JSON.stringify(noLandmarks), 10), /design data/);
+  const duplicateLayout = JSON.parse(fixture);
+  duplicateLayout.cities[1].layout.pattern = duplicateLayout.cities[0].layout.pattern;
+  assert.throws(() => parseWorldCityCatalog(JSON.stringify(duplicateLayout), 10), /design data/);
 });
