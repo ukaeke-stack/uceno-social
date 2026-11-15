@@ -124,7 +124,7 @@ export function parseCityInteractableManifest(
     if (!value || typeof value !== "object") throw new Error(`City interactable manifest entry ${index} is invalid`);
     const entry = value as Record<string, unknown>;
     if (typeof entry.cityId !== "string" || !expected.has(entry.cityId) ||
-        typeof entry.file !== "string" || !/^[a-zA-Z0-9_-]{1,80}\\.json$/.test(entry.file) ||
+        typeof entry.file !== "string" || !/^[a-zA-Z0-9_-]{1,80}\.json$/.test(entry.file) ||
         seenCities.has(entry.cityId) || seenFiles.has(entry.file))
       throw new Error(`City interactable manifest entry ${index} has invalid or duplicate identity/file`);
     seenCities.add(entry.cityId);
