@@ -347,18 +347,25 @@ namespace UCENO.VirtualWorld.Editor
             public void Cylinder(float x, float y, float z, float radius, float height, int sides)
             {
                 int start = vertices.Count;
-                for (int ring=0; ring<2; ring++)
-                    for (int i=0;i<sides;i++)
+                for (int ring = 0; ring < 2; ring++)
+                    for (int i = 0; i < sides; i++)
                     {
-                        double a = Math.PI*2*i/sides;
-                        vertices.Add(new Vector3(x+(float)Math.Cos(a)*radius,y+(ring==0?-height/2:height/2),z+(float)Math.Sin(a)*radius));
+                        double a = Math.PI * 2 * i / sides;
+                        vertices.Add(new Vector3(x + (float)Math.Cos(a) * radius,
+                            y + (ring == 0 ? -height / 2 : height / 2),
+                            z + (float)Math.Sin(a) * radius));
                     }
-                for (int i=0;i<sides;i++)
+                int bottomCenter = vertices.Count;
+                vertices.Add(new Vector3(x, y - height / 2, z));
+                int topCenter = vertices.Count;
+                vertices.Add(new Vector3(x, y + height / 2, z));
+                for (int i = 0; i < sides; i++)
                 {
-                    int n=(i+1)%sides;
-                    triangles.AddRange(new[]{start+i,start+n,start+sides+n,start+i,start+sides+n,start+sides+i});
-                    triangles.AddRange(new[]{start+sides,start+sides+n,start+n,start+sides,start+n,start+i});
-                    triangles.AddRange(new[]{start+i,start+n,start+sides+n});
+                    int next = (i + 1) % sides;
+                    triangles.AddRange(new[] { start + i, start + next, start + sides + next,
+                        start + i, start + sides + next, start + sides + i });
+                    triangles.AddRange(new[] { bottomCenter, start + next, start + i });
+                    triangles.AddRange(new[] { topCenter, start + sides + i, start + sides + next });
                 }
             }
 
