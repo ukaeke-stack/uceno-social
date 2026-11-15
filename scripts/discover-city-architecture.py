@@ -48,17 +48,26 @@ def main():
     report = {
         "source": BASE,
         "query_date_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "selection_policy": "realistic building-category search; no binary acquisition or Unity acceptance",
+        "selection_policy": "focused realistic architecture search with unfiltered query fallback; candidates require separate binary and Unity validation",
         "cities": {},
     }
     globally_seen = set()
     for city, queries in QUERIES.items():
         raw_by_slug = {}
         for query in queries:
-            params = urllib.parse.urlencode({
-                "q": query, "category": "buildings", "style": "realistic", "limit": 30
+            # Taxonomy slugs can change. Try focused filters first, then retry
+            # without taxonomy filters so a slug mismatch cannot hide matches.
+            focused = urllib.parse.urlencode({
+                "q": query, "category": "buildings", "style": "realistic",
+                "sort": "relevance", "limit": 100
             })
-            for item in unwrap(get(f"{BASE}/assets?{params}")):
+            results = unwrap(get(f"{BASE}/assets?{focused}"))
+            if not results:
+                fallback = urllib.parse.urlencode({
+                    "q": query, "sort": "relevance", "limit": 100
+                })
+                results = unwrap(get(f"{BASE}/assets?{fallback}"))
+            for item in results:
                 slug = item.get("slug") or item.get("id")
                 if slug:
                     raw_by_slug[slug] = item
