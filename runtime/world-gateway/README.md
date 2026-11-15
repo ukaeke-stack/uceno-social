@@ -29,7 +29,7 @@ Standalone WebSocket runtime for an already-provisioned UCENO world instance.
 - `WORLD_INSTANCE_CAPACITY` (optional, default 64; keep consistent with DB capacity)
 - `WORLD_BOUNDS` (optional, default 10000 world units)
 - `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (optional until spatial voice is provisioned; server-only credentials for pair-scoped audio rooms)
-- `WORLD_INTERACTABLES_FILE` (optional path to the Unity-exported `world-interactables.json` registry; entries are real, explicitly marked scene objects with stable IDs, kind and world transform; mount the file into the gateway container)
+- `WORLD_INTERACTABLES_MANIFEST_FILE` (path to the aggregate Unity-exported `world-interactables-manifest.json`; required for city admission; mount it together with every referenced `world-interactables-<cityId>.json` file)
 - `WORLD_COLLISION_BOXES` (optional JSON array of up to 500 static axis-aligned boxes; each box has numeric `minX`, `maxX`, `minY`, `maxY`, `minZ`, `maxZ` world coordinates)\n- `WORLD_DISTRICT_MAP_MANIFEST_FILE` (optional path to the Unity-generated district collision manifest; requires `WORLD_DISTRICTS` / `WORLD_DISTRICTS_FILE` to match exactly)\n- `WORLD_DISTRICTS` or `WORLD_DISTRICTS_FILE` (optional operator-authored district rectangles; each district has a unique `id`, display `name`, Addressables `contentLabel`, and `minX`, `maxX`, `minZ`, `maxZ`)
 
 Build with `npm install && npm run build`; run with `npm start`. The Dockerfile
@@ -59,31 +59,28 @@ content label as the scene address, and packs each district separately. The
 example rectangles above match those generated scene partitions. The base
 boot scene retains shared road/terrain, player, camera and session systems.
 
-### District-specific collision maps
+### City-scoped district collision maps
 
-The Unity Editor command **UCENO → World → Export Loaded District Maps** generates
-`runtime/world-gateway/data/districts/manifest.json` and one JSON collision map
-per district. After loading and validating every district scene, export those
-files and deploy the manifest and all referenced map files together.
+The Unity city scene pipeline exports one collision map per city/district under
+`runtime/world-gateway/data/city-districts/`, plus an aggregate
+`manifest.json`. Each manifest entry contains the city ID, district ID,
+content label, file name and exact district bounds. The exporter preserves
+other cities' entries when one city is regenerated and refuses to update the
+manifest if any district has no collision geometry.
 
-Set `WORLD_DISTRICT_MAP_MANIFEST_FILE` to the absolute path of the deployed
-manifest. The gateway validates at startup that every configured district
-appears exactly once, labels and X/Z boundaries match `WORLD_DISTRICTS`, map
-filenames cannot escape the manifest directory, and each map contains 1–500
-valid collision boxes.
+Set `WORLD_DISTRICT_MAP_MANIFEST_FILE` to the absolute path of the aggregate
+manifest. Mount the manifest and every referenced map file together. The
+gateway validates exact coverage of every district in the ten-city catalogue,
+city/district identity, content labels, bounds, safe filenames and each map's
+collision geometry. Missing or mismatched city data fails closed: the affected
+city cannot admit players and movement never falls back to another city's or
+the legacy global collision geometry.
 
-When a player enters a district, the gateway switches that player's authoritative
-X/Z collision queries to that district's map only after the server accepts the
-district content handshake. On leaving all configured districts, it falls back
-to the legacy global map. Keep the global map configured for shared/base-world
-geometry and gaps between district rectangles.
-
-This setting is optional for backward compatibility. If omitted, the gateway
-continues using the legacy global collision map. Do not enable the manifest
-until all district scenes have been exported and deployed together; missing,
-stale or mismatched files intentionally prevent gateway startup. Persistent
-object state remains keyed by world, district and object ID independently of
-collision-map selection.
+Do not deploy this manifest until all ten city exports have been generated and
+validated. A partial manifest intentionally prevents full city readiness.
+The old global collision-map setting is retained only for compatibility with
+other legacy code paths; it is not a substitute for city-scoped maps in the
+assigned-city movement simulation.
 
 At a district boundary, the authoritative simulation pauses the player's
 horizontal movement and sends `district_content_required` with the server-chosen
@@ -261,21 +258,30 @@ This is still not end-to-end voice chat: Unity microphone capture, LiveKit room
 connection, remote audio playback, positional attenuation, mute controls and
 Android audio lifecycle integration remain to be implemented and tested.
 
-## District-aware object persistence
+## City-scoped interactable registries and district object persistence
 
-Set WORLD_INTERACTABLES_FILE to the JSON map exported by Unity's
-UCENO/World/Export Current Scene Collision Map command, or use
-WORLD_COLLISION_BOXES_FILE for the same combined map. The file contains both
-static collision boxes and an interactables array. WORLD_INTERACTABLES may
-instead provide the interactables JSON directly.
+Unity exports one `world-interactables-<cityId>.json` file per city and updates
+`world-interactables-manifest.json`. Set
+`WORLD_INTERACTABLES_MANIFEST_FILE` to that aggregate manifest and mount all
+referenced city files beside it. The gateway requires exactly one registry for
+each city in the canonical ten-city catalogue. Each object's coordinates are
+validated against that city's own district rectangles; duplicate object IDs,
+unknown cities, missing city files and empty city registries are rejected.
 
-Each exported interactable has a stable object ID, kind, and authoritative
-world-space interaction anchor. The gateway derives district ownership from
-the anchor coordinates and WORLD_DISTRICTS; clients cannot submit or override
-the district. Supported durable kinds are door, furniture, vehicle and object.
-Seats remain temporary and are released on disconnect.
+City readiness is checked at city-and-district granularity. Every district
+must have both a validated collision map and at least one exported
+interactable. A legacy single-city `WORLD_INTERACTABLES_FILE` can still be
+loaded for migration diagnostics, but it has no city identity and cannot make
+a city ready. Interaction authorization, initial object snapshots and state
+broadcasts are restricted to the player's assigned city as well as district.
 
-Apply db/migrations/028_district_object_persistence.sql after migrations
+Each exported interactable has a stable scene-derived ID, kind and
+authoritative world-space interaction anchor. Clients cannot submit or
+override city or district ownership. Supported durable kinds are door,
+furniture, vehicle and object. Seats remain temporary and are released on
+disconnect.
+
+Apply `db/migrations/028_district_object_persistence.sql` after migrations
 015–027. PostgreSQL stores state by world, district and object ID. Runtime
 instances load state before admitting a WebSocket session, use version-checked
 writes, and refresh newer versions every 2.5 seconds so separate instances
@@ -283,8 +289,8 @@ converge. A district's object state is sent after its content-ready handshake.
 Do not enable the gateway against a database that has not received migration
 028.
 
-Unity's GameObject/UCENO authoring menu can mark selected scene objects as
-doors, seats, usable objects, furniture or vehicles. Assign the actual door
-pivot where applicable, keep object IDs stable, and export the scene map after
-authoring. The editor source change does not itself place markers on every
-furnished/city asset.
+The Unity authoring menu can mark scene objects as doors, seats, usable
+objects, furniture or vehicles. Assign the actual door pivot where applicable,
+keep object IDs stable, and export every city's saved generated district
+scenes. The exporter preserves other city entries, but the aggregate manifest
+is not complete until all ten cities have been exported.
