@@ -173,11 +173,15 @@ def main():
     if meridian is None:
         fail("The Meridian starter city is missing from the gateway city catalogue.")
     meridian_labels = {district.get("contentLabel") for district in meridian.get("districts", [])}
+    gateway_districts = json.loads(
+        (Path("runtime/world-gateway/config/world-districts.json")).read_text(encoding="utf-8")
+    ).get("districts", [])
+    gateway_labels = {district.get("contentLabel") for district in gateway_districts}
     district_builder = builder[builder.index("private static void BuildDistrictScenes"):]
     for district_id in ("south", "central-south", "central-north", "north"):
         expected_label = "world-city-meridian-" + district_id
-        if expected_label not in meridian_labels or expected_label not in district_builder:
-            fail("Meridian Addressables scene label is not aligned with the city catalogue: " + expected_label)
+        if expected_label not in meridian_labels or expected_label not in gateway_labels or expected_label not in district_builder:
+            fail("Meridian Addressables label is not consistent across the city catalogue, gateway admission config, and Unity scene builder: " + expected_label)
     if 'const string cityId = "meridian"' not in district_builder:
         fail("Starter district scene generation must identify its actual city instead of generic district labels.")
     if "world-city-district-" in district_builder:
