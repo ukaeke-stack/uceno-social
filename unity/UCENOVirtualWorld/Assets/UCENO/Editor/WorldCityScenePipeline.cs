@@ -98,9 +98,43 @@ namespace UCENO.VirtualWorld.Editor
         private const string ProfilesRelative = "unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json";
         private const string AddressableGroupName = "UCENO Remote District Scenes";
 
+        [MenuItem("UCENO/World/Validate Ten-City Catalogue and Pack Coverage", false, 30)]
+        public static void ValidateTenCityCoverage()
+        {
+            CityPipelineCity[] allAdditionalCities = LoadRemainingCities();
+            CityPipelineProfiles profiles = LoadProfiles();
+            var expected = new HashSet<string>(allAdditionalCities.Select(city => city.id), StringComparer.Ordinal);
+            var actual = new HashSet<string>(StringComparer.Ordinal);
+            var errors = new List<string>();
+
+            foreach (CityPipelineAssetProfile profile in profiles.cities ?? Array.Empty<CityPipelineAssetProfile>())
+            {
+                if (profile == null || string.IsNullOrWhiteSpace(profile.cityId) || !actual.Add(profile.cityId))
+                    errors.Add("Missing or duplicate city asset profile.");
+                else if (!expected.Contains(profile.cityId))
+                    errors.Add("Asset profile is not one of the nine non-Meridian cities: " + profile.cityId);
+            }
+
+            foreach (string cityId in expected)
+                if (!actual.Contains(cityId))
+                    errors.Add("Missing imported asset profile for city: " + cityId);
+
+            if (actual.Count != 9 || expected.Count != 9)
+                errors.Add("Coverage must include exactly nine additional city packs plus Meridian Prime in the ten-city catalogue.");
+
+            if (errors.Count > 0)
+                throw new BuildFailedException("Ten-city coverage validation failed:\\n- " +
+                    string.Join("\\n- ", errors));
+
+            Debug.Log("UCENO ten-city coverage passed: Meridian Prime plus nine distinct catalogue cities; four districts and three landmarks per city; nine independent non-Meridian imported-pack profiles.");
+        }
+
         [MenuItem("UCENO/World/Validate Remaining Nine City Asset Packs", false, 31)]
         public static void ValidateRemainingCityPacks()
         {
+            // Catalogue coverage includes Meridian plus all nine additional cities;
+            // only the nine non-Meridian cities require independent imported packs.
+            ValidateTenCityCoverage();
             // Imported provenance, geometry, textures, LODs and city ownership are
             // mandatory. The procedural blockout generator cannot satisfy this gate.
             ImportedCityAssetPackGate.Validate();
@@ -200,11 +234,11 @@ namespace UCENO.VirtualWorld.Editor
                         failures.Add(city.id + ": missing " + asset.category + " prefab " + asset.path);
                         continue;
                     }
-                    LODGroup group = prefab.GetComponentInChildren<LODGroup>(true);
-                    LOD[] lods = group != null ? group.GetLODs() : Array.Empty<LOD>();
-                    if (lods.Length < 3 || lods[0].renderers == null)
+                    if (!CityAssetLodContract.TryGetValidLods(prefab, out LOD[] lods))
                     {
-                        failures.Add(city.id + ": " + asset.category + " prefab lacks three LODs: " + asset.path);
+                        failures.Add(city.id + ": " + asset.category + " prefab requires at least " +
+                            CityAssetLodContract.MinimumLodCount +
+                            " authored LOD levels with valid renderers: " + asset.path);
                         continue;
                     }
                     int triangles = 0;
@@ -513,10 +547,10 @@ namespace UCENO.VirtualWorld.Editor
                     errors.Add(city.id + ": missing imported prefab " + assetPath);
                 else if (checkAssets && prefab != null)
                 {
-                    LODGroup lodGroup = prefab.GetComponentInChildren<LODGroup>(true);
-                    if (lodGroup == null || lodGroup.GetLODs().Length < 3 ||
-                        lodGroup.GetLODs().Any(lod => lod.renderers == null || lod.renderers.Length == 0))
-                        errors.Add(city.id + ": prefab requires at least three authored LOD levels for Android: " + assetPath);
+                    if (!CityAssetLodContract.TryGetValidLods(prefab, out _))
+                        errors.Add(city.id + ": prefab requires at least " +
+                            CityAssetLodContract.MinimumLodCount +
+                            " authored LOD levels with valid renderers for Android: " + assetPath);
                     if (!prefab.GetComponentsInChildren<Renderer>(true).Any(renderer => renderer != null))
                         errors.Add(city.id + ": prefab contains no renderable geometry: " + assetPath);
                     if (checkAssets && prefab != null)
