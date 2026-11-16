@@ -6,6 +6,11 @@ Meridian Prime remains the starter city. Nine additional cities are specified in
 
 The catalogue defines each city's identity, architecture language, biome, terrain, weather, road hierarchy, water, districts and named landmarks. Those specifications guide scene composition; they are not substitutes for imported art.
 
+
+## Ten-city coverage contract
+
+The catalogue must define exactly ten distinct cities: Meridian Prime plus the nine additional cities. Every city must retain four uniquely identified districts and three uniquely identified landmarks, with distinct urban form, biome, terrain and architecture identities. Meridian remains the starter-city path; the nine additional cities must each have one independent imported asset profile. The Editor command **UCENO > World > Validate Ten-City Catalogue and Pack Coverage** checks this split before imported-pack validation or scene generation. This catalogue/profile check does not claim that any city assets have been imported or that scenes exist.
+
 ## Non-negotiable imported-art requirement
 
 Do not use `CityProceduralAssetPackGenerator` to manufacture buildings, trees, landmarks or skyboxes from primitive meshes and flat-color materials. That generator is a blockout utility only and its output does not meet the visual-quality target. Do not treat its generated profiles as imported assets.
@@ -16,11 +21,11 @@ Each of the nine city packs must contain 12 distinct, licensed imported prefabs:
 - Four environment assets: biome-specific tree, ground cover, street furniture and signature landscape prop
 - Three dedicated landmark assets matching the city's catalogue landmark IDs
 
-That is 108 imported prefabs across the nine cities, plus nine city-specific HDRI panoramas. Each prefab must have detailed mesh geometry, textured PBR materials, at least two valid LOD levels and a city-owned path under `Assets/UCENO/Cities/<city-id>/Prefabs`. Each landmark must have a root `WorldInteractable` marker and a solid collider. Do not reuse another city's signature architecture or landmark mesh.
+That is 108 imported prefabs across the nine cities, plus nine city-specific HDRI panoramas. Each prefab must have detailed mesh geometry, textured PBR materials, at least three authored LOD levels (each with valid, non-empty renderer assignments) and a city-owned path under `Assets/UCENO/Cities/<city-id>/Prefabs`. Each landmark must have a root `WorldInteractable` marker and a solid collider. Do not reuse another city's signature architecture or landmark mesh.
 
 Every city folder must contain `source-manifest.json` with exactly 12 asset records. Each record must identify `prefab`, `sourceName`, `sourceUrl`, `license` and `attribution`. Keep the original downloaded source files and licence text alongside the imported assets. A filename or generated mesh is not proof of provenance. The automated release gate currently accepts only these exact commercial-use/derivative-use licence labels: `CC0 1.0`, `CC-BY 4.0`, `CC-BY 3.0`, `CC-BY-SA 4.0` or `CC-BY-SA 3.0`. Each `sourceUrl` must be an absolute HTTPS URL; each prefab path must appear exactly once and the manifest must cover exactly the 12 configured prefabs. Non-commercial, no-derivatives, unknown or unverified licences are rejected until explicitly reviewed and the gate is updated.
 
-The Editor gate `UCENO > World > Validate Imported City Art Packs` inspects the actual Unity prefab assets, mesh detail, textured materials, LOD groups, landmark interaction components, city-specific dependency fingerprints, provenance manifests and HDRI dimensions. It must pass before scene generation. A source-contract test cannot substitute for running this Editor gate.
+The Editor gate `UCENO > World > Validate Imported City Art Packs` inspects the actual Unity prefab assets, mesh detail, textured materials, LOD groups, landmark interaction components, city-specific dependency fingerprints, provenance manifests and HDRI dimensions. The shared `CityAssetLodContract` is authoritative for the three-level requirement and is enforced by both imported-pack and visual-quality validation. It must pass before scene generation. A source-contract test cannot substitute for running this Editor gate.
 
 ## Humanoid animation requirement
 
