@@ -19,6 +19,10 @@ cities = catalog.get("cities", [])
 require(len(cities) == 10, "catalogue must contain ten cities including Meridian Prime")
 remaining = [city for city in cities if city.get("id") != "meridian"]
 require(len(remaining) == 9, "exactly nine cities must be generated beyond Meridian Prime")
+require({city.get("id") for city in cities}.__contains__("meridian"),
+        "Meridian Prime must be present in the ten-city catalogue")
+require(len({city.get("contentLabel") for city in cities}) == 10,
+        "all ten cities need distinct content labels")
 
 for field in ("id", "identity", "climate", "architecture"):
     values = [city.get(field) for city in cities]
@@ -35,7 +39,7 @@ gate = IMPORTED_GATE.read_text(encoding="utf-8")
 for token in (
     "Validate Imported City Art Packs", "source-manifest.json", "sourceUrl", "license",
     "attribution", "GetComponentsInChildren<MeshFilter>", "mainTexture != null",
-    "GetLODs().Length >= 2", "WorldInteractable", "AssetDatabase.GetAssetDependencyHash",
+    "CityAssetLodContract.TryGetValidLods", "WorldInteractable", "AssetDatabase.GetAssetDependencyHash",
     "skybox.width >= 1024 && skybox.height >= 512",
 ):
     require(token in gate, "imported-art gate is missing check: " + token)
@@ -72,7 +76,8 @@ if PROFILES.exists():
 pipeline = SCENE_PIPELINE.read_text(encoding="utf-8")
 for token in ("Build Remaining Nine City Scenes", "RegisterAddressableScene",
               "WorldInteractableRegistryExporter.Export", "WorldCollisionGeometryExporter.Export",
-              "Verify Nine City Scene Registries"):
+              "Verify Nine City Scene Registries", "ValidateTenCityCoverage",
+              "CityAssetLodContract.TryGetValidLods"):
     require(token in pipeline, f"scene pipeline is missing {token}")
 require("VerifyNineCitySceneRegistries();" in pipeline,
         "scene generation must automatically verify exported scene and registry data")
