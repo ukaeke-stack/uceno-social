@@ -111,7 +111,8 @@ test("city interactable manifest rejects missing cities, duplicate files, empty 
   assert.throws(() => parseCityInteractableManifest(JSON.stringify({ cities: complete.slice(0, 1) }), cities, 200, () => "{}"),
     /exactly one registry for every configured city/);
   const duplicateFiles = [{ cityId: "meridian", file: "same.json" }, { cityId: "solstice", file: "same.json" }];
-  assert.throws(() => parseCityInteractableManifest(JSON.stringify({ cities: duplicateFiles }), cities, 200, () => "{}"),
+  assert.throws(() => parseCityInteractableManifest(JSON.stringify({ cities: duplicateFiles }), cities, 200, () =>
+    JSON.stringify({ interactables: [{ id: "scene:" + "d".repeat(32), kind: "door", x: 0, y: 0, z: 0 }] })),
     /invalid or duplicate identity/);
   assert.throws(() => parseCityInteractableManifest(JSON.stringify({ cities: complete }), cities, 200, () =>
     JSON.stringify({ interactables: [] })), /registry is empty/);

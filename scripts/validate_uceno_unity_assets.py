@@ -163,7 +163,7 @@ def main():
 
     imported_city_gate = read_text(ASSETS / "Editor/ImportedCityAssetPackGate.cs")
     for required in (
-        "manifest.assets.Select(a => a.prefab).Distinct(StringComparer.Ordinal).Count() != 12",
+        "manifest.assets.Select(a => a.prefab).Distinct(StringComparer.Ordinal).Count() == 12",
         "SetEquals(paths)",
         "Uri.TryCreate(source.sourceUrl, UriKind.Absolute, out Uri sourceUri)",
         "sourceUri.Scheme == Uri.UriSchemeHttps",
