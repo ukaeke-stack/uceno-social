@@ -29,13 +29,13 @@ test("catalogue rejects fewer than ten cities, malformed JSON and duplicate iden
   const parsed = JSON.parse(fixture);
   assert.throws(() => parseWorldCityCatalog(JSON.stringify({ cities: parsed.cities.slice(0, 9) }), 10), /at least 10/);
   parsed.cities[1].id = parsed.cities[0].id;
-  assert.throws(() => parseWorldCityCatalog(JSON.stringify(parsed), 10), /invalid or duplicate/);
+  assert.throws(() => parseWorldCityCatalog(JSON.stringify(parsed), 10), /invalid, incomplete or non-distinct design data/);
 });
 
 test("catalogue rejects invalid spawn bounds and mismatched content labels", () => {
   const outside = JSON.parse(fixture);
   outside.cities[0].spawn.x = 9000;
-  assert.throws(() => parseWorldCityCatalog(JSON.stringify(outside), 10), /invalid or duplicate/);
+  assert.throws(() => parseWorldCityCatalog(JSON.stringify(outside), 10), /invalid, incomplete or non-distinct design data/);
 
   const mismatched = JSON.parse(fixture);
   mismatched.cities[0].districts[0].contentLabel = "world-city-other-downtown";
@@ -58,7 +58,7 @@ test("catalogue rejects duplicate district IDs and fewer than four districts", (
 
   const incomplete = JSON.parse(fixture);
   incomplete.cities[0].districts = incomplete.cities[0].districts.slice(0, 3);
-  assert.throws(() => parseWorldCityCatalog(JSON.stringify(incomplete), 10), /invalid or duplicate/);
+  assert.throws(() => parseWorldCityCatalog(JSON.stringify(incomplete), 10), /invalid, incomplete or non-distinct design data/);
 });
 
 test("gateway loads the catalogue at startup and labels unpublished scenes honestly", () => {
@@ -233,11 +233,12 @@ test("city admission requires complete collision and interactable coverage for t
   const meridian = cities.find(city => city.id === "meridian");
   const solstice = cities.find(city => city.id === "solstice");
   assert.ok(meridian && solstice);
-  const meridianIds = new Set(meridian.districts.map(district => district.id));
-  const solsticeIds = new Set(solstice.districts.map(district => district.id));
+  const meridianIds = new Set(meridian.districts.map(district => meridian.id + ":" + district.id));
+  const solsticeIds = new Set(solstice.districts.map(district => solstice.id + ":" + district.id));
   assert.equal(evaluateCityRuntimeReadiness(meridian, meridianIds, meridianIds).ready, true);
   assert.ok(resolveReadyCityRuntime(cities, "meridian", meridianIds, meridianIds));
   assert.equal(resolveReadyCityRuntime(cities, "solstice", meridianIds, meridianIds), null);
+  assert.ok(resolveReadyCityRuntime(cities, "solstice", solsticeIds, solsticeIds));
   const partialCollision = new Set([...meridianIds].slice(1));
   assert.equal(evaluateCityRuntimeReadiness(meridian, partialCollision, meridianIds).ready, false);
   const partialInteractables = new Set([...meridianIds].slice(1));

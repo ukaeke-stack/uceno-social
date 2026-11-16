@@ -115,8 +115,9 @@ test("city interactable manifest rejects missing cities, duplicate files, empty 
     /invalid or duplicate identity/);
   assert.throws(() => parseCityInteractableManifest(JSON.stringify({ cities: complete }), cities, 200, () =>
     JSON.stringify({ interactables: [] })), /registry is empty/);
-  assert.throws(() => parseCityInteractableManifest(JSON.stringify({ cities: complete }), cities, 200, () =>
-    JSON.stringify({ interactables: [{ id: "scene:" + "a".repeat(32), kind: "door", x: 0, y: 0, z: 0 }] })),
+  assert.throws(() => parseCityInteractableManifest(JSON.stringify({ cities: complete }), cities, 200, (_file, cityId) =>
+    JSON.stringify({ interactables: [{ id: "scene:" + "a".repeat(32), kind: "door",
+      x: cityId === "meridian" ? 0 : 100, y: 0, z: cityId === "meridian" ? 0 : 100 }] })),
     /Duplicate interactable ID across cities/);
 });
 

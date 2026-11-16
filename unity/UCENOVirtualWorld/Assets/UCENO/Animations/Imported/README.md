@@ -23,7 +23,7 @@ Idle, walk, run, talk and dance must be loopable. Wave, cheer, turn and interact
 
 1. Add the original licensed FBX files under this folder. Preserve source files and licence documents.
 2. Create `animation-source-manifest.json` in this folder. It must contain one provenance record for every imported FBX. Use the exact Unity asset path in `sourceFbx`, plus `sourceName`, `sourceUrl`, `license` and `attribution`.
-3. Select each animation FBX in Unity and open **Rig**.
+3. Select each animation FBX in Unity and open **Rig > Animation Type** in the Model Import Settings.
 4. Set **Animation Type** to **Humanoid**.
 5. Set **Avatar Definition** to **Copy From Other Avatar** and select `Assets/UCENO/Characters/Imported/UCENO_Default_Avatar.fbx`'s Humanoid Avatar.
 6. Apply the import settings. Open **Animation** and confirm clip names, frame ranges, loop settings and root transform settings.

@@ -9,6 +9,7 @@ const sceneBuilder = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAsset
 const cityScenePipeline = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs");
 const buildCommand = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/BuildCommand.cs");
 const cityMobileImporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityMobileAssetPostprocessor.cs");
+const cityLodContract = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/CityAssetLodContract.cs");
 const avatarCrowdLod = read("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarCrowdLod.cs");
 const cityRegistryExporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldInteractableRegistryExporter.cs");
 const cityCollisionExporter = read("unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs");
@@ -38,12 +39,12 @@ const checks = [
   ["Nine-city scene pipeline generates separate district scenes and remote Addressables labels", /BuildCity\(/.test(cityScenePipeline) && /district.contentLabel/.test(cityScenePipeline) && /RegisterAddressableScene/.test(cityScenePipeline) && /PackSeparately/.test(cityScenePipeline)],
   ["City asset validation rejects shared imported mesh geometry across cities", /geometryOwners/.test(cityScenePipeline) && /GetAssetDependencyHash/.test(cityScenePipeline) && /mesh geometry is shared with/.test(cityScenePipeline)],
   ["All nine additional city layouts have dedicated architecture and environment placement rules", ["linear-waterfront", "multi-level-green-corridors", "river-island-campus", "contour-terraces", "oasis-radial-courtyards", "elevated-grid-and-canals", "entertainment-superblocks", "rail-spoke-industrial", "garden-city-radial"].every(pattern => cityScenePipeline.includes('layout == "' + pattern + '"' ) || cityScenePipeline.includes('layout == "' + pattern + '" ||')) && /BuildEnvironment\(root.transform, district, environment, city.environment.biome, city.layout.pattern\)/.test(cityScenePipeline)],
-  ["Human and AI avatars require three authored mesh LOD levels", /avatarLodGroup.GetLODs\(\).Length < 3/.test(sceneBuilder) && /meshLodGroup.GetLODs\(\).Length < 3/.test(avatarCrowdLod) && /lodGroup.GetLODs\(\).Length < 3/.test(cityScenePipeline)],
+  ["Human and AI avatars require three authored mesh LOD levels", /avatarLodGroup.GetLODs\(\).Length < 3/.test(sceneBuilder) && /meshLodGroup.GetLODs\(\).Length < 3/.test(avatarCrowdLod) && /CityAssetLodContract\.TryGetValidLods\(prefab, out LOD\[\] lods\)/.test(cityScenePipeline) && /MinimumLodCount = 3/.test(cityLodContract) && /GetComponentInChildren<LODGroup>\(true\)/.test(cityLodContract)],
   ["City landmark prefabs must be interactable and have targeting colliders", /WorldInteractable/.test(cityScenePipeline) && /non-trigger targeting collider/.test(cityScenePipeline)],
   ["Generated city manifests and isolated registry exports are verified", /city-scene-manifest/.test(cityScenePipeline) && /WorldInteractableRegistryExporter/.test(cityScenePipeline) && /VerifyNineCitySceneRegistries/.test(cityScenePipeline)],
   ["Every city exports a dedicated collision map and verifies collider/interactable parity", /WorldCollisionGeometryExporter\.Export\(city.id/.test(cityScenePipeline) && /uceno-city-collision-boxes-/.test(cityCollisionExporter) && /collision map interactables do not match/.test(cityScenePipeline)],
   ["City registry exporter writes district names and content labels", /contentLabel = district.contentLabel/.test(cityRegistryExporter) && /name = district.name/.test(cityRegistryExporter)],
-  ["City prefabs require Android LOD groups", /LODGroup/.test(cityScenePipeline) && /GetLODs/.test(cityScenePipeline)],
+  ["City prefabs require Android LOD groups", /GetComponentInChildren<LODGroup>\(true\)/.test(cityLodContract) && /MinimumLodCount = 3/.test(cityLodContract) && /CityAssetLodContract\.TryGetValidLods\(prefab, out LOD\[\] lods\)/.test(cityScenePipeline)],
   ["City asset importer applies Android ETC2 textures and compressed meshes", /ETC2_RGBA8/.test(cityMobileImporter) && /ETC2_RGB4/.test(cityMobileImporter) && /ModelImporterMeshCompression.Medium/.test(cityMobileImporter)],
   ["Every city requires and applies a distinct HDRI skybox and atmospheric lighting", /skyboxTexture/.test(cityScenePipeline) && /CreateCitySkybox/.test(cityScenePipeline) && /ConfigureCityEnvironment/.test(cityScenePipeline) && /Skybox\/Panoramic/.test(cityScenePipeline)],
   ["Districts contain role, centre, radius and city-specific layout metadata", cityCatalog.cities.every(city => city.districts.every(district => district.role && district.center && Number.isFinite(district.radius) && district.layout === city.layout.pattern))],
@@ -94,7 +95,7 @@ const checks = [
   ["Client can retry and clears cancelled district transitions", /RetryPendingDistrictContent/.test(gateway) && /district_content_cancelled/.test(gateway)],
   ["District policy tests cover bounds and overlaps", /rejects overlapping district rectangles/.test(districtTests) && /rejects malformed JSON/.test(districtTests)],
   ["Canonical gateway district config has four matching Unity scene labels", districtConfig.districts?.length === 4 && ["civic-core", "exchange-quarter", "garden-ring", "old-port"].every(id => districtConfig.districts.some(d => d.id === id && d.contentLabel === "world-city-meridian-" + id))],
-  ["Gateway tests exercise canonical district geometry fixture", /canonical gateway config matches the four generated Unity district scenes/.test(districtTests)],
+  ["Gateway tests exercise canonical district geometry fixture", /canonical gateway config matches Meridian catalogue geometry and streamed scene labels/.test(districtTests)],
   ["Architecture documents automatic loading and persistent cache", /automatically|on demand|preflight/i.test(architecture) && /persistent.*cache/i.test(architecture)],
   ["Acceptance tests cover interrupted downloads and district boundary gates", /Interrupt the connection mid-download/.test(tests) && /district boundary/.test(tests)]
 ];

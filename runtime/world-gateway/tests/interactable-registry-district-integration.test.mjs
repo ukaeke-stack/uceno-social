@@ -43,7 +43,7 @@ test("production district shared edges are assigned once using min-inclusive/max
     }]
   }), districts, 10000).get("scene:district-edge");
 
-  assert.equal(entry.districtId, "north");
+  assert.equal(entry.districtId, "old-port");
 });
 
 test("production district manifest rejects interactables outside all districts", () => {

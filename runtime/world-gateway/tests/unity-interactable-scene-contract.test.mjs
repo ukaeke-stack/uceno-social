@@ -46,7 +46,8 @@ test("scene export creates the exact file and schema loaded by the authoritative
   assert.match(exporter, /collider\.enabled && collider\.gameObject\.activeInHierarchy && !collider\.isTrigger/);
   assert.match(exporter, /marker\.Kind == "door" && !marker\.HasDoorPivot/);
   assert.match(exporter, /GlobalObjectId\.GetGlobalObjectIdSlow/);
-  assert.match(gateway, /process\.env\.WORLD_INTERACTABLES_MANIFEST_FILE/);\n  assert.match(gateway, /parseCityInteractableManifest\(manifest!, cityDistricts/);
+  assert.match(gateway, /process\.env\.WORLD_INTERACTABLES_MANIFEST_FILE/);
+  assert.match(gateway, /parseCityInteractableManifest\(manifest!, cityDistricts/);
   assert.match(gateway, /loadInteractableRegistry\(\s*raw, WORLD_DISTRICTS, WORLD_BOUNDS,/);
   assert.match(gateway, /WORLD_REQUIRE_INTERACTABLE_REGISTRY === "true"/);
   assert.match(registryPolicy, /function loadInteractableRegistry/);
@@ -82,5 +83,7 @@ test("Unity Build Automation pre-export generates the scene and gateway interact
   assert.match(buildCommand, /public\s+static\s+void\s+PrepareAndroidBuild\s*\(\)\s*\{[\s\S]*?StarterSceneBuilder\.CreateStarterScene\(\)/);
   assert.match(starterBuilder, /FreeAssetWorldSceneBuilder\.CreateStarterScene\(\)/);
   assert.match(sceneBuilder, /WorldInteractableRegistryExporter\.Export\(false\)/);
-  assert.match(exporter, /world-interactables-manifest\.json/);\n  assert.match(exporter, /WorldCityInteractableManifestDocument/);\n  assert.match(exporter, /File\.Replace\(manifestTemp, manifestPath, null\)/);
+  assert.match(exporter, /world-interactables-manifest\.json/);
+  assert.match(exporter, /WorldCityInteractableManifestDocument/);
+  assert.match(exporter, /File\.Replace\(manifestTemp, manifestPath, null\)/);
 });
