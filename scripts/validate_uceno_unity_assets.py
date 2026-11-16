@@ -185,14 +185,21 @@ def main():
             fail("Imported city art gate has an invalid project-root path or missing asset verification: " + required)
 
     city_pipeline = read_text(ASSETS / "Editor/WorldCityScenePipeline.cs")
+    city_lod_contract = read_text(ASSETS / "Editor/CityAssetLodContract.cs")
     for required in ("ValidateRemainingCityPacks", "BuildRemainingCities",
                      "VerifyNineCitySceneRegistries", "BuildRemoteAddressablesContent",
                      "CheckForCatalogUpdates", "UpdateCatalogs(catalogCheck.Result, false)",
                      "BuildPlayerContent(out AddressablesPlayerBuildResult result)",
                      "RemoteCatalogJsonFilePath", "RemoteCatalogHashFilePath",
-                     "geometryOwners", "GetAssetDependencyHash", "LODGroup"):
+                     "geometryOwners", "GetAssetDependencyHash"):
         if required not in city_pipeline and required not in read_text(ASSETS / "Scripts/WorldContentDelivery.cs"):
             fail("Nine-city/remote Addressables release pipeline is missing: " + required)
+    for required in ("CityAssetLodContract.TryGetValidLods(prefab, out LOD[] lods)",):
+        if required not in city_pipeline:
+            fail("Nine-city imported prefab pipeline is missing its shared LOD contract: " + required)
+    for required in ("MinimumLodCount = 3", "GetComponentInChildren<LODGroup>(true)"):
+        if required not in city_lod_contract:
+            fail("Nine-city imported prefab LOD contract is incomplete: " + required)
 
     build_command = read_text(ASSETS / "Editor/BuildCommand.cs")
     for required in ("ValidateRemainingCityPacks()", "BuildRemainingCities()",
