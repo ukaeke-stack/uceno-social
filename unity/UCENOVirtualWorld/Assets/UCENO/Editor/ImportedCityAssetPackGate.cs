@@ -129,9 +129,9 @@ namespace UCENO.VirtualWorld.Editor
                         m != null && m.mainTexture != null),
                         path + " has no textured imported material; flat-color placeholders are rejected.");
 
-                    LODGroup lod = prefab.GetComponentInChildren<LODGroup>(true);
-                    Require(lod != null && lod.GetLODs().Length >= 2,
-                        path + " must include at least two valid LOD levels.");
+                    Require(CityAssetLodContract.TryGetValidLods(prefab, out _),
+                        path + " must include at least " + CityAssetLodContract.MinimumLodCount +
+                        " authored LOD levels with valid renderers.");
 
                     if (path.Contains("/Landmarks/"))
                     {
