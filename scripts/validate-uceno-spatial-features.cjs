@@ -68,7 +68,7 @@ requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneB
 ]);
 
 requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs", [
-  "TriggerDance()", 'nextGesture == "dance"', "activeGesture == 3"
+  "TriggerDance()", "normalizedGesture switch", '"dance" => "Dance"', 'trigger == "Dance" ? 8f'
 ]);
 requireMarkers("unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs", [
   "TriggerDance()", "localAvatar.TriggerDance()"
