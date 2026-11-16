@@ -367,14 +367,17 @@ def main():
             fail("Real city scene generation is not connected to the registered interaction flow: " + required)
     registry_exporter = read_text(ASSETS / "Editor/WorldInteractableRegistryExporter.cs")
     for required in ("Export Scene Interactables to Gateway Registry",
-                     "WORLD_INTERACTABLES_FILE", "GetComponentsInChildren<Collider>",
-                     "world-interactables.json", "marker.HasDoorPivot",
+                     "world-interactables-manifest.json", 'world-interactables-" + activeCity.id + ".json',
+                     "GetComponentsInChildren<Collider>", "marker.HasDoorPivot",
                      "No scene interactables were found"):
         if required not in registry_exporter:
             fail("Scene-to-gateway object registry export is missing: " + required)
     gateway_server = read_text(Path("runtime/world-gateway/src/server.ts"))
-    if "WORLD_INTERACTABLES_FILE" not in gateway_server or "ensureObjectStatesLoaded(identity.worldId)" not in gateway_server:
-        fail("Gateway is not loading configured scene interactables and their durable states.")
+    if ("WORLD_INTERACTABLES_MANIFEST_FILE" not in gateway_server or
+            "parseCityInteractableManifest" not in gateway_server or
+            "WORLD_INTERACTABLES_FILE" not in gateway_server or
+            "ensureObjectStatesLoaded(identity.worldId)" not in gateway_server):
+        fail("Gateway is not loading the per-city scene interactable manifest and durable object states.")
     gateway_client = read_text(ASSETS / "Scripts/WorldGatewayClient.cs")
     for required in ('packet.type == "object_state"', "item.ApplyServerState", "RequestInteraction"):
         if required not in gateway_client:
