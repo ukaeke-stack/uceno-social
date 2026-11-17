@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -45,7 +45,7 @@ async function waitForReady(port, child, timeoutMs = 15000) {
   throw new Error(`gateway readiness timed out: ${lastError?.message ?? "unknown error"}\nGateway process output:\n${diagnostics}`);
 }
 
-function startGateway(port, instanceId, scopedDatabaseUrl, registryFile) {
+function startGateway(port, instanceId, scopedDatabaseUrl, registryManifestFile, collisionManifestFile) {
   const processDatabaseUrl = new URL(scopedDatabaseUrl);
   processDatabaseUrl.searchParams.set("application_name", "uceno-gateway-" + instanceId);
   const child = spawn(process.execPath, ["dist/server.js"], {
@@ -58,8 +58,8 @@ function startGateway(port, instanceId, scopedDatabaseUrl, registryFile) {
       DATABASE_URL: processDatabaseUrl.toString(),
       WORLD_TOKEN_SECRET: tokenSecret,
       WORLD_INSTANCE_CAPACITY: "8",
-      WORLD_INTERACTABLES: "",
-      WORLD_INTERACTABLES_FILE: registryFile
+      WORLD_INTERACTABLES_MANIFEST_FILE: registryManifestFile,
+      WORLD_DISTRICT_MAP_MANIFEST_FILE: collisionManifestFile
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -213,11 +213,53 @@ test("two real gateway processes: primary loss leaves the replacement process re
   let gatewayC;
   let duplicateGatewayA;
   const registryDirectory = mkdtempSync(join(tmpdir(), "uceno-world-registry-"));
-  const registryFile = join(registryDirectory, "world-interactables.json");
-  writeFileSync(registryFile, JSON.stringify({ interactables: [
-    { id: "scene:test-door", kind: "door", x: 37.5, y: 1.15, z: -22.25, yaw: 0 },
-    { id: "scene:test-furniture", kind: "furniture", x: 38.0, y: 1.15, z: -22.25, yaw: 0 }
-  ] }));
+  const cityCatalog = JSON.parse(readFileSync(new URL("../config/world-cities.json", import.meta.url), "utf8"));
+  const registryManifestFile = join(registryDirectory, "world-interactables-manifest.json");
+  const collisionManifestFile = join(registryDirectory, "world-district-map-manifest.json");
+  const registryCities = [];
+  const collisionDistricts = [];
+  let expectedRegisteredInteractables = 0;
+
+  // Exercise the same strict ten-city/four-district manifest contract used by
+  // production exports, with isolated synthetic geometry for this integration test.
+  for (const city of cityCatalog.cities) {
+    const registryName = "world-interactables-" + city.id + ".json";
+    const interactables = [];
+    for (const district of city.districts) {
+      const x = district.center.x;
+      const z = district.center.z;
+      interactables.push({
+        id: "scene:" + city.id + ":" + district.id + ":anchor",
+        kind: "object", x, y: 1.15, z, yaw: 0
+      });
+      const mapName = "collision-" + city.id + "-" + district.id + ".json";
+      const obstacleX = x + district.radius * 0.75;
+      const obstacleZ = z + district.radius * 0.75;
+      writeFileSync(join(registryDirectory, mapName), JSON.stringify({ boxes: [{
+        minX: obstacleX - 0.5, maxX: obstacleX + 0.5,
+        minY: 0, maxY: 3,
+        minZ: obstacleZ - 0.5, maxZ: obstacleZ + 0.5
+      }] }));
+      collisionDistricts.push({
+        cityId: city.id, id: district.id, contentLabel: district.contentLabel,
+        minX: x - district.radius, maxX: x + district.radius,
+        minZ: z - district.radius, maxZ: z + district.radius,
+        file: mapName
+      });
+      expectedRegisteredInteractables++;
+    }
+    if (city.id === "meridian") {
+      interactables.push(
+        { id: "scene:test-door", kind: "door", x: 37.5, y: 1.15, z: -22.25, yaw: 0 },
+        { id: "scene:test-furniture", kind: "furniture", x: 38.0, y: 1.15, z: -22.25, yaw: 0 }
+      );
+      expectedRegisteredInteractables += 2;
+    }
+    writeFileSync(join(registryDirectory, registryName), JSON.stringify({ interactables }));
+    registryCities.push({ cityId: city.id, file: registryName });
+  }
+  writeFileSync(registryManifestFile, JSON.stringify({ cities: registryCities }));
+  writeFileSync(collisionManifestFile, JSON.stringify({ districts: collisionDistricts }));
 
   try {
     await admin.unsafe(`CREATE SCHEMA "${schema}"`);
@@ -346,20 +388,20 @@ test("two real gateway processes: primary loss leaves the replacement process re
       VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'checkpoint_race',
        'active', 7, $5::jsonb, NOW(), NOW())`,
       [activityId, worldId, instanceA, userId, persistedActivity]);
-    gatewayA = startGateway(portA, instanceA, scoped.toString(), registryFile);
-    gatewayB = startGateway(portB, instanceB, scoped.toString(), registryFile);
+    gatewayA = startGateway(portA, instanceA, scoped.toString(), registryManifestFile, collisionManifestFile);
+    gatewayB = startGateway(portB, instanceB, scoped.toString(), registryManifestFile, collisionManifestFile);
     const readyA = await waitForReady(portA, gatewayA);
     const readyB = await waitForReady(portB, gatewayB);
     assert.equal(readyA.instanceId, instanceA);
     assert.equal(readyB.instanceId, instanceB);
-    assert.equal(readyA.registeredInteractables, 2,
-      "gateway A must load both real scene objects from WORLD_INTERACTABLES_FILE");
-    assert.equal(readyB.registeredInteractables, 2,
-      "gateway B must load both real scene objects from WORLD_INTERACTABLES_FILE");
+    assert.equal(readyA.registeredInteractables, expectedRegisteredInteractables,
+      "gateway A must load every city-district anchor and both test scene objects from the city manifest");
+    assert.equal(readyB.registeredInteractables, expectedRegisteredInteractables,
+      "gateway B must load every city-district anchor and both test scene objects from the city manifest");
 
     // A second real OS process using the same logical instance UUID must not
     // acquire ownership while the first process still holds its database lease.
-    duplicateGatewayA = startGateway(portC, instanceA, scoped.toString(), registryFile);
+    duplicateGatewayA = startGateway(portC, instanceA, scoped.toString(), registryManifestFile, collisionManifestFile);
     const duplicateDeadline = Date.now() + 10000;
     while (duplicateGatewayA.exitCode === null && Date.now() < duplicateDeadline)
       await delay(100);
@@ -395,7 +437,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.equal(openedDoorState.version, 1);
     const persistedDoor = await admin.unsafe(`SELECT object_kind, object_state, version
       FROM "${schema}".virtual_world_object_states
-      WHERE world_id = $1::uuid AND district_id = 'unassigned' AND object_id = 'scene:test-door'`,
+      WHERE world_id = $1::uuid AND district_id = 'exchange-quarter' AND object_id = 'scene:test-door'`,
       [worldId]);
     assert.equal(persistedDoor.length, 1);
     assert.equal(persistedDoor[0].object_kind, "door");
@@ -415,7 +457,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.equal(activeFurnitureState.version, 1);
     const persistedFurniture = await admin.unsafe(`SELECT object_kind, object_state, version
       FROM "${schema}".virtual_world_object_states
-      WHERE world_id = $1::uuid AND district_id = 'unassigned' AND object_id = 'scene:test-furniture'`,
+      WHERE world_id = $1::uuid AND district_id = 'exchange-quarter' AND object_id = 'scene:test-furniture'`,
       [worldId]);
     assert.equal(persistedFurniture.length, 1);
     assert.equal(persistedFurniture[0].object_kind, "furniture");
@@ -531,7 +573,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
         RETURNING id`,
         [worldId, instanceA, { serverTime: Date.now(), players: [{ userId, x: 19, y: 1.15, z: -7, yaw: 0 }] }]);
       const replayedEventId = Number(inserted[0].id);
-      gatewayB = startGateway(portB, instanceB, scoped.toString(), registryFile);
+      gatewayB = startGateway(portB, instanceB, scoped.toString(), registryManifestFile, collisionManifestFile);
       const restarted = await waitForReady(portB, gatewayB);
       assert.equal(restarted.instanceId, instanceB);
       // The relay is a live fan-out, not a per-client replay queue: it can consume
@@ -666,7 +708,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
       // Race two independent database claims against a second stale activity.
       // PostgreSQL must serialize the row update so exactly one candidate wins.
       // Race two independent replacement gateway OS processes against one stale activity.
-      gatewayC = startGateway(portC, instanceC, scoped.toString());
+      gatewayC = startGateway(portC, instanceC, scoped.toString(), registryManifestFile, collisionManifestFile);
       const readyC = await waitForReady(portC, gatewayC);
       assert.equal(readyC.instanceId, instanceC);
       const processRaceActivityId = randomUUID();
