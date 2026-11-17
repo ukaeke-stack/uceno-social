@@ -6,6 +6,7 @@ on:
       - feature/uceno-unity-foundation
     paths:
       - 'runtime/world-gateway/config/world-cities.json'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/CityAssetLodContract.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/CityProceduralAssetPackGenerator.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/ImportedCityAssetPackGate.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs'
@@ -16,6 +17,7 @@ on:
   pull_request:
     paths:
       - 'runtime/world-gateway/config/world-cities.json'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/CityAssetLodContract.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/CityProceduralAssetPackGenerator.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/ImportedCityAssetPackGate.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs'
@@ -36,5 +38,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate city catalogue, imported art gate and scene pipeline
+      - name: Validate ten-city catalogue, imported art gate and shared LOD contract
         run: python scripts/validate_uceno_city_generator.py
