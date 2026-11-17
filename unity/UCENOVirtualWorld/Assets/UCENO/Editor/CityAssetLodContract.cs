@@ -1,13 +1,13 @@
 #if UNITY_EDITOR
-using System.Linq;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace UCENO.VirtualWorld.Editor
 {
     /// <summary>
-    /// Single authored-LOD contract for imported city assets. Three authored
-    /// levels are required; no importer-generated or procedural LOD fallback
-    /// is accepted as a substitute.
+    /// One authoritative contract for imported city prefab LODs. Each prefab
+    /// must contain at least three genuinely distinct, authored LOD levels.
+    /// Every level must have valid mesh renderers and descending screen thresholds.
     /// </summary>
     public static class CityAssetLodContract
     {
@@ -21,10 +21,42 @@ namespace UCENO.VirtualWorld.Editor
             LODGroup group = prefab.GetComponentInChildren<LODGroup>(true);
             if (group == null) return false;
 
-            lods = group.GetLODs();
-            return lods.Length >= MinimumLodCount &&
-                lods.All(lod => lod.renderers != null && lod.renderers.Length > 0 &&
-                    lod.renderers.All(renderer => renderer != null));
+            LOD[] candidate = group.GetLODs();
+            if (candidate == null || candidate.Length < MinimumLodCount) return false;
+
+            var assignedRenderers = new HashSet<Renderer>();
+            float previousThreshold = float.PositiveInfinity;
+
+            foreach (LOD lod in candidate)
+            {
+                float threshold = lod.screenRelativeTransitionHeight;
+                if (float.IsNaN(threshold) || float.IsInfinity(threshold) ||
+                    threshold <= 0f || threshold >= previousThreshold)
+                    return false;
+
+                if (lod.renderers == null || lod.renderers.Length == 0)
+                    return false;
+
+                foreach (Renderer renderer in lod.renderers)
+                {
+                    if (renderer == null || !assignedRenderers.Add(renderer))
+                        return false;
+                    if (renderer.transform != prefab.transform &&
+                        !renderer.transform.IsChildOf(prefab.transform))
+                        return false;
+
+                    Mesh mesh = renderer is SkinnedMeshRenderer skinned
+                        ? skinned.sharedMesh
+                        : renderer.GetComponent<MeshFilter>()?.sharedMesh;
+                    if (mesh == null || mesh.vertexCount == 0 || mesh.subMeshCount == 0)
+                        return false;
+                }
+
+                previousThreshold = threshold;
+            }
+
+            lods = candidate;
+            return true;
         }
     }
 }
