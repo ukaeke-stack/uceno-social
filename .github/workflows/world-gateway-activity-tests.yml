@@ -17,6 +17,7 @@ on:
       - "db/migrations/034_*.sql"
       - "db/migrations/035_*.sql"
       - "db/migrations/036_*.sql"
+      - "db/migrations/037_*.sql"
       - ".github/workflows/world-gateway-activity-tests.yml"
   pull_request:
     paths:
@@ -32,6 +33,7 @@ on:
       - "db/migrations/034_*.sql"
       - "db/migrations/035_*.sql"
       - "db/migrations/036_*.sql"
+      - "db/migrations/037_*.sql"
       - ".github/workflows/world-gateway-activity-tests.yml"
 
 permissions:

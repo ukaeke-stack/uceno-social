@@ -280,8 +280,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
       suspended_until TIMESTAMPTZ
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_worlds (
-      id UUID PRIMARY KEY, status TEXT NOT NULL, visibility TEXT NOT NULL,
-      owner_user_id UUID NOT NULL
+      id UUID PRIMARY KEY, city_id TEXT NOT NULL DEFAULT 'meridian',
+      status TEXT NOT NULL, visibility TEXT NOT NULL, owner_user_id UUID NOT NULL
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_memberships (
       world_id UUID NOT NULL, user_id UUID NOT NULL, status TEXT NOT NULL,
