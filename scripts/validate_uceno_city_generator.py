@@ -7,42 +7,60 @@ ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "runtime/world-gateway/config/world-cities.json"
 PROFILES = ROOT / "unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json"
 IMPORTED_GATE = ROOT / "unity/UCENOVirtualWorld/Assets/UCENO/Editor/ImportedCityAssetPackGate.cs"
+LOD_CONTRACT = ROOT / "unity/UCENOVirtualWorld/Assets/UCENO/Editor/CityAssetLodContract.cs"
 SCENE_PIPELINE = ROOT / "unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs"
 PIPELINE_DOC = ROOT / "docs/virtual-world/NINE_CITY_SCENE_PIPELINE.md"
+
 
 def require(condition, message):
     if not condition:
         raise SystemExit("UCENO imported city art validation failed: " + message)
 
+
 catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
 cities = catalog.get("cities", [])
 require(len(cities) == 10, "catalogue must contain ten cities including Meridian Prime")
+city_ids = [city.get("id") for city in cities]
+require(len(set(city_ids)) == 10 and all(city_ids),
+        "all ten city IDs must be present and unique")
+require("meridian" in city_ids, "Meridian Prime must be present in the ten-city catalogue")
 remaining = [city for city in cities if city.get("id") != "meridian"]
 require(len(remaining) == 9, "exactly nine cities must be generated beyond Meridian Prime")
-require({city.get("id") for city in cities}.__contains__("meridian"),
-        "Meridian Prime must be present in the ten-city catalogue")
 require(len({city.get("contentLabel") for city in cities}) == 10,
         "all ten cities need distinct content labels")
 
-for field in ("id", "identity", "climate", "architecture"):
+for field in ("identity", "climate", "architecture"):
     values = [city.get(field) for city in cities]
-    require(all(values) and len(set(values)) == 10, f"all ten cities need distinct {field} values")
+    require(all(values) and len(set(values)) == 10,
+            f"all ten cities need distinct {field} values")
 
 for city in cities:
     require(len(city.get("districts", [])) == 4, f"{city.get('id')} must define four districts")
     require(len(city.get("landmarks", [])) == 3, f"{city.get('id')} must define three landmarks")
-    require(len({d.get("id") for d in city["districts"]}) == 4, f"{city['id']} district IDs must be unique")
-    require(len({l.get("id") for l in city["landmarks"]}) == 3, f"{city['id']} landmark IDs must be unique")
+    require(len({d.get("id") for d in city["districts"]}) == 4,
+            f"{city['id']} district IDs must be unique")
+    require(len({l.get("id") for l in city["landmarks"]}) == 3,
+            f"{city['id']} landmark IDs must be unique")
 
 require(IMPORTED_GATE.is_file(), "strict Unity imported-city-art gate is missing")
 gate = IMPORTED_GATE.read_text(encoding="utf-8")
 for token in (
     "Validate Imported City Art Packs", "source-manifest.json", "sourceUrl", "license",
     "attribution", "GetComponentsInChildren<MeshFilter>", "mainTexture != null",
-    "CityAssetLodContract.TryGetValidLods", "WorldInteractable", "AssetDatabase.GetAssetDependencyHash",
-    "skybox.width >= 1024 && skybox.height >= 512",
+    "CityAssetLodContract.TryGetValidLods", "WorldInteractable",
+    "AssetDatabase.GetAssetDependencyHash", "skybox.width >= 1024 && skybox.height >= 512",
 ):
     require(token in gate, "imported-art gate is missing check: " + token)
+
+require(LOD_CONTRACT.is_file(), "shared authored-LOD contract is missing")
+lod_contract = LOD_CONTRACT.read_text(encoding="utf-8")
+for token in (
+    "MinimumLodCount = 3", "screenRelativeTransitionHeight",
+    "previousThreshold", "assignedRenderers.Add(renderer)",
+    "renderer.GetComponent<MeshFilter>()", "skinned.sharedMesh",
+    "mesh.vertexCount == 0", "mesh.subMeshCount == 0",
+):
+    require(token in lod_contract, "shared LOD contract is missing validation: " + token)
 
 if PROFILES.exists():
     profiles = json.loads(PROFILES.read_text(encoding="utf-8")).get("cities", [])
@@ -74,11 +92,15 @@ if PROFILES.exists():
             "prefab paths must never be shared between cities")
 
 pipeline = SCENE_PIPELINE.read_text(encoding="utf-8")
-for token in ("Build Remaining Nine City Scenes", "RegisterAddressableScene",
-              "WorldInteractableRegistryExporter.Export", "WorldCollisionGeometryExporter.Export",
-              "Verify Nine City Scene Registries", "ValidateTenCityCoverage",
-              "CityAssetLodContract.TryGetValidLods"):
-    require(token in pipeline, f"scene pipeline is missing {token}")
+for token in (
+    "Validate Ten-City Catalogue and Pack Coverage", "actual.Count != 9",
+    "expected.Count != 9", "Meridian Prime plus nine distinct catalogue cities",
+    "Build Remaining Nine City Scenes", "RegisterAddressableScene",
+    "WorldInteractableRegistryExporter.Export", "WorldCollisionGeometryExporter.Export",
+    "Verify Nine City Scene Registries", "ValidateTenCityCoverage",
+    "CityAssetLodContract.TryGetValidLods",
+):
+    require(token in pipeline, f"scene pipeline is missing ten-city/LOD contract: {token}")
 require("VerifyNineCitySceneRegistries();" in pipeline,
         "scene generation must automatically verify exported scene and registry data")
 require("ImportedCityAssetPackGate.Validate();" in pipeline,
@@ -87,9 +109,12 @@ require("ValidateNineCityVisualQuality();" in pipeline,
         "city scene generation must enforce its visual-quality release gate")
 
 doc = PIPELINE_DOC.read_text(encoding="utf-8")
-for token in ("Do not use", "Validate Imported City Art Packs", "source-manifest.json",
-              "108 imported prefabs", "nine city-specific HDRI"):
+for token in (
+    "Do not use", "Validate Imported City Art Packs", "source-manifest.json",
+    "108 imported prefabs", "nine city-specific HDRI",
+    "shared `CityAssetLodContract` is authoritative",
+):
     require(token in doc, "pipeline documentation is missing imported-art policy: " + token)
 
-print("UCENO imported city source contract passed: ten-city catalogue, nine independent packs, 108 imported prefabs, nine HDRI panoramas, source/licence provenance, detailed textured meshes, LODs, unique city ownership and scene/registry export wiring.")
+print("UCENO imported city source contract passed: ten-city catalogue, Meridian plus nine distinct city profiles, 36 districts, 30 landmarks, 108 imported prefabs, nine HDRI panoramas, provenance, detailed meshes and the shared authored-LOD contract.")
 print("STATUS: source contract only. Unity Editor asset import, gate execution, scene generation and visual acceptance are still required.")
