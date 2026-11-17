@@ -1,0 +1,34 @@
+{
+  "city_id": "nexus",
+  "city_label": "Nexus Delta",
+  "asset_id": "modern_buildings_2",
+  "name": "Modern Buildings 2",
+  "creator_contributions": {
+    "Alexander Scholten": "All"
+  },
+  "source_page": "https://polyhaven.com/a/modern_buildings_2",
+  "api_file_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/modern_buildings_2_1k.hdr",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "api_terms": "https://polyhaven.com/our-api",
+  "format": "Radiance HDR (.hdr)",
+  "resolution_tier": "1k",
+  "expected_size_bytes": 1658938,
+  "verified_md5": "f7f296ddec5f0120b62369615d97a662",
+  "file": "unity/UCENOVirtualWorld/Assets/UCENO/Cities/nexus/Textures/Skybox/nexus_environment.hdr",
+  "catalogue_description": "Free 21K unclipped HDRI of a modern riverside plaza with glass and concrete, partly cloudy morning/afternoon light, high-contrast sun.",
+  "category": "Streets & Town/Squares & Plazas/City Squares",
+  "tags": [
+    "river",
+    "building",
+    "city",
+    "urban",
+    "concrete",
+    "modern",
+    "glass",
+    "water"
+  ],
+  "acquisition_status": "downloaded-and-md5-verified",
+  "unity_import_status": "not-yet-imported",
+  "visual_acceptance_status": "pending"
+}

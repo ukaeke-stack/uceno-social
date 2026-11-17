@@ -1,0 +1,36 @@
+{
+  "city_id": "solstice",
+  "city_label": "Solstice Bay",
+  "asset_id": "small_harbour_sunset",
+  "name": "Small Harbour Sunset",
+  "creator_contributions": {
+    "Greg Zaal": "Photography",
+    "Jarod Guest": "Processing"
+  },
+  "source_page": "https://polyhaven.com/a/small_harbour_sunset",
+  "api_file_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/small_harbour_sunset_1k.hdr",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "api_terms": "https://polyhaven.com/our-api",
+  "format": "Radiance HDR (.hdr)",
+  "resolution_tier": "1k",
+  "expected_size_bytes": 1499733,
+  "verified_md5": "0e1b9c84b8eee9f64f0ebd04e5fe6a76",
+  "file": "unity/UCENOVirtualWorld/Assets/UCENO/Cities/solstice/Textures/Skybox/solstice_environment.hdr",
+  "catalogue_description": "Free 24K unclipped HDRI: warm sunset over a small harbour - calm lake reflections, low sun rim light, clear sky, soft golden tones, med. contrast, dock & boats.",
+  "category": "Coast & Water/Harbours & Piers/Piers & Jetties",
+  "tags": [
+    "sun",
+    "lake",
+    "water",
+    "dam",
+    "dock",
+    "harbour",
+    "harbor",
+    "jetty",
+    "boat"
+  ],
+  "acquisition_status": "downloaded-and-md5-verified",
+  "unity_import_status": "not-yet-imported",
+  "visual_acceptance_status": "pending"
+}

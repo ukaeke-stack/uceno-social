@@ -1,0 +1,33 @@
+{
+  "city_id": "aurora",
+  "city_label": "Aurora Heights",
+  "asset_id": "alps_field",
+  "name": "Alps Field",
+  "creator_contributions": {
+    "Andreas Mischok": "All"
+  },
+  "source_page": "https://polyhaven.com/a/alps_field",
+  "api_file_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/alps_field_1k.hdr",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "api_terms": "https://polyhaven.com/our-api",
+  "format": "Radiance HDR (.hdr)",
+  "resolution_tier": "1k",
+  "expected_size_bytes": 1614313,
+  "verified_md5": "1999bed08695f784471ca1c232a732c0",
+  "file": "unity/UCENOVirtualWorld/Assets/UCENO/Cities/aurora/Textures/Skybox/aurora_environment.hdr",
+  "catalogue_description": "Unclipped free 20K HDRI of an Alps field: sunny, partly-cloudy morning/afternoon with high-contrast natural light, crisp alpine valley atmosphere, strong sun.",
+  "category": "Mountains & Hills/Mountains & Alpine/Alpine Valleys",
+  "tags": [
+    "sun",
+    "grass",
+    "field",
+    "mountain",
+    "forest",
+    "alps",
+    "valley"
+  ],
+  "acquisition_status": "downloaded-and-md5-verified",
+  "unity_import_status": "not-yet-imported",
+  "visual_acceptance_status": "pending"
+}

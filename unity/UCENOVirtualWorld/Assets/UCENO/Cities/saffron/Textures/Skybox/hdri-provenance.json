@@ -1,0 +1,35 @@
+{
+  "city_id": "saffron",
+  "city_label": "Saffron Dunes",
+  "asset_id": "valley_of_desolation",
+  "name": "Valley Of Desolation",
+  "creator_contributions": {
+    "Dario Barresi": "All"
+  },
+  "source_page": "https://polyhaven.com/a/valley_of_desolation",
+  "api_file_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/valley_of_desolation_1k.hdr",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "api_terms": "https://polyhaven.com/our-api",
+  "format": "Radiance HDR (.hdr)",
+  "resolution_tier": "1k",
+  "expected_size_bytes": 1481806,
+  "verified_md5": "11ad0c81cfc47c7c4bbe16b08e7230ad",
+  "file": "unity/UCENOVirtualWorld/Assets/UCENO/Cities/saffron/Textures/Skybox/saffron_environment.hdr",
+  "catalogue_description": "Unclipped, free 24K HDRI of a rocky valley at golden hour: clear sky, warm sun near horizon, crisp contrast, long shadows, vivid scrub and cliffs, dry tones.",
+  "category": "Desert & Arid/Karoo & Scrubland/Rocky Outcrops",
+  "tags": [
+    "sun",
+    "view",
+    "hilltop",
+    "rock formation",
+    "desert canyon",
+    "mesa",
+    "rocky outcrop",
+    "cliff edge",
+    "scrubland"
+  ],
+  "acquisition_status": "downloaded-and-md5-verified",
+  "unity_import_status": "not-yet-imported",
+  "visual_acceptance_status": "pending"
+}

@@ -1,0 +1,34 @@
+{
+  "city_id": "eclipse",
+  "city_label": "Eclipse Central",
+  "asset_id": "rogland_clear_night",
+  "name": "Rogland Clear Night",
+  "creator_contributions": {
+    "Greg Zaal": "All"
+  },
+  "source_page": "https://polyhaven.com/a/rogland_clear_night",
+  "api_file_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/rogland_clear_night_1k.hdr",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "api_terms": "https://polyhaven.com/our-api",
+  "format": "Radiance HDR (.hdr)",
+  "resolution_tier": "1k",
+  "expected_size_bytes": 1694136,
+  "verified_md5": "509bf6a02213f0bf068ebf7fc56d45b1",
+  "file": "unity/UCENOVirtualWorld/Assets/UCENO/Cities/eclipse/Textures/Skybox/eclipse_environment.hdr",
+  "catalogue_description": "Free, unclipped 24K HDRI: clear, desert night with Milky Way and stars over rocky, arid terrain, soft natural starlight for subtle night lighting.",
+  "category": "Desert & Arid/Karoo & Scrubland/Rocky Outcrops",
+  "tags": [
+    "stars",
+    "milky way",
+    "galaxy",
+    "astronomy",
+    "dark",
+    "rocky",
+    "arid",
+    "desert"
+  ],
+  "acquisition_status": "downloaded-and-md5-verified",
+  "unity_import_status": "not-yet-imported",
+  "visual_acceptance_status": "pending"
+}

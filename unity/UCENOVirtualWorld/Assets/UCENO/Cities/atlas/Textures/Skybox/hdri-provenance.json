@@ -1,0 +1,34 @@
+{
+  "city_id": "atlas",
+  "city_label": "Atlas Frontier",
+  "asset_id": "abandoned_hopper_terminal_01",
+  "name": "Abandoned Hopper Terminal 01",
+  "creator_contributions": {
+    "Sergej Majboroda": "All"
+  },
+  "source_page": "https://polyhaven.com/a/abandoned_hopper_terminal_01",
+  "api_file_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/abandoned_hopper_terminal_01_1k.hdr",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "api_terms": "https://polyhaven.com/our-api",
+  "format": "Radiance HDR (.hdr)",
+  "resolution_tier": "1k",
+  "expected_size_bytes": 1640604,
+  "verified_md5": "8288507793405df6eb404233d3b8cbb0",
+  "file": "unity/UCENOVirtualWorld/Assets/UCENO/Cities/atlas/Textures/Skybox/atlas_environment.hdr",
+  "catalogue_description": "Free 16K unclipped HDRI: cold, partly cloudy morning with soft sun and medium contrast over an abandoned hopper terminal - tracks, road, bare winter trees.",
+  "category": "Abandoned & Ruins/Industrial/Rail & Transport Yards",
+  "tags": [
+    "tree",
+    "sun",
+    "winter",
+    "road",
+    "tracks",
+    "rail",
+    "industrial",
+    "backplates"
+  ],
+  "acquisition_status": "downloaded-and-md5-verified",
+  "unity_import_status": "not-yet-imported",
+  "visual_acceptance_status": "pending"
+}
