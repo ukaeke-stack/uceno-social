@@ -22,48 +22,48 @@ UA = "UCENO-VirtualWorld-AssetPipeline/1.1 (CC0 asset acquisition)"
 CITIES = {
     "solstice": {
         "label": "Solstice Bay",
-        "terms": ["coast", "beach", "harbour", "harbor", "water", "pier"],
-        "preferred": ["small_harbour_sunset", "alkantstrand_breakwater_beach"],
+        "terms": ["waterfront", "harbour", "harbor", "river", "skyline", "city", "urban"],
+        "preferred": ["shanghai_bund", "docklands_02", "canary_wharf"],
     },
     "verdant": {
         "label": "Verdant Reach",
-        "terms": ["garden", "forest", "park", "woodland", "greenhouse"],
-        "preferred": ["suburban_garden", "sunny_rose_garden"],
+        "terms": ["sunset", "skyline", "city", "urban", "building", "architecture"],
+        "preferred": ["sunset_jhbcentral", "modern_buildings", "wide_street_01"],
     },
     "nexus": {
         "label": "Nexus Delta",
-        "terms": ["modern", "urban", "street", "building", "city"],
-        "preferred": ["modern_buildings", "modern_buildings_2"],
+        "terms": ["skyscraper", "skyline", "modern", "urban", "city", "glass"],
+        "preferred": ["canary_wharf", "modern_buildings_night", "potsdamer_platz"],
     },
     "aurora": {
         "label": "Aurora Heights",
-        "terms": ["mountain", "alps", "hill", "snow", "highland"],
-        "preferred": ["alps_field", "lilienstein"],
+        "terms": ["city", "urban", "street", "building", "plaza", "skyline"],
+        "preferred": ["potsdamer_platz", "hansaplatz", "wide_street_01"],
     },
     "saffron": {
         "label": "Saffron Dunes",
-        "terms": ["desert", "arid", "dune", "sand", "valley"],
-        "preferred": ["valley_of_desolation", "goegap_road"],
+        "terms": ["city", "urban", "street", "architecture", "building", "dusk"],
+        "preferred": ["urban_street_02", "urban_street_01", "modern_evening_street"],
     },
     "monsoon": {
         "label": "Monsoon Harbour",
-        "terms": ["cloudy", "overcast", "coast", "pier", "harbour", "harbor"],
-        "preferred": ["durban_pier_dawn", "salt_rock_beach_cloudy"],
+        "terms": ["harbour", "harbor", "docklands", "river", "waterfront", "city", "urban"],
+        "preferred": ["docklands_02", "shanghai_bund", "canary_wharf"],
     },
     "eclipse": {
         "label": "Eclipse Central",
-        "terms": ["night", "evening", "street", "city", "urban"],
-        "preferred": ["modern_evening_street", "rogland_clear_night"],
+        "terms": ["night", "evening", "city", "urban", "street", "skyline", "neon"],
+        "preferred": ["modern_buildings_night", "hansaplatz", "shanghai_bund"],
     },
     "origin": {
         "label": "Origin Plains",
-        "terms": ["grassland", "field", "countryside", "meadow", "garden"],
-        "preferred": ["grasslands_sunset", "suburban_garden"],
+        "terms": ["sunset", "skyline", "city", "street", "urban", "building"],
+        "preferred": ["wide_street_01", "sunset_jhbcentral", "urban_street_01"],
     },
     "atlas": {
         "label": "Atlas Frontier",
-        "terms": ["industrial", "factory", "terminal", "rail", "warehouse"],
-        "preferred": ["overcast_industrial_courtyard", "industrial_sunset_pure_sky"],
+        "terms": ["industrial", "city", "urban", "street", "architecture", "building"],
+        "preferred": ["urban_street_01", "docklands_02", "wide_street_02"],
     },
 }
 
@@ -129,7 +129,7 @@ for city_id, config in CITIES.items():
         score = sum(3 for term in config["terms"] if term in searchable)
         if asset_id in config["preferred"]:
             score += 100
-        if score:
+        if score and any(asset_id == preferred_id for preferred_id in config["preferred"]):
             candidates.append((score, asset_id, item))
 
     candidates.sort(key=lambda candidate: (-candidate[0], candidate[1]))
@@ -139,7 +139,7 @@ for city_id, config in CITIES.items():
     )
     if chosen is None:
         raise RuntimeError(
-            f"No distinct outdoor HDRI candidate for {config['label']}; refusing substitution"
+            f"No distinct preferred urban-city HDRI candidate for {config['label']}; refusing non-city substitution"
         )
 
     _, asset_id, item = chosen
