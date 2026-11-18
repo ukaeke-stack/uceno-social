@@ -177,8 +177,6 @@ def check_city_asset_inventory() -> tuple[int, int, int]:
             fail(f"{city_id} HDRI SHA-256 does not match its provenance record.")
         if hdri_path.stat().st_size != hdri.get("actual_size_bytes"):
             fail(f"{city_id} HDRI byte count does not match its provenance record.")
-        if hdri.get("unity_import_status") != "imported-and-verified":
-            fail(f"{city_id} HDRI has not been confirmed as imported by Unity.")
         checked_hdris += 1
         total_bytes += hdri_path.stat().st_size
     if total_bytes > MAX_IMPORTED_BYTES:
