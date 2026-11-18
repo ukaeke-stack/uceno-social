@@ -79,6 +79,11 @@ test("PostgreSQL session and activity fencing integration", { skip: !databaseUrl
       await tx`DELETE FROM virtual_world_realtime_events WHERE world_id = ${ids.world}::uuid`;
       await tx`DELETE FROM virtual_world_activity_results WHERE session_id = ${ids.activity}::uuid`;
       await tx`DELETE FROM virtual_world_activity_sessions WHERE id = ${ids.activity}::uuid`;
+      // The process-lease test renews the old instance heartbeat. Restore the
+      // stale-host precondition before every takeover/transfer-fencing case.
+      await tx`UPDATE virtual_world_instances
+        SET heartbeat_at = NOW() - INTERVAL '2 minutes'
+        WHERE id = ${ids.old}::uuid`;
       await seedActivity(tx, instanceId);
     });
     const takeover = (instanceId, hostId) => withSchema(tx => tx`
