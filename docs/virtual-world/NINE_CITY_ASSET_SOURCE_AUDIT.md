@@ -6,7 +6,7 @@
 
 ## Release requirements
 
-The nine non-Meridian cities require 108 distinct imported prefabs (12 per city), nine city-specific HDRIs, nine complete provenance manifests, and 36 additive district scenes. Each imported model must pass the existing Unity Editor release gate: real mesh geometry, textured materials, at least two LOD levels, correct collision/interactable setup where applicable, a redistributable licence, and city-specific visual review.
+The nine non-Meridian cities require 108 distinct imported prefabs (12 per city), nine city-specific HDRIs, nine complete provenance manifests, and 36 additive district scenes. Each imported model must pass the existing Unity Editor release gate: real mesh geometry, textured materials, at least three authored LOD levels, correct collision/interactable setup where applicable, a redistributable licence, and city-specific visual review.
 
 A source page or a downloadable archive is not proof of acquisition, import, licence compliance, or Unity acceptance. Keep those states separate in future asset records.
 
@@ -17,7 +17,7 @@ A source page or a downloadable archive is not proof of acquisition, import, lic
 | [OpenHDRI](https://openhdri.org/) | CC0 real-world HDRI captures | Useful for environment lighting/reflections; does not provide 3D city architecture | Shortlist for nine distinct sky environments; inspect resolution, panorama projection, and visual match before import |
 | [ambientCG](https://ambientcg.com/) | CC0 PBR materials and HDRIs | Useful for surface materials and some environment lighting; not a source of complete city buildings | Shortlist for city-specific PBR surface libraries and supplementary HDRIs |
 | [Devall Modular Urban Building Kit Vol. 1](https://devallassets.itch.io/modular-urban-building-kit-vol-1-17-game-ready-pieces) | Listing describes 17 modular pieces, GLB/FBX/OBJ and Blender source, CC0; 44–3,388 triangles per piece and under 10K triangles for the whole set | Licence is compatible in principle, but the stated geometry budget is too small to treat this pack as the photorealistic hero architecture for UCENO | Reject as a primary realism pack; consider only for distant/background or prototype use after visual inspection |
-| [Greanapple Cityscape Kit v1](https://greanapple.itch.io/cityscape-kit) | Listing describes 12 game-ready pieces, 1024px PBR textures, two LOD levels, and a royalty-free commercial-game licence; files may not be redistributed as-is | Better stated PBR/LOD fit, but paid and not CC0/CC-BY/CC-BY-SA; the current Unity gate would reject its licence string | Do not import under the current gate. Any use requires licence review and an explicit, tested allowlist policy for embedded game assets |
+| [Greanapple Cityscape Kit v1](https://greanapple.itch.io/cityscape-kit) | Listing describes 12 game-ready pieces, 1024px PBR textures, three authored LOD levels, and a royalty-free commercial-game licence; files may not be redistributed as-is | Better stated PBR/LOD fit, but paid and not CC0/CC-BY/CC-BY-SA; the current Unity gate would reject its licence string | Do not import under the current gate. Any use requires licence review and an explicit, tested allowlist policy for embedded game assets |
 | [3DAssets.dev realistic buildings](https://3dassets.dev/assets?category=buildings&style=realistic) | Catalogue claims free commercial-use GLB models | Potentially useful breadth, but each model's actual source licence, provenance, texture quality, LODs, collision and geometry must be checked individually | Research only; do not accept based on catalogue-level claims |
 | [Sketchfab](https://sketchfab.com/) | Large model catalogue with per-model licence terms | Potential source for distinctive landmarks and architecture, but licence and redistribution rights vary by model | Use only individually verified CC0/CC-BY/CC-BY-SA assets, with source-page evidence preserved |
 
@@ -48,7 +48,7 @@ A source page or a downloadable archive is not proof of acquisition, import, lic
 2. Verify redistribution rights for a packaged mobile game; reject ambiguous terms.
 3. Download and preserve the original archive and licence text.
 4. Import into Unity; inspect scale, mesh, materials, UVs, normals and texture maps.
-5. Create and inspect at least two useful LOD levels; verify collision and interaction requirements.
+5. Create and inspect at least three authored LOD levels; verify collision and interaction requirements.
 6. Place the prefab in its assigned city's asset folder and add its exact provenance record.
 7. Run the Unity imported-city-art gate, then inspect the actual prefab and scene in Unity.
 8. Only then mark the asset accepted. A green source-contract workflow alone does not prove visual quality.
