@@ -7,7 +7,8 @@ namespace UCENO.VirtualWorld.Editor
     /// <summary>
     /// One authoritative contract for imported city prefab LODs. Each prefab
     /// must contain at least three genuinely distinct, authored LOD levels.
-    /// Every level must have valid mesh renderers and descending screen thresholds.
+    /// Every level must have valid mesh renderers, descending screen thresholds,
+    /// and strictly decreasing aggregate vertex and index counts.
     /// </summary>
     public static class CityAssetLodContract
     {
@@ -26,6 +27,8 @@ namespace UCENO.VirtualWorld.Editor
 
             var assignedRenderers = new HashSet<Renderer>();
             float previousThreshold = float.PositiveInfinity;
+            long previousVertexCount = long.MaxValue;
+            long previousIndexCount = long.MaxValue;
 
             foreach (LOD lod in candidate)
             {
@@ -36,6 +39,9 @@ namespace UCENO.VirtualWorld.Editor
 
                 if (lod.renderers == null || lod.renderers.Length == 0)
                     return false;
+
+                long lodVertexCount = 0;
+                long lodIndexCount = 0;
 
                 foreach (Renderer renderer in lod.renderers)
                 {
@@ -50,8 +56,19 @@ namespace UCENO.VirtualWorld.Editor
                         : renderer.GetComponent<MeshFilter>()?.sharedMesh;
                     if (mesh == null || mesh.vertexCount == 0 || mesh.subMeshCount == 0)
                         return false;
+
+                    lodVertexCount += mesh.vertexCount;
+                    for (int subMesh = 0; subMesh < mesh.subMeshCount; subMesh++)
+                        lodIndexCount += (long)mesh.GetIndexCount(subMesh);
                 }
 
+                if (lodVertexCount <= 0 || lodIndexCount <= 0 ||
+                    lodVertexCount >= previousVertexCount ||
+                    lodIndexCount >= previousIndexCount)
+                    return false;
+
+                previousVertexCount = lodVertexCount;
+                previousIndexCount = lodIndexCount;
                 previousThreshold = threshold;
             }
 
