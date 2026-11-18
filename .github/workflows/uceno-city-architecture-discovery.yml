@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/discover-city-architecture.py"
       - "scripts/acquire-city-architecture.py"
+      - "scripts/tests/test_city_architecture_screening.py"
       - ".github/workflows/uceno-city-architecture-discovery.yml"
 permissions:
   contents: read
