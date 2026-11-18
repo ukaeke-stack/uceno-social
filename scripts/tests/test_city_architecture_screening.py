@@ -1,0 +1,74 @@
+import importlib.util
+import pathlib
+import unittest
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+def load_script(name, filename):
+    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / filename)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+discovery = load_script("uceno_city_discovery", "discover-city-architecture.py")
+acquisition = load_script("uceno_city_acquisition", "acquire-city-architecture.py")
+
+
+def asset(title, dimensions, summary="realistic exterior building", tags=None):
+    return {
+        "title": title,
+        "summary": summary,
+        "tags": tags or [{"slug": "realistic"}, {"slug": "exterior"}],
+        "stats": {"sizeMeters": dimensions, "fileSize": 250000, "triangles": 80000},
+    }
+
+
+class CityArchitectureScreeningTests(unittest.TestCase):
+    def test_complete_office_tower_is_a_candidate(self):
+        self.assertIsNone(discovery.rejection_reason(
+            asset("Glass Office Tower", [24, 62, 20]), "NexusDelta"))
+
+    def test_windmill_cross_is_not_a_complete_city_building(self):
+        reason = discovery.rejection_reason(
+            asset("Mill Sail Cross", [10.4, 10.4, 0.83]), "SolsticeBay")
+        self.assertIn(reason, {
+            "non-building-object-title",
+            "title-does-not-identify-a-complete-building",
+            "too-small-or-too-narrow-to-be-a-complete-building",
+        })
+
+    def test_thin_facade_like_object_is_rejected(self):
+        reason = discovery.rejection_reason(
+            asset("Modern Office Tower", [18, 42, 0.9]), "NexusDelta")
+        self.assertEqual(reason, "too-small-or-too-narrow-to-be-a-complete-building")
+
+    def test_eclipse_central_requires_35_metre_tower(self):
+        reason = discovery.rejection_reason(
+            asset("Glass Office Tower", [18, 34, 18]), "EclipseCentral")
+        self.assertEqual(reason, "lumen-tower-candidate-below-35m")
+
+    def test_acquisition_rechecks_complete_building_title_and_footprint(self):
+        detail = {
+            "title": "Mill Sail Cross",
+            "description": "realistic exterior building",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [10.4, 10.4, 0.83]},
+        }
+        with self.assertRaises(ValueError):
+            acquisition.validate_complete_building(detail, "SolsticeBay")
+
+    def test_acquisition_accepts_full_scale_office_tower(self):
+        detail = {
+            "title": "Glass Office Tower",
+            "description": "realistic exterior office building",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [24, 62, 20]},
+        }
+        self.assertEqual(
+            acquisition.validate_complete_building(detail, "NexusDelta"),
+            (24.0, 62.0, 20.0),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
