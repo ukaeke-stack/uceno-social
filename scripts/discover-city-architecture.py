@@ -76,6 +76,7 @@ UA = "UCENO-city-architecture-discovery/2.0"
 MAX_BYTES = 25 * 1024 * 1024
 MIN_HEIGHT_M = 8.0
 MIN_FOOTPRINT_M = 4.0
+MIN_HORIZONTAL_SPAN_M = 4.0
 ECLIPSE_MIN_HEIGHT_M = 35.0
 
 # A modular kit component is not a complete building, regardless of its name.
@@ -93,6 +94,16 @@ IRRELEVANT_TERMS = (
     "cattery", "cruise ship", "yacht", "ship deck", "jungle temple",
 )
 TOWER_TERMS = ("skyscraper", "supertall", "high rise", "high-rise", "tower", "office")
+WHOLE_BUILDING_TITLE_TERMS = (
+    "building", "skyscraper", "tower", "high rise", "high-rise", "office",
+    "residential block", "apartment block", "apartment building", "hotel",
+    "campus", "terminal", "civic centre", "civic center", "commercial building",
+    "mixed use", "mixed-use", "arena", "factory", "house", "school", "hospital",
+)
+NON_BUILDING_TITLE_TERMS = (
+    "windmill", "wind turbine", "mill sail", "sculpture", "statue", "fountain",
+    "sign", "monument", "bridge", "wall panel", "facade panel", "module", "prop",
+)
 POSITIVE_TERMS = (
     "building", "skyscraper", "tower", "high rise", "high-rise", "office",
     "residential", "hotel", "campus", "terminal", "civic", "commercial",
@@ -141,6 +152,7 @@ def rejection_reason(item, city):
     title = item.get("title") or item.get("name") or ""
     summary = item.get("summary") or item.get("description") or ""
     searchable = f"{title} {summary}"
+    title_searchable = re.sub(r"[_-]+", " ", str(title).lower())
     tags = tag_slugs(item)
     if "realistic" not in tags:
         return "missing-realistic-tag"
@@ -148,6 +160,10 @@ def rejection_reason(item, city):
         return "not-marked-exterior"
     if "modular" in tags:
         return "modular-kit-component"
+    if words_present(title_searchable, NON_BUILDING_TITLE_TERMS):
+        return "non-building-object-title"
+    if not words_present(title_searchable, WHOLE_BUILDING_TITLE_TERMS):
+        return "title-does-not-identify-a-complete-building"
     if words_present(searchable, PART_TERMS):
         return "individual-building-part-or-prop"
     if words_present(searchable, IRRELEVANT_TERMS):
@@ -156,8 +172,9 @@ def rejection_reason(item, city):
     if width is None or height is None or depth is None:
         return "missing-real-world-dimensions"
     footprint = max(width, depth)
-    if height < MIN_HEIGHT_M or footprint < MIN_FOOTPRINT_M:
-        return "too-small-to-be-a-complete-building"
+    if (height < MIN_HEIGHT_M or footprint < MIN_FOOTPRINT_M or
+            min(width, depth) < MIN_HORIZONTAL_SPAN_M):
+        return "too-small-or-too-narrow-to-be-a-complete-building"
     if city == "EclipseCentral":
         if height < ECLIPSE_MIN_HEIGHT_M:
             return "lumen-tower-candidate-below-35m"
