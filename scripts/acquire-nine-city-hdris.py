@@ -129,7 +129,7 @@ for city_id, config in CITIES.items():
         score = sum(3 for term in config["terms"] if term in searchable)
         if asset_id in config["preferred"]:
             score += 100
-        if score and any(asset_id == preferred_id for preferred_id in config["preferred"]):
+        if score:
             candidates.append((score, asset_id, item))
 
     candidates.sort(key=lambda candidate: (-candidate[0], candidate[1]))
