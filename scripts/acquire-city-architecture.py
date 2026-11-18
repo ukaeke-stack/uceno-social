@@ -19,6 +19,7 @@ MAX_BYTES = 25 * 1024 * 1024
 PER_CITY = 2
 MIN_HEIGHT_M = 8.0
 MIN_FOOTPRINT_M = 4.0
+MIN_HORIZONTAL_SPAN_M = 4.0
 ECLIPSE_MIN_HEIGHT_M = 35.0
 UA = "UCENO-city-architecture-acquisition/2.0"
 PART_TERMS = (
@@ -35,6 +36,16 @@ IRRELEVANT_TERMS = (
     "cattery", "cruise ship", "yacht", "ship deck", "jungle temple",
 )
 TOWER_TERMS = ("skyscraper", "supertall", "high rise", "high-rise", "tower", "office")
+WHOLE_BUILDING_TITLE_TERMS = (
+    "building", "skyscraper", "tower", "high rise", "high-rise", "office",
+    "residential block", "apartment block", "apartment building", "hotel",
+    "campus", "terminal", "civic centre", "civic center", "commercial building",
+    "mixed use", "mixed-use", "arena", "factory", "house", "school", "hospital",
+)
+NON_BUILDING_TITLE_TERMS = (
+    "windmill", "wind turbine", "mill sail", "sculpture", "statue", "fountain",
+    "sign", "monument", "bridge", "wall panel", "facade panel", "module", "prop",
+)
 
 def request_json(url):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
@@ -76,6 +87,7 @@ def validate_complete_building(detail, city):
     title = detail.get("title") or detail.get("name") or ""
     summary = detail.get("summary") or detail.get("description") or ""
     searchable = re.sub(r"[_-]+", " ", f"{title} {summary}".lower())
+    title_searchable = re.sub(r"[_-]+", " ", str(title).lower())
     tags = tag_slugs(detail)
     if "realistic" not in tags:
         raise ValueError("Missing realistic tag")
@@ -83,6 +95,10 @@ def validate_complete_building(detail, city):
         raise ValueError("Not identified as an exterior asset")
     if "modular" in tags:
         raise ValueError("Modular kit part rejected")
+    if any(term in title_searchable for term in NON_BUILDING_TITLE_TERMS):
+        raise ValueError("Title identifies a prop or non-building object")
+    if not any(term in title_searchable for term in WHOLE_BUILDING_TITLE_TERMS):
+        raise ValueError("Title does not identify a complete building")
     if any(term in searchable for term in PART_TERMS):
         raise ValueError("Individual building component or prop rejected")
     if any(term in searchable for term in IRRELEVANT_TERMS):
@@ -91,8 +107,9 @@ def validate_complete_building(detail, city):
     if dims is None:
         raise ValueError("Missing real-world dimensions")
     width, height, depth = dims
-    if height < MIN_HEIGHT_M or max(width, depth) < MIN_FOOTPRINT_M:
-        raise ValueError(f"Too small to be a complete building: dimensions={dims}")
+    if (height < MIN_HEIGHT_M or max(width, depth) < MIN_FOOTPRINT_M or
+            min(width, depth) < MIN_HORIZONTAL_SPAN_M):
+        raise ValueError(f"Too small or too narrow to be a complete building: dimensions={dims}")
     if city == "EclipseCentral":
         if height < ECLIPSE_MIN_HEIGHT_M:
             raise ValueError(f"Lumen Tower candidate below 35 m: height={height}")
