@@ -321,6 +321,11 @@ test("two real gateway processes: primary loss leaves the replacement process re
       id UUID PRIMARY KEY, moderation_status TEXT NOT NULL DEFAULT 'active',
       suspended_until TIMESTAMPTZ
     )`);
+    await admin.unsafe(`CREATE TABLE "${schema}".user_avatar_appearances (
+      user_id UUID PRIMARY KEY REFERENCES "${schema}".users(id) ON DELETE CASCADE,
+      appearance JSONB NOT NULL DEFAULT '{}'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_worlds (
       id UUID PRIMARY KEY, city_id TEXT NOT NULL DEFAULT 'meridian',
       status TEXT NOT NULL, visibility TEXT NOT NULL, owner_user_id UUID NOT NULL
