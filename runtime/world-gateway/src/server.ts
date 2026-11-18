@@ -909,13 +909,15 @@ async function loadPlayer(userId: string, worldId: string, cityId: string, token
   const p = savedPosition ?? {
     x: cityRuntime.city.spawn.x, y: GROUND_Y, z: cityRuntime.city.spawn.z
   };
-  const savedPositionValid =
-    finiteNumber(p.x, cityRuntime.city.bounds.minX, cityRuntime.city.bounds.maxX) &&
-    finiteNumber(p.z, cityRuntime.city.bounds.minZ, cityRuntime.city.bounds.maxZ) &&
-    findWorldDistrict(cityRuntime.districts, p.x, p.z) !== null;
-  const x = savedPositionValid ? p.x : cityRuntime.city.spawn.x;
+  let x = cityRuntime.city.spawn.x;
+  let z = cityRuntime.city.spawn.z;
+  if (finiteNumber(p.x, cityRuntime.city.bounds.minX, cityRuntime.city.bounds.maxX) &&
+      finiteNumber(p.z, cityRuntime.city.bounds.minZ, cityRuntime.city.bounds.maxZ) &&
+      findWorldDistrict(cityRuntime.districts, p.x, p.z) !== null) {
+    x = p.x;
+    z = p.z;
+  }
   const y = finiteNumber(p.y, GROUND_Y, WORLD_BOUNDS) ? p.y : GROUND_Y;
-  const z = savedPositionValid ? p.z : cityRuntime.city.spawn.z;
   const appearanceRows = await sql`
     SELECT appearance
     FROM user_avatar_appearances
