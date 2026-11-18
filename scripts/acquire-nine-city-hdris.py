@@ -157,6 +157,25 @@ for city_id, config in CITIES.items():
     if actual_md5.lower() != variant["md5"].lower():
         target.unlink(missing_ok=True)
         raise RuntimeError(f"MD5 mismatch for {asset_id}")
+    actual_size = target.stat().st_size
+    if actual_size != int(variant["size"]):
+        target.unlink(missing_ok=True)
+        raise RuntimeError(f"Size mismatch for {asset_id}: expected {variant['size']}, received {actual_size}")
+    with target.open("rb") as stream:
+        header = stream.read(512)
+    if not header.startswith(b"#?RADIANCE") and not header.startswith(b"#?RGBE"):
+        target.unlink(missing_ok=True)
+        raise RuntimeError(f"Downloaded file is not a Radiance HDR panorama: {asset_id}")
+    import re
+    resolution = re.search(rb"(?m)^-Y\\s+(\\d+)\\s+\\+X\\s+(\\d+)\\s*$", header)
+    if not resolution:
+        target.unlink(missing_ok=True)
+        raise RuntimeError(f"Unsupported or missing Radiance HDR resolution header: {asset_id}")
+    height, width = map(int, resolution.groups())
+    if width < 1024 or height < 512 or not 1.8 <= width / height <= 2.2:
+        target.unlink(missing_ok=True)
+        raise RuntimeError(f"Unexpected HDRI dimensions for {asset_id}: {width}x{height}")
+    actual_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
 
     used_asset_ids.add(asset_id)
     record = {
@@ -174,6 +193,10 @@ for city_id, config in CITIES.items():
         "resolution_tier": "1k",
         "expected_size_bytes": variant.get("size"),
         "verified_md5": actual_md5,
+        "verified_sha256": actual_sha256,
+        "actual_size_bytes": actual_size,
+        "width": width,
+        "height": height,
         "file": target.as_posix(),
         "catalogue_description": item.get("description"),
         "category": item.get("category"),
