@@ -118,7 +118,7 @@ def download_and_verify(url, path, expected_md5, expected_size):
             header = stream.read(512)
         if not header.startswith(b"#?RADIANCE") and not header.startswith(b"#?RGBE"):
             raise RuntimeError(f"Downloaded file is not a Radiance HDR panorama: {path.name}")
-        resolution = re.search(rb"(?m)^-Y\s+(\d+)\\s+\\+X\\s+(\\d+)\\s*$", header)
+        resolution = re.search(rb"(?m)^-Y\s+(\d+)\s+\+X\s+(\d+)\s*$", header)
         if not resolution:
             raise RuntimeError(f"Unsupported or missing Radiance HDR resolution header: {path.name}")
         height, width = map(int, resolution.groups())
