@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Acquire a small, verified first batch of city architecture GLBs.
+"""Acquire only complete, full-scale city-building GLBs.
 
-Input is the live discovery report. Binaries are staged as a CI artifact rather
-than committed to Git, keeping the source repository and Unity checkout lean.
-Every file is checked for CC0 metadata, size, GLB magic and non-empty content.
+Every live detail record is rechecked for CC0, exterior/realistic tags,
+whole-building dimensions and city-specific tower requirements before download.
+Binaries remain CI artifacts until geometry/material inspection and Unity import.
 """
 import hashlib
 import json
 import pathlib
+import re
 import time
 import urllib.request
 
@@ -16,7 +17,24 @@ INPUT = pathlib.Path("artifacts/city-architecture-candidates/nine-city-candidate
 OUT = pathlib.Path("artifacts/city-architecture-models")
 MAX_BYTES = 25 * 1024 * 1024
 PER_CITY = 2
-UA = "UCENO-city-architecture-acquisition/1.0"
+MIN_HEIGHT_M = 8.0
+MIN_FOOTPRINT_M = 4.0
+ECLIPSE_MIN_HEIGHT_M = 35.0
+UA = "UCENO-city-architecture-acquisition/2.0"
+PART_TERMS = (
+    "module", "panel", "wall", "slab", "floor tile", "door", "window",
+    "column", "beam", "rail", "railing", "stair", "staircase", "roof section",
+    "roof slope", "roof cap", "canopy bay", "counter", "bollard", "plinth",
+    "trim", "facade panel", "ceiling", "corner block", "gate", "ladder",
+    "bulkhead", "paving", "bench", "fence", "barrier", "prop",
+)
+IRRELEVANT_TERMS = (
+    "arctic", "military", "tank", "weapon", "bunker", "missile", "airfield",
+    "aircraft", "field camp", "battle royale", "fps kit", "fantasy", "temple",
+    "shrine", "medieval", "monastery", "tavern", "guild hall", "kennel",
+    "cattery", "cruise ship", "yacht", "ship deck", "jungle temple",
+)
+TOWER_TERMS = ("skyscraper", "supertall", "high rise", "high-rise", "tower", "office")
 
 def request_json(url):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
@@ -28,7 +46,7 @@ def unwrap_detail(payload):
         return payload["data"]
     if isinstance(payload, dict) and payload.get("slug"):
         return payload
-    raise RuntimeError("Unexpected asset detail response; refusing to guess fields")
+    raise RuntimeError("Unexpected asset detail response; refusing to guess response fields")
 
 def get_license(detail):
     info = detail.get("license")
@@ -38,6 +56,50 @@ def get_license(detail):
         return str(info.get("id") or info.get("slug") or info.get("name") or "").lower()
     return ""
 
+def tag_slugs(detail):
+    tags = detail.get("tags") or []
+    return [str(tag.get("slug") or tag.get("title") or "").lower()
+            if isinstance(tag, dict) else str(tag).lower() for tag in tags]
+
+def dimensions(detail):
+    stats = detail.get("stats") or {}
+    dims = stats.get("sizeMeters")
+    if isinstance(dims, list) and len(dims) >= 3:
+        return tuple(float(dims[i]) for i in range(3))
+    box = stats.get("boundingBox") or {}
+    low, high = box.get("min"), box.get("max")
+    if isinstance(low, list) and isinstance(high, list) and len(low) >= 3 and len(high) >= 3:
+        return tuple(float(high[i]) - float(low[i]) for i in range(3))
+    return None
+
+def validate_complete_building(detail, city):
+    title = detail.get("title") or detail.get("name") or ""
+    summary = detail.get("summary") or detail.get("description") or ""
+    searchable = re.sub(r"[_-]+", " ", f"{title} {summary}".lower())
+    tags = tag_slugs(detail)
+    if "realistic" not in tags:
+        raise ValueError("Missing realistic tag")
+    if "exterior" not in tags and "exterior" not in searchable:
+        raise ValueError("Not identified as an exterior asset")
+    if "modular" in tags:
+        raise ValueError("Modular kit part rejected")
+    if any(term in searchable for term in PART_TERMS):
+        raise ValueError("Individual building component or prop rejected")
+    if any(term in searchable for term in IRRELEVANT_TERMS):
+        raise ValueError("Unrelated theme or setting rejected")
+    dims = dimensions(detail)
+    if dims is None:
+        raise ValueError("Missing real-world dimensions")
+    width, height, depth = dims
+    if height < MIN_HEIGHT_M or max(width, depth) < MIN_FOOTPRINT_M:
+        raise ValueError(f"Too small to be a complete building: dimensions={dims}")
+    if city == "EclipseCentral":
+        if height < ECLIPSE_MIN_HEIGHT_M:
+            raise ValueError(f"Lumen Tower candidate below 35 m: height={height}")
+        if not any(term in searchable for term in TOWER_TERMS):
+            raise ValueError("Eclipse Central candidate is not a skyscraper/office tower")
+    return dims
+
 def main():
     if not INPUT.is_file():
         raise SystemExit(f"Missing discovery report: {INPUT}")
@@ -46,7 +108,7 @@ def main():
     manifest = {
         "source": "https://3dassets.dev",
         "acquired_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "policy": "first-batch only; exact source record, CC0 licence metadata, <=25MiB and GLB header verified",
+        "policy": "live detail revalidation: CC0, realistic exterior, complete-building scale, city-specific tower threshold, <=25MiB and GLB 2.0 header",
         "cities": {},
     }
     seen = set()
@@ -64,6 +126,7 @@ def main():
                 licence = get_license(detail)
                 if "cc0" not in licence and "cc0" not in json.dumps(detail.get("license", {})).lower():
                     raise ValueError(f"Licence metadata is not explicitly CC0: {licence or 'missing'}")
+                dims = validate_complete_building(detail, city)
                 url = detail.get("cdnUrl") or detail.get("cdn_url")
                 if not isinstance(url, str) or not url.startswith("https://"):
                     raise ValueError("Asset detail has no HTTPS cdnUrl")
@@ -80,31 +143,34 @@ def main():
                 acquired.append({
                     "slug": slug,
                     "name": detail.get("name") or detail.get("title") or candidate.get("name"),
+                    "dimensions_m": list(dims),
                     "file": f"{city}/{filename}",
                     "bytes": len(data),
                     "sha256": digest,
                     "license": detail.get("license"),
-                    "source_url": f"https://3dassets.dev/assets/{slug}",
+                    "source_url": detail.get("url") or f"https://3dassets.dev/assets/{slug}",
                     "cdn_url": url,
                     "stats": detail.get("stats"),
                     "status": detail.get("status"),
+                    "geometry_visual_review": "pending",
+                    "unity_import_status": "not-imported",
                 })
                 seen.add(slug)
-                print(f"ACQUIRED {city}/{filename} ({len(data)} bytes)")
+                print(f"ACQUIRED COMPLETE BUILDING {city}/{filename} ({len(data)} bytes; dimensions={dims})")
             except Exception as exc:
                 failures.append({"city": city, "slug": slug, "error": str(exc)})
-                print(f"SKIP {city}/{slug}: {exc}")
+                print(f"REJECTED {city}/{slug}: {exc}")
         manifest["cities"][city] = acquired
         if not acquired:
-            print(f"NO MODELS ACQUIRED for {city}")
+            print(f"NO QUALIFYING COMPLETE BUILDING ACQUIRED for {city}")
     manifest["failures"] = failures
     manifest["total_models"] = sum(len(v) for v in manifest["cities"].values())
     (OUT / "acquisition-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    print(f"Acquired {manifest['total_models']} GLB files across {len(manifest['cities'])} cities")
+    print(f"Acquired {manifest['total_models']} full-building GLB files across {len(manifest['cities'])} cities")
     if manifest["total_models"] == 0:
-        raise SystemExit("No valid models acquired; failing rather than reporting success")
+        raise SystemExit("No qualifying full-building models acquired; failing rather than reporting success")
     if any(not models for models in manifest["cities"].values()):
-        raise SystemExit("Partial city coverage: acquisition artifact retained for diagnosis, job marked failed")
+        raise SystemExit("Incomplete full-building city coverage; artifact retained for diagnosis.")
 
 if __name__ == "__main__":
     main()
