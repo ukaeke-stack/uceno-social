@@ -10,6 +10,9 @@ from __future__ import annotations
 import hashlib
 import json
 import pathlib
+import re
+import os
+import tempfile
 import urllib.request
 
 API = "https://api.polyhaven.com"
@@ -82,17 +85,56 @@ def get_json(url):
         return json.loads(response.read())
 
 
-def download_and_hash(url, path):
+def download_and_verify(url, path, expected_md5, expected_size):
+    """Download beside the destination, validate completely, then atomically publish."""
     request = urllib.request.Request(url, headers={"User-Agent": UA})
-    digest = hashlib.md5()
-    with urllib.request.urlopen(request, timeout=180) as response, path.open("wb") as output:
-        while True:
-            chunk = response.read(1024 * 1024)
-            if not chunk:
-                break
-            output.write(chunk)
-            digest.update(chunk)
-    return digest.hexdigest()
+    md5 = hashlib.md5()
+    sha256 = hashlib.sha256()
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=path.name + ".", suffix=".partial", dir=path.parent
+    )
+    temporary = pathlib.Path(temporary_name)
+    actual_size = 0
+    try:
+        with os.fdopen(fd, "wb") as output, urllib.request.urlopen(request, timeout=180) as response:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                output.write(chunk)
+                md5.update(chunk)
+                sha256.update(chunk)
+                actual_size += len(chunk)
+            output.flush()
+            os.fsync(output.fileno())
+
+        if md5.hexdigest().lower() != expected_md5.lower():
+            raise RuntimeError(f"MD5 mismatch for {path.name}")
+        if actual_size != int(expected_size):
+            raise RuntimeError(
+                f"Size mismatch for {path.name}: expected {expected_size}, received {actual_size}"
+            )
+        with temporary.open("rb") as stream:
+            header = stream.read(512)
+        if not header.startswith(b"#?RADIANCE") and not header.startswith(b"#?RGBE"):
+            raise RuntimeError(f"Downloaded file is not a Radiance HDR panorama: {path.name}")
+        resolution = re.search(rb"(?m)^-Y\\s+(\\d+)\\s+\\+X\\s+(\\d+)\\s*$", header)
+        if not resolution:
+            raise RuntimeError(f"Unsupported or missing Radiance HDR resolution header: {path.name}")
+        height, width = map(int, resolution.groups())
+        if width < 1024 or height < 512 or not 1.8 <= width / height <= 2.2:
+            raise RuntimeError(f"Unexpected HDRI dimensions for {path.name}: {width}x{height}")
+
+        os.replace(temporary, path)
+        return {
+            "md5": md5.hexdigest(),
+            "sha256": sha256.hexdigest(),
+            "size": actual_size,
+            "width": width,
+            "height": height,
+        }
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 profiles = json.loads(PROFILES.read_text(encoding="utf-8"))
@@ -153,29 +195,14 @@ for city_id, config in CITIES.items():
     skybox_dir = ROOT / city_id / "Textures" / "Skybox"
     skybox_dir.mkdir(parents=True, exist_ok=True)
     target = skybox_dir / f"{city_id}_environment.hdr"
-    actual_md5 = download_and_hash(variant["url"], target)
-    if actual_md5.lower() != variant["md5"].lower():
-        target.unlink(missing_ok=True)
-        raise RuntimeError(f"MD5 mismatch for {asset_id}")
-    actual_size = target.stat().st_size
-    if actual_size != int(variant["size"]):
-        target.unlink(missing_ok=True)
-        raise RuntimeError(f"Size mismatch for {asset_id}: expected {variant['size']}, received {actual_size}")
-    with target.open("rb") as stream:
-        header = stream.read(512)
-    if not header.startswith(b"#?RADIANCE") and not header.startswith(b"#?RGBE"):
-        target.unlink(missing_ok=True)
-        raise RuntimeError(f"Downloaded file is not a Radiance HDR panorama: {asset_id}")
-    import re
-    resolution = re.search(rb"(?m)^-Y\\s+(\\d+)\\s+\\+X\\s+(\\d+)\\s*$", header)
-    if not resolution:
-        target.unlink(missing_ok=True)
-        raise RuntimeError(f"Unsupported or missing Radiance HDR resolution header: {asset_id}")
-    height, width = map(int, resolution.groups())
-    if width < 1024 or height < 512 or not 1.8 <= width / height <= 2.2:
-        target.unlink(missing_ok=True)
-        raise RuntimeError(f"Unexpected HDRI dimensions for {asset_id}: {width}x{height}")
-    actual_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
+    verification = download_and_verify(
+        variant["url"], target, variant["md5"], variant["size"]
+    )
+    actual_md5 = verification["md5"]
+    actual_sha256 = verification["sha256"]
+    actual_size = verification["size"]
+    width = verification["width"]
+    height = verification["height"]
 
     used_asset_ids.add(asset_id)
     record = {
