@@ -475,7 +475,9 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.equal(sessionRowsBeforeClose.length, 1, "the connected player must have an authoritative session fence");
     const closingSessionId = sessionRowsBeforeClose[0].session_id;
     const closingGeneration = Number(sessionRowsBeforeClose[0].generation);
+    const clientClose = new Promise(resolve => authenticated.socket.once("close", resolve));
     authenticated.socket.close();
+    await clientClose;
 
     // Do not terminate PostgreSQL until the gateway has durably acknowledged
     // the disconnect checkpoint. This separates a checkpoint-write race from
@@ -500,7 +502,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
       disconnectedCheckpoint[0].updated_by_session === closingSessionId &&
       disconnectedCheckpoint[0].position?.x === 37.5 &&
       disconnectedCheckpoint[0].position?.z === -22.25,
-      "disconnect must persist the last valid player checkpoint before database connections are terminated");
+      `disconnect must persist the last valid player checkpoint before database connections are terminated; observed row: ${JSON.stringify(disconnectedCheckpoint[0] ?? null)}`);
 
     const heartbeatDeadline = Date.now() + 5000;
     let liveHeartbeats = [];
