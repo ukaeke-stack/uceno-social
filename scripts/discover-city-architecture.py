@@ -19,7 +19,14 @@ QUERIES = {
     "AuroraHeights": ["alpine mountain station", "mountain lodge modern", "mountain observatory"],
     "SaffronDunes": ["desert modern building", "oasis architecture", "solar canopy building"],
     "MonsoonHarbour": ["harbour port building", "canal waterfront building", "maritime terminal"],
-    "EclipseCentral": ["modern entertainment venue", "concert arena building", "nightlife tower"],
+    "EclipseCentral": [
+        "futuristic illuminated skyscraper tower",
+        "supertall glass office tower",
+        "mixed use skyscraper landmark",
+        "modern entertainment venue",
+        "concert arena building",
+        "nightlife tower",
+    ],
     "OriginPlains": ["university campus building", "agricultural research greenhouse", "modern education building"],
     "AtlasFrontier": ["industrial logistics terminal", "rail freight warehouse", "modern factory building"],
 }
@@ -123,7 +130,23 @@ def main():
                 size_penalty = 100
             return (triangle_penalty + size_penalty, candidate["slug"])
 
-        candidates.sort(key=mobile_cost)
+        if city == "EclipseCentral":
+            # Lumen Tower is a signature skyscraper, not a generic venue.
+            # Rank tower-shaped landmark candidates ahead of unrelated low-poly
+            # assets, then use Android geometry/size cost as the tie-breaker.
+            tower_terms = ("skyscraper", "tower", "high-rise", "highrise", "supertall", "office")
+            def eclipse_tower_priority(candidate):
+                searchable = " ".join([
+                    str(candidate.get("name") or ""),
+                    str(candidate.get("description") or ""),
+                    " ".join(str(tag) for tag in (candidate.get("tags") or [])),
+                    str(candidate.get("category") or ""),
+                ]).lower()
+                relevance = sum(1 for term in tower_terms if term in searchable)
+                return (-relevance, mobile_cost(candidate))
+            candidates.sort(key=eclipse_tower_priority)
+        else:
+            candidates.sort(key=mobile_cost)
         chosen = candidates[:30]
         globally_seen.update(item["slug"] for item in chosen)
         report["cities"][city] = {
