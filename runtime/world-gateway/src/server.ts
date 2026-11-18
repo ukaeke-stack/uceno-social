@@ -1250,6 +1250,11 @@ wss.on("connection", async (socket: WebSocket) => {
         send(socket, activityPayload(activity));
     }
 
+    // Load persisted world object state before constructing the joining snapshot.
+    // A replacement process has an empty in-memory registry cache; without this
+    // read it would send registry defaults to reconnecting clients.
+    await ensureObjectStatesLoaded(player.worldId);
+
     // A joining or reconnecting client must receive the current authoritative
     // state of every scene interactable. Broadcasting only future changes
     // leaves late joiners with stale door/object visuals and unknown seat use.
