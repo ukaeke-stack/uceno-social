@@ -115,6 +115,76 @@ def check_manifests() -> tuple[int, int]:
     return len(manifests), checked_files
 
 
+def check_city_asset_inventory() -> tuple[int, int, int]:
+    """Require real city files and complete source records, not path-only manifests."""
+    profile_file = ASSETS / "Editor/city-scene-asset-profiles.json"
+    try:
+        profiles = json.loads(profile_file.read_text(encoding="utf-8")).get("cities", [])
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"Invalid city asset profiles: {error}")
+    expected = {"solstice", "verdant", "nexus", "aurora", "saffron", "monsoon", "eclipse", "origin", "atlas"}
+    if len(profiles) != 9 or {item.get("cityId") for item in profiles} != expected:
+        fail("City asset inventory must contain exactly the nine non-Meridian cities.")
+    checked_prefabs = 0
+    checked_hdris = 0
+    total_bytes = 0
+    for city in profiles:
+        city_id = city["cityId"]
+        city_root = Path("unity/UCENOVirtualWorld/Assets/UCENO/Cities") / city_id
+        prefab_paths = (city.get("architecturePrefabs") or []) + (city.get("environmentPrefabs") or []) + [
+            landmark.get("prefab") for landmark in city.get("landmarks", [])
+        ]
+        if len(prefab_paths) != 12 or len(set(prefab_paths)) != 12:
+            fail(f"{city_id} must declare 12 distinct city-owned prefab paths.")
+        for asset_path in prefab_paths:
+            if not isinstance(asset_path, str) or not asset_path.startswith(f"Assets/UCENO/Cities/{city_id}/Prefabs/"):
+                fail(f"{city_id} contains a prefab path outside its own imported asset root: {asset_path}")
+            disk_path = PROJECT / asset_path
+            if not disk_path.is_file() or disk_path.stat().st_size == 0:
+                fail(f"{city_id} prefab is absent or empty; manifest paths are not proof of import: {disk_path}")
+            checked_prefabs += 1
+            total_bytes += disk_path.stat().st_size
+        source_manifest = city_root / "source-manifest.json"
+        try:
+            provenance = json.loads(source_manifest.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            fail(f"{city_id} source manifest is missing or invalid: {error}")
+        records = provenance.get("assets") or []
+        if len(records) != 12 or {item.get("prefab") for item in records} != set(prefab_paths):
+            fail(f"{city_id} source manifest must account for exactly its 12 configured prefabs.")
+        for record in records:
+            if not record.get("sourceName") or not record.get("attribution"):
+                fail(f"{city_id} has incomplete source attribution for {record.get('prefab')}.")
+            source = record.get("sourceUrl", "")
+            if not source.startswith("https://") or record.get("license") not in {
+                "CC0 1.0", "CC-BY 4.0", "CC-BY 3.0", "CC-BY-SA 4.0", "CC-BY-SA 3.0"
+            }:
+                fail(f"{city_id} has an unapproved source URL or redistribution licence.")
+        hdri_path = PROJECT / city.get("skyboxTexture", "")
+        expected_hdri = city_root / "Textures" / "Skybox" / f"{city_id}_environment.hdr"
+        if hdri_path != expected_hdri or not hdri_path.is_file() or hdri_path.stat().st_size == 0:
+            fail(f"{city_id} city-specific HDRI is missing or mapped to the wrong path: {hdri_path}")
+        record_path = hdri_path.parent / "hdri-provenance.json"
+        try:
+            hdri = json.loads(record_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            fail(f"{city_id} HDRI provenance is missing or invalid: {error}")
+        if hdri.get("city_id") != city_id or hdri.get("file") != hdri_path.as_posix():
+            fail(f"{city_id} HDRI provenance does not identify the exact city file.")
+        import hashlib
+        digest = hashlib.sha256(hdri_path.read_bytes()).hexdigest()
+        if digest.lower() != str(hdri.get("verified_sha256", "")).lower():
+            fail(f"{city_id} HDRI SHA-256 does not match its provenance record.")
+        if hdri_path.stat().st_size != hdri.get("actual_size_bytes"):
+            fail(f"{city_id} HDRI byte count does not match its provenance record.")
+        if hdri.get("unity_import_status") != "imported-and-verified":
+            fail(f"{city_id} HDRI has not been confirmed as imported by Unity.")
+        checked_hdris += 1
+        total_bytes += hdri_path.stat().st_size
+    if total_bytes > MAX_IMPORTED_BYTES:
+        fail(f"City-specific imported assets exceed 350 MB ({total_bytes} bytes).")
+    return checked_prefabs, checked_hdris, total_bytes
+
 def main():
     missing = [path for path in REQUIRED_FILES + REQUIRED_TEXTURES if not path.is_file()]
     if missing:
@@ -449,12 +519,16 @@ def main():
     if '"SIT"' not in hud or '"STAND"' not in hud or "GetSeatControlRect" not in hud:
         fail("Mobile sit/stand control is missing.")
 
+    city_prefabs, city_hdris, city_bytes = check_city_asset_inventory()
     manifests, listed_files = check_manifests()
     total_required = sum(path.stat().st_size for path in REQUIRED_FILES + REQUIRED_TEXTURES)
     print("UCENO Unity source asset validation passed.")
     print(f"- Required source files: {len(REQUIRED_FILES) + len(REQUIRED_TEXTURES)}")
     print(f"- CC0 asset manifests: {manifests}")
     print(f"- Manifest-listed files checked: {listed_files}")
+    print(f"- City-specific imported prefabs verified: {city_prefabs}/108")
+    print(f"- City-specific HDRIs with matching SHA-256: {city_hdris}/9")
+    print(f"- City-specific asset bytes: {city_bytes}")
     print(f"- Required source file bytes: {total_required}")
     print("- Procedural avatar/environment placeholders: absent")
     print("- Unity compilation, rendering and Android runtime: NOT tested by this check")
