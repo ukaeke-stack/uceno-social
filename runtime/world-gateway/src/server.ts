@@ -881,6 +881,16 @@ async function authenticate(token: string, allowActivityTransfer = false) {
   return { userId: row.id as string, worldId: payload.world_id as string, cityId: String(row.cityId) };
 }
 
+function parseStoredJsonObject(value: unknown): Record<string, unknown> | null {
+  let parsed = value;
+  if (typeof parsed === "string") {
+    try { parsed = JSON.parse(parsed); }
+    catch { return null; }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  return parsed as Record<string, unknown>;
+}
+
 async function loadPlayer(userId: string, worldId: string, cityId: string, token: string, socket: WebSocket, sessionId: string, sessionGeneration: number): Promise<Player> {
   const rows = await sql`
     SELECT position, rotation, session_generation AS "sessionGeneration",
@@ -895,7 +905,8 @@ async function loadPlayer(userId: string, worldId: string, cityId: string, token
     cityRuntimeInteractableKeys()
   );
   if (!cityRuntime) throw new Error("city_runtime_not_ready");
-  const p = rows[0]?.position || {
+  const savedPosition = parseStoredJsonObject(rows[0]?.position);
+  const p = savedPosition ?? {
     x: cityRuntime.city.spawn.x, y: GROUND_Y, z: cityRuntime.city.spawn.z
   };
   const savedPositionValid =
@@ -922,7 +933,7 @@ async function loadPlayer(userId: string, worldId: string, cityId: string, token
     WHERE e.user_id = ${userId}::uuid
     ORDER BY e.slot
   `;
-  const rotation = rows[0]?.rotation || { y: 0, w: 1 };
+  const rotation = parseStoredJsonObject(rows[0]?.rotation) ?? { y: 0, w: 1 };
   const yaw = finiteNumber(rotation.y, -1.01, 1.01) && finiteNumber(rotation.w, -1.01, 1.01)
     ? 2 * Math.atan2(rotation.y, rotation.w) : 0;
   return {
@@ -1244,15 +1255,6 @@ wss.on("connection", async (socket: WebSocket) => {
     }).setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setIssuer("uceno-social").setAudience("uceno-world-gateway")
       .setSubject(identity.userId).setIssuedAt().setExpirationTime("1h").sign(secret) : "";
-    send(socket, { type: "welcome", userId: identity.userId, tickRate: TICK_RATE,
-      sessionGeneration: player.sessionGeneration, stateVersion: player.stateVersion,
-      accessToken: renewedAccessToken, instanceId: INSTANCE_ID, expiresInSeconds: renewedAccessToken ? 3600 : 0,
-      state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
-    for (const activity of activitySessions.values()) {
-      if (activity.worldId === player.worldId && activity.instanceId === INSTANCE_ID)
-        send(socket, activityPayload(activity));
-    }
-
     // Load persisted world object state before constructing the joining snapshot.
     // A replacement process has an empty in-memory registry cache; without this
     // read it would send registry defaults to reconnecting clients.
@@ -1263,22 +1265,6 @@ wss.on("connection", async (socket: WebSocket) => {
     // leaves late joiners with stale door/object visuals and unknown seat use.
     const joiningDistrictId = findPlayerDistrict(player, player.x, player.z)?.id ?? "unassigned";
     const joiningObjects = [...INTERACTABLES.values()].filter(target => target.cityId === player.cityId && target.districtId === joiningDistrictId);
-    console.info("world_interactable_snapshot_sent", {
-      userId: player.id, districtId: joiningDistrictId,
-      registeredCount: INTERACTABLES.size, sentCount: joiningObjects.length
-    });
-    for (const target of joiningObjects) {
-      if (target.districtId !== joiningDistrictId) continue;
-      send(socket, {
-        type: "object_state",
-        objectId: target.id,
-        objectState: target.state,
-        actorId: target.actorId,
-        occupantId: target.occupantId,
-        version: target.version
-      });
-    }
-
     socket.on("message", async (raw) => {
       if (players.get(player.id) !== player || player.socket !== socket) return;
       let msg: any;
@@ -1770,6 +1756,32 @@ wss.on("connection", async (socket: WebSocket) => {
       if (player.seated) player.jumpQueued = false;
       if (msg.jump && player.grounded && !player.seated) player.jumpQueued = true;
     });
+    // Register the message handler before announcing readiness. Clients may
+    // send their first activity/input packet immediately after receiving welcome.
+    send(socket, { type: "welcome", userId: identity.userId, tickRate: TICK_RATE,
+      sessionGeneration: player.sessionGeneration, stateVersion: player.stateVersion,
+      accessToken: renewedAccessToken, instanceId: INSTANCE_ID, expiresInSeconds: renewedAccessToken ? 3600 : 0,
+      state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
+    for (const activity of activitySessions.values()) {
+      if (activity.worldId === player.worldId && activity.instanceId === INSTANCE_ID)
+        send(socket, activityPayload(activity));
+    }
+    console.info("world_interactable_snapshot_sent", {
+      userId: player.id, districtId: joiningDistrictId,
+      registeredCount: INTERACTABLES.size, sentCount: joiningObjects.length
+    });
+    for (const target of joiningObjects) {
+      if (target.districtId !== joiningDistrictId) continue;
+      send(socket, {
+        type: "object_state",
+        objectId: target.id,
+        objectState: target.state,
+        actorId: target.actorId,
+        occupantId: target.occupantId,
+        version: target.version
+      });
+    }
+
     const releaseSeats = () => {
       const current = players.get(identity.userId);
       if (!current || current.socket !== socket || current.sessionId !== identity.sessionId) return;
