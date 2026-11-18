@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const migrations = [
+  "026_user_avatar_appearance.sql",
   "029_player_session_fencing.sql",
   "030_world_realtime_event_stream.sql",
   "031_durable_activity_sessions.sql",
