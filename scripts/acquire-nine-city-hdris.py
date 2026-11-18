@@ -23,47 +23,47 @@ CITIES = {
     "solstice": {
         "label": "Solstice Bay",
         "terms": ["waterfront", "harbour", "harbor", "river", "skyline", "city", "urban"],
-        "preferred": ["shanghai_bund", "docklands_02", "canary_wharf"],
+        "preferred": ["docklands_02"],
     },
     "verdant": {
         "label": "Verdant Reach",
         "terms": ["sunset", "skyline", "city", "urban", "building", "architecture"],
-        "preferred": ["sunset_jhbcentral", "modern_buildings", "wide_street_01"],
+        "preferred": ["sunset_jhbcentral"],
     },
     "nexus": {
         "label": "Nexus Delta",
         "terms": ["skyscraper", "skyline", "modern", "urban", "city", "glass"],
-        "preferred": ["canary_wharf", "modern_buildings_night", "potsdamer_platz"],
+        "preferred": ["modern_buildings_night"],
     },
     "aurora": {
         "label": "Aurora Heights",
         "terms": ["city", "urban", "street", "building", "plaza", "skyline"],
-        "preferred": ["potsdamer_platz", "hansaplatz", "wide_street_01"],
+        "preferred": ["potsdamer_platz"],
     },
     "saffron": {
         "label": "Saffron Dunes",
         "terms": ["city", "urban", "street", "architecture", "building", "dusk"],
-        "preferred": ["urban_street_02", "urban_street_01", "modern_evening_street"],
+        "preferred": ["modern_evening_street"],
     },
     "monsoon": {
         "label": "Monsoon Harbour",
         "terms": ["harbour", "harbor", "docklands", "river", "waterfront", "city", "urban"],
-        "preferred": ["docklands_02", "shanghai_bund", "canary_wharf"],
+        "preferred": ["shanghai_bund"],
     },
     "eclipse": {
         "label": "Eclipse Central",
         "terms": ["night", "evening", "city", "urban", "street", "skyline", "neon"],
-        "preferred": ["modern_buildings_night", "hansaplatz", "shanghai_bund"],
+        "preferred": ["hansaplatz"],
     },
     "origin": {
         "label": "Origin Plains",
         "terms": ["sunset", "skyline", "city", "street", "urban", "building"],
-        "preferred": ["wide_street_01", "sunset_jhbcentral", "urban_street_01"],
+        "preferred": ["wide_street_01"],
     },
     "atlas": {
         "label": "Atlas Frontier",
         "terms": ["industrial", "city", "urban", "street", "architecture", "building"],
-        "preferred": ["urban_street_01", "docklands_02", "wide_street_02"],
+        "preferred": ["wide_street_02"],
     },
 }
 
