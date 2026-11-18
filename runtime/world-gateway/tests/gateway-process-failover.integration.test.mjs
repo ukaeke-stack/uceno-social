@@ -468,7 +468,40 @@ test("two real gateway processes: primary loss leaves the replacement process re
     assert.equal(persistedFurniture[0].object_kind, "furniture");
     assert.equal(persistedFurniture[0].object_state, "active");
     assert.equal(Number(persistedFurniture[0].version), 1);
+    const sessionRowsBeforeClose = await admin.unsafe(`
+      SELECT session_id, generation FROM "${schema}".virtual_world_player_sessions
+      WHERE world_id = $1::uuid AND user_id = $2::uuid
+    `, [worldId, userId]);
+    assert.equal(sessionRowsBeforeClose.length, 1, "the connected player must have an authoritative session fence");
+    const closingSessionId = sessionRowsBeforeClose[0].session_id;
+    const closingGeneration = Number(sessionRowsBeforeClose[0].generation);
     authenticated.socket.close();
+
+    // Do not terminate PostgreSQL until the gateway has durably acknowledged
+    // the disconnect checkpoint. This separates a checkpoint-write race from
+    // failures caused by the deliberate pooled-connection interruption below.
+    const checkpointDeadline = Date.now() + 5000;
+    let disconnectedCheckpoint = [];
+    while (Date.now() < checkpointDeadline) {
+      disconnectedCheckpoint = await admin.unsafe(`
+        SELECT position, session_generation, state_version, updated_by_session
+        FROM "${schema}".virtual_world_player_state
+        WHERE world_id = $1::uuid AND user_id = $2::uuid
+      `, [worldId, userId]);
+      const checkpoint = disconnectedCheckpoint[0];
+      if (checkpoint &&
+          Number(checkpoint.session_generation) === closingGeneration &&
+          checkpoint.updated_by_session === closingSessionId &&
+          checkpoint.position?.x === 37.5 && checkpoint.position?.z === -22.25) break;
+      await delay(50);
+    }
+    assert.ok(disconnectedCheckpoint[0] &&
+      Number(disconnectedCheckpoint[0].session_generation) === closingGeneration &&
+      disconnectedCheckpoint[0].updated_by_session === closingSessionId &&
+      disconnectedCheckpoint[0].position?.x === 37.5 &&
+      disconnectedCheckpoint[0].position?.z === -22.25,
+      "disconnect must persist the last valid player checkpoint before database connections are terminated");
+
     const heartbeatDeadline = Date.now() + 5000;
     let liveHeartbeats = [];
     while (Date.now() < heartbeatDeadline) {
@@ -526,6 +559,10 @@ test("two real gateway processes: primary loss leaves the replacement process re
         }
       }
       assert.ok(recoverySocket, `gateway WebSocket authorization did not recover: ${lastAuthError?.message ?? "unknown error"}`);
+      assert.equal(recoverySocket.welcome.state.x, 37.5,
+        "database reconnect must restore the durable player checkpoint, not the city spawn");
+      assert.equal(recoverySocket.welcome.state.z, -22.25,
+        "database reconnect must preserve the player's district position");
       const restoredDoorAfterReconnect = await receiveSocketMessage(recoverySocket.socket, "object_state", 5000,
         packet => packet.objectId === "scene:test-door", "door state after reconnect");
       assert.equal(restoredDoorAfterReconnect.objectState, "open",
