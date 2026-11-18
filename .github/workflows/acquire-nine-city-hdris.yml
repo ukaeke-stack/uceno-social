@@ -32,4 +32,8 @@ jobs:
           git add unity/UCENOVirtualWorld/Assets/UCENO/Cities
           git diff --cached --quiet && { echo "No new panorama files to commit"; exit 1; }
           git commit -m "Acquire nine city-specific CC0 HDR panoramas"
+          # Other CI jobs may advance the branch while downloads are running.
+          # Rebase the verified asset commit onto the latest branch before pushing.
+          git fetch origin feature/uceno-unity-foundation
+          git rebase origin/feature/uceno-unity-foundation
           git push origin HEAD:feature/uceno-unity-foundation
