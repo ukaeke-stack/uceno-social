@@ -491,18 +491,26 @@ test("two real gateway processes: primary loss leaves the replacement process re
         WHERE world_id = $1::uuid AND user_id = $2::uuid
       `, [worldId, userId]);
       const checkpoint = disconnectedCheckpoint[0];
+      const position = typeof checkpoint?.position === "string"
+        ? JSON.parse(checkpoint.position) : checkpoint?.position;
       if (checkpoint &&
           Number(checkpoint.session_generation) === closingGeneration &&
           checkpoint.updated_by_session === closingSessionId &&
-          checkpoint.position?.x === 37.5 && checkpoint.position?.z === -22.25) break;
+          position?.x === 37.5 && position?.z === -22.25) break;
       await delay(50);
     }
-    assert.ok(disconnectedCheckpoint[0] &&
-      Number(disconnectedCheckpoint[0].session_generation) === closingGeneration &&
-      disconnectedCheckpoint[0].updated_by_session === closingSessionId &&
-      disconnectedCheckpoint[0].position?.x === 37.5 &&
-      disconnectedCheckpoint[0].position?.z === -22.25,
-      `disconnect must persist the last valid player checkpoint before database connections are terminated; observed row: ${JSON.stringify(disconnectedCheckpoint[0] ?? null)}`);
+    const observedCheckpoint = disconnectedCheckpoint[0];
+    const observedPosition = typeof observedCheckpoint?.position === "string"
+      ? JSON.parse(observedCheckpoint.position) : observedCheckpoint?.position;
+    const activeFenceAfterClose = await admin.unsafe(`
+      SELECT session_id, generation FROM "${schema}".virtual_world_player_sessions
+      WHERE world_id = $1::uuid AND user_id = $2::uuid
+    `, [worldId, userId]);
+    assert.ok(observedCheckpoint &&
+      Number(observedCheckpoint.session_generation) === closingGeneration &&
+      observedCheckpoint.updated_by_session === closingSessionId &&
+      observedPosition?.x === 37.5 && observedPosition?.z === -22.25,
+      `disconnect checkpoint mismatch; expected session=${closingSessionId} generation=${closingGeneration}; observed row=${JSON.stringify(observedCheckpoint ?? null)}; active fence=${JSON.stringify(activeFenceAfterClose)}`);
 
     const heartbeatDeadline = Date.now() + 5000;
     let liveHeartbeats = [];
