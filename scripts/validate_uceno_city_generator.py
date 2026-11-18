@@ -59,6 +59,9 @@ for token in (
     "previousThreshold", "assignedRenderers.Add(renderer)",
     "renderer.GetComponent<MeshFilter>()", "skinned.sharedMesh",
     "mesh.vertexCount == 0", "mesh.subMeshCount == 0",
+    "previousVertexCount", "previousIndexCount", "lodVertexCount", "lodIndexCount",
+    "lodVertexCount >= previousVertexCount", "lodIndexCount >= previousIndexCount",
+    "mesh.GetIndexCount(subMesh)",
 ):
     require(token in lod_contract, "shared LOD contract is missing validation: " + token)
 
