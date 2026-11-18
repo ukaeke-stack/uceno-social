@@ -317,9 +317,11 @@ function assertProcessAuthority(): void {
   }
 }
 
-const loadedObjectWorlds = new Set<string>();
 async function ensureObjectStatesLoaded(worldId: string): Promise<void> {
-  if (loadedObjectWorlds.has(worldId)) return;
+  // Re-read persisted state whenever a client joins or reconnects. The SQL
+  // pool can recover its connections without restarting this process, so a
+  // process-lifetime "already loaded" cache would otherwise preserve stale
+  // registry defaults after a database outage.
   const rows = await sql`
     SELECT district_id AS "districtId", object_id AS "objectId",
       object_kind AS "objectKind", object_state AS "objectState", version
@@ -327,12 +329,13 @@ async function ensureObjectStatesLoaded(worldId: string): Promise<void> {
   `;
   for (const row of rows) {
     const target = INTERACTABLES.get(row.objectId);
+    const version = Number(row.version);
     if (!target || target.kind === "seat" || target.districtId !== row.districtId ||
-        target.kind !== row.objectKind || !isPersistentObjectState(target.kind, row.objectState)) continue;
+        target.kind !== row.objectKind || !isPersistentObjectState(target.kind, row.objectState) ||
+        !Number.isSafeInteger(version) || version < target.version) continue;
     target.state = row.objectState;
-    target.version = Number(row.version);
+    target.version = version;
   }
-  loadedObjectWorlds.add(worldId);
 }
 
 async function persistDatabaseObjectState(worldId: string, actorId: string, target: Interactable): Promise<boolean> {
