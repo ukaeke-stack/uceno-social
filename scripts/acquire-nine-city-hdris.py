@@ -123,8 +123,8 @@ for city_id, config in CITIES.items():
             continue
         if attributes.get("environment") == "indoor":
             continue
-        if attributes.get("sky_view") == "obstructed":
-            continue
+        # Urban street panoramas often have an intentionally obstructed sky.
+        # That is valid for city backdrops and must not exclude real streets.
 
         score = sum(3 for term in config["terms"] if term in searchable)
         if asset_id in config["preferred"]:
