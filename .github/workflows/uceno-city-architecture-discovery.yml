@@ -21,6 +21,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Test strict city-building discovery and acquisition filters
+        run: python -m unittest discover -s scripts/tests -p "test_city_architecture*.py"
       - name: Query live realistic CC0 architecture catalogue
         run: python scripts/discover-city-architecture.py
       - name: Download and verify first-batch city architecture GLBs
