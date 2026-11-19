@@ -105,7 +105,7 @@ import { calculateEarnedCreditGrant } from "../dist/activity-reward-policy.js";
 
 const rewardResult = (overrides = {}) => ({
   source: "authoritative_gateway",
-  resultId: "123e4567-e89b-42d3-a456-426614174001",
+  resultId: "42",
   sessionId: "123e4567-e89b-42d3-a456-426614174002",
   userId: "123e4567-e89b-42d3-a456-426614174003",
   activityKind: "checkpoint_race",
@@ -128,14 +128,14 @@ test("earned credit reward is derived only from an authoritative completed resul
   assert.equal(result.grant.currency, "earned_credits");
   assert.equal(result.grant.ledgerType, "earned");
   assert.equal(result.grant.idempotencyKey,
-    "activity-result:123e4567-e89b-42d3-a456-426614174001:earned-credits");
+    "activity-result:42:earned-credits");
 });
 
 test("rejects client-originated, unfinished, malformed and zero-value reward claims", () => {
   assert.equal(calculateEarnedCreditGrant(rewardResult({ source: "client" }), rewardRule).ok, false);
   assert.equal(calculateEarnedCreditGrant(rewardResult({ status: "dnf" }), rewardRule).ok, false);
   assert.equal(calculateEarnedCreditGrant(rewardResult({ placement: 0 }), rewardRule).ok, false);
-  assert.equal(calculateEarnedCreditGrant(rewardResult({ userId: "not-a-uuid" }), rewardRule).ok, false);
+  assert.equal(calculateEarnedCreditGrant(rewardResult({ resultId: "0" }), rewardRule).ok, false);
   assert.equal(calculateEarnedCreditGrant(rewardResult(), {
     ...rewardRule, baseCredits: 0, placementBonus: {}, maximumCreditsPerResult: 0
   }).ok, false);
