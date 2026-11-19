@@ -624,14 +624,81 @@ async function persistActivity(session: ActivitySession): Promise<boolean> {
         FOR UPDATE`;
       if (!authority[0]) return false;
       for (const [index, participant] of ordered.entries()) {
-        await tx`INSERT INTO virtual_world_activity_results
+        const resultRows = await tx`INSERT INTO virtual_world_activity_results
           (session_id, world_id, user_id, placement, status, checkpoint_index, finish_time)
           VALUES (${session.id}::uuid, ${session.worldId}::uuid, ${participant.userId}::uuid,
             ${participant.status === "finished" ? index + 1 : null}, ${participant.status},
             ${participant.checkpointIndex}, ${participant.finishTime})
           ON CONFLICT (session_id, user_id) DO UPDATE SET
             placement = EXCLUDED.placement, status = EXCLUDED.status,
-            checkpoint_index = EXCLUDED.checkpoint_index, finish_time = EXCLUDED.finish_time`;
+            checkpoint_index = EXCLUDED.checkpoint_index, finish_time = EXCLUDED.finish_time
+          RETURNING id`;
+        // Only server-simulated checkpoint-race finishes are currently eligible
+        // for mission progress. Other activity kinds need their own verified
+        // completion validators before they can produce mission events.
+        if (session.phase !== "completed" || participant.status !== "finished" ||
+            session.kind !== "checkpoint_race" || participant.finishTime === null || !resultRows[0]) continue;
+
+        const eventKind = "checkpoint_finished";
+        const missions = await tx`SELECT instance.id, template.target_count AS "targetCount",
+            template.reward_earned_credits AS "rewardEarnedCredits"
+          FROM virtual_world_daily_mission_instances AS instance
+          JOIN virtual_world_daily_mission_templates AS template
+            ON template.id = instance.template_id
+          WHERE template.enabled = TRUE
+            AND template.event_kind = ${eventKind}
+            AND (instance.world_id IS NULL OR instance.world_id = ${session.worldId}::uuid)
+            AND instance.starts_at <= to_timestamp(${participant.finishTime / 1000})
+            AND instance.ends_at > to_timestamp(${participant.finishTime / 1000})
+          FOR UPDATE OF instance`;
+
+        for (const mission of missions) {
+          const eventRows = await tx`INSERT INTO virtual_world_daily_mission_events
+            (event_id, mission_instance_id, user_id, activity_result_id, event_kind, occurred_at)
+            VALUES (${randomUUID()}::uuid, ${mission.id}::uuid, ${participant.userId}::uuid,
+              ${resultRows[0].id}, ${eventKind}, to_timestamp(${participant.finishTime / 1000}))
+            ON CONFLICT (mission_instance_id, user_id, activity_result_id) DO NOTHING
+            RETURNING event_id`;
+          if (!eventRows[0]) continue;
+
+          const progressRows = await tx`INSERT INTO virtual_world_daily_mission_progress
+            (mission_instance_id, user_id, progress_count, completed_at)
+            VALUES (${mission.id}::uuid, ${participant.userId}::uuid, 1,
+              CASE WHEN 1 >= ${mission.targetCount} THEN to_timestamp(${participant.finishTime / 1000}) ELSE NULL END)
+            ON CONFLICT (mission_instance_id, user_id) DO UPDATE SET
+              progress_count = LEAST(virtual_world_daily_mission_progress.progress_count + 1, ${mission.targetCount}),
+              completed_at = COALESCE(virtual_world_daily_mission_progress.completed_at,
+                CASE WHEN virtual_world_daily_mission_progress.progress_count + 1 >= ${mission.targetCount}
+                  THEN to_timestamp(${participant.finishTime / 1000}) ELSE NULL END),
+              version = virtual_world_daily_mission_progress.version + 1,
+              updated_at = NOW()
+            WHERE virtual_world_daily_mission_progress.completed_at IS NULL
+            RETURNING completed_at AS "completedAt"`;
+          if (!progressRows[0]?.completedAt) continue;
+
+          const rewardClaim = await tx`UPDATE virtual_world_daily_mission_progress
+            SET reward_issued_at = NOW(), updated_at = NOW()
+            WHERE mission_instance_id = ${mission.id}::uuid
+              AND user_id = ${participant.userId}::uuid
+              AND completed_at IS NOT NULL AND reward_issued_at IS NULL
+            RETURNING mission_instance_id`;
+          if (!rewardClaim[0]) continue;
+
+          const rewardAmount = String(mission.rewardEarnedCredits);
+          if (!/^(0|[1-9][0-9]*)$/.test(rewardAmount) || rewardAmount.length > 19 ||
+              (rewardAmount.length === 19 && rewardAmount > "9223372036854775807"))
+            throw new Error("daily_mission_reward_out_of_range");
+          if (rewardAmount !== "0") {
+            await tx`INSERT INTO virtual_world_earned_credit_ledger
+              (user_id, ledger_type, currency, amount, idempotency_key, source_type,
+               source_mission_instance_id, metadata)
+              VALUES (${participant.userId}::uuid, 'earned', 'earned_credits', ${rewardAmount}::bigint,
+                ${"mission:" + mission.id + ":" + participant.userId}, 'daily_mission',
+                ${mission.id}::uuid,
+                ${JSON.stringify({ activityResultId: String(resultRows[0].id), activitySessionId: session.id })}::jsonb)
+              ON CONFLICT (idempotency_key) DO NOTHING`;
+          }
+        }
       }
       return true;
     });
