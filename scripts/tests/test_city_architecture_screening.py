@@ -28,6 +28,23 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         self.assertIsNone(discovery.rejection_reason(
             asset("Glass Office Tower", [24, 62, 20]), "NexusDelta"))
 
+    def test_building_description_may_mention_walls_windows_and_columns(self):
+        building = asset(
+            "Modern Residential Tower", [24, 62, 20],
+            summary="Glass windows, concrete walls, steel columns, floor slabs and balconies."
+        )
+        self.assertIsNone(discovery.rejection_reason(building, "NexusDelta"))
+
+    def test_component_title_is_rejected_even_if_description_says_building(self):
+        component = asset(
+            "Office Tower Facade Panel", [8, 12, 0.2],
+            summary="Realistic exterior building component"
+        )
+        self.assertEqual(
+            discovery.rejection_reason(component, "NexusDelta"),
+            "individual-building-part-or-prop",
+        )
+
     def test_windmill_cross_is_not_a_complete_city_building(self):
         reason = discovery.rejection_reason(
             asset("Mill Sail Cross", [10.4, 10.4, 0.83]), "SolsticeBay")
@@ -56,6 +73,18 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         }
         with self.assertRaises(ValueError):
             acquisition.validate_complete_building(detail, "SolsticeBay")
+
+    def test_acquisition_allows_component_words_in_building_description(self):
+        detail = {
+            "title": "Modern Residential Tower",
+            "description": "Glass windows, concrete walls, steel columns and floor slabs.",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [24, 62, 20]},
+        }
+        self.assertEqual(
+            acquisition.validate_complete_building(detail, "NexusDelta"),
+            (24.0, 62.0, 20.0),
+        )
 
     def test_acquisition_accepts_full_scale_office_tower(self):
         detail = {
