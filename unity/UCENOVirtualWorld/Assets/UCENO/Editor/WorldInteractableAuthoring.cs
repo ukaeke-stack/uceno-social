@@ -1,8 +1,6 @@
 #if UNITY_EDITOR
 using System;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -120,14 +118,10 @@ namespace UCENO.VirtualWorld.Editor
             if (marker == null) marker = Undo.AddComponent<WorldInteractable>(selected);
             SerializedObject data = new SerializedObject(marker);
             data.FindProperty("kind").enumValueIndex = (int)kind;
-            string globalId = GlobalObjectId.GetGlobalObjectIdSlow(selected).ToString();
-            if (string.IsNullOrWhiteSpace(selected.scene.path) || string.IsNullOrWhiteSpace(globalId) || globalId == GlobalObjectId.Null.ToString())
-                throw new InvalidOperationException("Save the scene and prefab instance before assigning a stable UCENO object ID.");
-            using (SHA256 hash = SHA256.Create())
-            {
-                byte[] digest = hash.ComputeHash(Encoding.UTF8.GetBytes(globalId));
-                data.FindProperty("objectId").stringValue = "scene:" + BitConverter.ToString(digest, 0, 16).Replace("-", "").ToLowerInvariant();
-            }
+            // Persistent logical identity is independent of scene GUIDs and imported asset vendors.
+            SerializedProperty objectId = data.FindProperty("objectId");
+            if (string.IsNullOrWhiteSpace(objectId.stringValue))
+                objectId.stringValue = "uceno:" + Guid.NewGuid().ToString("N");
             // Never assume the selected assembly root is a door hinge.
             if (kind == WorldInteractableKind.Door) data.FindProperty("doorPivot").objectReferenceValue = null;
             data.ApplyModifiedProperties();
