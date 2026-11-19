@@ -559,12 +559,14 @@ async function recordTreasureDiscovery(player: Player, target: RegisteredInterac
     // authoring pipeline. Refuse ambiguous content instead of granting twice.
     if (clues.length !== 1) return { discovered: false, completed: false, rewardEarnedCredits: "0", code: "ambiguous_treasure_clue" };
     const clue = clues[0];
-    const progressRows = await tx`INSERT INTO virtual_world_treasure_progress (hunt_id, user_id)
+    await tx`INSERT INTO virtual_world_treasure_progress (hunt_id, user_id)
       VALUES (${clue.huntId}::uuid, ${player.id}::uuid)
-      ON CONFLICT (hunt_id, user_id) DO UPDATE SET
-        version = virtual_world_treasure_progress.version + 1,
-        updated_at = NOW()
-      RETURNING next_sequence AS "nextSequence", completed_at AS "completedAt"`;
+      ON CONFLICT (hunt_id, user_id) DO NOTHING`;
+    const progressRows = await tx`SELECT next_sequence AS "nextSequence",
+        completed_at AS "completedAt"
+      FROM virtual_world_treasure_progress
+      WHERE hunt_id = ${clue.huntId}::uuid AND user_id = ${player.id}::uuid
+      FOR UPDATE`;
     const progress = progressRows[0];
     if (!progress || progress.completedAt || Number(progress.nextSequence) !== Number(clue.sequence))
       return { discovered: false, completed: false, rewardEarnedCredits: "0",
