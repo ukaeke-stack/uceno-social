@@ -51,6 +51,16 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
         : "migration position unavailable";
       throw new Error(`Migration 037 failed: ${error instanceof Error ? error.message : String(error)}; SQL context: ${context}`);
     }
+    const expectedIndexes = [
+      "virtual_world_daily_mission_active_lookup_idx",
+      "virtual_world_daily_mission_template_event_idx",
+      "virtual_world_treasure_hunt_active_lookup_idx",
+      "virtual_world_treasure_clue_location_lookup_idx"
+    ];
+    const installedIndexes = await db`SELECT indexname FROM pg_indexes
+      WHERE schemaname = current_schema() AND indexname = ANY(${expectedIndexes})`;
+    assert.deepEqual(installedIndexes.map(row => row.indexname).sort(), expectedIndexes.sort());
+
     await db.unsafe("INSERT INTO users(id) VALUES ($1)", [userId]);
     await db.unsafe("INSERT INTO virtual_worlds(id) VALUES ($1)", [worldId]);
     await db.unsafe("INSERT INTO virtual_world_activity_sessions(id) VALUES ($1)", [resultSessionId]);
