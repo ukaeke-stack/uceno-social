@@ -226,3 +226,36 @@ test("treasure hunt rejects client discoveries and duplicate clue claims", () =>
   if (first.ok) assert.equal(applyTreasureDiscovery(clues, first.progress,
     treasureDiscovery(idA, 0)).ok, false);
 });
+
+import { readFileSync } from "node:fs";
+
+test("daily mission, treasure and Earned Credits schema is durable and replay-safe", () => {
+  const migration = readFileSync(new URL("../../../db/migrations/037_daily_missions_treasure_rewards.sql", import.meta.url), "utf8");
+  for (const marker of [
+    "virtual_world_daily_mission_templates",
+    "virtual_world_daily_mission_instances",
+    "virtual_world_daily_mission_progress",
+    "virtual_world_daily_mission_events",
+    "UNIQUE (mission_instance_id, user_id, activity_result_id)",
+    "virtual_world_treasure_hunts",
+    "virtual_world_treasure_clues",
+    "virtual_world_treasure_progress",
+    "virtual_world_treasure_discoveries",
+    "UNIQUE (hunt_id, user_id, sequence)",
+    "virtual_world_earned_credit_ledger",
+    "idempotency_key TEXT NOT NULL UNIQUE",
+    "earned_credit_ledger_is_append_only"
+  ]) assert.ok(migration.includes(marker), "migration missing " + marker);
+  assert.match(migration, /REFERENCES virtual_world_activity_results\(id\)/);
+  assert.match(migration, /BEFORE UPDATE OR DELETE ON virtual_world_earned_credit_ledger/);
+  assert.match(migration, /CHECK \(ledger_type = 'earned'\)/);
+  assert.match(migration, /CHECK \(currency = 'earned_credits'\)/);
+  assert.doesNotMatch(migration, /INSERT INTO virtual_world_(daily_mission|treasure)/);
+});
+
+test("reward source identity matches the database BIGSERIAL activity result key", () => {
+  assert.equal(calculateEarnedCreditGrant(rewardResult({ resultId: "42" }), rewardRule).ok, true);
+  assert.equal(calculateEarnedCreditGrant(rewardResult({ resultId: "0" }), rewardRule).ok, false);
+  assert.equal(calculateEarnedCreditGrant(rewardResult({ resultId: "1.5" }), rewardRule).ok, false);
+  assert.equal(calculateEarnedCreditGrant(rewardResult({ resultId: "9223372036854775808" }), rewardRule).ok, false);
+});
