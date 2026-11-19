@@ -304,11 +304,11 @@ namespace UCENO.VirtualWorld
             {
                 string catalogUrl = remoteCatalogUrl.Trim();
                 if (!Uri.TryCreate(catalogUrl, UriKind.Absolute, out Uri parsedCatalogUrl) ||
-                    (parsedCatalogUrl.Scheme != Uri.UriSchemeHttps && parsedCatalogUrl.Scheme != Uri.UriSchemeHttp))
+                    parsedCatalogUrl.Scheme != Uri.UriSchemeHttps)
                 {
                     initializing = false;
                     StatusChanged?.Invoke("Remote world catalog URL is invalid.");
-                    completed?.Invoke(false, "Remote catalog URL must be an absolute HTTP or HTTPS URL.");
+                    completed?.Invoke(false, "Remote catalog URL must be an absolute HTTPS URL.");
                     yield break;
                 }
 
