@@ -220,10 +220,10 @@ def main():
             page_diagnostics = []
             # The catalogue caps each response at 100 records. Read multiple
             # pages so relevance-ranked page one cannot hide qualifying assets.
-            for page in range(1, 4):
+            for page in range(1, 9):
                 params = urllib.parse.urlencode({
                     "q": query, "category": "buildings", "style": "realistic",
-                    "sort": "relevance", "limit": 100, "page": page
+                    "tag": "exterior", "sort": "relevance", "limit": 100, "page": page
                 })
                 results = unwrap(get(f"{BASE}/assets?{params}"))
                 if page == 1 and not results:
