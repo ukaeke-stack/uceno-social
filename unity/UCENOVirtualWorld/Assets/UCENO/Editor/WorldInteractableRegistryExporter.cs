@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -290,8 +291,19 @@ namespace UCENO.VirtualWorld.Editor
 
         private static string StableObjectId(WorldInteractable marker)
         {
-            // Persist identity on the logical component, not on the Unity scene object or vendor prefab.
-            string id = "uceno:" + Guid.NewGuid().ToString("N");
+            // Derive a repeatable ID from Unity's persistent scene/object identity.
+            // Saving scenes before export ensures GlobalObjectId contains a stable scene GUID.
+            string globalId = GlobalObjectId.GetGlobalObjectIdSlow(marker).ToString();
+            if (string.IsNullOrWhiteSpace(globalId) || globalId.Contains("-0-0-0-0"))
+                throw new InvalidOperationException("Cannot derive a stable interactable ID from an unsaved scene object.");
+            string id;
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] digest = sha.ComputeHash(Encoding.UTF8.GetBytes(globalId));
+                id = "uceno:" + BitConverter.ToString(digest).Replace("-", "").ToLowerInvariant().Substring(0, 32);
+            }
+            // Retain a defensive GUID fallback token for compatibility with older authoring flows.
+            if (string.IsNullOrEmpty(id)) id = "uceno:" + Guid.NewGuid().ToString("N");
             SerializedObject data = new SerializedObject(marker);
             data.FindProperty("objectId").stringValue = id;
             data.ApplyModifiedPropertiesWithoutUndo();
