@@ -200,7 +200,7 @@ namespace UCENO.VirtualWorld.Editor
                 fileUrl.Scheme == Uri.UriSchemeHttps && fileUrl.Host == "dl.polyhaven.org",
                 city.cityId + " HDRI download URL is not a trusted HTTPS Poly Haven file URL.");
 
-            string relativeFile = hdriPath.Substring(projectRoot.Length + 1).Replace('\\\\', '/');
+            string relativeFile = hdriPath.Substring(projectRoot.Length + 1).Replace('\\', '/');
             Require(string.Equals(provenance.file, relativeFile, StringComparison.Ordinal),
                 city.cityId + " HDRI provenance points to a different file path.");
             var fileInfo = new FileInfo(hdriPath);
