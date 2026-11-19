@@ -91,6 +91,32 @@ if PROFILES.exists():
         require(all(path.startswith(profile["assetRoot"] + "/") for path in paths),
                 f"{city_id} has assets outside its own root")
         all_paths.extend(paths)
+
+        unity_root = ROOT / "unity/UCENOVirtualWorld"
+        city_root = unity_root / "Assets/UCENO/Cities" / city_id
+        manifest = city_root / "source-manifest.json"
+        require(manifest.is_file(),
+                f"{city_id} is missing its real source-manifest.json file")
+        manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
+        manifest_assets = manifest_data.get("assets", [])
+        require(len(manifest_assets) == 12,
+                f"{city_id} source manifest must account for exactly 12 prefabs")
+        manifest_paths = {entry.get("prefab") for entry in manifest_assets}
+        require(manifest_paths == set(paths),
+                f"{city_id} source manifest must cover the exact configured prefab paths")
+
+        for asset_path in paths:
+            disk_path = unity_root / asset_path
+            require(disk_path.is_file(),
+                    f"{city_id} configured prefab is absent from the repository: {asset_path}")
+
+        skybox_path = unity_root / profile["skyboxTexture"]
+        require(skybox_path.is_file(),
+                f"{city_id} city-specific HDRI source file is absent: {profile['skyboxTexture']}")
+        hdri_provenance = skybox_path.parent / "hdri-provenance.json"
+        require(hdri_provenance.is_file(),
+                f"{city_id} is missing its HDRI provenance record")
+
     require(len(all_paths) == len(set(all_paths)),
             "prefab paths must never be shared between cities")
 
