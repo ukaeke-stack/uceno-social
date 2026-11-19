@@ -39,6 +39,10 @@ namespace UCENO.VirtualWorld
         private readonly HashSet<string> residencyLoads = new HashSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<string, AsyncOperationHandle<IList<UnityEngine.Object>>> pendingLoadHandles =
             new Dictionary<string, AsyncOperationHandle<IList<UnityEngine.Object>>>(StringComparer.Ordinal);
+        private readonly Dictionary<string, AsyncOperationHandle<long>> pendingSizeHandles =
+            new Dictionary<string, AsyncOperationHandle<long>>(StringComparer.Ordinal);
+        private readonly Dictionary<string, AsyncOperationHandle> pendingDependencyHandles =
+            new Dictionary<string, AsyncOperationHandle>(StringComparer.Ordinal);
         private readonly Dictionary<string, AsyncOperationHandle<SceneInstance>> residentSceneHandles =
             new Dictionary<string, AsyncOperationHandle<SceneInstance>>(StringComparer.Ordinal);
         private readonly Dictionary<string, AsyncOperationHandle<SceneInstance>> pendingSceneHandles =
@@ -230,6 +234,10 @@ namespace UCENO.VirtualWorld
                 if (handle.IsValid()) Addressables.Release(handle);
             foreach (AsyncOperationHandle<IList<UnityEngine.Object>> handle in pendingLoadHandles.Values)
                 if (handle.IsValid()) Addressables.Release(handle);
+            foreach (AsyncOperationHandle<long> handle in pendingSizeHandles.Values)
+                if (handle.IsValid()) Addressables.Release(handle);
+            foreach (AsyncOperationHandle handle in pendingDependencyHandles.Values)
+                if (handle.IsValid()) Addressables.Release(handle);
             foreach (AsyncOperationHandle<SceneInstance> handle in residentSceneHandles.Values)
             {
                 if (handle.IsValid()) Addressables.UnloadSceneAsync(handle, true);
@@ -259,6 +267,8 @@ namespace UCENO.VirtualWorld
                 };
             }
             pendingLoadHandles.Clear();
+            pendingSizeHandles.Clear();
+            pendingDependencyHandles.Clear();
             residentHandles.Clear();
             residentSceneHandles.Clear();
             pendingSceneHandles.Clear();
@@ -424,7 +434,9 @@ namespace UCENO.VirtualWorld
             {
                 StatusChanged?.Invoke("Preparing " + label + " (attempt " + attempt + ")...");
                 AsyncOperationHandle<long> sizeHandle = Addressables.GetDownloadSizeAsync(label);
+                pendingSizeHandles[label] = sizeHandle;
                 yield return sizeHandle;
+                pendingSizeHandles.Remove(label);
                 if (sizeHandle.Status != AsyncOperationStatus.Succeeded)
                 {
                     lastError = "Could not calculate the content download size.";
@@ -445,12 +457,14 @@ namespace UCENO.VirtualWorld
                 }
 
                 AsyncOperationHandle download = Addressables.DownloadDependenciesAsync(label, false);
+                pendingDependencyHandles[label] = download;
                 while (!download.IsDone)
                 {
                     ProgressChanged?.Invoke(label, download.PercentComplete);
                     yield return null;
                 }
 
+                pendingDependencyHandles.Remove(label);
                 if (download.Status == AsyncOperationStatus.Succeeded)
                 {
                     ProgressChanged?.Invoke(label, 1f);
