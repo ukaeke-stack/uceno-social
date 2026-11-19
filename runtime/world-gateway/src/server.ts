@@ -559,6 +559,15 @@ async function recordTreasureDiscovery(player: Player, target: RegisteredInterac
     // authoring pipeline. Refuse ambiguous content instead of granting twice.
     if (clues.length !== 1) return { discovered: false, completed: false, rewardEarnedCredits: "0", code: "ambiguous_treasure_clue" };
     const clue = clues[0];
+    const chainRows = await tx`SELECT COUNT(*)::integer AS total,
+        MIN(sequence)::integer AS first_sequence,
+        MAX(sequence)::integer AS last_sequence
+      FROM virtual_world_treasure_clues WHERE hunt_id = ${clue.huntId}::uuid`;
+    const chain = chainRows[0];
+    const chainTotal = Number(chain?.total ?? 0);
+    if (chainTotal < 2 || chainTotal > 100 ||
+        Number(chain.first_sequence) !== 0 || Number(chain.last_sequence) !== chainTotal - 1)
+      return { discovered: false, completed: false, rewardEarnedCredits: "0", code: "treasure_hunt_invalid_clue_chain" };
     await tx`INSERT INTO virtual_world_treasure_progress (hunt_id, user_id)
       VALUES (${clue.huntId}::uuid, ${player.id}::uuid)
       ON CONFLICT (hunt_id, user_id) DO NOTHING`;
@@ -580,11 +589,7 @@ async function recordTreasureDiscovery(player: Player, target: RegisteredInterac
       RETURNING id`;
     if (!inserted.length) return { discovered: false, completed: false, rewardEarnedCredits: "0", code: "treasure_clue_already_discovered" };
 
-    const totals = await tx`SELECT COUNT(*)::integer AS total
-      FROM virtual_world_treasure_clues WHERE hunt_id = ${clue.huntId}::uuid`;
-    const total = Number(totals[0]?.total ?? 0);
-    if (total < 2 || total > 100) throw new Error("treasure_hunt_invalid_clue_count");
-    const completed = Number(clue.sequence) + 1 === total;
+    const completed = Number(clue.sequence) + 1 === chainTotal;
     await tx`UPDATE virtual_world_treasure_progress SET
         next_sequence = next_sequence + 1,
         completed_at = CASE WHEN ${completed} THEN to_timestamp(${now / 1000}) ELSE NULL END,
