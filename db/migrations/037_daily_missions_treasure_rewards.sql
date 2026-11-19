@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS virtual_world_daily_mission_templates (
   code TEXT NOT NULL UNIQUE CHECK (code ~ '^[a-z0-9][a-z0-9_-]{2,63}$'),
   title TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 120),
   event_kind TEXT NOT NULL CHECK (event_kind IN (
-    'checkpoint_finished', 'dance_completed', 'adventure_objective'
+    'checkpoint_finished', 'dance_completed', 'sports_completed', 'adventure_objective'
   )),
   target_count INTEGER NOT NULL CHECK (target_count BETWEEN 1 AND 10000),
   reward_earned_credits BIGINT NOT NULL DEFAULT 0 CHECK (reward_earned_credits >= 0),
