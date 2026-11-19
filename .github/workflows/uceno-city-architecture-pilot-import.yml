@@ -47,7 +47,9 @@ jobs:
           mkdir -p artifacts/pilot-input
           cp "$candidate" artifacts/pilot-input/solsticebay-lod0.glb
           echo "path=$PWD/artifacts/pilot-input/solsticebay-lod0.glb" >> "$GITHUB_OUTPUT"
-          sha256sum artifacts/pilot-input/solsticebay-lod0.glb | tee artifacts/pilot-input/SHA256SUMS
+          sha="$(sha256sum artifacts/pilot-input/solsticebay-lod0.glb | cut -d ' ' -f 1)"
+          printf "%s  %s\\n" "$sha" "solsticebay-lod0.glb" | tee artifacts/pilot-input/SHA256SUMS
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Run Unity Editor import-only pilot
         uses: game-ci/unity-builder@v4
@@ -56,6 +58,7 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UCENO_PILOT_GLB: ${{ steps.candidate.outputs.path }}
+          UCENO_PILOT_EXPECTED_SHA256: ${{ steps.candidate.outputs.sha256 }}
         with:
           projectPath: unity/UCENOVirtualWorld
           unityVersion: 6000.3.27f1
