@@ -128,6 +128,19 @@ CREATE INDEX IF NOT EXISTS virtual_world_treasure_discoveries_user_idx
 
 -- This ledger is for gameplay Earned Credits only. Purchased Credits and Cash
 -- Rewards must use separate accounting systems and cannot be represented here.
+-- Keep the gateway's active-schedule and clue lookups bounded as mission
+-- templates and city content grow. These indexes are additive and safe for
+-- empty/new installations; they do not seed schedules or invented clue data.
+CREATE INDEX IF NOT EXISTS virtual_world_daily_mission_active_lookup_idx
+  ON virtual_world_daily_mission_instances (world_id, starts_at, ends_at, template_id);
+CREATE INDEX IF NOT EXISTS virtual_world_daily_mission_template_event_idx
+  ON virtual_world_daily_mission_templates (event_kind, enabled);
+CREATE INDEX IF NOT EXISTS virtual_world_treasure_hunt_active_lookup_idx
+  ON virtual_world_treasure_hunts (starts_at, ends_at, city_id)
+  WHERE enabled = TRUE;
+CREATE INDEX IF NOT EXISTS virtual_world_treasure_clue_location_lookup_idx
+  ON virtual_world_treasure_clues (city_id, district_id, interactable_id, hunt_id);
+
 CREATE TABLE IF NOT EXISTS virtual_world_earned_credit_ledger (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
