@@ -1,4 +1,13 @@
 {
+  "scopedRegistries": [
+    {
+      "name": "OpenUPM",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "org.khronos.unitygltf"
+      ]
+    }
+  ],
   "dependencies": {
     "com.unity.addressables": "2.7.6",
     "com.unity.modules.physics": "1.0.0",
@@ -7,6 +16,9 @@
     "com.unity.modules.animation": "1.0.0",
     "com.unity.modules.unitywebrequest": "1.0.0",
     "com.endel.nativewebsocket": "https://github.com/endel/NativeWebSocket.git#upm",
-    "io.livekit:client-sdk-unity": "https://github.com/livekit/client-sdk-unity.git#v2.1.0"
+    "io.livekit:client-sdk-unity": "https://github.com/livekit/client-sdk-unity.git#v2.1.0",
+    "org.khronos.unitygltf": "2.24.0",
+    "com.unity.cloud.ktx": "3.8.0",
+    "com.unity.meshopt.decompress": "0.2.0-exp.1"
   }
 }
