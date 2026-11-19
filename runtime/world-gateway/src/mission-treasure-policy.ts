@@ -8,7 +8,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 export interface DailyMission {
   id: string;
-  eventKind: "checkpoint_finished" | "dance_completed" | "adventure_objective";
+  eventKind: "checkpoint_finished" | "dance_completed" | "sports_completed" | "adventure_objective";
   targetCount: number;
   startsAt: number;
   endsAt: number;
