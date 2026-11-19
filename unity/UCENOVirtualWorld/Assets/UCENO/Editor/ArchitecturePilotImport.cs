@@ -36,6 +36,8 @@ namespace UCENO.VirtualWorld.Editor
             public int triangleCount;
             public string[] meshNames;
             public string[] materialNames;
+            public string[] textureNames;
+            public string[] textureBindings;
             public string[] errors;
             public string status;
         }
@@ -63,13 +65,15 @@ namespace UCENO.VirtualWorld.Editor
 
             var report = new ImportReport
             {
-                candidate = "SolsticeBay Korean Apartment Tower (Tevy CC0 candidate)",
+                candidate = Environment.GetEnvironmentVariable("UCENO_PILOT_CANDIDATE_NAME") ?? "Unspecified manifest candidate",
                 importedAssetPath = destination,
                 unityVersion = Application.unityVersion,
                 sourceSha256 = actualSha,
                 sourceBytes = new FileInfo(source).Length,
                 meshNames = Array.Empty<string>(),
                 materialNames = Array.Empty<string>(),
+                textureNames = Array.Empty<string>(),
+                textureBindings = Array.Empty<string>(),
                 errors = Array.Empty<string>(),
                 status = "failed"
             };
@@ -93,17 +97,40 @@ namespace UCENO.VirtualWorld.Editor
                 .Concat(skinned.Where(x => x.sharedMesh != null).Select(x => x.sharedMesh)).ToArray();
             Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
             Material[] materials = renderers.SelectMany(x => x.sharedMaterials).Where(x => x != null).Distinct().ToArray();
-            Texture[] textures = materials.Select(x => x.mainTexture).Where(x => x != null).Distinct().ToArray();
+            var textureReferences = new List<string>();
+            var textures = new HashSet<Texture>();
+            foreach (Material material in materials)
+            {
+                Shader shader = material.shader;
+                if (shader == null) continue;
+                for (int propertyIndex = 0; propertyIndex < shader.GetPropertyCount(); propertyIndex++)
+                {
+                    if (shader.GetPropertyType(propertyIndex) != UnityEngine.Rendering.ShaderPropertyType.Texture)
+                        continue;
+                    string propertyName = shader.GetPropertyName(propertyIndex);
+                    if (!material.HasProperty(propertyName)) continue;
+                    Texture texture = material.GetTexture(propertyName);
+                    if (texture == null) continue;
+                    textures.Add(texture);
+                    textureReferences.Add(material.name + ":" + propertyName + "->" + texture.name);
+                }
+            }
 
             report.meshCount = meshes.Length;
             report.rendererCount = renderers.Length;
             report.materialCount = materials.Length;
-            report.texturedMaterialCount = materials.Count(x => x.mainTexture != null);
-            report.textureCount = textures.Length;
+            report.texturedMaterialCount = materials.Count(material =>
+                material.shader != null && Enumerable.Range(0, material.shader.GetPropertyCount())
+                    .Any(i => material.shader.GetPropertyType(i) == UnityEngine.Rendering.ShaderPropertyType.Texture &&
+                              material.HasProperty(material.shader.GetPropertyName(i)) &&
+                              material.GetTexture(material.shader.GetPropertyName(i)) != null));
+            report.textureCount = textures.Count;
             report.triangleCount = meshes.Sum(x => Enumerable.Range(0, x.subMeshCount)
                 .Sum(i => (int)(x.GetIndexCount(i) / 3)));
             report.meshNames = meshes.Select(x => x.name).ToArray();
             report.materialNames = materials.Select(x => x.name).ToArray();
+            report.textureNames = textures.Select(x => x.name).ToArray();
+            report.textureBindings = textureReferences.ToArray();
 
             var errors = new List<string>();
             if (report.meshCount == 0) errors.Add("No imported meshes were found.");
@@ -111,7 +138,7 @@ namespace UCENO.VirtualWorld.Editor
             if (report.triangleCount == 0) errors.Add("Imported geometry contains zero triangles.");
             if (report.materialCount == 0) errors.Add("No imported materials were found.");
             if (report.texturedMaterialCount == 0 || report.textureCount == 0)
-                errors.Add("No material main textures were exposed by the imported GLB.");
+                errors.Add("No shader texture-property bindings were exposed by the imported GLB.");
             report.errors = errors.ToArray();
             report.status = errors.Count == 0 ? "technical-import-pass-visual-review-pending" : "failed";
             WriteReport(report);
