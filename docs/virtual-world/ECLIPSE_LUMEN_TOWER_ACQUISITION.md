@@ -57,3 +57,23 @@ The source model is a modern 15-storey slab office tower with a podium and rooft
 - Human visual acceptance: **No**
 
 Do not add this candidate to `Assets/UCENO/Cities/eclipse/source-manifest.json` or change the city asset profile until all applicable checks above pass.
+
+## Unity importer compatibility investigation (2026-11-19)
+
+The official Unity package registry currently lists **com.unity.cloud.gltfast 6.21.0** as the latest stable release. Its package metadata specifies Unity **6000.0 or newer**, so the package's declared Unity floor includes this project's Unity 6000.3.27f1 editor version. This is a compatibility indication, not a verified project import or compile.
+
+Official glTFast documentation confirms:
+- Editor import of GLB files into Unity-native imported assets/prefabs.
+- KTX2/Basis texture import through the separate **com.unity.cloud.ktx** package.
+- EXT_meshopt_compression import through the separate **com.unity.meshopt.decompress** package.
+- Normal texture import is supported; the importer does not by itself prove that this particular asset contains a valid 1K+ normal map.
+
+References:
+- https://github.com/Unity-Technologies/com.unity.cloud.gltfast
+- https://docs.unity3d.com/Packages/com.unity.cloud.ktx@latest
+- https://docs.unity3d.com/Packages/com.unity.meshopt.decompress@0.1/manual/index.html
+- https://versionalert.com/unity/package-releases/com.unity.cloud.gltfast/6.21.0
+
+**Import decision:** glTFast 6.21.0 is the leading importer candidate for a controlled Unity 6000.3 test. Do not add it or its optional packages to the project manifest yet. First inspect the downloaded GLB extension declarations and texture payloads, then pin mutually compatible stable package versions and verify import in the actual Unity Editor. Do not install the latest pre-release package merely because it appears on the repository's main branch.
+
+This investigation did not obtain the model binaries. The Tevy download endpoint returned an unsupported binary content type to the browser retrieval layer, and the container download attempt failed. Consequently, no GLB bytes, checksums, KTX2 payloads, meshopt payloads, or texture dimensions were inspected locally.
