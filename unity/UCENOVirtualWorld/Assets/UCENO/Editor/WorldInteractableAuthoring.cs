@@ -1,6 +1,8 @@
 #if UNITY_EDITOR
 using System;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -110,6 +112,18 @@ namespace UCENO.VirtualWorld.Editor
             }
         }
 
+        private static string StableObjectId(UnityEngine.Object target)
+        {
+            string globalId = GlobalObjectId.GetGlobalObjectIdSlow(target).ToString();
+            if (string.IsNullOrWhiteSpace(globalId) || globalId.Contains("-0-0-0-0"))
+                throw new InvalidOperationException("Save the scene object before assigning its persistent UCENO identity.");
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] digest = sha.ComputeHash(Encoding.UTF8.GetBytes(globalId));
+                return "uceno:" + BitConverter.ToString(digest).Replace("-", "").ToLowerInvariant().Substring(0, 32);
+            }
+        }
+
         private static void Add(WorldInteractableKind kind)
         {
             GameObject selected = Selection.activeGameObject;
@@ -121,7 +135,7 @@ namespace UCENO.VirtualWorld.Editor
             // Persistent logical identity is independent of scene GUIDs and imported asset vendors.
             SerializedProperty objectId = data.FindProperty("objectId");
             if (string.IsNullOrWhiteSpace(objectId.stringValue))
-                objectId.stringValue = "uceno:" + Guid.NewGuid().ToString("N");
+                objectId.stringValue = StableObjectId(marker);
             // Never assume the selected assembly root is a door hinge.
             if (kind == WorldInteractableKind.Door) data.FindProperty("doorPivot").objectReferenceValue = null;
             data.ApplyModifiedProperties();
