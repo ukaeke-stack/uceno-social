@@ -271,3 +271,54 @@ test("daily mission policy accepts verified sports completions", () => {
   assert.equal(result.ok, true);
   if (result.ok) assert.equal(result.progress.completedAt, 2_000);
 });
+
+const HUNT = "123e4567-e89b-12d3-a456-426614174010";
+const TREASURE_USER = "123e4567-e89b-12d3-a456-426614174011";
+const CLUES = [
+  { id: "123e4567-e89b-12d3-a456-426614174012", sequence: 0 },
+  { id: "123e4567-e89b-12d3-a456-426614174013", sequence: 1 },
+  { id: "123e4567-e89b-12d3-a456-426614174014", sequence: 2 }
+];
+function treasureProgress(overrides = {}) {
+  return { huntId: HUNT, userId: TREASURE_USER, nextSequence: 0,
+    discoveredClueIds: [], completedAt: null, ...overrides };
+}
+function treasureDiscovery(clue = CLUES[0], overrides = {}) {
+  return { source: "authoritative_gateway", huntId: HUNT, userId: TREASURE_USER,
+    clueId: clue.id, sequence: clue.sequence, discoveredAt: 2_000, ...overrides };
+}
+
+test("treasure discovery requires the next clue and rejects out-of-order attempts", () => {
+  const rejected = applyTreasureDiscovery(CLUES, treasureProgress(),
+    treasureDiscovery(CLUES[1]));
+  assert.equal(rejected.ok, false);
+  if (!rejected.ok) assert.equal(rejected.code, "treasure_clue_out_of_order");
+  assert.equal(applyTreasureDiscovery(CLUES, treasureProgress(),
+    treasureDiscovery(CLUES[0])).ok, true);
+});
+
+test("treasure discovery is idempotently rejected after a clue is already recorded", () => {
+  const progress = treasureProgress({ nextSequence: 1, discoveredClueIds: [CLUES[0].id] });
+  const duplicate = applyTreasureDiscovery(CLUES, progress, treasureDiscovery(CLUES[0]));
+  assert.equal(duplicate.ok, false);
+  if (!duplicate.ok) assert.equal(duplicate.code, "treasure_clue_already_discovered");
+});
+
+test("treasure completion occurs only after the final ordered clue", () => {
+  const progress = treasureProgress({ nextSequence: 2,
+    discoveredClueIds: [CLUES[0].id, CLUES[1].id] });
+  const result = applyTreasureDiscovery(CLUES, progress, treasureDiscovery(CLUES[2]));
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.completed, true);
+    assert.equal(result.progress.nextSequence, 3);
+    assert.equal(result.progress.completedAt, 2_000);
+  }
+});
+
+test("treasure discovery rejects malformed chains and unauthoritative sources", () => {
+  const gap = [CLUES[0], { ...CLUES[2], sequence: 2 }];
+  assert.equal(applyTreasureDiscovery(gap, treasureProgress(), treasureDiscovery()).ok, false);
+  assert.equal(applyTreasureDiscovery(CLUES, treasureProgress(),
+    treasureDiscovery(CLUES[0], { source: "client" })).ok, false);
+});
