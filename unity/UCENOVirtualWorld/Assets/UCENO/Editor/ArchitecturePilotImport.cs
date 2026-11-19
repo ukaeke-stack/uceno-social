@@ -44,7 +44,8 @@ namespace UCENO.VirtualWorld.Editor
 
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "UCENO/ImportStaging/SolsticeBay"));
             string destination = StagingRoot + "/solsticebay-apartment-lod0.glb";
-            File.Copy(source, destination, true);
+            string destinationAbsolute = Path.Combine(Application.dataPath, "UCENO/ImportStaging/SolsticeBay/solsticebay-apartment-lod0.glb");
+            File.Copy(source, destinationAbsolute, true);
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             AssetDatabase.ImportAsset(destination, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
 
