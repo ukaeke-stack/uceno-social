@@ -149,3 +149,80 @@ test("reward policy cannot create Purchased Credits or cash payouts", () => {
     ["amount", "currency", "idempotencyKey", "ledgerType", "sessionId", "sourceResultId", "userId"].sort());
   assert.equal(result.grant.currency, "earned_credits");
 });
+
+import { applyDailyMissionEvent, applyTreasureDiscovery } from "../dist/mission-treasure-policy.js";
+
+const idA = "123e4567-e89b-42d3-a456-426614174010";
+const idB = "123e4567-e89b-42d3-a456-426614174011";
+const idC = "123e4567-e89b-42d3-a456-426614174012";
+const idD = "123e4567-e89b-42d3-a456-426614174013";
+const mission = { id: idA, eventKind: "checkpoint_finished", targetCount: 2,
+  startsAt: 1_000, endsAt: 10_000 };
+const missionProgress = () => ({ missionId: idA, userId: idB, count: 0,
+  completedAt: null, processedEventIds: [] });
+const missionEvent = (eventId, overrides = {}) => ({ source: "authoritative_gateway",
+  eventId, missionId: idA, userId: idB, eventKind: "checkpoint_finished",
+  occurredAt: 2_000, ...overrides });
+
+test("daily mission progress is authoritative, windowed and replay-safe", () => {
+  const first = applyDailyMissionEvent(mission, missionProgress(), missionEvent(idC));
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  assert.equal(first.progress.count, 1);
+  const replay = applyDailyMissionEvent(mission, first.progress, missionEvent(idC));
+  assert.equal(replay.ok, true);
+  if (replay.ok) assert.equal(replay.duplicate, true);
+  const second = applyDailyMissionEvent(mission, first.progress, missionEvent(idD, { occurredAt: 3_000 }));
+  assert.equal(second.ok, true);
+  if (second.ok) {
+    assert.equal(second.progress.count, 2);
+    assert.equal(second.progress.completedAt, 3_000);
+  }
+});
+
+test("daily missions reject client claims, wrong event kinds and out-of-window events", () => {
+  assert.equal(applyDailyMissionEvent(mission, missionProgress(),
+    missionEvent(idC, { source: "client" })).ok, false);
+  assert.equal(applyDailyMissionEvent(mission, missionProgress(),
+    missionEvent(idC, { eventKind: "dance_completed" })).ok, false);
+  assert.equal(applyDailyMissionEvent(mission, missionProgress(),
+    missionEvent(idC, { occurredAt: 10_000 })).ok, false);
+});
+
+const clues = [
+  { id: idA, sequence: 0 },
+  { id: idB, sequence: 1 },
+  { id: idC, sequence: 2 }
+];
+const treasureProgress = () => ({ huntId: idD, userId: idA, nextSequence: 0,
+  discoveredClueIds: [], completedAt: null });
+const treasureDiscovery = (clueId, sequence, overrides = {}) => ({
+  source: "authoritative_gateway", huntId: idD, userId: idA, clueId, sequence,
+  discoveredAt: 2_000, ...overrides
+});
+
+test("treasure hunt enforces ordered clues and completes once the chain is solved", () => {
+  const outOfOrder = applyTreasureDiscovery(clues, treasureProgress(), treasureDiscovery(idB, 1));
+  assert.equal(outOfOrder.ok, false);
+  const first = applyTreasureDiscovery(clues, treasureProgress(), treasureDiscovery(idA, 0));
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  const second = applyTreasureDiscovery(clues, first.progress, treasureDiscovery(idB, 1));
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+  const final = applyTreasureDiscovery(clues, second.progress, treasureDiscovery(idC, 2));
+  assert.equal(final.ok, true);
+  if (final.ok) {
+    assert.equal(final.completed, true);
+    assert.equal(final.progress.completedAt, 2_000);
+  }
+});
+
+test("treasure hunt rejects client discoveries and duplicate clue claims", () => {
+  assert.equal(applyTreasureDiscovery(clues, treasureProgress(),
+    treasureDiscovery(idA, 0, { source: "client" })).ok, false);
+  const first = applyTreasureDiscovery(clues, treasureProgress(), treasureDiscovery(idA, 0));
+  assert.equal(first.ok, true);
+  if (first.ok) assert.equal(applyTreasureDiscovery(clues, first.progress,
+    treasureDiscovery(idA, 0)).ok, false);
+});
