@@ -215,19 +215,31 @@ def main():
         raw_by_slug = {}
         query_diagnostics = []
         for query in queries:
-            params = urllib.parse.urlencode({
-                "q": query, "category": "buildings", "style": "realistic",
-                "sort": "relevance", "limit": 100
-            })
-            results = unwrap(get(f"{BASE}/assets?{params}"))
+            query_results = []
             used_fallback = False
-            if not results:
-                fallback = urllib.parse.urlencode({"q": query, "sort": "relevance", "limit": 100})
-                results = unwrap(get(f"{BASE}/assets?{fallback}"))
-                used_fallback = True
+            page_diagnostics = []
+            # The catalogue caps each response at 100 records. Read multiple
+            # pages so relevance-ranked page one cannot hide qualifying assets.
+            for page in range(1, 4):
+                params = urllib.parse.urlencode({
+                    "q": query, "category": "buildings", "style": "realistic",
+                    "sort": "relevance", "limit": 100, "page": page
+                })
+                results = unwrap(get(f"{BASE}/assets?{params}"))
+                if page == 1 and not results:
+                    fallback = urllib.parse.urlencode({
+                        "q": query, "sort": "relevance", "limit": 100, "page": page
+                    })
+                    results = unwrap(get(f"{BASE}/assets?{fallback}"))
+                    used_fallback = True
+                page_diagnostics.append({"page": page, "result_count": len(results)})
+                query_results.extend(results)
+                if len(results) < 100:
+                    break
             query_diagnostics.append({
                 "query": query,
-                "result_count": len(results),
+                "result_count": len(query_results),
+                "pages_checked": page_diagnostics,
                 "fallback_without_category_or_style": used_fallback,
                 "sample_records": [{
                     "slug": item.get("slug") or item.get("id"),
@@ -237,9 +249,9 @@ def main():
                     "tags": tag_slugs(item),
                     "stats": item.get("stats"),
                     "summary": item.get("summary") or item.get("description"),
-                } for item in results[:8]],
+                } for item in query_results[:8]],
             })
-            for item in results:
+            for item in query_results:
                 slug = item.get("slug") or item.get("id")
                 if slug:
                     raw_by_slug[slug] = item
