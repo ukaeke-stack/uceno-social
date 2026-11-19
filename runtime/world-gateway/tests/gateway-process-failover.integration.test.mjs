@@ -568,7 +568,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
           await delay(250);
         }
       }
-      assert.ok(recoverySocket, `gateway WebSocket authorization did not recover: ${lastAuthError?.message ?? "unknown error"}`);
+      assert.ok(recoverySocket, `gateway WebSocket authorization did not recover: ${lastAuthError?.message ?? "unknown error"}; gatewayB exitCode=${gatewayB?.exitCode}; signalCode=${gatewayB?.signalCode}; process output:\n${gatewayB?.testOutput?.() ?? "unavailable"}`);
       assert.equal(recoverySocket.welcome.state.x, 37.5,
         "database reconnect must restore the durable player checkpoint, not the city spawn");
       assert.equal(recoverySocket.welcome.state.z, -22.25,
