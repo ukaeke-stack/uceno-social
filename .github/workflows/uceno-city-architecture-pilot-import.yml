@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          manifest="$(find acquisition -type f -name tevy-acquisition-manifest.json -print -quit)"
+          manifest="$(find "$RUNNER_TEMP/uceno-city-architecture-source-acquisition" -type f -name tevy-acquisition-manifest.json -print -quit)"
           test -n "$manifest"
           python - "$manifest" "$RUNNER_TEMP/uceno-city-architecture-source-acquisition" "$GITHUB_OUTPUT" <<'PY'
           import hashlib, json, os, pathlib, shutil, sys
@@ -76,6 +76,16 @@ jobs:
           (destination.parent / "SHA256SUMS").write_text(f"{expected}  solsticebay-lod0.glb\n", encoding="utf-8")
           print(f"Selected manifest-pinned candidate: {candidate.get('name')} ({candidate.get('slug')})")
           PY
+
+      - name: Confirm repository is clean before Unity Builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --short
+            echo "Repository must be clean before Unity Builder semantic versioning." >&2
+            exit 1
+          fi
 
       - name: Run Unity Editor import-only pilot
         uses: game-ci/unity-builder@v4
