@@ -31,7 +31,8 @@ function rejected(registry, districtDoc, pattern) {
   assert.match(result.stderr, pattern);
 }
 try {
-  const valid = run({ interactables: [item] });
+  const valid = run({ interactables: [item, { ...item,
+    id: "uceno:fedcba9876543210fedcba9876543210", x: 125 }] });
   assert.equal(valid.status, 0, valid.stderr);
   assert.match(valid.stdout, /Gateway parser validated 1 exported scene interactables against 2 configured districts/);
 
@@ -50,7 +51,7 @@ try {
   rejected({ interactables: Array.from({ length: 501 }, (_, i) => ({ ...item,
     id: "scene:" + i.toString(16).padStart(32, "0") })) }, districts, /cannot exceed 500 entries/);
 
-  console.log("UBA registry validator tests passed (8 rejection cases plus valid export)");
+  console.log("UBA registry validator tests passed (8 rejection cases plus legacy and persistent UCENO IDs)");
 } finally {
   fs.rmSync(temp, { recursive: true, force: true });
 }
