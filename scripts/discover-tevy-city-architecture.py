@@ -17,17 +17,17 @@ OUT = pathlib.Path("artifacts/tevy-city-architecture")
 MAX_BYTES = 25 * 1024 * 1024
 PER_CITY = 2
 CITIES = {
-    "SolsticeBay": ("waterfront", "coastal", "harbour", "harbor", "marina", "lighthouse", "hotel", "residential", "apartment", "tower"),
+    "SolsticeBay": ("waterfront", "coastal", "harbour", "harbor", "marina", "hotel", "residential", "apartment", "tower"),
     "VerdantReach": ("green", "garden", "sustainable", "eco", "biophilic", "park", "campus", "residential", "apartment", "office"),
     "NexusDelta": ("skyscraper", "high rise", "high-rise", "tower", "office", "commercial", "mixed use", "mixed-use", "apartment", "city"),
     "AuroraHeights": ("alpine", "mountain", "ski", "snow", "resort", "hotel", "lodge", "glass", "tower", "residential"),
     "SaffronDunes": ("desert", "adobe", "arid", "solar", "sand", "hot", "pueblo", "residential", "hotel", "tower"),
-    "MonsoonHarbour": ("harbour", "harbor", "port", "waterfront", "coastal", "tropical", "marina", "terminal", "lighthouse", "warehouse"),
+    "MonsoonHarbour": ("harbour", "harbor", "port", "waterfront", "coastal", "tropical", "marina", "terminal", "warehouse"),
     "EclipseCentral": ("skyscraper", "supertall", "high rise", "high-rise", "tower", "office", "commercial", "city"),
     "OriginPlains": ("university", "campus", "school", "library", "museum", "civic", "hospital", "classroom", "college", "office"),
     "AtlasFrontier": ("industrial", "factory", "warehouse", "hangar", "logistics", "workshop", "manufacturing", "terminal", "plant", "office"),
 }
-NON_OCCUPIABLE = ("power pylon", "transmission pylon", "pylon", "tv tower", "television tower", "broadcast tower", "radio tower", "harbour crane", "harbor crane", "crane", "chairlift", "ski lift", "tower crown", "glass tower crown", "lobby floor", "cooling tower", "launch tower", "drop tower", "wind turbine", "turbine", "lighthouse", "airport control tower", "control tower")
+NON_OCCUPIABLE = ("power pylon", "transmission pylon", "pylon", "tv tower", "television tower", "broadcast tower", "radio tower", "harbour crane", "harbor crane", "crane", "chairlift", "ski lift", "tower crown", "glass tower crown", "lobby floor", "cooling tower", "launch tower", "drop tower", "wind turbine", "turbine", "lighthouse", "airport control tower", "control tower", "ferris wheel", "observation wheel", "roller coaster", "amusement ride", "theme park ride")
 EXCLUDE = ("horror", "abandoned", "post-apocalyptic", "medieval", "fantasy", "zombie", "military", "battle", "weapon", "ruin", "derelict", "western", "wild west", "christmas", "seasonal")
 GENERIC = ("building", "house", "apartment", "block", "tower", "office", "hotel", "terminal", "campus", "factory", "warehouse", "hangar", "school", "hospital", "library", "museum", "station", "hall", "residential", "commercial", "civic", "industrial", "hotel", "lighthouse", "fuel station")
 
