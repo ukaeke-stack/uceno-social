@@ -45,7 +45,11 @@ test("scene export creates the exact file and schema loaded by the authoritative
   assert.match(exporter, /GetComponentsInChildren<Collider>\(true\)/);
   assert.match(exporter, /collider\.enabled && collider\.gameObject\.activeInHierarchy && !collider\.isTrigger/);
   assert.match(exporter, /marker\.Kind == "door" && !marker\.HasDoorPivot/);
-  assert.match(exporter, /GlobalObjectId\.GetGlobalObjectIdSlow/);
+  assert.match(exporter, /Guid\.NewGuid\(\)\.ToString\("N"\)/);
+  assert.match(exporter, /id\.StartsWith\("uceno:"/);
+  assert.match(authoring, /objectId\.stringValue = "uceno:"/);
+  assert.match(authoring, /string\.IsNullOrWhiteSpace\(objectId\.stringValue\)/);
+  assert.doesNotMatch(authoring, /GlobalObjectId\.GetGlobalObjectIdSlow/);
   assert.match(gateway, /process\.env\.WORLD_INTERACTABLES_MANIFEST_FILE/);
   assert.match(gateway, /parseCityInteractableManifest\(manifest!, cityDistricts/);
   assert.match(gateway, /loadInteractableRegistry\(\s*raw, WORLD_DISTRICTS, WORLD_BOUNDS,/);
@@ -56,6 +60,7 @@ test("scene export creates the exact file and schema loaded by the authoritative
 });
 
 test("editor preflight enforces the same stable ID, collider, hinge and district contract", () => {
+  assert.match(validator, /id\.StartsWith\("uceno:", StringComparison\.Ordinal\)/);
   assert.match(validator, /id\.StartsWith\("scene:", StringComparison\.Ordinal\)/);
   assert.match(validator, /id\.Length == 38/);
   assert.match(validator, /collider\.enabled && collider\.gameObject\.activeInHierarchy && !collider\.isTrigger/);
