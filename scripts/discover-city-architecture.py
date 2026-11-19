@@ -213,15 +213,32 @@ def main():
     globally_seen = set()
     for city, queries in QUERIES.items():
         raw_by_slug = {}
+        query_diagnostics = []
         for query in queries:
             params = urllib.parse.urlencode({
                 "q": query, "category": "buildings", "style": "realistic",
                 "sort": "relevance", "limit": 100
             })
             results = unwrap(get(f"{BASE}/assets?{params}"))
+            used_fallback = False
             if not results:
                 fallback = urllib.parse.urlencode({"q": query, "sort": "relevance", "limit": 100})
                 results = unwrap(get(f"{BASE}/assets?{fallback}"))
+                used_fallback = True
+            query_diagnostics.append({
+                "query": query,
+                "result_count": len(results),
+                "fallback_without_category_or_style": used_fallback,
+                "sample_records": [{
+                    "slug": item.get("slug") or item.get("id"),
+                    "title": item.get("title") or item.get("name"),
+                    "category": item.get("category"),
+                    "style": item.get("style"),
+                    "tags": tag_slugs(item),
+                    "stats": item.get("stats"),
+                    "summary": item.get("summary") or item.get("description"),
+                } for item in results[:8]],
+            })
             for item in results:
                 slug = item.get("slug") or item.get("id")
                 if slug:
@@ -233,7 +250,19 @@ def main():
                 continue
             reason = rejection_reason(item, city)
             if reason:
-                rejected.append({"slug": slug, "name": item.get("title") or item.get("name"), "reason": reason})
+                rejected.append({
+                    "slug": slug,
+                    "name": item.get("title") or item.get("name"),
+                    "reason": reason,
+                    "category": item.get("category"),
+                    "style": item.get("style"),
+                    "tags": tags,
+                    "dimensions_m": list(dimensions(item)),
+                    "summary": item.get("summary") or item.get("description"),
+                    "source_url": item.get("url") or ("https://3dassets.dev/assets/" + str(slug)),
+                    "stats": item.get("stats"),
+                    "license": item.get("license"),
+                })
                 continue
             stats = item.get("stats") or {}
             dims = dimensions(item)
@@ -267,10 +296,11 @@ def main():
         globally_seen.update(item["slug"] for item in chosen)
         report["cities"][city] = {
             "queries": queries,
+            "query_diagnostics": query_diagnostics,
             "raw_candidate_count": len(raw_by_slug),
             "candidate_count": len(candidates),
             "rejected_count": len(rejected),
-            "rejection_samples": rejected[:40],
+            "rejection_records": rejected,
             "candidates": chosen,
         }
         print(f"{city}: {len(raw_by_slug)} raw; {len(candidates)} complete-building candidates; rejected {len(rejected)}")
