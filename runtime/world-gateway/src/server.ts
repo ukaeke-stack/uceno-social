@@ -1824,6 +1824,10 @@ wss.on("connection", async (socket: WebSocket) => {
       } catch (error) {
         console.error("spatial_return_checkpoint_failed", error);
       }
+      // A replacement connection may have registered while the database
+      // write was pending. Never let this stale close callback delete it or
+      // tear down its activity/seat state.
+      if (players.get(identity.userId)?.socket !== socket) return;
       // Do not release the in-memory player/activity state until the durable
       // checkpoint attempt has completed.
       players.delete(identity.userId);
