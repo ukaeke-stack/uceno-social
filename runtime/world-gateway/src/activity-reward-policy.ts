@@ -47,8 +47,9 @@ export function calculateEarnedCreditGrant(
   if (result.status !== "finished") return { ok: false, code: "activity_not_completed" };
   if (!Number.isFinite(result.recordedAt) || result.recordedAt <= 0)
     return { ok: false, code: "invalid_result_timestamp" };
-  if (!Number.isInteger(rule.baseCredits) || rule.baseCredits < 0 ||
-      !Number.isInteger(rule.maximumCreditsPerResult) || rule.maximumCreditsPerResult < 0 ||
+  if (!rule || !rule.placementBonus || typeof rule.placementBonus !== "object" ||
+      !Number.isSafeInteger(rule.baseCredits) || rule.baseCredits < 0 ||
+      !Number.isSafeInteger(rule.maximumCreditsPerResult) || rule.maximumCreditsPerResult < 0 ||
       rule.baseCredits > rule.maximumCreditsPerResult)
     return { ok: false, code: "invalid_reward_rule" };
 
@@ -58,7 +59,7 @@ export function calculateEarnedCreditGrant(
       return { ok: false, code: "invalid_placement" };
     bonus = rule.placementBonus[result.placement] ?? 0;
   }
-  if (!Number.isInteger(bonus) || bonus < 0) return { ok: false, code: "invalid_placement_bonus" };
+  if (!Number.isSafeInteger(bonus) || bonus < 0) return { ok: false, code: "invalid_placement_bonus" };
 
   const amount = Math.min(rule.maximumCreditsPerResult, rule.baseCredits + bonus);
   if (amount <= 0) return { ok: false, code: "no_reward_due" };
