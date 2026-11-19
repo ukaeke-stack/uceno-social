@@ -1784,18 +1784,20 @@ wss.on("connection", async (socket: WebSocket) => {
       });
     }
 
-    const releaseSeats = () => {
+    let releaseStarted = false;
+    const releaseSeats = async () => {
+      if (releaseStarted) return;
+      releaseStarted = true;
       const current = players.get(identity.userId);
       if (!current || current.socket !== socket || current.sessionId !== identity.sessionId) return;
       // Ignore a late close event from an older socket after this user has
-      // already reconnected, but release seats if moderation removed this
-      // socket from the live-player map before the close event arrived.
-      if (current && current.socket !== socket) return;
+      // already reconnected. The exact session fence is checked again by the
+      // checkpoint statement, so an obsolete socket cannot overwrite newer state.
       if (current?.voiceActive) leaveVoiceRoom(current);
       const destination = current.returnState ?? { x: current.x, y: current.y, z: current.z, yaw: current.yaw };
       current.stateVersion += 1;
-      {
-        void sql`
+      try {
+        const checkpoint = await sql`
           INSERT INTO virtual_world_player_state
             (world_id, user_id, position, rotation, session_generation, state_version, updated_by_session, updated_at)
           SELECT ${current.worldId}::uuid, ${current.id}::uuid,
@@ -1812,8 +1814,18 @@ wss.on("connection", async (socket: WebSocket) => {
           WHERE virtual_world_player_state.session_generation < EXCLUDED.session_generation
              OR (virtual_world_player_state.session_generation = EXCLUDED.session_generation
                  AND virtual_world_player_state.state_version < EXCLUDED.state_version)
-        `.catch(error => console.error("spatial_return_checkpoint_failed", error));
+          RETURNING state_version
+        `;
+        if (!checkpoint[0]) {
+          console.warn("spatial_return_checkpoint_rejected_by_session_fence", {
+            userId: current.id, sessionId: current.sessionId, generation: current.sessionGeneration
+          });
+        }
+      } catch (error) {
+        console.error("spatial_return_checkpoint_failed", error);
       }
+      // Do not release the in-memory player/activity state until the durable
+      // checkpoint attempt has completed.
       players.delete(identity.userId);
       for (const session of activitySessions.values()) {
         const participant = session.participants.get(identity.userId);
