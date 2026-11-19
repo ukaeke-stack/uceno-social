@@ -22,7 +22,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: uceno-city-architecture-discovery
+  group: uceno-city-architecture-discovery-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   discover-and-acquire:
