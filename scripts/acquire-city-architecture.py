@@ -41,6 +41,8 @@ WHOLE_BUILDING_TITLE_TERMS = (
     "residential block", "apartment block", "apartment building", "hotel",
     "campus", "terminal", "civic centre", "civic center", "commercial building",
     "mixed use", "mixed-use", "arena", "factory", "house", "school", "hospital",
+    "residential building", "apartment", "museum", "library", "city hall",
+    "train station", "railway station", "airport terminal", "university", "stadium",
 )
 NON_BUILDING_TITLE_TERMS = (
     "windmill", "wind turbine", "mill sail", "sculpture", "statue", "fountain",
@@ -99,7 +101,9 @@ def validate_complete_building(detail, city):
         raise ValueError("Title identifies a prop or non-building object")
     if not any(term in title_searchable for term in WHOLE_BUILDING_TITLE_TERMS):
         raise ValueError("Title does not identify a complete building")
-    if any(term in searchable for term in PART_TERMS):
+    # Component terms in a descriptive paragraph (e.g. "stone walls and
+    # large windows") do not make a complete building a modular part.
+    if any(term in title_searchable for term in PART_TERMS):
         raise ValueError("Individual building component or prop rejected")
     if any(term in searchable for term in IRRELEVANT_TERMS):
         raise ValueError("Unrelated theme or setting rejected")
