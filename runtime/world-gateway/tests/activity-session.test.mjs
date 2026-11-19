@@ -244,7 +244,11 @@ test("daily mission, treasure and Earned Credits schema is durable and replay-sa
     "UNIQUE (hunt_id, user_id, sequence)",
     "virtual_world_earned_credit_ledger",
     "idempotency_key TEXT NOT NULL UNIQUE",
-    "earned_credit_ledger_is_append_only"
+    "earned_credit_ledger_is_append_only",
+    "virtual_world_daily_mission_active_lookup_idx",
+    "virtual_world_daily_mission_template_event_idx",
+    "virtual_world_treasure_hunt_active_lookup_idx",
+    "virtual_world_treasure_clue_location_lookup_idx"
   ]) assert.ok(migration.includes(marker), "migration missing " + marker);
   assert.match(migration, /REFERENCES virtual_world_activity_results\(id\)/);
   assert.match(migration, /BEFORE UPDATE OR DELETE ON virtual_world_earned_credit_ledger/);
