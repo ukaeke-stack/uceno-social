@@ -175,13 +175,13 @@ for city_id, config in CITIES.items():
             candidates.append((score, asset_id, item))
 
     candidates.sort(key=lambda candidate: (-candidate[0], candidate[1]))
-    chosen = next(
-        (candidate for candidate in candidates if candidate[1] not in used_asset_ids),
-        None,
-    )
+    preferred_id = config["preferred"][0]
+    chosen = next((candidate for candidate in candidates
+                   if candidate[1] == preferred_id and candidate[1] not in used_asset_ids), None)
     if chosen is None:
         raise RuntimeError(
-            f"No distinct preferred urban-city HDRI candidate for {config['label']}; refusing non-city substitution"
+            f"Required city HDRI {preferred_id!r} for {config['label']} is absent, "
+            "not classified as an eligible HDRI, or already assigned; refusing silent substitution"
         )
 
     _, asset_id, item = chosen
