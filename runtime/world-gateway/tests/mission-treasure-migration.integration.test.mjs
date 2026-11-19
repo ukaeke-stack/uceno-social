@@ -76,9 +76,9 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       VALUES ($1, 'pilot-hunt', 'Pilot hunt', NOW() - INTERVAL '1 hour',
         NOW() + INTERVAL '1 hour', TRUE, 25)`, [huntId]);
     await db.unsafe(`INSERT INTO virtual_world_treasure_clues
-      (id, hunt_id, sequence, district_id, interactable_id,
+      (id, hunt_id, sequence, city_id, district_id, interactable_id,
        position_x, position_y, position_z, interaction_radius)
-      VALUES ($1, $2, 0, 'central', 'uceno:0123456789abcdef0123456789abcdef',
+      VALUES ($1, $2, 0, 'meridian', 'central', 'uceno:0123456789abcdef0123456789abcdef',
         1, 1.15, 1, 2)`, [clueId, huntId]);
     await db.unsafe(`INSERT INTO virtual_world_treasure_progress
       (hunt_id, user_id, next_sequence) VALUES ($1, $2, 1)`, [huntId, userId]);
