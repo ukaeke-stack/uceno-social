@@ -4,6 +4,8 @@ on:
     paths:
       - ".github/workflows/world-gateway.yml"
       - "runtime/world-gateway/**"
+      - "scripts/validate-world-interactable-registry.mjs"
+      - "scripts/tests/validate-world-interactable-registry.test.mjs"
       - "db/migrations/024_virtual_world_instance_leases.sql"
       - "db/migrations/025_virtual_world_event_locations.sql"
       - "db/migrations/028_district_object_persistence.sql"
@@ -23,6 +25,8 @@ on:
     paths:
       - ".github/workflows/world-gateway.yml"
       - "runtime/world-gateway/**"
+      - "scripts/validate-world-interactable-registry.mjs"
+      - "scripts/tests/validate-world-interactable-registry.test.mjs"
       - "db/migrations/024_virtual_world_instance_leases.sql"
       - "db/migrations/025_virtual_world_event_locations.sql"
       - "db/migrations/028_district_object_persistence.sql"
