@@ -259,3 +259,11 @@ test("reward source identity matches the database BIGSERIAL activity result key"
   assert.equal(calculateEarnedCreditGrant(rewardResult({ resultId: "1.5" }), rewardRule).ok, false);
   assert.equal(calculateEarnedCreditGrant(rewardResult({ resultId: "9223372036854775808" }), rewardRule).ok, false);
 });
+
+test("daily mission policy accepts verified sports completions", () => {
+  const sportsMission = { ...mission, eventKind: "sports_completed", targetCount: 1 };
+  const result = applyDailyMissionEvent(sportsMission, missionProgress(),
+    missionEvent("123e4567-e89b-42d3-a456-426614174014", { eventKind: "sports_completed" }));
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.progress.completedAt, 2_000);
+});
