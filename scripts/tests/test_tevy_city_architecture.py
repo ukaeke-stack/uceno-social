@@ -32,6 +32,15 @@ class TevyCityArchitectureTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertEqual(tevy.screen(record(name=name), "NexusDelta"), "non-occupiable-infrastructure")
 
+    def test_lighthouse_is_rejected_even_if_catalogue_calls_it_a_building(self):
+        self.assertEqual(tevy.screen(record(name="Coastal Lighthouse"), "SolsticeBay"), "non-occupiable-infrastructure")
+
+    def test_infrastructure_hidden_in_description_or_tags_is_rejected(self):
+        item = record(name="Office Tower", description="A modern tower beside an observation wheel")
+        self.assertEqual(tevy.screen(item, "NexusDelta"), "non-occupiable-infrastructure")
+        item = record(name="Office Tower", tags=["office", "theme park ride"])
+        self.assertEqual(tevy.screen(item, "NexusDelta"), "non-occupiable-infrastructure")
+
     def test_non_building_category_is_rejected(self):
         self.assertEqual(tevy.screen(record(category="props"), "NexusDelta"), "not-building-category")
 
@@ -50,7 +59,7 @@ class TevyCityArchitectureTests(unittest.TestCase):
         self.assertEqual(tevy.screen(item, "NexusDelta"), "deprecated")
 
     def test_city_relevance_scores_are_not_identical(self):
-        coastal = record(name="Coastal Lighthouse", tags=["coastal", "lighthouse"])
+        coastal = record(name="Coastal Apartment Hotel", tags=["coastal", "apartment", "hotel"])
         industrial = record(name="Industrial Factory", tags=["industrial", "factory"])
         self.assertGreater(tevy.score(coastal, "SolsticeBay"), tevy.score(industrial, "SolsticeBay"))
 
