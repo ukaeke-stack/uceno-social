@@ -89,3 +89,24 @@ The following alternatives were reviewed to avoid treating any convenient downlo
 - **ModKit** — CC0 modular walls, floors, roofs, stairs and props, but the reviewed catalogue does not establish three authored LODs or the required 1K albedo and normal maps for the supplied modules. It may be useful for kitbash/source exploration only; it cannot be counted as a passing city prefab without those checks. Source: https://github.com/JaronKBragg7337/asset-pack-ue-threejs-blender-unity
 
 **Decision:** keep Tevy Office Tower as the leading Lumen Tower base candidate because its published three-LOD geometry and CC0 licence are the closest match to the current acceptance contract. Do not weaken the contract to admit low-poly, flat-colour, or unverified catalogue models. The immediate blocker remains obtaining and inspecting actual source binaries through a reliable download path.
+
+
+## Additional landmark-library screening — 2026-11-19
+
+**Codriver 3D Assets** was inspected as a possible source of realistic landmark and city-building geometry: https://github.com/codriver-io/codriver-3d-assets
+
+- The public catalogue describes 675 landmarks and 1,366 self-contained GLB variants, with near/far detail variants and editable generators.
+- The repository's `LICENSES.md` identifies the original models as CC BY 4.0, requiring creator attribution; geographic data derived from OpenStreetMap remains ODbL 1.0 and carries separate obligations.
+- The model submission checklist calls for self-contained near/far GLBs, not three authored LOD levels. The README confirms near/far variants only. This does not satisfy UCENO's current three-authored-LOD acceptance contract.
+- The public repository documentation does not establish that individual models contain the required 1K albedo and normal-map textures. No model binary was downloaded or inspected in this pass.
+
+**Decision:** do not import or count Codriver assets as passing UCENO prefabs. The library is a possible separately licensed reference/source for future review, but its two-detail-level contract and CC BY/ODbL obligations make it unsuitable as an immediate drop-in for the current release gate. Do not infer that a model's presence in a public catalogue proves Unity import, material, texture, LOD or visual acceptance.
+
+## Latest imported-art gate evidence — 2026-11-19
+
+- Workflow run `44559570645` completed with failure. The strengthened validator reported **117 missing items**: nine city `source-manifest.json` files and 108 configured prefab files (12 per city across solstice, verdant, nexus, aurora, saffron, monsoon, eclipse, origin and atlas).
+- The same failure log did not report missing city HDRI files or HDRI provenance files. Their source-file presence is therefore not the current reported blocker; it still does not prove Unity import or visual acceptance.
+- The gateway/client workflow run `44559570574` completed successfully. Its gateway build and real-process PostgreSQL fencing/failover tests passed, as did Unity source-contract validation. This is not Unity Editor compilation or Android-device testing.
+- Other source checks on this commit also completed successfully: world gateway tests, activity tests, voice HUD, content delivery, humanoid animation source contract, and Unity Build Automation artifact-handoff checks.
+
+**Next source task:** source and inspect actual prefabs/models, then create manifests from the verified imported assets. Do not manufacture placeholder prefabs or manifests merely to make the gate green.
