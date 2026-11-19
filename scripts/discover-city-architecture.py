@@ -99,6 +99,8 @@ WHOLE_BUILDING_TITLE_TERMS = (
     "residential block", "apartment block", "apartment building", "hotel",
     "campus", "terminal", "civic centre", "civic center", "commercial building",
     "mixed use", "mixed-use", "arena", "factory", "house", "school", "hospital",
+    "residential building", "apartment", "museum", "library", "city hall",
+    "train station", "railway station", "airport terminal", "university", "stadium",
 )
 NON_BUILDING_TITLE_TERMS = (
     "windmill", "wind turbine", "mill sail", "sculpture", "statue", "fountain",
@@ -164,7 +166,10 @@ def rejection_reason(item, city):
         return "non-building-object-title"
     if not words_present(title_searchable, WHOLE_BUILDING_TITLE_TERMS):
         return "title-does-not-identify-a-complete-building"
-    if words_present(searchable, PART_TERMS):
+    # Descriptions of whole buildings routinely mention walls, windows, floors,
+    # doors and columns. Apply component rejection to the asset title only;
+    # applying it to prose silently rejects nearly every real building.
+    if words_present(title_searchable, PART_TERMS):
         return "individual-building-part-or-prop"
     if words_present(searchable, IRRELEVANT_TERMS):
         return "unrelated-theme-or-setting"
