@@ -37,7 +37,7 @@ class CityArchitectureScreeningTests(unittest.TestCase):
 
     def test_component_title_is_rejected_even_if_description_says_building(self):
         component = asset(
-            "Office Tower Facade Panel", [8, 12, 0.2],
+            "Office Tower Wall", [8, 12, 0.2],
             summary="Realistic exterior building component"
         )
         self.assertEqual(
