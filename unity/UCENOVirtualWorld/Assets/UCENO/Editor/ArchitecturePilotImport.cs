@@ -42,7 +42,7 @@ namespace UCENO.VirtualWorld.Editor
             if (string.IsNullOrWhiteSpace(source) || !File.Exists(source))
                 throw new FileNotFoundException("UCENO_PILOT_GLB must point to the acquired SolsticeBay LOD0 GLB.", source);
 
-            Directory.CreateDirectory(StagingRoot);
+            Directory.CreateDirectory(Path.Combine(Application.dataPath, "UCENO/ImportStaging/SolsticeBay"));
             string destination = StagingRoot + "/solsticebay-apartment-lod0.glb";
             File.Copy(source, destination, true);
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
@@ -108,7 +108,7 @@ namespace UCENO.VirtualWorld.Editor
 
         private static void WriteReport(ImportReport report)
         {
-            string fullPath = Path.GetFullPath(ReportPath);
+            string fullPath = Path.GetFullPath(Path.Combine(Application.dataPath, "../../..", ReportPath));
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
             File.WriteAllText(fullPath, JsonUtility.ToJson(report, true) + Environment.NewLine);
         }
