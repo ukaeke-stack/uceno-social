@@ -527,6 +527,91 @@ function activityPayload(session: ActivitySession) {
   };
 }
 
+async function recordTreasureDiscovery(player: Player, target: RegisteredInteractable, now: number):
+  Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string }> {
+  return sql.begin(async tx => {
+    const owner = await tx`SELECT id FROM virtual_world_instances
+      WHERE id = ${INSTANCE_ID}::uuid AND owner_process_id = ${PROCESS_ID}::uuid
+        AND owner_generation = ${processGeneration}
+        AND owner_lease_expires_at > clock_timestamp()
+      FOR SHARE`;
+    if (!owner.length) return { discovered: false, completed: false, rewardEarnedCredits: "0", code: "stale_gateway_owner" };
+
+    const clues = await tx`
+      SELECT clue.id AS "clueId", clue.hunt_id AS "huntId", clue.sequence,
+        clue.position_x AS "x", clue.position_y AS "y", clue.position_z AS "z",
+        clue.interaction_radius AS "radius", hunt.reward_earned_credits AS "reward"
+      FROM virtual_world_treasure_clues AS clue
+      JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = clue.hunt_id
+      WHERE clue.city_id = ${target.cityId} AND clue.district_id = ${target.districtId}
+        AND clue.interactable_id = ${target.id} AND hunt.enabled = TRUE
+        AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
+        AND hunt.starts_at <= to_timestamp(${now / 1000})
+        AND hunt.ends_at > to_timestamp(${now / 1000})
+        AND sqrt(power(${player.x} - clue.position_x, 2) +
+          power(${player.y} - clue.position_y, 2) +
+          power(${player.z} - clue.position_z, 2)) <= clue.interaction_radius
+      ORDER BY hunt.id
+      FOR UPDATE OF hunt, clue`;
+    if (!clues.length) return { discovered: false, completed: false, rewardEarnedCredits: "0" };
+
+    // A single interactable can only be assigned to one active hunt by the
+    // authoring pipeline. Refuse ambiguous content instead of granting twice.
+    if (clues.length !== 1) return { discovered: false, completed: false, rewardEarnedCredits: "0", code: "ambiguous_treasure_clue" };
+    const clue = clues[0];
+    const progressRows = await tx`INSERT INTO virtual_world_treasure_progress (hunt_id, user_id)
+      VALUES (${clue.huntId}::uuid, ${player.id}::uuid)
+      ON CONFLICT (hunt_id, user_id) DO UPDATE SET
+        version = virtual_world_treasure_progress.version + 1,
+        updated_at = NOW()
+      RETURNING next_sequence AS "nextSequence", completed_at AS "completedAt"`;
+    const progress = progressRows[0];
+    if (!progress || progress.completedAt || Number(progress.nextSequence) !== Number(clue.sequence))
+      return { discovered: false, completed: false, rewardEarnedCredits: "0",
+        code: progress?.completedAt ? "treasure_hunt_completed" : "treasure_clue_out_of_order" };
+
+    const inserted = await tx`INSERT INTO virtual_world_treasure_discoveries
+      (id, hunt_id, user_id, clue_id, sequence, discovered_at)
+      VALUES (${randomUUID()}::uuid, ${clue.huntId}::uuid, ${player.id}::uuid,
+        ${clue.clueId}::uuid, ${clue.sequence}, to_timestamp(${now / 1000}))
+      ON CONFLICT (hunt_id, user_id, sequence) DO NOTHING
+      RETURNING id`;
+    if (!inserted.length) return { discovered: false, completed: false, rewardEarnedCredits: "0", code: "treasure_clue_already_discovered" };
+
+    const totals = await tx`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_treasure_clues WHERE hunt_id = ${clue.huntId}::uuid`;
+    const total = Number(totals[0]?.total ?? 0);
+    if (total < 2 || total > 100) throw new Error("treasure_hunt_invalid_clue_count");
+    const completed = Number(clue.sequence) + 1 === total;
+    await tx`UPDATE virtual_world_treasure_progress SET
+        next_sequence = next_sequence + 1,
+        completed_at = CASE WHEN ${completed} THEN to_timestamp(${now / 1000}) ELSE NULL END,
+        version = version + 1, updated_at = NOW()
+      WHERE hunt_id = ${clue.huntId}::uuid AND user_id = ${player.id}::uuid`;
+
+    if (!completed) return { discovered: true, completed: false, rewardEarnedCredits: "0" };
+    const claimed = await tx`UPDATE virtual_world_treasure_progress
+      SET reward_issued_at = NOW(), updated_at = NOW()
+      WHERE hunt_id = ${clue.huntId}::uuid AND user_id = ${player.id}::uuid
+        AND completed_at IS NOT NULL AND reward_issued_at IS NULL
+      RETURNING hunt_id`;
+    if (!claimed.length) return { discovered: true, completed: true, rewardEarnedCredits: "0" };
+    const reward = String(clue.reward);
+    if (!/^(0|[1-9][0-9]*)$/.test(reward) || reward.length > 19 ||
+        (reward.length === 19 && reward > "9223372036854775807"))
+      throw new Error("treasure_hunt_reward_out_of_range");
+    if (reward !== "0") await tx`INSERT INTO virtual_world_earned_credit_ledger
+      (user_id, ledger_type, currency, amount, idempotency_key, source_type,
+       source_treasure_hunt_id, metadata)
+      VALUES (${player.id}::uuid, 'earned', 'earned_credits', ${reward}::bigint,
+        ${"treasure:" + clue.huntId + ":" + player.id}, 'treasure_hunt',
+        ${clue.huntId}::uuid,
+        ${JSON.stringify({ finalClueId: clue.clueId, interactableId: target.id })}::jsonb)
+      ON CONFLICT (idempotency_key) DO NOTHING`;
+    return { discovered: true, completed: true, rewardEarnedCredits: reward };
+  });
+}
+
 async function persistActivity(session: ActivitySession): Promise<boolean> {
   const hostUserId = activityHosts.get(session.id);
   if (!hostUserId || fencedActivitySessions.has(session.id)) return false;
@@ -1721,6 +1806,21 @@ wss.on("connection", async (socket: WebSocket) => {
             console.error("Could not persist world object state:", error);
             send(socket, { type: "interaction_rejected", code: "state_persistence_failed" });
             return;
+          }
+        }
+        if (msg.action === "use") {
+          try {
+            const treasure = await recordTreasureDiscovery(player, target, now);
+            if (treasure.discovered) send(socket, {
+              type: "treasure_clue_discovered", objectId: target.id,
+              completed: treasure.completed, rewardEarnedCredits: treasure.rewardEarnedCredits
+            });
+            else if (treasure.code) send(socket, {
+              type: "treasure_discovery_rejected", objectId: target.id, code: treasure.code
+            });
+          } catch (error) {
+            console.error("treasure_discovery_persistence_failed", error);
+            send(socket, { type: "treasure_discovery_rejected", objectId: target.id, code: "persistence_failed" });
           }
         }
         player.lastInteractionAt = now;
