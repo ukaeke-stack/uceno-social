@@ -146,10 +146,10 @@ def check_city_asset_inventory() -> tuple[int, int, int]:
     if missing_prefabs or missing_source_manifests:
         details = []
         if missing_prefabs:
-            details.append(f"{len(missing_prefabs)} missing/empty city prefabs:\\n - " + "\\n - ".join(missing_prefabs))
+            details.append(f"{len(missing_prefabs)} missing/empty city prefabs:\n - " + "\n - ".join(missing_prefabs))
         if missing_source_manifests:
-            details.append(f"{len(missing_source_manifests)} missing/empty city source manifests:\\n - " + "\\n - ".join(missing_source_manifests))
-        fail("City imported-asset inventory is incomplete; path-only profiles are not proof of imported files.\\n" + "\\n".join(details))
+            details.append(f"{len(missing_source_manifests)} missing/empty city source manifests:\n - " + "\n - ".join(missing_source_manifests))
+        fail("City imported-asset inventory is incomplete; path-only profiles are not proof of imported files.\n" + "\n".join(details))
 
     checked_prefabs = 0
     checked_hdris = 0
