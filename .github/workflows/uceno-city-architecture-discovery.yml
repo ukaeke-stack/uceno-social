@@ -1,4 +1,4 @@
-name: UCENO nine-city architecture source discovery and acquisition
+name: UCENO city architecture source discovery and acquisition
 on:
   workflow_dispatch:
   push:
@@ -6,7 +6,9 @@ on:
     paths:
       - "scripts/discover-city-architecture.py"
       - "scripts/acquire-city-architecture.py"
+      - "scripts/discover-tevy-city-architecture.py"
       - "scripts/tests/test_city_architecture_screening.py"
+      - "scripts/tests/test_tevy_city_architecture.py"
       - ".github/workflows/uceno-city-architecture-discovery.yml"
 permissions:
   contents: read
@@ -24,16 +26,18 @@ jobs:
           python-version: "3.12"
       - name: Test strict city-building discovery and acquisition filters
         run: python -m unittest discover -s scripts/tests -p "test_city_architecture*.py"
-      - name: Query live realistic CC0 architecture catalogue
+      - name: Discover, pin and checksum-verify CC0 Tevy building GLBs
+        run: python scripts/discover-tevy-city-architecture.py
+      - name: Preserve legacy 3DAssets.dev diagnostic report
+        continue-on-error: true
         run: python scripts/discover-city-architecture.py
-      - name: Download and verify first-batch city architecture GLBs
-        run: python scripts/acquire-city-architecture.py
       - name: Preserve discovery and partial acquisition evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: uceno-nine-city-architecture-acquisition
+          name: uceno-city-architecture-source-acquisition
           path: |
+            artifacts/tevy-city-architecture/
             artifacts/city-architecture-candidates/
             artifacts/city-architecture-models/
           if-no-files-found: warn
