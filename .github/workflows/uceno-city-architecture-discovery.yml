@@ -10,6 +10,15 @@ on:
       - "scripts/tests/test_city_architecture_screening.py"
       - "scripts/tests/test_tevy_city_architecture.py"
       - ".github/workflows/uceno-city-architecture-discovery.yml"
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - "scripts/discover-city-architecture.py"
+      - "scripts/acquire-city-architecture.py"
+      - "scripts/discover-tevy-city-architecture.py"
+      - "scripts/tests/test_city_architecture_screening.py"
+      - "scripts/tests/test_tevy_city_architecture.py"
+      - ".github/workflows/uceno-city-architecture-discovery.yml"
 permissions:
   contents: read
 concurrency:
