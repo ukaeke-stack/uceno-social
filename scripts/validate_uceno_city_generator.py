@@ -65,6 +65,8 @@ for token in (
 ):
     require(token in lod_contract, "shared LOD contract is missing validation: " + token)
 
+require(PROFILES.is_file(), "nine-city imported asset profiles are missing")
+
 if PROFILES.exists():
     profiles = json.loads(PROFILES.read_text(encoding="utf-8")).get("cities", [])
     expected = {city["id"] for city in remaining}
