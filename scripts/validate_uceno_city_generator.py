@@ -72,6 +72,7 @@ if PROFILES.exists():
     require(actual == expected and len(profiles) == 9,
             "asset profiles must map one-to-one to the nine remaining cities")
     all_paths = []
+    asset_errors = []
     for profile in profiles:
         city_id = profile["cityId"]
         require(len(profile.get("architecturePrefabs", [])) == 5,
@@ -95,30 +96,45 @@ if PROFILES.exists():
         unity_root = ROOT / "unity/UCENOVirtualWorld"
         city_root = unity_root / "Assets/UCENO/Cities" / city_id
         manifest = city_root / "source-manifest.json"
-        require(manifest.is_file(),
-                f"{city_id} is missing its real source-manifest.json file")
-        manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
-        manifest_assets = manifest_data.get("assets", [])
-        require(len(manifest_assets) == 12,
-                f"{city_id} source manifest must account for exactly 12 prefabs")
-        manifest_paths = {entry.get("prefab") for entry in manifest_assets}
-        require(manifest_paths == set(paths),
-                f"{city_id} source manifest must cover the exact configured prefab paths")
+        if not manifest.is_file():
+            asset_errors.append(
+                f"{city_id}: missing source-manifest.json ({manifest.relative_to(unity_root)})")
+        else:
+            try:
+                manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
+                manifest_assets = manifest_data.get("assets", [])
+                if len(manifest_assets) != 12:
+                    asset_errors.append(
+                        f"{city_id}: source manifest declares {len(manifest_assets)} assets; expected 12")
+                manifest_paths = {entry.get("prefab") for entry in manifest_assets}
+                if manifest_paths != set(paths):
+                    asset_errors.append(
+                        f"{city_id}: source manifest does not cover the exact configured prefab paths")
+            except (OSError, json.JSONDecodeError, AttributeError, TypeError) as error:
+                asset_errors.append(f"{city_id}: source manifest cannot be parsed: {error}")
 
         for asset_path in paths:
             disk_path = unity_root / asset_path
-            require(disk_path.is_file(),
-                    f"{city_id} configured prefab is absent from the repository: {asset_path}")
+            if not disk_path.is_file():
+                asset_errors.append(
+                    f"{city_id}: missing configured prefab {asset_path}")
 
         skybox_path = unity_root / profile["skyboxTexture"]
-        require(skybox_path.is_file(),
-                f"{city_id} city-specific HDRI source file is absent: {profile['skyboxTexture']}")
+        if not skybox_path.is_file():
+            asset_errors.append(
+                f"{city_id}: missing city-specific HDRI source {profile['skyboxTexture']}")
         hdri_provenance = skybox_path.parent / "hdri-provenance.json"
-        require(hdri_provenance.is_file(),
-                f"{city_id} is missing its HDRI provenance record")
+        if not hdri_provenance.is_file():
+            asset_errors.append(
+                f"{city_id}: missing HDRI provenance {hdri_provenance.relative_to(unity_root)}")
 
     require(len(all_paths) == len(set(all_paths)),
             "prefab paths must never be shared between cities")
+    if asset_errors:
+        details = "\n - ".join(asset_errors)
+        raise SystemExit(
+            "UCENO imported city art validation failed with "
+            f"{len(asset_errors)} missing or invalid source-art records:\n - {details}")
 
 pipeline = SCENE_PIPELINE.read_text(encoding="utf-8")
 for token in (
