@@ -30,7 +30,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add unity/UCENOVirtualWorld/Assets/UCENO/Cities
-          git diff --cached --quiet && { echo "No new panorama files to commit"; exit 1; }
+          if git diff --cached --quiet; then echo "All nine verified panoramas are already current"; exit 0; fi
           git commit -m "Acquire nine city-specific CC0 HDR panoramas"
           # Other CI jobs may advance the branch while downloads are running.
           # Rebase the verified asset commit onto the latest branch before pushing.
