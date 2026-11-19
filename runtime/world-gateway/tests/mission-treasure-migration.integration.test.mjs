@@ -67,8 +67,8 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       VALUES ($1, $2, $3, $4, 'checkpoint_finished', NOW())`,
       [activityId, missionInstanceId, userId, resultId]);
     await assert.rejects(() => db.unsafe(`INSERT INTO virtual_world_daily_mission_events
-      (event_id, mission_instance_id, user_id, activity_result_id, event_kind)
-      VALUES ($1, $2, $3, $4, 'checkpoint_finished')`,
+      (event_id, mission_instance_id, user_id, activity_result_id, event_kind, occurred_at)
+      VALUES ($1, $2, $3, $4, 'checkpoint_finished', NOW())`,
       [randomUUID(), missionInstanceId, userId, resultId]));
 
     await db.unsafe(`INSERT INTO virtual_world_treasure_hunts
