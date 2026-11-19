@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using UnityEditor;
 using UnityEngine;
 
@@ -26,6 +27,13 @@ namespace UCENO.VirtualWorld.Editor
             public LandmarkProfile[] landmarks;
         }
         [Serializable] private sealed class LandmarkProfile { public string landmarkId, prefab; }
+        [Serializable] private sealed class HdriProvenance
+        {
+            public string city_id, asset_id, source_page, api_file_url, license, format;
+            public string resolution_tier, verified_md5, verified_sha256, file, acquisition_status;
+            public long expected_size_bytes, actual_size_bytes;
+            public int width, height;
+        }
         [Serializable] private sealed class SourceManifest { public SourceAsset[] assets; }
         [Serializable] private sealed class SourceAsset
         {
@@ -54,6 +62,8 @@ namespace UCENO.VirtualWorld.Editor
                 .Where(id => !string.Equals(id, "meridian", StringComparison.OrdinalIgnoreCase)));
             var seenCities = new HashSet<string>();
             var crossCityFingerprints = new Dictionary<string, string>();
+            var seenHdriAssetIds = new HashSet<string>(StringComparer.Ordinal);
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", ".."));
             int checkedPrefabs = 0;
 
             foreach (CityProfile city in profiles.cities)
@@ -155,11 +165,63 @@ namespace UCENO.VirtualWorld.Editor
                 Texture2D skybox = AssetDatabase.LoadAssetAtPath<Texture2D>(city.skyboxTexture);
                 Require(skybox != null && skybox.width >= 1024 && skybox.height >= 512,
                     city.cityId + " needs a real imported HDRI panorama (minimum 1024x512).");
+                ValidateCityHdri(city, skybox, projectRoot, seenHdriAssetIds);
             }
 
             Require(seenCities.SetEquals(expectedCities), "Not all nine non-Meridian cities have profiles.");
             Debug.Log("Imported city art gate passed: " + checkedPrefabs +
                 " unique textured imported prefabs, exact catalogue landmarks, nine provenance manifests and nine HDRI panoramas.");
+        }
+
+        private static void ValidateCityHdri(CityProfile city, Texture2D importedTexture,
+            string projectRoot, HashSet<string> seenAssetIds)
+        {
+            string hdriPath = AssetAbsolutePath(city.skyboxTexture);
+            string provenancePath = Path.Combine(Path.GetDirectoryName(hdriPath), "hdri-provenance.json");
+            Require(File.Exists(hdriPath), city.cityId + " HDRI source file is missing from disk.");
+            Require(File.Exists(provenancePath), city.cityId + " is missing its HDRI provenance record.");
+
+            var provenance = JsonUtility.FromJson<HdriProvenance>(File.ReadAllText(provenancePath));
+            Require(provenance != null && provenance.city_id == city.cityId,
+                city.cityId + " HDRI provenance has the wrong or missing city ID.");
+            Require(!string.IsNullOrWhiteSpace(provenance.asset_id) && seenAssetIds.Add(provenance.asset_id),
+                city.cityId + " HDRI source asset ID is missing or reused by another city.");
+            Require(provenance.license == "CC0 1.0" && provenance.format == "Radiance HDR (.hdr)" &&
+                provenance.resolution_tier == "1k" && provenance.acquisition_status == "downloaded-and-md5-verified",
+                city.cityId + " HDRI provenance does not establish a verified CC0 1K Radiance download.");
+
+            Uri sourcePage;
+            Uri fileUrl;
+            Require(Uri.TryCreate(provenance.source_page, UriKind.Absolute, out sourcePage) &&
+                sourcePage.Scheme == Uri.UriSchemeHttps && sourcePage.Host == "polyhaven.com" &&
+                sourcePage.AbsolutePath == "/a/" + provenance.asset_id,
+                city.cityId + " HDRI source page does not match its Poly Haven asset ID.");
+            Require(Uri.TryCreate(provenance.api_file_url, UriKind.Absolute, out fileUrl) &&
+                fileUrl.Scheme == Uri.UriSchemeHttps && fileUrl.Host == "dl.polyhaven.org",
+                city.cityId + " HDRI download URL is not a trusted HTTPS Poly Haven file URL.");
+
+            string relativeFile = hdriPath.Substring(projectRoot.Length + 1).Replace('\\\\', '/');
+            Require(string.Equals(provenance.file, relativeFile, StringComparison.Ordinal),
+                city.cityId + " HDRI provenance points to a different file path.");
+            var fileInfo = new FileInfo(hdriPath);
+            Require(fileInfo.Length > 0 && fileInfo.Length == provenance.expected_size_bytes &&
+                fileInfo.Length == provenance.actual_size_bytes,
+                city.cityId + " HDRI file size does not match its acquisition record.");
+
+            string md5;
+            string sha256;
+            using (var stream = File.OpenRead(hdriPath))
+            using (var algorithm = MD5.Create())
+                md5 = BitConverter.ToString(algorithm.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+            using (var stream = File.OpenRead(hdriPath))
+            using (var algorithm = SHA256.Create())
+                sha256 = BitConverter.ToString(algorithm.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+            Require(string.Equals(md5, provenance.verified_md5, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(sha256, provenance.verified_sha256, StringComparison.OrdinalIgnoreCase),
+                city.cityId + " HDRI file checksum does not match its provenance record.");
+            Require(provenance.width >= 1024 && provenance.height >= 512 &&
+                importedTexture.width == provenance.width && importedTexture.height == provenance.height,
+                city.cityId + " imported HDRI dimensions do not match its verified source dimensions.");
         }
 
         private static string AssetAbsolutePath(string assetPath)
