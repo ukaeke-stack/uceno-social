@@ -34,17 +34,17 @@ jobs:
           name: uceno-city-architecture-source-acquisition
           run-id: ${{ inputs.acquisition_run_id }}
           github-token: ${{ github.token }}
-          path: acquisition
+          path: ${{ runner.temp }}/uceno-city-architecture-source-acquisition
 
       - name: Select the manifest-pinned SolsticeBay LOD0 candidate
         id: candidate
         shell: bash
         run: |
           set -euo pipefail
-          manifest="$(find acquisition -type f -name tevy-acquisition-manifest.json -print -quit)"
+          manifest="$(find "$RUNNER_TEMP/uceno-city-architecture-source-acquisition" -type f -name tevy-acquisition-manifest.json -print -quit)"
           test -n "$manifest"
-          python - "$manifest" "$PWD/acquisition" "$GITHUB_OUTPUT" <<'PY'
-          import hashlib, json, pathlib, shutil, sys
+          python - "$manifest" "$RUNNER_TEMP/uceno-city-architecture-source-acquisition" "$GITHUB_OUTPUT" <<'PY'
+          import hashlib, json, os, pathlib, shutil, sys
           manifest_path, acquisition_root, output_path = map(pathlib.Path, sys.argv[1:])
           data = json.loads(manifest_path.read_text(encoding="utf-8"))
           city = data.get("cities", {}).get("SolsticeBay", {})
@@ -66,16 +66,26 @@ jobs:
           digest = hashlib.sha256(source.read_bytes()).hexdigest()
           if digest != expected:
               raise SystemExit(f"Acquired LOD0 checksum mismatch: manifest={expected}, file={digest}")
-          destination = pathlib.Path("artifacts/pilot-input/solsticebay-lod0.glb")
+          destination = pathlib.Path(os.environ["RUNNER_TEMP"]) / "uceno-solsticebay-lod0.glb"
           destination.parent.mkdir(parents=True, exist_ok=True)
           shutil.copyfile(source, destination)
           with pathlib.Path(output_path).open("a", encoding="utf-8") as out:
-              out.write(f"path={pathlib.Path.cwd() / destination}\n")
+              out.write(f"path={destination.resolve()}\n")
               out.write(f"sha256={expected}\n")
               out.write(f"candidate={candidate.get('name') or candidate.get('slug')}\n")
           (destination.parent / "SHA256SUMS").write_text(f"{expected}  solsticebay-lod0.glb\n", encoding="utf-8")
           print(f"Selected manifest-pinned candidate: {candidate.get('name')} ({candidate.get('slug')})")
           PY
+
+      - name: Confirm repository is clean before Unity Builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --short
+            echo "Repository must be clean before Unity Builder semantic versioning." >&2
+            exit 1
+          fi
 
       - name: Run Unity Editor import-only pilot
         uses: game-ci/unity-builder@v4
@@ -86,6 +96,7 @@ jobs:
           UCENO_PILOT_GLB: ${{ steps.candidate.outputs.path }}
           UCENO_PILOT_EXPECTED_SHA256: ${{ steps.candidate.outputs.sha256 }}
           UCENO_PILOT_CANDIDATE_NAME: ${{ steps.candidate.outputs.candidate }}
+          UCENO_PILOT_REPORT: ${{ runner.temp }}/uceno-solsticebay-glb-import-report.json
         with:
           projectPath: unity/UCENOVirtualWorld
           unityVersion: 6000.3.27f1
@@ -99,7 +110,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          report="artifacts/uceno-solsticebay-glb-import-report.json"
+          report="$RUNNER_TEMP/uceno-solsticebay-glb-import-report.json"
           test -s "$report"
           python - "$report" <<'PY'
           import json, sys
@@ -119,7 +130,7 @@ jobs:
         with:
           name: uceno-solsticebay-unity-import-pilot
           path: |
-            artifacts/pilot-input/
-            artifacts/uceno-solsticebay-glb-import-report.json
+            ${{ runner.temp }}/uceno-solsticebay-lod0.glb
+            ${{ runner.temp }}/uceno-solsticebay-glb-import-report.json
           if-no-files-found: warn
           retention-days: 30
