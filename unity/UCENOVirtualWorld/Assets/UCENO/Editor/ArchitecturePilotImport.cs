@@ -16,7 +16,6 @@ namespace UCENO.VirtualWorld.Editor
     public static class ArchitecturePilotImport
     {
         private const string StagingRoot = "Assets/UCENO/ImportStaging/SolsticeBay";
-        private const string ReportPath = "artifacts/uceno-solsticebay-glb-import-report.json";
 
         [Serializable]
         private sealed class ImportReport
@@ -154,7 +153,10 @@ namespace UCENO.VirtualWorld.Editor
 
         private static void WriteReport(ImportReport report)
         {
-            string fullPath = Path.GetFullPath(Path.Combine(Application.dataPath, "../../..", ReportPath));
+            string configuredPath = Environment.GetEnvironmentVariable("UCENO_PILOT_REPORT");
+            string fullPath = string.IsNullOrWhiteSpace(configuredPath)
+                ? Path.GetFullPath(Path.Combine(Application.dataPath, "../../..", "artifacts/uceno-solsticebay-glb-import-report.json"))
+                : Path.GetFullPath(configuredPath);
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
             File.WriteAllText(fullPath, JsonUtility.ToJson(report, true) + Environment.NewLine);
         }
