@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using UnityEditor;
 using UnityEngine;
 
@@ -23,6 +24,9 @@ namespace UCENO.VirtualWorld.Editor
             public string candidate;
             public string importedAssetPath;
             public string unityVersion;
+            public string importerType;
+            public string sourceSha256;
+            public long sourceBytes;
             public bool importedGameObject;
             public int meshCount;
             public int rendererCount;
@@ -41,6 +45,14 @@ namespace UCENO.VirtualWorld.Editor
             string source = Environment.GetEnvironmentVariable("UCENO_PILOT_GLB");
             if (string.IsNullOrWhiteSpace(source) || !File.Exists(source))
                 throw new FileNotFoundException("UCENO_PILOT_GLB must point to the acquired SolsticeBay LOD0 GLB.", source);
+            string expectedSha = Environment.GetEnvironmentVariable("UCENO_PILOT_EXPECTED_SHA256");
+            string actualSha;
+            using (var sha = SHA256.Create())
+            using (var stream = File.OpenRead(source))
+                actualSha = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+            if (!string.IsNullOrWhiteSpace(expectedSha) &&
+                !string.Equals(actualSha, expectedSha.Trim(), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("The staged GLB SHA-256 does not match the workflow checksum.");
 
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "UCENO/ImportStaging/SolsticeBay"));
             string destination = StagingRoot + "/solsticebay-apartment-lod0.glb";
@@ -54,17 +66,23 @@ namespace UCENO.VirtualWorld.Editor
                 candidate = "SolsticeBay Korean Apartment Tower (Tevy CC0 candidate)",
                 importedAssetPath = destination,
                 unityVersion = Application.unityVersion,
+                sourceSha256 = actualSha,
+                sourceBytes = new FileInfo(source).Length,
                 meshNames = Array.Empty<string>(),
                 materialNames = Array.Empty<string>(),
                 errors = Array.Empty<string>(),
                 status = "failed"
             };
 
+            AssetImporter importer = AssetImporter.GetAtPath(destination);
+            report.importerType = importer == null ? null : importer.GetType().FullName;
             GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(destination);
             report.importedGameObject = root != null;
             if (root == null)
             {
-                report.errors = new[] { "Unity did not expose the imported GLB as a GameObject. Check importer registration and Editor logs." };
+                report.errors = new[] { importer == null
+                    ? "Unity did not register an AssetImporter for the staged GLB."
+                    : "Unity did not expose the imported GLB as a GameObject. Check importer registration and Editor logs." };
                 WriteReport(report);
                 throw new InvalidOperationException(report.errors[0]);
             }
