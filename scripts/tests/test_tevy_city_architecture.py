@@ -28,7 +28,7 @@ class TevyCityArchitectureTests(unittest.TestCase):
         self.assertIsNone(tevy.screen(record(), "NexusDelta"))
 
     def test_non_occupiable_infrastructure_is_rejected(self):
-        for name in ("Power Pylon", "Lattice TV Tower", "Harbour Crane", "Chairlift Bottom Station", "Glass Tower Crown"):
+        for name in ("Power Pylon", "Lattice TV Tower", "Harbour Crane", "Chairlift Bottom Station", "Glass Tower Crown", "High-Voltage Pylon", "Cooling Tower", "Launch Tower and Pad", "Glass Tower Lobby Floor"):
             with self.subTest(name=name):
                 self.assertEqual(tevy.screen(record(name=name), "NexusDelta"), "non-occupiable-infrastructure")
 
