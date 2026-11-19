@@ -60,6 +60,7 @@ const checks = [
   ["Successful labels are cached in session", /readyLabels\.Add\(label\)/.test(delivery)],
   ["Developer preload list exists", /preloadLabels/.test(delivery) && /PreloadConfiguredContent/.test(delivery)],
   ["Remote catalog is configurable", /remoteCatalogUrl/.test(delivery)],
+  ["Remote catalog URLs reject plaintext HTTP and require HTTPS", /parsedCatalogUrl\\.Scheme !== Uri\\.UriSchemeHttps/.test(delivery) && /absolute HTTPS URL/.test(delivery)],
   ["Labeled assets are loaded into memory through Addressables", /LoadAssetsAsync<UnityEngine.Object>/.test(delivery)],
   ["Resident content uses reference-counted leases", /residencyReferences/.test(delivery) && /AcquireContent\(/.test(delivery)],
   ["Resident labels are released at zero references", /ReleaseContent\(/.test(delivery) && /Addressables.Release\(handle\)/.test(delivery)],
