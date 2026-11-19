@@ -42,7 +42,15 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (session_id, user_id)
     )`);
-    await db.unsafe(migration);
+    try {
+      await db.unsafe(migration);
+    } catch (error) {
+      const position = Number(error?.position);
+      const context = Number.isInteger(position) && position > 0
+        ? migration.slice(Math.max(0, position - 100), position + 100)
+        : "migration position unavailable";
+      throw new Error(`Migration 037 failed: ${error instanceof Error ? error.message : String(error)}; SQL context: ${context}`);
+    }
     await db.unsafe("INSERT INTO users(id) VALUES ($1)", [userId]);
     await db.unsafe("INSERT INTO virtual_worlds(id) VALUES ($1)", [worldId]);
     await db.unsafe("INSERT INTO virtual_world_activity_sessions(id) VALUES ($1)", [resultSessionId]);
