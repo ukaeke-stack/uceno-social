@@ -256,7 +256,7 @@ def main():
                     "reason": reason,
                     "category": item.get("category"),
                     "style": item.get("style"),
-                    "tags": tags,
+                    "tags": tag_slugs(item),
                     "dimensions_m": list(dimensions(item)),
                     "summary": item.get("summary") or item.get("description"),
                     "source_url": item.get("url") or ("https://3dassets.dev/assets/" + str(slug)),
