@@ -27,7 +27,7 @@ CITIES = {
     "OriginPlains": ("university", "campus", "school", "library", "museum", "civic", "hospital", "classroom", "college", "office"),
     "AtlasFrontier": ("industrial", "factory", "warehouse", "hangar", "logistics", "workshop", "manufacturing", "terminal", "plant", "office"),
 }
-NON_OCCUPIABLE = ("power pylon", "transmission pylon", "tv tower", "television tower", "broadcast tower", "radio tower", "harbour crane", "harbor crane", "crane", "chairlift", "ski lift", "tower crown", "glass tower crown")
+NON_OCCUPIABLE = ("power pylon", "transmission pylon", "pylon", "tv tower", "television tower", "broadcast tower", "radio tower", "harbour crane", "harbor crane", "crane", "chairlift", "ski lift", "tower crown", "glass tower crown", "lobby floor", "cooling tower", "launch tower")
 EXCLUDE = ("horror", "abandoned", "post-apocalyptic", "medieval", "fantasy", "zombie", "military", "battle", "weapon", "ruin", "derelict", "western", "wild west", "christmas", "seasonal")
 GENERIC = ("building", "house", "apartment", "block", "tower", "office", "hotel", "terminal", "campus", "factory", "warehouse", "hangar", "school", "hospital", "library", "museum", "station", "hall", "residential", "commercial", "civic", "industrial", "hotel", "lighthouse", "fuel station")
 
