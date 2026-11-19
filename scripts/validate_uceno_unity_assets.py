@@ -125,6 +125,32 @@ def check_city_asset_inventory() -> tuple[int, int, int]:
     expected = {"solstice", "verdant", "nexus", "aurora", "saffron", "monsoon", "eclipse", "origin", "atlas"}
     if len(profiles) != 9 or {item.get("cityId") for item in profiles} != expected:
         fail("City asset inventory must contain exactly the nine non-Meridian cities.")
+    missing_prefabs = []
+    missing_source_manifests = []
+    for city in profiles:
+        city_id = city["cityId"]
+        city_root = Path("unity/UCENOVirtualWorld/Assets/UCENO/Cities") / city_id
+        prefab_paths = (city.get("architecturePrefabs") or []) + (city.get("environmentPrefabs") or []) + [
+            landmark.get("prefab") for landmark in city.get("landmarks", [])
+        ]
+        for asset_path in prefab_paths:
+            if not isinstance(asset_path, str):
+                missing_prefabs.append(f"{city_id}: invalid prefab path {asset_path!r}")
+                continue
+            disk_path = PROJECT / asset_path
+            if not disk_path.is_file() or disk_path.stat().st_size == 0:
+                missing_prefabs.append(str(disk_path))
+        source_manifest = city_root / "source-manifest.json"
+        if not source_manifest.is_file() or source_manifest.stat().st_size == 0:
+            missing_source_manifests.append(str(source_manifest))
+    if missing_prefabs or missing_source_manifests:
+        details = []
+        if missing_prefabs:
+            details.append(f"{len(missing_prefabs)} missing/empty city prefabs:\\n - " + "\\n - ".join(missing_prefabs))
+        if missing_source_manifests:
+            details.append(f"{len(missing_source_manifests)} missing/empty city source manifests:\\n - " + "\\n - ".join(missing_source_manifests))
+        fail("City imported-asset inventory is incomplete; path-only profiles are not proof of imported files.\\n" + "\\n".join(details))
+
     checked_prefabs = 0
     checked_hdris = 0
     total_bytes = 0
