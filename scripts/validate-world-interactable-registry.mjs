@@ -25,9 +25,9 @@ if (districts.length === 0)
   throw new Error("world-districts.json must contain at least one configured district");
 
 for (const item of rawRegistry.interactables) {
-  if (!item || typeof item.id !== "string" || !/^scene:[0-9a-f]{32}$/.test(item.id) ||
+  if (!item || typeof item.id !== "string" || !/^(?:uceno|scene):[0-9a-f]{32}$/.test(item.id) ||
       typeof item.yaw !== "number" || !Number.isFinite(item.yaw))
-    throw new Error("Every exported scene interactable must have a stable scene: ID");
+    throw new Error("Every exported interactable must have a persistent UCENO ID");
 }
 const parsed = parseInteractableRegistry(registryText, districts, worldBounds);
 if (parsed.size !== rawRegistry.interactables.length)
