@@ -77,3 +77,15 @@ References:
 **Import decision:** glTFast 6.21.0 is the leading importer candidate for a controlled Unity 6000.3 test. Do not add it or its optional packages to the project manifest yet. First inspect the downloaded GLB extension declarations and texture payloads, then pin mutually compatible stable package versions and verify import in the actual Unity Editor. Do not install the latest pre-release package merely because it appears on the repository's main branch.
 
 This investigation did not obtain the model binaries. The Tevy download endpoint returned an unsupported binary content type to the browser retrieval layer, and the container download attempt failed. Consequently, no GLB bytes, checksums, KTX2 payloads, meshopt payloads, or texture dimensions were inspected locally.
+
+
+## Alternative source screening (2026-11-19)
+
+The following alternatives were reviewed to avoid treating any convenient download as a release-ready landmark. None is accepted into the Eclipse pack:
+
+- **Tevy Town Hall** — CC0 1.0, 30,508 LOD0 triangles, three published LODs (30,508 / 13,678 / 1,531 triangles). This confirms the publisher has other potentially useful LOD-authored architecture, but the binary download/import and 1K albedo + normal-map checks remain outstanding. It is not a visual substitute for Lumen Tower. Source: https://tevy.dev/models/town-hall
+- **3DAssets.dev realistic buildings catalogue** — publisher describes 1,418 CC0 GLB building assets with embedded WebP textures. The catalogue page does not establish three authored LODs or the required 1K albedo and normal-map pair for any specific candidate. Treat as discovery only; no model accepted. Sources: https://3dassets.dev/assets?category=buildings&style=realistic and https://3dassets.dev/
+- **Low Poly City Kit** — 129 CC0 GLB models, but the publisher specifies flat colours, no textures, and a maximum of 1,500 triangles per model. It fails the current architecture/landmark LOD0 minimum and 1K PBR texture requirements. It is unsuitable for this release gate. Source: https://github.com/kayquer/kit-cidade-lowpoly
+- **ModKit** — CC0 modular walls, floors, roofs, stairs and props, but the reviewed catalogue does not establish three authored LODs or the required 1K albedo and normal maps for the supplied modules. It may be useful for kitbash/source exploration only; it cannot be counted as a passing city prefab without those checks. Source: https://github.com/JaronKBragg7337/asset-pack-ue-threejs-blender-unity
+
+**Decision:** keep Tevy Office Tower as the leading Lumen Tower base candidate because its published three-LOD geometry and CC0 licence are the closest match to the current acceptance contract. Do not weaken the contract to admit low-poly, flat-colour, or unverified catalogue models. The immediate blocker remains obtaining and inspecting actual source binaries through a reliable download path.
