@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Test strict city-building discovery and acquisition filters
-        run: python -m unittest discover -s scripts/tests -p "test_city_architecture*.py"
+        run: python -m unittest discover -s scripts/tests -p "test_*city_architecture*.py"
       - name: Discover, pin and checksum-verify CC0 Tevy building GLBs
         run: python scripts/discover-tevy-city-architecture.py
       - name: Preserve legacy 3DAssets.dev diagnostic report
