@@ -7,7 +7,6 @@ is pinned to a published version and checked against the catalogue SHA-256.
 import hashlib
 import json
 import pathlib
-import re
 import time
 import urllib.request
 
@@ -29,7 +28,7 @@ CITIES = {
 }
 NON_OCCUPIABLE = ("power pylon", "transmission pylon", "pylon", "tv tower", "television tower", "broadcast tower", "radio tower", "harbour crane", "harbor crane", "crane", "chairlift", "ski lift", "tower crown", "glass tower crown", "lobby floor", "cooling tower", "launch tower", "drop tower", "wind turbine", "turbine", "lighthouse", "airport control tower", "control tower", "ferris wheel", "observation wheel", "roller coaster", "amusement ride", "theme park ride")
 EXCLUDE = ("horror", "abandoned", "post-apocalyptic", "medieval", "fantasy", "zombie", "military", "battle", "weapon", "ruin", "derelict", "western", "wild west", "christmas", "seasonal")
-GENERIC = ("building", "house", "apartment", "block", "tower", "office", "hotel", "terminal", "campus", "factory", "warehouse", "hangar", "school", "hospital", "library", "museum", "station", "hall", "residential", "commercial", "civic", "industrial", "hotel", "lighthouse", "fuel station")
+GENERIC = ("building", "house", "apartment", "block", "tower", "office", "hotel", "terminal", "campus", "factory", "warehouse", "hangar", "school", "hospital", "library", "museum", "station", "hall", "residential", "commercial", "civic", "industrial", "hotel", "fuel station")
 
 def get_json(url):
     req = urllib.request.Request(url, headers={"User-Agent": "UCENO-city-architecture/1.0", "Accept": "application/json"})
