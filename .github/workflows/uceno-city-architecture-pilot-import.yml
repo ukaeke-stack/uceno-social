@@ -59,7 +59,7 @@ jobs:
           if len(expected) != 64:
               raise SystemExit("Manifest LOD0 SHA-256 is malformed.")
           matches = list(acquisition_root.rglob(pathlib.Path(lod0["file"]).name))
-          matches = [p for p in matches if p.as_posix().endswith("/" + lod0["file"].replace("\\\\", "/")) or p.name == pathlib.Path(lod0["file"]).name]
+          matches = [p for p in matches if p.as_posix().endswith("/" + lod0["file"].replace("\\\\", "/"))]
           if len(matches) != 1:
               raise SystemExit(f"Expected exactly one file for {lod0['file']}; found {len(matches)}.")
           source = matches[0]
