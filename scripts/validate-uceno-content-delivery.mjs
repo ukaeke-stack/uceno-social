@@ -54,6 +54,8 @@ const checks = [
   ["Addressables catalog refreshes versioned remote content", /CheckForCatalogUpdates\(false\)/.test(delivery) && /UpdateCatalogs\(catalogCheck.Result, false\)/.test(delivery)],
   ["On-demand dependency size is checked", /GetDownloadSizeAsync\(label\)/.test(delivery)],
   ["Dependencies download asynchronously", /DownloadDependenciesAsync\(label, false\)/.test(delivery)],
+  ["Concurrent requests for one label share a single download operation", /EnsureContentSharedRoutine/.test(delivery) && /ensureInProgress/.test(delivery) && /ensureWaiters/.test(delivery)],
+
   ["Remote Addressables catalogs are checked and updated before city labels resolve", /CheckForCatalogUpdates\(false\)/.test(delivery) && /UpdateCatalogs\(catalogCheck.Result, false\)/.test(delivery)],
   ["Download progress is exposed", /ProgressChanged\?\.Invoke\(label, download\.PercentComplete\)/.test(delivery)],
   ["Failures are retried", /attempt < maxAttempts/.test(delivery) && /WaitForSecondsRealtime/.test(delivery)],
