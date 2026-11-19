@@ -34,7 +34,7 @@ try {
   const valid = run({ interactables: [item, { ...item,
     id: "uceno:fedcba9876543210fedcba9876543210", x: 125 }] });
   assert.equal(valid.status, 0, valid.stderr);
-  assert.match(valid.stdout, /Gateway parser validated 1 exported scene interactables against 2 configured districts/);
+  assert.match(valid.stdout, /Gateway parser validated 2 exported scene interactables against 2 configured districts/);
 
   rejected({ interactables: [] }, districts, /non-empty interactables/);
   rejected({ interactables: [{ ...item, kind: "teleporter" }] }, districts, /invalid or duplicate fields/);
