@@ -47,9 +47,10 @@ test("scene export creates the exact file and schema loaded by the authoritative
   assert.match(exporter, /marker\.Kind == "door" && !marker\.HasDoorPivot/);
   assert.match(exporter, /Guid\.NewGuid\(\)\.ToString\("N"\)/);
   assert.match(exporter, /id\.StartsWith\("uceno:"/);
-  assert.match(authoring, /objectId\.stringValue = "uceno:"/);
+  assert.match(authoring, /objectId\.stringValue = StableObjectId\(marker\)/);
   assert.match(authoring, /string\.IsNullOrWhiteSpace\(objectId\.stringValue\)/);
-  assert.doesNotMatch(authoring, /GlobalObjectId\.GetGlobalObjectIdSlow/);
+  assert.match(authoring, /GlobalObjectId\.GetGlobalObjectIdSlow/);
+  assert.match(authoring, /SHA256/);
   assert.match(gateway, /process\.env\.WORLD_INTERACTABLES_MANIFEST_FILE/);
   assert.match(gateway, /parseCityInteractableManifest\(manifest!, cityDistricts/);
   assert.match(gateway, /loadInteractableRegistry\(\s*raw, WORLD_DISTRICTS, WORLD_BOUNDS,/);
