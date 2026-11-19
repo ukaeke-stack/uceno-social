@@ -70,10 +70,10 @@ jobs:
           destination.parent.mkdir(parents=True, exist_ok=True)
           shutil.copyfile(source, destination)
           with pathlib.Path(output_path).open("a", encoding="utf-8") as out:
-              out.write(f"path={pathlib.Path.cwd() / destination}\\n")
-              out.write(f"sha256={expected}\\n")
-              out.write(f"candidate={candidate.get('name') or candidate.get('slug')}\\n")
-          (destination.parent / "SHA256SUMS").write_text(f"{expected}  solsticebay-lod0.glb\\n", encoding="utf-8")
+              out.write(f"path={pathlib.Path.cwd() / destination}\n")
+              out.write(f"sha256={expected}\n")
+              out.write(f"candidate={candidate.get('name') or candidate.get('slug')}\n")
+          (destination.parent / "SHA256SUMS").write_text(f"{expected}  solsticebay-lod0.glb\n", encoding="utf-8")
           print(f"Selected manifest-pinned candidate: {candidate.get('name')} ({candidate.get('slug')})")
           PY
 
