@@ -136,7 +136,7 @@ CREATE INDEX IF NOT EXISTS virtual_world_daily_mission_active_lookup_idx
 CREATE INDEX IF NOT EXISTS virtual_world_daily_mission_template_event_idx
   ON virtual_world_daily_mission_templates (event_kind, enabled);
 CREATE INDEX IF NOT EXISTS virtual_world_treasure_hunt_active_lookup_idx
-  ON virtual_world_treasure_hunts (starts_at, ends_at, city_id)
+  ON virtual_world_treasure_hunts (starts_at, ends_at, world_id)
   WHERE enabled = TRUE;
 CREATE INDEX IF NOT EXISTS virtual_world_treasure_clue_location_lookup_idx
   ON virtual_world_treasure_clues (city_id, district_id, interactable_id, hunt_id);
