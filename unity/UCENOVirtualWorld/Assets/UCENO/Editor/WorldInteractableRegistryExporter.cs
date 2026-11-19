@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -192,10 +191,11 @@ namespace UCENO.VirtualWorld.Editor
                                 dirtyScenes.Add(scene.path);
                             }
 
-                            if (!id.StartsWith("scene:", StringComparison.Ordinal) || id.Length != 38 ||
-                                !id.Substring(6).All(ch => (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f')) ||
-                                !ids.Add(id))
-                                throw new InvalidOperationException("Every interactable must have a unique stable scene ID: " + id);
+                            bool stableId = (id.StartsWith("uceno:", StringComparison.Ordinal) ||
+                                id.StartsWith("scene:", StringComparison.Ordinal)) && id.Length == 38 &&
+                                id.Substring(6).All(ch => (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'));
+                            if (!stableId || !ids.Add(id))
+                                throw new InvalidOperationException("Every interactable must have a unique persistent UCENO ID: " + id);
 
                             Collider[] targetingColliders = marker.GetComponentsInChildren<Collider>(true);
                             if (!targetingColliders.Any(collider =>
@@ -290,21 +290,13 @@ namespace UCENO.VirtualWorld.Editor
 
         private static string StableObjectId(WorldInteractable marker)
         {
-            string globalId = GlobalObjectId.GetGlobalObjectIdSlow(marker.gameObject).ToString();
-            if (string.IsNullOrWhiteSpace(globalId) || globalId == GlobalObjectId.Null.ToString())
-                throw new InvalidOperationException("Save the scene and prefab instance before assigning a stable UCENO object ID.");
-
-            using (SHA256 hash = SHA256.Create())
-            {
-                byte[] digest = hash.ComputeHash(Encoding.UTF8.GetBytes(globalId));
-                string id = "scene:" + BitConverter.ToString(digest, 0, 16)
-                    .Replace("-", "").ToLowerInvariant();
-                SerializedObject data = new SerializedObject(marker);
-                data.FindProperty("objectId").stringValue = id;
-                data.ApplyModifiedPropertiesWithoutUndo();
-                EditorUtility.SetDirty(marker);
-                return id;
-            }
+            // Persist identity on the logical component, not on the Unity scene object or vendor prefab.
+            string id = "uceno:" + Guid.NewGuid().ToString("N");
+            SerializedObject data = new SerializedObject(marker);
+            data.FindProperty("objectId").stringValue = id;
+            data.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(marker);
+            return id;
         }
     }
     internal sealed class WorldCityRegistrySettingsWindow : EditorWindow
