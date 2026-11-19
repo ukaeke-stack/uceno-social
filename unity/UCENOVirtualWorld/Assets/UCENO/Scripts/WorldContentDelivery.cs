@@ -29,6 +29,9 @@ namespace UCENO.VirtualWorld
         public event Action<string> ContentFailed;
 
         private readonly HashSet<string> readyLabels = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> ensureInProgress = new HashSet<string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, List<Action<bool, string>>> ensureWaiters =
+            new Dictionary<string, List<Action<bool, string>>>(StringComparer.Ordinal);
         private readonly Dictionary<string, AsyncOperationHandle<IList<UnityEngine.Object>>> residentHandles =
             new Dictionary<string, AsyncOperationHandle<IList<UnityEngine.Object>>>(StringComparer.Ordinal);
         private readonly Dictionary<string, int> residencyReferences =
@@ -58,7 +61,7 @@ namespace UCENO.VirtualWorld
                 completed?.Invoke(false, "A content label is required.");
                 return;
             }
-            StartCoroutine(EnsureContentRoutine(label.Trim(), completed));
+            StartCoroutine(EnsureContentSharedRoutine(label.Trim(), completed));
         }
 
         public void AcquireContent(string label, Action<bool, string> completed = null)
@@ -75,7 +78,7 @@ namespace UCENO.VirtualWorld
         {
             bool downloaded = false;
             string downloadError = null;
-            yield return EnsureContentRoutine(label, (ok, error) =>
+            yield return EnsureContentSharedRoutine(label, (ok, error) =>
             {
                 downloaded = ok;
                 downloadError = error;
@@ -262,6 +265,8 @@ namespace UCENO.VirtualWorld
             sceneUnloads.Clear();
             residencyReferences.Clear();
             residencyLoads.Clear();
+            ensureInProgress.Clear();
+            ensureWaiters.Clear();
         }
 
         public void PreloadConfiguredContent(Action<bool, string> completed = null)
@@ -360,6 +365,42 @@ namespace UCENO.VirtualWorld
             completed?.Invoke(true, null);
         }
 
+        private IEnumerator EnsureContentSharedRoutine(string label, Action<bool, string> completed)
+        {
+            if (ensureInProgress.Contains(label))
+            {
+                bool finished = false;
+                bool succeeded = false;
+                string error = null;
+                ensureWaiters[label].Add((ok, message) =>
+                {
+                    succeeded = ok;
+                    error = message;
+                    finished = true;
+                });
+                while (!finished) yield return null;
+                completed?.Invoke(succeeded, error);
+                yield break;
+            }
+
+            ensureInProgress.Add(label);
+            var waiters = new List<Action<bool, string>>();
+            ensureWaiters[label] = waiters;
+            bool result = false;
+            string resultError = null;
+            yield return EnsureContentRoutine(label, (ok, message) =>
+            {
+                result = ok;
+                resultError = message;
+            });
+
+            ensureInProgress.Remove(label);
+            ensureWaiters.Remove(label);
+            completed?.Invoke(result, resultError);
+            foreach (var waiter in waiters)
+                waiter?.Invoke(result, resultError);
+        }
+
         private IEnumerator EnsureContentRoutine(string label, Action<bool, string> completed)
         {
             bool initOk = false;
@@ -441,7 +482,7 @@ namespace UCENO.VirtualWorld
                 if (string.IsNullOrWhiteSpace(label)) continue;
                 bool itemOk = false;
                 string itemError = null;
-                yield return EnsureContentRoutine(label.Trim(), (success, message) =>
+                yield return EnsureContentSharedRoutine(label.Trim(), (success, message) =>
                 {
                     itemOk = success;
                     itemError = message;
