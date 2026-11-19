@@ -1,0 +1,95 @@
+name: UCENO SolsticeBay architecture GLB pilot import
+
+on:
+  workflow_dispatch:
+    inputs:
+      acquisition_run_id:
+        description: "Successful city architecture acquisition workflow run ID"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: uceno-city-architecture-pilot-import
+  cancel-in-progress: false
+
+jobs:
+  import-one-real-glb:
+    if: ${{ vars.UCENO_UNITY_CONTENT_EXPORT_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          lfs: true
+
+      - name: Download the selected acquisition run artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: uceno-city-architecture-source-acquisition
+          run-id: ${{ inputs.acquisition_run_id }}
+          github-token: ${{ github.token }}
+          path: acquisition
+
+      - name: Select and stage the SolsticeBay LOD0 candidate
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="$(find acquisition -type f -path '*SolsticeBay/*-lod0.glb' -print -quit)"
+          test -n "$candidate"
+          test -s "$candidate"
+          mkdir -p artifacts/pilot-input
+          cp "$candidate" artifacts/pilot-input/solsticebay-lod0.glb
+          echo "path=$PWD/artifacts/pilot-input/solsticebay-lod0.glb" >> "$GITHUB_OUTPUT"
+          sha256sum artifacts/pilot-input/solsticebay-lod0.glb | tee artifacts/pilot-input/SHA256SUMS
+
+      - name: Run Unity Editor import-only pilot
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UCENO_PILOT_GLB: ${{ steps.candidate.outputs.path }}
+        with:
+          projectPath: unity/UCENOVirtualWorld
+          unityVersion: 6000.3.27f1
+          targetPlatform: StandaloneLinux64
+          buildMethod: UCENO.VirtualWorld.Editor.ArchitecturePilotImport.Run
+          buildsPath: Builds/ArchitecturePilot
+          buildName: uceno-solsticebay-import-only
+
+      - name: Verify the technical import report
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="artifacts/uceno-solsticebay-glb-import-report.json"
+          test -s "$report"
+          python - "$report" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert data.get("status") == "technical-import-pass-visual-review-pending", data
+          assert data.get("meshCount", 0) > 0, data
+          assert data.get("rendererCount", 0) > 0, data
+          assert data.get("triangleCount", 0) > 0, data
+          assert data.get("materialCount", 0) > 0, data
+          assert data.get("textureCount", 0) > 0, data
+          print(json.dumps(data, indent=2))
+          PY
+
+      - name: Upload pilot input, import report and Editor logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uceno-solsticebay-unity-import-pilot
+          path: |
+            artifacts/pilot-input/
+            artifacts/uceno-solsticebay-glb-import-report.json
+          if-no-files-found: warn
+          retention-days: 30
