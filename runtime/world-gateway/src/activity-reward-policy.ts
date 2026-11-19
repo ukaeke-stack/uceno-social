@@ -40,7 +40,7 @@ export function calculateEarnedCreditGrant(
   rule: EarnedCreditRule
 ): { ok: true; grant: EarnedCreditGrant } | { ok: false; code: string } {
   if (!result || result.source !== "authoritative_gateway") return { ok: false, code: "unverified_activity_result" };
-  if (!/^[1-9][0-9]{0,18}$/.test(result.resultId) || BigInt(result.resultId) > 9223372036854775807n ||
+  if (!/^[1-9][0-9]{0,18}$/.test(result.resultId) ||\n      (result.resultId.length === 19 && result.resultId > "9223372036854775807") ||
       ![result.sessionId, result.userId].every(value => typeof value === "string" && UUID.test(value)))
     return { ok: false, code: "invalid_activity_identity" };
   if (!["checkpoint_race", "dance", "sports", "adventure"].includes(result.activityKind))
