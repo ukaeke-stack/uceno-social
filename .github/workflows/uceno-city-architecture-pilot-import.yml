@@ -36,20 +36,46 @@ jobs:
           github-token: ${{ github.token }}
           path: acquisition
 
-      - name: Select and stage the SolsticeBay LOD0 candidate
+      - name: Select the manifest-pinned SolsticeBay LOD0 candidate
         id: candidate
         shell: bash
         run: |
           set -euo pipefail
-          candidate="$(find acquisition -type f -path '*SolsticeBay/*-lod0.glb' -print -quit)"
-          test -n "$candidate"
-          test -s "$candidate"
-          mkdir -p artifacts/pilot-input
-          cp "$candidate" artifacts/pilot-input/solsticebay-lod0.glb
-          echo "path=$PWD/artifacts/pilot-input/solsticebay-lod0.glb" >> "$GITHUB_OUTPUT"
-          sha="$(sha256sum artifacts/pilot-input/solsticebay-lod0.glb | cut -d ' ' -f 1)"
-          printf "%s  %s\\n" "$sha" "solsticebay-lod0.glb" | tee artifacts/pilot-input/SHA256SUMS
-          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          manifest="$(find acquisition -type f -name tevy-acquisition-manifest.json -print -quit)"
+          test -n "$manifest"
+          python - "$manifest" "$PWD/acquisition" "$GITHUB_OUTPUT" <<'PY'
+          import hashlib, json, pathlib, shutil, sys
+          manifest_path, acquisition_root, output_path = map(pathlib.Path, sys.argv[1:])
+          data = json.loads(manifest_path.read_text(encoding="utf-8"))
+          city = data.get("cities", {}).get("SolsticeBay", {})
+          candidates = city.get("selected_and_acquired", [])
+          if not candidates:
+              raise SystemExit("Manifest contains no acquired SolsticeBay building.")
+          candidate = candidates[0]
+          lod0 = next((x for x in candidate.get("lods", []) if x.get("lod") == 0), None)
+          if not lod0 or not lod0.get("file") or not lod0.get("sha256"):
+              raise SystemExit("Selected SolsticeBay candidate has no manifest-pinned LOD0 file/checksum.")
+          expected = str(lod0["sha256"]).lower()
+          if len(expected) != 64:
+              raise SystemExit("Manifest LOD0 SHA-256 is malformed.")
+          matches = list(acquisition_root.rglob(pathlib.Path(lod0["file"]).name))
+          matches = [p for p in matches if p.as_posix().endswith("/" + lod0["file"].replace("\\\\", "/")) or p.name == pathlib.Path(lod0["file"]).name]
+          if len(matches) != 1:
+              raise SystemExit(f"Expected exactly one file for {lod0['file']}; found {len(matches)}.")
+          source = matches[0]
+          digest = hashlib.sha256(source.read_bytes()).hexdigest()
+          if digest != expected:
+              raise SystemExit(f"Acquired LOD0 checksum mismatch: manifest={expected}, file={digest}")
+          destination = pathlib.Path("artifacts/pilot-input/solsticebay-lod0.glb")
+          destination.parent.mkdir(parents=True, exist_ok=True)
+          shutil.copyfile(source, destination)
+          with pathlib.Path(output_path).open("a", encoding="utf-8") as out:
+              out.write(f"path={pathlib.Path.cwd() / destination}\\n")
+              out.write(f"sha256={expected}\\n")
+              out.write(f"candidate={candidate.get('name') or candidate.get('slug')}\\n")
+          (destination.parent / "SHA256SUMS").write_text(f"{expected}  solsticebay-lod0.glb\\n", encoding="utf-8")
+          print(f"Selected manifest-pinned candidate: {candidate.get('name')} ({candidate.get('slug')})")
+          PY
 
       - name: Run Unity Editor import-only pilot
         uses: game-ci/unity-builder@v4
@@ -59,6 +85,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UCENO_PILOT_GLB: ${{ steps.candidate.outputs.path }}
           UCENO_PILOT_EXPECTED_SHA256: ${{ steps.candidate.outputs.sha256 }}
+          UCENO_PILOT_CANDIDATE_NAME: ${{ steps.candidate.outputs.candidate }}
         with:
           projectPath: unity/UCENOVirtualWorld
           unityVersion: 6000.3.27f1
