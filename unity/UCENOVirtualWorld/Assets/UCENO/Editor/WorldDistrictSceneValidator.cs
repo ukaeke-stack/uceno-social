@@ -90,7 +90,8 @@ namespace UCENO.VirtualWorld.Editor
         private static bool IsGatewayObjectId(string id)
         {
             return !string.IsNullOrWhiteSpace(id) &&
-                id.StartsWith("scene:", StringComparison.Ordinal) &&
+                (id.StartsWith("uceno:", StringComparison.Ordinal) ||
+                 id.StartsWith("scene:", StringComparison.Ordinal)) &&
                 id.Length == 38 &&
                 id.Substring(6).All(ch =>
                     (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'));
