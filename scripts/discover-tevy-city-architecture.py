@@ -27,6 +27,7 @@ CITIES = {
     "OriginPlains": ("university", "campus", "school", "library", "museum", "civic", "hospital", "classroom", "college", "office"),
     "AtlasFrontier": ("industrial", "factory", "warehouse", "hangar", "logistics", "workshop", "manufacturing", "terminal", "plant", "office"),
 }
+NON_OCCUPIABLE = ("power pylon", "transmission pylon", "tv tower", "television tower", "broadcast tower", "radio tower", "harbour crane", "harbor crane", "crane", "chairlift", "ski lift", "tower crown", "glass tower crown")
 EXCLUDE = ("horror", "abandoned", "post-apocalyptic", "medieval", "fantasy", "zombie", "military", "battle", "weapon", "ruin", "derelict", "western", "wild west", "christmas", "seasonal")
 GENERIC = ("building", "house", "apartment", "block", "tower", "office", "hotel", "terminal", "campus", "factory", "warehouse", "hangar", "school", "hospital", "library", "museum", "station", "hall", "residential", "commercial", "civic", "industrial", "hotel", "lighthouse", "fuel station")
 
@@ -73,6 +74,8 @@ def screen(record, city):
     if lods[0].get("bytes", MAX_BYTES + 1) > MAX_BYTES:
         return "lod0-over-25-mib"
     text = " ".join([record.get("name", ""), record.get("description", ""), " ".join(record.get("tags") or [])]).lower()
+    if any(term in text for term in NON_OCCUPIABLE):
+        return "non-occupiable-infrastructure"
     if any(term in text for term in EXCLUDE):
         return "unwanted-theme"
     return None
