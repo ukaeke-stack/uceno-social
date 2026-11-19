@@ -100,3 +100,52 @@ test("host departure returns no replacement when no active participant remains",
   assert.equal(leaveActivity(session, "host-user", 1_200).ok, true);
   assert.equal(selectNextActivityHost(session, "host-user"), null);
 });
+
+import { calculateEarnedCreditGrant } from "../dist/activity-reward-policy.js";
+
+const rewardResult = (overrides = {}) => ({
+  source: "authoritative_gateway",
+  resultId: "123e4567-e89b-42d3-a456-426614174001",
+  sessionId: "123e4567-e89b-42d3-a456-426614174002",
+  userId: "123e4567-e89b-42d3-a456-426614174003",
+  activityKind: "checkpoint_race",
+  status: "finished",
+  placement: 1,
+  recordedAt: 1_700_000_000_000,
+  ...overrides
+});
+const rewardRule = {
+  baseCredits: 10,
+  placementBonus: { 1: 5, 2: 3, 3: 1 },
+  maximumCreditsPerResult: 12
+};
+
+test("earned credit reward is derived only from an authoritative completed result and is capped", () => {
+  const result = calculateEarnedCreditGrant(rewardResult(), rewardRule);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.grant.amount, 12);
+  assert.equal(result.grant.currency, "earned_credits");
+  assert.equal(result.grant.ledgerType, "earned");
+  assert.equal(result.grant.idempotencyKey,
+    "activity-result:123e4567-e89b-42d3-a456-426614174001:earned-credits");
+});
+
+test("rejects client-originated, unfinished, malformed and zero-value reward claims", () => {
+  assert.equal(calculateEarnedCreditGrant(rewardResult({ source: "client" }), rewardRule).ok, false);
+  assert.equal(calculateEarnedCreditGrant(rewardResult({ status: "dnf" }), rewardRule).ok, false);
+  assert.equal(calculateEarnedCreditGrant(rewardResult({ placement: 0 }), rewardRule).ok, false);
+  assert.equal(calculateEarnedCreditGrant(rewardResult({ userId: "not-a-uuid" }), rewardRule).ok, false);
+  assert.equal(calculateEarnedCreditGrant(rewardResult(), {
+    ...rewardRule, baseCredits: 0, placementBonus: {}, maximumCreditsPerResult: 0
+  }).ok, false);
+});
+
+test("reward policy cannot create Purchased Credits or cash payouts", () => {
+  const result = calculateEarnedCreditGrant(rewardResult({ placement: 2 }), rewardRule);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(Object.keys(result.grant).sort(),
+    ["amount", "currency", "idempotencyKey", "ledgerType", "sessionId", "sourceResultId", "userId"].sort());
+  assert.equal(result.grant.currency, "earned_credits");
+});
