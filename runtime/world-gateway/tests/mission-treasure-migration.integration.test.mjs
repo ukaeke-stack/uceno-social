@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
+import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "../dist/private-treasure-runtime.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -28,6 +29,9 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
   const missionTemplateId = randomUUID();
   const missionInstanceId = randomUUID();
   const huntId = randomUUID();
+  const privateHuntId = randomUUID();
+  const instanceId = randomUUID();
+  const processId = randomUUID();
   const clueId = randomUUID();
 
   try {
@@ -35,6 +39,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     await db.unsafe("CREATE TABLE users (id UUID PRIMARY KEY)");
     await db.unsafe("CREATE TABLE virtual_worlds (id UUID PRIMARY KEY)");
     await db.unsafe("CREATE TABLE virtual_world_activity_sessions (id UUID PRIMARY KEY)");
+    await db.unsafe("CREATE TABLE virtual_world_instances (id UUID PRIMARY KEY, owner_process_id UUID NOT NULL, owner_generation INTEGER NOT NULL, owner_lease_expires_at TIMESTAMPTZ NOT NULL)");
     await db.unsafe(`CREATE TABLE virtual_world_activity_results (
       id BIGSERIAL PRIMARY KEY,
       session_id UUID NOT NULL REFERENCES virtual_world_activity_sessions(id),
@@ -156,6 +161,62 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       (team_id, user_id, contribution_points, amount)
       VALUES ($1, $2, 3, 15), ($1, $3, 2, 10)`,
       [teamId, userId, secondUserId]);
+    await db.unsafe(`INSERT INTO virtual_world_instances
+      (id, owner_process_id, owner_generation, owner_lease_expires_at)
+      VALUES ($1, $2, 1, NOW() + INTERVAL '1 hour')`, [instanceId, processId]);
+    await db.unsafe(`INSERT INTO virtual_world_treasure_hunts
+      (id, code, title, world_id, starts_at, ends_at, reward_earned_credits,
+       enabled, distribution_mode)
+      VALUES ($1, 'private-route-test', 'Private route test', $2,
+        NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour', 25, TRUE, 'personal')`,
+      [privateHuntId, worldId]);
+    const routePoints = [];
+    for (let sequence = 0; sequence < 2; sequence++) {
+      for (let candidate = 0; candidate < 3; candidate++) {
+        const point = { id: randomUUID(), sequence, cityId: 'solsticebay',
+          districtId: 'central', interactableId: 'private-' + sequence + '-' + candidate,
+          x: sequence * 10 + candidate, y: 1.15, z: candidate };
+        routePoints.push(point);
+        await db.unsafe(`INSERT INTO virtual_world_treasure_spawn_points
+          (id, hunt_id, sequence, city_id, district_id, interactable_id,
+           position_x, position_y, position_z, interaction_radius, clue_payload)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 2,
+            '{"title":"Private clue","hint":"Search the old arch","position_x":999}'::jsonb)`,
+          [point.id, privateHuntId, point.sequence, point.cityId, point.districtId,
+            point.interactableId, point.x, point.y, point.z]);
+      }
+    }
+    const privatePlayer = { id: userId, worldId, x: 0, y: 1.15, z: 0 };
+    const privateHints = await loadPrivateTreasureHints(db, privatePlayer, Date.now(),
+      'integration-test-secret-that-is-at-least-32-characters');
+    assert.equal(privateHints.length, 1);
+    assert.equal(privateHints[0].clue.title, 'Private clue');
+    assert.equal('position_x' in privateHints[0].clue, false);
+    const assignments = await db`SELECT assignment.sequence, point.id AS "spawnPointId",
+        point.city_id AS "cityId", point.district_id AS "districtId",
+        point.interactable_id AS "interactableId", point.position_x AS x,
+        point.position_y AS y, point.position_z AS z
+      FROM virtual_world_treasure_assignments AS assignment
+      JOIN virtual_world_treasure_spawn_points AS point
+        ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
+      WHERE assignment.hunt_id = ${privateHuntId}::uuid
+        AND assignment.user_id = ${userId}::uuid ORDER BY assignment.sequence`;
+    assert.equal(assignments.length, 2);
+    for (const [index, point] of assignments.entries()) {
+      const result = await recordPrivateTreasureDiscovery(db,
+        { id: userId, worldId, x: Number(point.x), y: Number(point.y), z: Number(point.z) },
+        { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
+        Date.now(), 'integration-test-secret-that-is-at-least-32-characters',
+        instanceId, processId, 1);
+      assert.equal(result.handled, true);
+      assert.equal(result.discovered, true);
+      assert.equal(result.completed, index === 1);
+      if (index === 1) assert.equal(result.rewardEarnedCredits, '25');
+    }
+    const privateReward = await db`SELECT amount FROM virtual_world_earned_credit_ledger
+      WHERE idempotency_key = ${'private-treasure:' + privateHuntId + ':' + userId}`;
+    assert.equal(privateReward.length, 1);
+    assert.equal(String(privateReward[0].amount), '25');
 
     await db.unsafe(`INSERT INTO virtual_world_treasure_progress
       (hunt_id, user_id, next_sequence) VALUES ($1, $2, 1)`, [huntId, userId]);
