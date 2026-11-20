@@ -370,6 +370,118 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const completedHints = await loadTeamTreasureHints(db, privatePlayer, Date.now());
     assert.equal(completedHints.length, 0);
 
+    // A failure after reward writes but before COMMIT must roll back the
+    // completion, ledger, allocations, inventory and minted supply together.
+    // Retrying the same final clue must then recover exactly one complete award.
+    const recoveryHuntId = randomUUID();
+    const recoveryCollectibleId = randomUUID();
+    await db`INSERT INTO virtual_world_treasure_hunts
+      (id, code, title, world_id, starts_at, ends_at, enabled,
+       reward_earned_credits, distribution_mode)
+      VALUES (${recoveryHuntId}::uuid, ${'recovery-' + recoveryHuntId.slice(0, 8)},
+        'Reward transaction recovery', ${worldId}::uuid,
+        NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour',
+        TRUE, 37, 'team')`;
+    await db`INSERT INTO virtual_world_collectible_catalog
+      (id, code, display_name, category, rarity, max_supply, enabled)
+      VALUES (${recoveryCollectibleId}::uuid, 'recovery-badge-' || ${recoveryHuntId.slice(0, 8)},
+        'Recovery Badge', 'badge', 'rare', 2, TRUE)`;
+    await db`INSERT INTO virtual_world_treasure_reward_items
+      (hunt_id, collectible_id, quantity)
+      VALUES (${recoveryHuntId}::uuid, ${recoveryCollectibleId}::uuid, 1)`;
+    for (let sequence = 0; sequence < 2; sequence++) {
+      const point = { id: randomUUID(), sequence, interactableId: 'recovery-' + sequence,
+        x: sequence * 10, y: 1.15, z: 0 };
+      await db`INSERT INTO virtual_world_treasure_spawn_points
+        (id, hunt_id, sequence, city_id, district_id, interactable_id,
+         position_x, position_y, position_z, interaction_radius)
+        VALUES (${point.id}::uuid, ${recoveryHuntId}::uuid, ${sequence},
+          'solsticebay', 'central', ${point.interactableId}, ${point.x}, ${point.y}, ${point.z}, 2)`;
+    }
+    const recoveryTeam = await createTreasureTeam(
+      db, recoveryHuntId, userId, worldId, 2, Date.now(), teamSecret);
+    assert.equal(recoveryTeam.ok, true);
+    const recoveryJoin = await joinTreasureTeam(
+      db, recoveryTeam.teamId, secondUserId, worldId, Date.now());
+    assert.equal(recoveryJoin.ok, true);
+    const recoveryRoute = await db`SELECT assignment.sequence,
+        point.interactable_id AS "interactableId", point.city_id AS "cityId",
+        point.district_id AS "districtId", point.position_x AS x,
+        point.position_y AS y, point.position_z AS z
+      FROM virtual_world_treasure_team_assignments AS assignment
+      JOIN virtual_world_treasure_spawn_points AS point
+        ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
+      WHERE assignment.team_id = ${recoveryTeam.teamId}::uuid
+      ORDER BY assignment.sequence`;
+    assert.equal(recoveryRoute.length, 2);
+    const recoveryFirst = recoveryRoute[0];
+    const recoveryFinal = recoveryRoute[1];
+    const recoveryFirstResult = await recordTeamTreasureDiscovery(db,
+      { id: userId, worldId, x: Number(recoveryFirst.x), y: Number(recoveryFirst.y), z: Number(recoveryFirst.z) },
+      { id: recoveryFirst.interactableId, cityId: recoveryFirst.cityId, districtId: recoveryFirst.districtId },
+      Date.now(), teamSecret, instanceId, processId, 1);
+    assert.equal(recoveryFirstResult.discovered, true);
+    const failBeforeCommitDb = {
+      begin: fn => db.begin(async tx => {
+        const result = await fn(tx);
+        if (result.completed) throw new Error('simulated_reward_commit_failure');
+        return result;
+      })
+    };
+    await assert.rejects(() => recordTeamTreasureDiscovery(failBeforeCommitDb,
+      { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
+      { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
+      Date.now(), teamSecret, instanceId, processId, 1), /simulated_reward_commit_failure/);
+    const rolledBackProgress = await db`SELECT next_sequence AS "nextSequence", completed_at AS "completedAt"
+      FROM virtual_world_treasure_team_progress WHERE team_id = ${recoveryTeam.teamId}::uuid`;
+    const rolledBackTeam = await db`SELECT status FROM virtual_world_treasure_teams
+      WHERE id = ${recoveryTeam.teamId}::uuid`;
+    const rolledBackLedger = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_earned_credit_ledger
+      WHERE idempotency_key LIKE ${'team-treasure:' + recoveryTeam.teamId + ':%'}`;
+    const rolledBackInventory = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_user_collectibles
+      WHERE source_treasure_hunt_id = ${recoveryHuntId}::uuid`;
+    const rolledBackCatalog = await db`SELECT minted_count FROM virtual_world_collectible_catalog
+      WHERE id = ${recoveryCollectibleId}::uuid`;
+    assert.equal(Number(rolledBackProgress[0].nextSequence), 1);
+    assert.equal(rolledBackProgress[0].completedAt, null);
+    assert.equal(rolledBackTeam[0].status, 'active');
+    assert.equal(rolledBackLedger[0].total, 0);
+    assert.equal(rolledBackInventory[0].total, 0);
+    assert.equal(Number(rolledBackCatalog[0].minted_count), 0);
+    const recoveredCompletion = await recordTeamTreasureDiscovery(db,
+      { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
+      { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
+      Date.now(), teamSecret, instanceId, processId, 1);
+    assert.equal(recoveredCompletion.completed, true);
+    assert.equal(BigInt(recoveredCompletion.rewardEarnedCredits) > 0n, true);
+    const recoveredLedger = await db`SELECT COUNT(*)::integer AS total,
+        COALESCE(SUM(amount), 0)::text AS amount
+      FROM virtual_world_earned_credit_ledger
+      WHERE idempotency_key LIKE ${'team-treasure:' + recoveryTeam.teamId + ':%'}`;
+    const recoveredInventory = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_user_collectibles
+      WHERE source_treasure_hunt_id = ${recoveryHuntId}::uuid`;
+    const recoveredCatalog = await db`SELECT minted_count FROM virtual_world_collectible_catalog
+      WHERE id = ${recoveryCollectibleId}::uuid`;
+    assert.equal(recoveredLedger[0].total, 2);
+    assert.equal(BigInt(recoveredLedger[0].amount), 37n);
+    assert.equal(recoveredInventory[0].total, 2);
+    assert.equal(Number(recoveredCatalog[0].minted_count), 2);
+    const recoveredReplay = await recordTeamTreasureDiscovery(db,
+      { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
+      { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
+      Date.now(), teamSecret, instanceId, processId, 1);
+    assert.equal(recoveredReplay.discovered, false);
+    const finalRecoveryCounts = await db`SELECT
+        (SELECT COUNT(*) FROM virtual_world_earned_credit_ledger
+          WHERE idempotency_key LIKE ${'team-treasure:' + recoveryTeam.teamId + ':%'})::integer AS ledger,
+        (SELECT COUNT(*) FROM virtual_world_user_collectibles
+          WHERE source_treasure_hunt_id = ${recoveryHuntId}::uuid)::integer AS inventory`;
+    assert.equal(finalRecoveryCounts[0].ledger, 2);
+    assert.equal(finalRecoveryCounts[0].inventory, 2);
+
     // Distinct teams must complete concurrently without serializing ordinary
     // discoveries on the hunt row, while the final reward cap remains strict.
     const cappedHuntId = randomUUID();
