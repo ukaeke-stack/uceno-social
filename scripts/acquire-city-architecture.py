@@ -85,6 +85,34 @@ def dimensions(detail):
         return tuple(float(high[i]) - float(low[i]) for i in range(3))
     return None
 
+def verify_glb(data, expected_sha=None):
+    if not isinstance(data, (bytes, bytearray)) or len(data) < 20 or len(data) > MAX_BYTES:
+        raise ValueError("GLB binary has an invalid size")
+    if data[:4] != b"glTF":
+        raise ValueError("Downloaded file does not have a GLB header")
+    version = int.from_bytes(data[4:8], "little")
+    declared_length = int.from_bytes(data[8:12], "little")
+    if version != 2 or declared_length != len(data):
+        raise ValueError("GLB must be a complete version-2 binary")
+    chunk_length = int.from_bytes(data[12:16], "little")
+    chunk_type = int.from_bytes(data[16:20], "little")
+    if chunk_type != 0x4E4F534A or 20 + chunk_length > len(data):
+        raise ValueError("GLB JSON chunk is missing or malformed")
+    try:
+        document = json.loads(data[20:20 + chunk_length].decode("utf-8").rstrip(" \\x00"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("GLB JSON chunk is invalid") from exc
+    if document.get("asset", {}).get("version") != "2.0":
+        raise ValueError("Embedded glTF asset version is not 2.0")
+    digest = hashlib.sha256(data).hexdigest()
+    if expected_sha is not None:
+        if not isinstance(expected_sha, str) or re.fullmatch(r"[0-9a-fA-F]{64}", expected_sha) is None:
+            raise ValueError("Source SHA-256 metadata is invalid")
+        if digest.lower() != expected_sha.lower():
+            raise ValueError("Downloaded GLB SHA-256 does not match source metadata")
+    return digest
+
+
 def validate_complete_building(detail, city):
     category = detail.get("category")
     if isinstance(category, dict):
@@ -161,11 +189,8 @@ def main():
                 req = urllib.request.Request(url, headers={"User-Agent": UA})
                 with urllib.request.urlopen(req, timeout=120) as response:
                     data = response.read(MAX_BYTES + 1)
-                if len(data) > MAX_BYTES:
-                    raise ValueError(f"GLB exceeds 25 MiB ({len(data)} bytes)")
-                if len(data) < 12 or data[:4] != b"glTF":
-                    raise ValueError("Downloaded file does not have a GLB 2.0 header")
-                digest = hashlib.sha256(data).hexdigest()
+                expected_sha = detail.get("sha256") or detail.get("checksum")
+                digest = verify_glb(data, expected_sha)
                 filename = f"{slug}.glb"
                 (city_dir / filename).write_bytes(data)
                 acquired.append({
