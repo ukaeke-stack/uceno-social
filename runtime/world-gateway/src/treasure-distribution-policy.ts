@@ -28,7 +28,9 @@ export function selectPersonalTreasureRoute(
 ): PersonalTreasureAssignment[] {
   if (!/^[0-9a-f-]{36}$/i.test(huntId) || !/^[0-9a-f-]{36}$/i.test(userId))
     throw new Error("invalid_treasure_assignment_identity");
-  if (assignmentSecret.length < 32) throw new Error("treasure_assignment_secret_too_short");
+  if (typeof assignmentSecret !== "string" ||
+      Buffer.byteLength(assignmentSecret, "utf8") < 32)
+    throw new Error("treasure_assignment_secret_too_short");
   if (!Number.isInteger(clueCount) || clueCount < 2 || clueCount > 100)
     throw new Error("invalid_treasure_clue_count");
   if (!Array.isArray(candidates) || candidates.length < clueCount || candidates.length > 10000)
