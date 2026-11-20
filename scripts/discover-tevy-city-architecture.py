@@ -99,6 +99,24 @@ def score(record, city):
     y = dimensions(record)[1]
     return city_hits * 10 + min(generic_hits, 5) * 2 + (5 if y >= 35 else 0)
 
+def allocate_city_candidates(candidate_pools, per_city=PER_CITY):
+    """Reserve scarce city-specific candidates before filling broad city pools."""
+    used = set()
+    allocations = {}
+    for city in sorted(candidate_pools, key=lambda name: (len(candidate_pools[name]), name)):
+        selected = []
+        for record in candidate_pools[city]:
+            slug = record.get("slug")
+            if not isinstance(slug, str) or slug in used:
+                continue
+            selected.append(record)
+            used.add(slug)
+            if len(selected) >= per_city:
+                break
+        allocations[city] = selected
+    return allocations
+
+
 def verify_glb(data, expected_sha):
     if len(data) < 20 or len(data) > MAX_BYTES or data[:4] != b"glTF":
         raise ValueError("Invalid GLB header or size")
@@ -126,7 +144,9 @@ def main():
         raise RuntimeError("Unexpected tevy models.json schema")
     report = {"source": INDEX_URL, "catalogue_generated": index.get("generated"), "queried_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "policy": "CC0-1.0 complete building category, dimensions, three versioned GLB LODs, <=25 MiB LOD0, SHA-256 and GLB 2.0 validation; visual review and Unity import remain pending", "cities": {}}
     all_eligible = [m for m in models if isinstance(m, dict)]
-    globally_used = set()
+    all_eligible = [m for m in models if isinstance(m, dict)]
+    candidate_pools = {}
+    rejection_pools = {}
     for city in CITIES:
         rejected = {}
         candidates = []
@@ -137,9 +157,16 @@ def main():
                 continue
             candidates.append(record)
         candidates.sort(key=lambda r: (-score(r, city), -dimensions(r)[1], r.get("slug", "")))
-        selected = [r for r in candidates if r.get("slug") not in globally_used][:PER_CITY]
+        candidate_pools[city] = candidates
+        rejection_pools[city] = rejected
+
+    # The previous fixed city order let the first three broad catalogues claim
+    # models needed by scarce city themes. Allocate rare pools first so one
+    # city's generic overlap cannot starve a city with fewer eligible assets.
+    allocations = allocate_city_candidates(candidate_pools)
+    for city in sorted(CITIES, key=lambda name: (len(candidate_pools[name]), name)):
         acquired = []
-        for record in selected:
+        for record in allocations[city]:
             slug = record["slug"]
             meta = get_json(f"{BASE}/models/{slug}.json")
             if meta.get("license") != "CC0-1.0" or meta.get("deprecated") or meta.get("slug", slug) != slug:
@@ -164,9 +191,8 @@ def main():
                 target.write_bytes(data)
                 lod_records.append({"lod": lod, "file": f"{city}/{target.name}", "bytes": len(data), "sha256": digest, "triangles": file_info.get("triangles"), "extensions_used": extensions})
             acquired.append({"slug": slug, "name": meta.get("name"), "version": version, "license": meta.get("license"), "dimensions_m": meta.get("dimensions"), "preview": BASE + meta.get("preview", ""), "source_url": f"{BASE}/models/{slug}", "lods": lod_records, "status": "binary-verified; visual-review-pending; unity-import-pending"})
-            globally_used.add(slug)
-        report["cities"][city] = {"eligible_catalogue_count": len(candidates), "rejection_counts": rejected, "selected_and_acquired": acquired}
-        print(f"{city}: {len(candidates)} eligible catalogue buildings; acquired {len(acquired)}")
+        report["cities"][city] = {"eligible_catalogue_count": len(candidate_pools[city]), "rejection_counts": rejection_pools[city], "selected_and_acquired": acquired}
+        print(f"{city}: {len(candidate_pools[city])} eligible catalogue buildings; acquired {len(acquired)}")
     report["total_models"] = sum(len(v["selected_and_acquired"]) for v in report["cities"].values())
     (OUT / "tevy-acquisition-manifest.json").write_text(json.dumps(report, indent=2) + "\n")
     shortfalls = {
