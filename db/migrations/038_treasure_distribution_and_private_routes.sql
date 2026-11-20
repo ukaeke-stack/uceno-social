@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS virtual_world_treasure_spawn_points (
   position_y DOUBLE PRECISION NOT NULL CHECK (position_y BETWEEN -10000 AND 10000),
   position_z DOUBLE PRECISION NOT NULL CHECK (position_z BETWEEN -10000 AND 10000),
   interaction_radius DOUBLE PRECISION NOT NULL CHECK (interaction_radius BETWEEN 0.5 AND 8),
+  clue_payload JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(clue_payload) = 'object'),
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (hunt_id, sequence, interactable_id),
