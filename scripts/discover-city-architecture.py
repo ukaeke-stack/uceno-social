@@ -113,7 +113,9 @@ NON_BUILDING_TITLE_TERMS = (
     "sign", "monument", "bridge", "wall panel", "facade panel", "module", "prop",
     "front", "frontage", "shopfront", "shop front", "building front", "roof section",
     "tower section", "gantry", "silo", "glazed dome", "staging tower",
-    "observation tower", "site office",
+    "observation tower", "site office", "canopy", "canopy section",
+    "forecourt canopy", "canopy module", "fabrication shed bay", "shed bay",
+    "bay section", "section module",
 )
 POSITIVE_TERMS = (
     "building", "skyscraper", "tower", "high rise", "high-rise", "office",
