@@ -49,8 +49,15 @@ function hasQualifiedSpawnPool(points: any[], mode: string): boolean {
   const clueCount = Math.max(...points.map((point: any) => Number(point.sequence))) + 1;
   if (!Number.isInteger(clueCount) || clueCount < 2 || clueCount > 100) return false;
   const counts = new Map<number, number>();
-  for (const point of points) counts.set(Number(point.sequence),
-    (counts.get(Number(point.sequence)) ?? 0) + 1);
+  const seenInteractables = new Set<string>();
+  for (const point of points) {
+    const identity = JSON.stringify([point.cityId, point.districtId, point.interactableId]);
+    // A scheduled route must not count duplicate rows for the same in-world
+    // object as alternate clue locations or repeat one object across steps.
+    if (seenInteractables.has(identity)) return false;
+    seenInteractables.add(identity);
+    counts.set(Number(point.sequence), (counts.get(Number(point.sequence)) ?? 0) + 1);
+  }
   const minimum = mode === "team" ? 1 : 2;
   return Array.from({ length: clueCount }, (_, sequence) => counts.get(sequence) ?? 0)
     .every(count => count >= minimum);
