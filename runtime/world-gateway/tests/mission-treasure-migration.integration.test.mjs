@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "../dist/private-treasure-runtime.js";
 import { createTreasureTeam, joinTreasureTeam, loadTeamTreasureHints, recordTeamTreasureDiscovery } from "../dist/team-treasure-runtime.js";
+import { grantTreasureCollectibles } from "../dist/treasure-collectible-runtime.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -38,6 +39,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
   const instanceId = randomUUID();
   const processId = randomUUID();
   const clueId = randomUUID();
+  const collectibleId = randomUUID();
 
   try {
     await admin.unsafe(`CREATE SCHEMA "${schema}"`);
@@ -147,6 +149,25 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
        position_x, position_y, position_z, interaction_radius)
       VALUES ($1, $2, 0, 'meridian', 'central', 'uceno:0123456789abcdef0123456789abcdef',
         1, 1.15, 1, 2)`, [clueId, huntId]);
+    await db.unsafe(`INSERT INTO virtual_world_collectible_catalog
+      (id, code, display_name, category, rarity, max_supply, enabled)
+      VALUES ($1, 'finite-supply', 'Finite Supply Badge', 'badge', 'rare', 1, TRUE)`,
+      [collectibleId]);
+    await db.unsafe(`INSERT INTO virtual_world_treasure_reward_items
+      (hunt_id, collectible_id, quantity) VALUES ($1, $2, 1)`, [huntId, collectibleId]);
+    const concurrentCollectibleGrants = await Promise.all([
+      db.begin(tx => grantTreasureCollectibles(tx, huntId, userId)),
+      db.begin(tx => grantTreasureCollectibles(tx, huntId, secondUserId))
+    ]);
+    assert.equal(concurrentCollectibleGrants.flat().length, 1);
+    const finiteInventory = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_user_collectibles
+      WHERE collectible_id = ${collectibleId}::uuid AND source_treasure_hunt_id = ${huntId}::uuid`;
+    const finiteCatalog = await db`SELECT minted_count FROM virtual_world_collectible_catalog
+      WHERE id = ${collectibleId}::uuid`;
+    assert.equal(finiteInventory[0].total, 1);
+    assert.equal(Number(finiteCatalog[0].minted_count), 1);
+
     const spawnA = randomUUID();
     const spawnB = randomUUID();
     await db`INSERT INTO virtual_world_treasure_spawn_points
