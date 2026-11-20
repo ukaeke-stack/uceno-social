@@ -66,7 +66,7 @@ export function createActivitySession(input: {
     return { ok: false, code: "invalid_capacity" };
   if (!Number.isInteger(checkpointCount) || checkpointCount < MIN_CHECKPOINTS || checkpointCount > MAX_CHECKPOINTS)
     return { ok: false, code: "invalid_checkpoint_count" };
-  if (!Number.isFinite(now)) return { ok: false, code: "invalid_timestamp" };
+  if (!Number.isFinite(now) || now < 0) return { ok: false, code: "invalid_timestamp" };
 
   return {
     ok: true,
@@ -143,7 +143,9 @@ export function leaveActivity(session: ActivitySession, userId: string, now = Da
   const participant = session.participants.get(userId);
   if (!participant || participant.status === "left") return { ok: true, session };
   if (participant.status === "finished") return { ok: false, code: "participant_already_finished" };
-  if (!Number.isFinite(now)) return { ok: false, code: "invalid_timestamp" };
+  if (!Number.isFinite(now) || now < session.createdAt || now < participant.lastActionAt ||
+      (session.startedAt !== null && now < session.startedAt))
+    return { ok: false, code: "invalid_timestamp" };
   participant.status = session.phase === "active" ? "dnf" : "left";
   participant.lastActionAt = now;
   session.version++;
@@ -159,7 +161,9 @@ export function cancelActivity(session: ActivitySession, actorIsAuthorizedHost: 
   if (!actorIsAuthorizedHost) return { ok: false, code: "host_required" };
   if (session.phase === "completed" || session.phase === "cancelled")
     return { ok: false, code: "session_already_terminal" };
-  if (!Number.isFinite(now)) return { ok: false, code: "invalid_timestamp" };
+  if (!Number.isFinite(now) || now < session.createdAt ||
+      (session.startedAt !== null && now < session.startedAt))
+    return { ok: false, code: "invalid_timestamp" };
   session.phase = "cancelled";
   session.completedAt = now;
   session.version++;

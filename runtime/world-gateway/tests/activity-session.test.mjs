@@ -100,3 +100,28 @@ test("host departure returns no replacement when no active participant remains",
   assert.equal(leaveActivity(session, "host-user", 1_200).ok, true);
   assert.equal(selectNextActivityHost(session, "host-user"), null);
 });
+
+
+test("leave rejects timestamps before creation, start, or the participant's last action", () => {
+  const lobby = race(1_000);
+  assert.equal(joinActivity(lobby, "user-a", 1_100).ok, true);
+  assert.deepEqual(leaveActivity(lobby, "user-a", 999), { ok: false, code: "invalid_timestamp" });
+  assert.equal(lobby.participants.get("user-a")?.status, "joined");
+
+  const active = race(1_000);
+  joinTwo(active);
+  assert.equal(startActivity(active, true, 1_200).ok, true);
+  assert.deepEqual(leaveActivity(active, "user-a", 1_199), { ok: false, code: "invalid_timestamp" });
+  assert.equal(active.participants.get("user-a")?.status, "joined");
+});
+
+test("cancel rejects timestamps before the activity lifecycle begins", () => {
+  const lobby = race(1_000);
+  assert.deepEqual(cancelActivity(lobby, true, 999), { ok: false, code: "invalid_timestamp" });
+  assert.equal(lobby.phase, "lobby");
+
+  joinTwo(lobby);
+  assert.equal(startActivity(lobby, true, 1_200).ok, true);
+  assert.deepEqual(cancelActivity(lobby, true, 1_199), { ok: false, code: "invalid_timestamp" });
+  assert.equal(lobby.phase, "active");
+});
