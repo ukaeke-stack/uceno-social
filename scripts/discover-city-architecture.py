@@ -141,7 +141,7 @@ def words_present(text, terms):
     found = []
     for term in terms:
         normalized = re.sub(r"[_-]+", " ", str(term).lower())
-        if re.search(r"(?<!\\w)" + re.escape(normalized) + r"(?!\\w)", value):
+        if re.search(r"(?<!\w)" + re.escape(normalized) + r"(?!\w)", value):
             found.append(term)
     return found
 
