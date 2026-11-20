@@ -111,7 +111,7 @@ WHOLE_BUILDING_TITLE_TERMS = (
 NON_BUILDING_TITLE_TERMS = (
     "windmill", "wind turbine", "mill sail", "sculpture", "statue", "fountain",
     "sign", "monument", "bridge", "wall panel", "facade panel", "module", "prop",
-    "frontage", "shopfront", "shop front", "building front", "roof section",
+    "front", "frontage", "shopfront", "shop front", "building front", "roof section",
     "tower section", "gantry", "silo", "glazed dome", "staging tower",
     "observation tower", "site office",
 )
