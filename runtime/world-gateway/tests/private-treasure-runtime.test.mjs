@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadPrivateTreasureHints } from "../dist/private-treasure-runtime.js";
+import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "../dist/private-treasure-runtime.js";
 
 const playerId = "123e4567-e89b-42d3-a456-426614174001";
 const worldId = "123e4567-e89b-42d3-a456-426614174002";
@@ -92,4 +92,9 @@ test("private treasure entry points fail closed for non-string and short assignm
   const player = { id: playerId, worldId, x: 0, y: 1.15, z: 0 };
   assert.deepEqual(await loadPrivateTreasureHints(db, player, Date.now(), null), []);
   assert.deepEqual(await loadPrivateTreasureHints(db, player, Date.now(), "a".repeat(31)), []);
+  const rejected = await recordPrivateTreasureDiscovery(db, player,
+    { id: "real-interactable", cityId: "solsticebay", districtId: "central" },
+    Date.now(), null, worldId, playerId, 1);
+  assert.equal(rejected.handled, false);
+  assert.equal(rejected.rewardEarnedCredits, "0");
 });
