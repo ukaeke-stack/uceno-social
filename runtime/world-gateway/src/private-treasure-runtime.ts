@@ -22,12 +22,22 @@ async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: str
   const assignmentUsers: string[] = [];
   const assignmentSequences: number[] = [];
   const assignmentPoints: string[] = [];
+  // Load every eligible hunt's authored candidate pool in one query. The
+  // previous per-hunt query multiplied database round-trips by active hunts.
+  const candidateRows = hunts.length ? await tx.unsafe(`SELECT hunt_id AS "huntId",
+      id, sequence, city_id AS "cityId", district_id AS "districtId",
+      interactable_id AS "interactableId"
+    FROM virtual_world_treasure_spawn_points
+    WHERE hunt_id = ANY($1::uuid[]) AND enabled = TRUE
+    ORDER BY hunt_id, sequence, id`, [hunts.map((hunt: any) => hunt.id)]) : [];
+  const pointsByHunt = new Map<string, any[]>();
+  for (const point of candidateRows) {
+    const group = pointsByHunt.get(point.huntId) ?? [];
+    if (group.length < 10000) group.push(point);
+    pointsByHunt.set(point.huntId, group);
+  }
   for (const hunt of hunts) {
-    const points = await tx.unsafe(`SELECT id, sequence, city_id AS "cityId",
-        district_id AS "districtId", interactable_id AS "interactableId"
-      FROM virtual_world_treasure_spawn_points
-      WHERE hunt_id = $1::uuid AND enabled = TRUE
-      ORDER BY sequence, id LIMIT 10000`, [hunt.id]);
+    const points = pointsByHunt.get(hunt.id) ?? [];
     if (!points.length) continue;
     const clueCount = Math.max(...points.map((p: any) => Number(p.sequence))) + 1;
     if (clueCount < 2 || clueCount > 100) continue;
