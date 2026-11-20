@@ -80,7 +80,7 @@ def screen(record, city):
            for i in (0, 1, 2)):
         return "missing-or-invalid-lod-checksum"
     if any(re.fullmatch(
-        rf"/models/{re.escape(slug)}/v[1-9][0-9]*/lod{i}\\.glb",
+        rf"/models/{re.escape(slug)}/v[1-9][0-9]*/lod{i}\.glb",
         str(lods[i].get("path", ""))) is None for i in (0, 1, 2)):
         return "unpinned-or-unsafe-glb-lod-path"
     if lods[0].get("bytes", MAX_BYTES + 1) > MAX_BYTES:
