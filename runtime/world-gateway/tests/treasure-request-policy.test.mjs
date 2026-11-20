@@ -9,12 +9,19 @@ test("treasure request budget allows only the configured burst in a window", () 
   assert.equal(budget.requestCount, 8);
 });
 
-test("treasure request budget resets after its window and on clock rollback", () => {
+test("treasure request budget resets after its window and fails closed on clock rollback", () => {
   const budget = { windowStartedAt: 5_000, requestCount: 8 };
   assert.equal(consumeTreasureRequestBudget(budget, 15_000), true);
   assert.equal(budget.requestCount, 1);
-  assert.equal(consumeTreasureRequestBudget(budget, 14_999), true);
+  assert.equal(consumeTreasureRequestBudget(budget, 14_999), false);
+  assert.equal(budget.windowStartedAt, 15_000);
   assert.equal(budget.requestCount, 1);
+});
+
+test("corrupted in-memory budget state fails closed instead of resetting the burst", () => {
+  const budget = { windowStartedAt: 1_000, requestCount: Number.NaN };
+  assert.equal(consumeTreasureRequestBudget(budget, 1_001), false);
+  assert.equal(Number.isNaN(budget.requestCount), true);
 });
 
 test("invalid time or budget configuration fails closed", () => {
