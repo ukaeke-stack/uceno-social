@@ -25,6 +25,21 @@ CREATE TABLE IF NOT EXISTS virtual_world_treasure_team_members (
 CREATE INDEX IF NOT EXISTS virtual_world_treasure_team_members_rank_idx
   ON virtual_world_treasure_team_members (team_id, contribution_points DESC, user_id);
 
+CREATE TABLE IF NOT EXISTS virtual_world_treasure_team_assignments (
+  hunt_id UUID NOT NULL,
+  team_id UUID NOT NULL,
+  sequence INTEGER NOT NULL CHECK (sequence BETWEEN 0 AND 99),
+  spawn_point_id UUID NOT NULL,
+  assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (team_id, sequence),
+  FOREIGN KEY (hunt_id, team_id)
+    REFERENCES virtual_world_treasure_teams(hunt_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (hunt_id, spawn_point_id)
+    REFERENCES virtual_world_treasure_spawn_points(hunt_id, id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS virtual_world_treasure_team_assignments_spawn_idx
+  ON virtual_world_treasure_team_assignments (hunt_id, spawn_point_id);
+
 CREATE TABLE IF NOT EXISTS virtual_world_treasure_team_progress (
   hunt_id UUID NOT NULL,
   team_id UUID NOT NULL,
