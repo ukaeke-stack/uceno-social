@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { sanitizeTreasureCluePayload, selectPersonalTreasureRoute } from "./treasure-distribution-policy.js";
+import { grantTreasureCollectibles, type CollectibleReward } from "./treasure-collectible-runtime.js";
 
 type PlayerRef = { id: string; worldId: string; x: number; y: number; z: number };
 type TargetRef = { id: string; cityId: string; districtId: string };
 type Db = { begin<T>(fn: (tx: any) => Promise<T>): Promise<T>; unsafe(query: string, params?: unknown[]): Promise<any[]> };
 type Hint = { huntId: string; title: string; sequence: number; clue: unknown };
-type Discovery = { handled: boolean; discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string };
+type Discovery = { handled: boolean; discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; collectibles?: CollectibleReward[] };
 
 async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: string): Promise<Hint[]> {
   const hunts = await tx.unsafe(`SELECT id, title FROM virtual_world_treasure_hunts
@@ -153,6 +154,7 @@ export async function recordPrivateTreasureDiscovery(
       ON CONFLICT (idempotency_key) DO NOTHING`,
       [player.id, reward, "private-treasure:" + match.huntId + ":" + player.id,
         match.huntId, JSON.stringify({ spawnPointId: match.spawnPointId })]);
-    return { handled: true, discovered: true, completed: true, rewardEarnedCredits: reward };
+    const collectibles = await grantTreasureCollectibles(tx, match.huntId, player.id);
+    return { handled: true, discovered: true, completed: true, rewardEarnedCredits: reward, collectibles };
   });
 }
