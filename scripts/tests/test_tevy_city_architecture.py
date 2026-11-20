@@ -154,6 +154,26 @@ class TevyCityArchitectureTests(unittest.TestCase):
             {"shared-tower", "nexus-only"}
         )
 
+    def test_allocator_gives_every_city_first_asset_before_filling_broad_city(self):
+        shared = record(name="Modern Glass Office Tower",
+                        tags=["office", "tower"], description="office tower building")
+        shared["slug"] = "shared-office-tower"
+        broad_a = record(name="NexusDelta Commercial Skyscraper",
+                         tags=["skyscraper", "commercial", "tower"])
+        broad_a["slug"] = "nexus-a"
+        broad_b = record(name="NexusDelta High Rise Office",
+                         tags=["high rise", "office", "tower"])
+        broad_b["slug"] = "nexus-b"
+        pools = {
+            "NexusDelta": [shared, broad_a, broad_b],
+            "EclipseCentral": [shared],
+        }
+        allocations = tevy.allocate_city_candidates(pools, 2)
+        self.assertEqual(len(allocations["EclipseCentral"]), 1)
+        self.assertEqual(len(allocations["NexusDelta"]), 2)
+        all_slugs = [item["slug"] for items in allocations.values() for item in items]
+        self.assertEqual(len(all_slugs), len(set(all_slugs)))
+
     def test_city_asset_allocation_never_reuses_a_model_slug(self):
         shared = record(name="Modern Office Tower", tags=["office", "tower"])
         shared["slug"] = "shared-tower"
