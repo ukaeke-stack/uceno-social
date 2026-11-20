@@ -239,10 +239,9 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
         const point = { id: randomUUID(), sequence, interactableId: 'team-' + sequence + '-' + candidate,
           x: sequence * 10 + candidate, y: 1.15, z: candidate };
         await db`INSERT INTO virtual_world_treasure_spawn_points
-          (id, hunt_id, sequence, city_id, district_id, interactable_id, position_x, position_y, position_z, interaction_radius, clue_payload)
+          (id, hunt_id, sequence, city_id, district_id, interactable_id, position_x, position_y, position_z, interaction_radius)
           VALUES (${point.id}::uuid, ${teamHuntId}::uuid, ${sequence}, 'solsticebay', 'central',
-            ${point.interactableId}, ${point.x}, ${point.y}, ${point.z}, 2,
-            ${JSON.stringify({ title: 'Team clue ' + (sequence + 1), hint: 'Work together' })}::jsonb)`;
+            ${point.interactableId}, ${point.x}, ${point.y}, ${point.z}, 2)`;
       }
     }
     const createdTeam = await createTreasureTeam(db, teamHuntId, userId, worldId, 4, Date.now(), teamSecret);
