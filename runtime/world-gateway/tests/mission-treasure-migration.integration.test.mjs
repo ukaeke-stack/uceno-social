@@ -70,6 +70,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     }
     const distributionIndexes = [
       "virtual_world_treasure_spawn_candidates_idx",
+      "virtual_world_treasure_spawn_location_idx",
       "virtual_world_treasure_assignments_user_idx",
       "virtual_world_treasure_global_claims_recent_idx",
       "virtual_world_treasure_route_discoveries_user_idx",
