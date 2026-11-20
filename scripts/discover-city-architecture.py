@@ -118,7 +118,11 @@ NON_BUILDING_TITLE_TERMS = (
 POSITIVE_TERMS = (
     "building", "skyscraper", "tower", "high rise", "high-rise", "office",
     "residential", "hotel", "campus", "terminal", "civic", "commercial",
-    "mixed use", "mixed-use", "arena", "factory", "waterfront",
+    "mixed use", "mixed-use", "arena", "factory", "waterfront", "house",
+    "village", "laboratory", "plant", "warehouse", "workshop", "hangar",
+    "church", "mosque", "clinic", "shop", "store", "market", "villa",
+    "cottage", "chalet", "lodge", "resort", "bank", "cinema", "theatre",
+    "theater",
 )
 CITY_RELEVANCE = {
     "SolsticeBay": ("waterfront", "coastal", "harbour", "harbor", "marina", "beach",
@@ -128,7 +132,7 @@ CITY_RELEVANCE = {
                      "university", "park", "botanical", "residential", "vertical garden"),
     "NexusDelta": ("skyscraper", "high rise", "high-rise", "office", "commercial",
                    "mixed use", "mixed-use", "city block", "urban", "glass", "bank",
-                   "cinema", "supermarket", "market"),
+                   "cinema", "supermarket", "market", "residential"),
     "AuroraHeights": ("alpine", "mountain", "ski", "snow", "resort", "lodge", "chalet",
                       "village", "timber", "mountain", "ski lodge"),
     "SaffronDunes": ("desert", "adobe", "arid", "sand", "solar", "oasis", "mosque",
