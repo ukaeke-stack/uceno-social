@@ -218,6 +218,14 @@ class TevyCityArchitectureTests(unittest.TestCase):
             request.assert_called_once()
             sleep.assert_not_called()
 
+    def test_frontier_building_is_not_misclassified_as_a_front_facade(self):
+        candidate = record(
+            name="Frontier Church With Steeple",
+            tags=["office", "commercial"],
+            description="western frontier town complete church building"
+        )
+        self.assertEqual(tevy.screen(candidate, "SaffronDunes"), "unwanted-theme")
+
     def test_izakaya_front_facade_is_not_acquired_as_a_building(self):
         candidate = record(
             name="Izakaya Front",
