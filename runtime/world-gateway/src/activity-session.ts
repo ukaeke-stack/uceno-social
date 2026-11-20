@@ -81,7 +81,11 @@ export function createActivitySession(input: {
 
 export function joinActivity(session: ActivitySession, userId: string, now = Date.now()): ActivityResult {
   if (!userId || userId.length > 128) return { ok: false, code: "invalid_user_id" };
-  if (!Number.isFinite(now) || now < session.createdAt)
+  const latestParticipantEventAt = [...session.participants.values()].reduce(
+    (latest, participant) => Math.max(latest, participant.joinedAt, participant.lastActionAt),
+    session.createdAt
+  );
+  if (!Number.isFinite(now) || now < latestParticipantEventAt)
     return { ok: false, code: "invalid_timestamp" };
   const existing = session.participants.get(userId);
   if (existing && existing.status !== "left" && existing.status !== "dnf")
@@ -166,7 +170,11 @@ export function cancelActivity(session: ActivitySession, actorIsAuthorizedHost: 
   if (!actorIsAuthorizedHost) return { ok: false, code: "host_required" };
   if (session.phase === "completed" || session.phase === "cancelled")
     return { ok: false, code: "session_already_terminal" };
-  if (!Number.isFinite(now) || now < session.createdAt ||
+  const latestParticipantActionAt = [...session.participants.values()].reduce(
+    (latest, participant) => Math.max(latest, participant.joinedAt, participant.lastActionAt),
+    session.createdAt
+  );
+  if (!Number.isFinite(now) || now < latestParticipantActionAt ||
       (session.startedAt !== null && now < session.startedAt))
     return { ok: false, code: "invalid_timestamp" };
   session.phase = "cancelled";
