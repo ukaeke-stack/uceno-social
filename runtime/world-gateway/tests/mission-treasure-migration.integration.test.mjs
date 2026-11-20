@@ -248,7 +248,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     const createdTeam = await createTreasureTeam(db, teamHuntId, userId, worldId, 4, Date.now(), teamSecret);
     assert.equal(createdTeam.ok, true);
     assert.equal(createdTeam.status, 'forming');
-    const createdTeamId = createdTeam.createdTeamId;
+    const createdTeamId = createdTeam.teamId;
     const joinedTeam = await joinTreasureTeam(db, createdTeamId, secondUserId, worldId, Date.now());
     assert.equal(joinedTeam.ok, true);
     assert.equal(joinedTeam.status, 'active');
