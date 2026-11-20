@@ -596,7 +596,7 @@ async function recordTreasureDiscovery(player: Player, target: RegisteredInterac
     TREASURE_ASSIGNMENT_SECRET, INSTANCE_ID, PROCESS_ID, processGeneration);
   if (teamResult.handled) return { discovered: teamResult.discovered,
     completed: teamResult.completed, rewardEarnedCredits: teamResult.rewardEarnedCredits,
-    code: teamResult.code, teamId: teamResult.teamId, collectibles: teamResult.collectibles };
+    code: teamResult.code, huntId: teamResult.huntId, teamId: teamResult.teamId, collectibles: teamResult.collectibles };
   const privateResult = await recordPrivateTreasureDiscovery(sql, player, target, now,
     TREASURE_ASSIGNMENT_SECRET, INSTANCE_ID, PROCESS_ID, processGeneration);
   if (privateResult.handled) return { discovered: privateResult.discovered,
@@ -1954,6 +1954,15 @@ wss.on("connection", async (socket: WebSocket) => {
                 const teamMembers = await sql`SELECT user_id AS "userId" FROM virtual_world_treasure_team_members WHERE team_id = ${treasure.teamId}::uuid`;
                 for (const member of teamMembers) { const online = players.get(member.userId);
                   if (online && online !== player) void pushPrivateTreasureHints(online); }
+                if (treasure.completed) {
+                  const allocations = await sql`SELECT user_id AS "userId", amount::text AS amount
+                    FROM virtual_world_treasure_team_reward_allocations WHERE team_id = ${treasure.teamId}::uuid`;
+                  for (const allocation of allocations) {
+                    const recipient = players.get(allocation.userId);
+                    if (recipient) send(recipient.socket, { type: "team_treasure_reward",
+                      huntId: treasure.huntId, teamId: treasure.teamId, rewardEarnedCredits: allocation.amount });
+                  }
+                }
               }
             } else if (treasure.code) {
               send(socket, { type: "treasure_discovery_rejected", objectId: target.id, code: treasure.code });
