@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS virtual_world_treasure_hunt_templates (
   title TEXT NOT NULL CHECK (length(title) BETWEEN 1 AND 120),
   world_id UUID REFERENCES virtual_worlds(id) ON DELETE CASCADE,
   cadence TEXT NOT NULL CHECK (cadence IN ('daily', 'weekly', 'seasonal')),
-  time_zone TEXT NOT NULL DEFAULT 'Africa/Lagos' CHECK (length(time_zone) BETWEEN 1 AND 80),
+  time_zone TEXT NOT NULL CHECK (length(time_zone) BETWEEN 1 AND 80),
   active_from TIMESTAMPTZ,
   active_until TIMESTAMPTZ,
   reward_earned_credits BIGINT NOT NULL DEFAULT 0 CHECK (reward_earned_credits >= 0),
