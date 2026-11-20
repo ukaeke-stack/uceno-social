@@ -218,6 +218,29 @@ class TevyCityArchitectureTests(unittest.TestCase):
             request.assert_called_once()
             sleep.assert_not_called()
 
+    def test_acquired_catalogue_infrastructure_is_not_misclassified_as_buildings(self):
+        rejected_titles = [
+            "Quay Wall Straight with Bollard", "Passenger Boarding Bridge",
+            "Chain Swing Ride", "Carousel", "Bumper Car Pavilion", "Escalator Pair",
+            "Station Entrance Canopy", "Loading Dock", "Grain Silo Set",
+            "Rooftop Water Tower", "Gas Storage Tanks", "Conveyor Transfer Tower",
+            "Giant Corner LED Screen", "Metro Platform End with Stairs",
+            "Tower Windmill", "Sci-Fi Reactor Room"
+        ]
+        for title in rejected_titles:
+            item = record(name=title, tags=["office", "commercial"],
+                          description="urban office building")
+            self.assertEqual(tevy.screen(item, "NexusDelta"),
+                             "non-occupiable-infrastructure", title)
+
+    def test_complete_occupiable_buildings_remain_eligible(self):
+        for title in ["Harbour Control Office", "Fire Station",
+                      "Village Grocery Shop", "White Village Church",
+                      "Korean Apartment Tower"]:
+            item = record(name=title, tags=["office", "commercial"],
+                          description="complete realistic exterior building")
+            self.assertIsNone(tevy.screen(item, "NexusDelta"), title)
+
     def test_lod_metadata_rejects_non_hex_checksums_and_path_traversal(self):
         item = record()
         item["files"][0]["sha256"] = "g" * 64
