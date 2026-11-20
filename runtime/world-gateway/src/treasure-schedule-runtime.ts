@@ -44,7 +44,8 @@ function isQualifiedSpawnPoint(point: any): boolean {
 }
 
 function hasQualifiedSpawnPool(points: any[], mode: string): boolean {
-  if (!Array.isArray(points) || points.length < 2 || points.length > 10000 ||\n      !points.every(isQualifiedSpawnPoint)) return false;
+  if (!Array.isArray(points) || points.length < 2 || points.length > 10000 ||
+      !points.every(isQualifiedSpawnPoint)) return false;
   const clueCount = Math.max(...points.map((point: any) => Number(point.sequence))) + 1;
   if (!Number.isInteger(clueCount) || clueCount < 2 || clueCount > 100) return false;
   const counts = new Map<number, number>();
