@@ -156,8 +156,9 @@ def rejection_reason(item, city):
     searchable = f"{title} {summary}"
     title_searchable = re.sub(r"[_-]+", " ", str(title).lower())
     tags = tag_slugs(item)
-    if "realistic" not in tags:
-        return "missing-realistic-tag"
+    style = str(item.get("style") or "").lower()
+    if "realistic" not in tags and style != "realistic":
+        return "missing-realistic-style"
     if "exterior" not in tags and "exterior" not in searchable.lower():
         return "not-marked-exterior"
     if "modular" in tags:
