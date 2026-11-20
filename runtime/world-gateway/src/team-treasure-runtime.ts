@@ -87,6 +87,7 @@ export async function joinTreasureTeam(
   return db.begin(async tx => {
     const rows = await tx.unsafe(`SELECT team.id, team.hunt_id AS "huntId",
         team.status, team.max_members AS "maxMembers", hunt.enabled,
+        hunt.distribution_mode AS "distributionMode",
         hunt.starts_at AS "startsAt", hunt.ends_at AS "endsAt"
       FROM virtual_world_treasure_teams AS team
       JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = team.hunt_id
@@ -94,7 +95,7 @@ export async function joinTreasureTeam(
       FOR UPDATE OF team, hunt`, [teamId, worldId]);
     if (!rows.length) return { ok: false, code: "team_not_found" };
     const team = rows[0];
-    if (team.enabled !== true || new Date(team.startsAt).getTime() > now ||
+    if (team.enabled !== true || team.distributionMode !== "team" || new Date(team.startsAt).getTime() > now ||
         new Date(team.endsAt).getTime() <= now || !["forming", "active"].includes(team.status))
       return { ok: false, code: "team_not_joinable" };
     const member = await tx.unsafe(`SELECT 1 FROM virtual_world_treasure_team_members
@@ -135,7 +136,7 @@ export async function loadTeamTreasureHints(
         ON assignment.team_id = team.id AND assignment.sequence = progress.next_sequence
       JOIN virtual_world_treasure_spawn_points AS point
         ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
-      WHERE member.user_id = $1::uuid AND team.status = 'active'
+      WHERE member.user_id = $1::uuid AND team.status = 'active' AND hunt.distribution_mode = 'team'
         AND (hunt.world_id IS NULL OR hunt.world_id = $3::uuid)
         AND hunt.enabled = TRUE AND hunt.starts_at <= to_timestamp($2)
         AND hunt.ends_at > to_timestamp($2) AND progress.completed_at IS NULL
@@ -170,7 +171,7 @@ export async function recordTeamTreasureDiscovery(
       JOIN virtual_world_treasure_spawn_points AS point
         ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
       JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = team.hunt_id
-      WHERE member.user_id = $1::uuid AND team.status = 'active'
+      WHERE member.user_id = $1::uuid AND team.status = 'active' AND hunt.distribution_mode = 'team'
         AND point.sequence = progress.next_sequence AND point.city_id = $2
         AND point.district_id = $3 AND point.interactable_id = $4 AND point.enabled = TRUE
         AND sqrt(power($5 - point.position_x, 2) + power($6 - point.position_y, 2) +
