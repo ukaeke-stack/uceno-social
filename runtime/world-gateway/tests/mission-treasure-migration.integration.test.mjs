@@ -352,6 +352,21 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const teamCatalogSupply = await db`SELECT minted_count FROM virtual_world_collectible_catalog
       WHERE id = ${teamCollectibleId}::uuid`;
     assert.equal(Number(teamCatalogSupply[0].minted_count), 2);
+    // Simulate a client retry after the completion response was lost. The
+    // completed route must not mint another inventory row or increment supply.
+    const replayedCompletion = await recordTeamTreasureDiscovery(db,
+      { id: finalUserId, worldId, x: Number(secondStep.x), y: Number(secondStep.y), z: Number(secondStep.z) },
+      { id: secondStep.interactableId, cityId: secondStep.cityId, districtId: secondStep.districtId },
+      Date.now(), teamSecret, instanceId, processId, 1);
+    assert.equal(replayedCompletion.discovered, false);
+    const replayInventory = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_user_collectibles
+      WHERE collectible_id = ${teamCollectibleId}::uuid
+        AND source_treasure_hunt_id = ${teamHuntId}::uuid`;
+    const replaySupply = await db`SELECT minted_count FROM virtual_world_collectible_catalog
+      WHERE id = ${teamCollectibleId}::uuid`;
+    assert.equal(replayInventory[0].total, 2);
+    assert.equal(Number(replaySupply[0].minted_count), 2);
     const completedHints = await loadTeamTreasureHints(db, privatePlayer, Date.now());
     assert.equal(completedHints.length, 0);
 
