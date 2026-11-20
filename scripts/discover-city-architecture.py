@@ -151,6 +151,12 @@ def dimensions(item):
     return None, None, None
 
 def rejection_reason(item, city):
+    category = item.get("category")
+    if isinstance(category, dict):
+        category = category.get("slug") or category.get("title") or category.get("name")
+    category_key = re.sub(r"[^a-z]", "", str(category or "").lower())
+    if category_key not in {"building", "buildings", "buildingsarchitecture", "architecture"}:
+        return "not-building-category"
     title = item.get("title") or item.get("name") or ""
     summary = item.get("summary") or item.get("description") or ""
     searchable = f"{title} {summary}"
