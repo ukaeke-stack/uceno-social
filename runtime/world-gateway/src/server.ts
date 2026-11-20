@@ -556,12 +556,12 @@ async function isActiveTreasureInteractable(player: Player, target: RegisteredIn
 }
 
 async function recordTreasureDiscovery(player: Player, target: RegisteredInteractable, now: number):
-  Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; collectibles?: { code: string; displayName: string; category: string; rarity: string; quantity: number }[] }> {
+  Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; huntId?: string; collectibles?: { code: string; displayName: string; category: string; rarity: string; quantity: number }[] }> {
   const privateResult = await recordPrivateTreasureDiscovery(sql, player, target, now,
     TREASURE_ASSIGNMENT_SECRET, INSTANCE_ID, PROCESS_ID, processGeneration);
   if (privateResult.handled) return { discovered: privateResult.discovered,
     completed: privateResult.completed, rewardEarnedCredits: privateResult.rewardEarnedCredits,
-    code: privateResult.code, collectibles: privateResult.collectibles };
+    code: privateResult.code, huntId: privateResult.huntId, collectibles: privateResult.collectibles };
   return sql.begin(async tx => {
     const owner = await tx`SELECT id FROM virtual_world_instances
       WHERE id = ${INSTANCE_ID}::uuid AND owner_process_id = ${PROCESS_ID}::uuid
@@ -629,7 +629,7 @@ async function recordTreasureDiscovery(player: Player, target: RegisteredInterac
         version = version + 1, updated_at = NOW()
       WHERE hunt_id = ${clue.huntId}::uuid AND user_id = ${player.id}::uuid`;
 
-    if (!completed) return { discovered: true, completed: false, rewardEarnedCredits: "0" };
+    if (!completed) return { discovered: true, completed: false, rewardEarnedCredits: "0", huntId: clue.huntId };
     const claimed = await tx`UPDATE virtual_world_treasure_progress
       SET reward_issued_at = NOW(), updated_at = NOW()
       WHERE hunt_id = ${clue.huntId}::uuid AND user_id = ${player.id}::uuid
@@ -649,7 +649,7 @@ async function recordTreasureDiscovery(player: Player, target: RegisteredInterac
         ${JSON.stringify({ finalClueId: clue.clueId, interactableId: target.id })}::jsonb)
       ON CONFLICT (idempotency_key) DO NOTHING`;
     const collectibles = await grantTreasureCollectibles(tx, clue.huntId, player.id);
-    return { discovered: true, completed: true, rewardEarnedCredits: reward, collectibles };
+    return { discovered: true, completed: true, rewardEarnedCredits: reward, collectibles, huntId: clue.huntId };
   });
 }
 
@@ -1872,7 +1872,7 @@ wss.on("connection", async (socket: WebSocket) => {
           try {
             const treasure = await recordTreasureDiscovery(player, target, now);
             if (treasure.discovered) {
-              send(socket, { type: "treasure_clue_discovered", objectId: target.id,
+              send(socket, { type: "treasure_clue_discovered", objectId: target.id, huntId: treasure.huntId,
                 completed: treasure.completed, rewardEarnedCredits: treasure.rewardEarnedCredits,
                 collectibles: treasure.collectibles ?? [] });
               void loadPrivateTreasureHints(sql, player, Date.now(), TREASURE_ASSIGNMENT_SECRET).then(hints => {
