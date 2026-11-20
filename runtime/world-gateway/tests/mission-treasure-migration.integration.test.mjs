@@ -672,6 +672,28 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       WHERE id = ${sharedSupplyCollectibleId}::uuid`;
     assert.equal(Number(sharedSupplyCatalog[0].minted_count), 2);
 
+    // Replaying each team's final discovery after commit must not re-award
+    // Earned Credits, collectible inventory, or catalog supply.
+    const sharedCompletionReplays = await Promise.all(sharedSupplyRoutes.map(async (route, index) => {
+      const point = route[1];
+      return recordTeamTreasureDiscovery(db,
+        { id: sharedSupplyPlayers[index].member, worldId,
+          x: Number(point.x), y: Number(point.y), z: Number(point.z) },
+        { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
+        Date.now(), teamSecret, instanceId, processId, 1);
+    }));
+    assert.equal(sharedCompletionReplays.every(result =>
+      !result.discovered && !result.completed && result.rewardEarnedCredits === "0"), true);
+    const sharedRewardLedger = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_earned_credit_ledger
+      WHERE source_type = 'treasure_hunt'
+        AND source_treasure_hunt_id = ANY(${sharedSupplyHunts}::uuid[])`;
+    assert.equal(Number(sharedRewardLedger[0].total), 4);
+    const sharedAllocations = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_treasure_team_reward_allocations
+      WHERE team_id = ANY(${sharedSupplyTeams}::uuid[])`;
+    assert.equal(Number(sharedAllocations[0].total), 4);
+
     // Two different teams in the same hunt may be joined concurrently by one
     // player. Exactly one membership wins the database uniqueness constraint;
     // the losing transaction must remain usable and return a normal conflict.
