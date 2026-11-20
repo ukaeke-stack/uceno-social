@@ -6,6 +6,7 @@ import postgres from "postgres";
 import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "../dist/private-treasure-runtime.js";
 import { createTreasureTeam, joinTreasureTeam, loadTeamTreasureHints, recordTeamTreasureDiscovery } from "../dist/team-treasure-runtime.js";
 import { grantTreasureCollectibles } from "../dist/treasure-collectible-runtime.js";
+import { materializeScheduledTreasureHunts } from "../dist/treasure-schedule-runtime.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -162,6 +163,48 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       VALUES (${randomUUID()}::uuid, ${'bad-season-' + scheduleTemplateId.slice(0, 8)},
         'Invalid seasonal template', 'seasonal', 'Africa/Lagos',
         NOW(), NULL, 'global', 10)`);
+
+    // A failure while copying authored spawn points must roll back the
+    // generated hunt too. A retry after the transient failure should create
+    // exactly one complete snapshot rather than a hunt with no playable route.
+    const recoveryTemplateId = randomUUID();
+    const recoveryTemplateCode = 'recover-' + recoveryTemplateId.slice(0, 8);
+    await db`INSERT INTO virtual_world_treasure_hunt_templates
+      (id, code, title, world_id, cadence, time_zone, distribution_mode, enabled)
+      VALUES (${recoveryTemplateId}::uuid, ${recoveryTemplateCode},
+        'Schedule recovery test', ${worldId}::uuid, 'daily',
+        'Africa/Lagos', 'team', TRUE)`;
+    for (let sequence = 0; sequence < 2; sequence++) {
+      await db`INSERT INTO virtual_world_treasure_template_spawn_points
+        (id, template_id, sequence, city_id, district_id, interactable_id,
+         position_x, position_y, position_z, interaction_radius)
+        VALUES (${randomUUID()}::uuid, ${recoveryTemplateId}::uuid, ${sequence},
+          'solsticebay', 'central', ${'recovery-' + sequence},
+          ${sequence}, 1.15, 0, 2)`;
+    }
+    await db.unsafe(`CREATE FUNCTION fail_treasure_spawn_snapshot() RETURNS trigger
+      LANGUAGE plpgsql AS $ BEGIN
+        RAISE EXCEPTION 'simulated_spawn_snapshot_failure';
+      END $`);
+    await db.unsafe(`CREATE TRIGGER fail_treasure_spawn_snapshot
+      BEFORE INSERT ON virtual_world_treasure_spawn_points
+      FOR EACH ROW EXECUTE FUNCTION fail_treasure_spawn_snapshot()`);
+    const scheduleInstant = Date.parse('2026-11-20T12:00:00Z');
+    await assert.rejects(() => materializeScheduledTreasureHunts(db, scheduleInstant),
+      /simulated_spawn_snapshot_failure/);
+    const rolledBackSchedule = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_treasure_hunts WHERE template_id = ${recoveryTemplateId}::uuid`;
+    assert.equal(rolledBackSchedule[0].total, 0);
+    await db.unsafe("DROP TRIGGER fail_treasure_spawn_snapshot ON virtual_world_treasure_spawn_points");
+    await db.unsafe("DROP FUNCTION fail_treasure_spawn_snapshot()");
+    assert.equal(await materializeScheduledTreasureHunts(db, scheduleInstant), 1);
+    assert.equal(await materializeScheduledTreasureHunts(db, scheduleInstant), 0);
+    const recoveredSchedule = await db`SELECT id FROM virtual_world_treasure_hunts
+      WHERE template_id = ${recoveryTemplateId}::uuid`;
+    assert.equal(recoveredSchedule.length, 1);
+    const recoveredSpawnPoints = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_treasure_spawn_points WHERE hunt_id = ${recoveredSchedule[0].id}::uuid`;
+    assert.equal(recoveredSpawnPoints[0].total, 2);
 
     await db.unsafe("INSERT INTO virtual_world_activity_sessions(id) VALUES ($1)", [resultSessionId]);
     const result = await db.unsafe(`INSERT INTO virtual_world_activity_results
