@@ -50,7 +50,7 @@ def dimensions(record):
 
 def contains_term(text, term):
     # Match complete words/phrases; "airport" must not match "port".
-    return re.search(r"(?<!\\w)" + re.escape(term) + r"(?!\\w)", text) is not None
+    return re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text) is not None
 
 def screen(record, city):
     if record.get("category") != "buildings":
