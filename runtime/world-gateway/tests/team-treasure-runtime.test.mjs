@@ -34,7 +34,10 @@ test("team creation persists one shared assignment per authored clue step", asyn
   const result = await createTreasureTeam(db, huntId, userId, worldId, 5, now, secret);
   assert.equal(result.ok, true);
   assert.equal(result.status, "forming");
-  assert.equal(db.calls.filter(call => call.query.includes("INSERT INTO virtual_world_treasure_team_assignments")).length, 2);
+  assert.equal(db.calls.filter(call => call.query.includes("INSERT INTO virtual_world_treasure_team_assignments")).length, 1);
+  const routeInsert = db.calls.find(call => call.query.includes("INSERT INTO virtual_world_treasure_team_assignments"));
+  assert.equal(routeInsert.params[2].length, 2);
+  assert.equal(routeInsert.params[3].length, 2);
   assert.equal(db.calls.filter(call => call.query.includes("INSERT INTO virtual_world_treasure_team_progress")).length, 1);
 });
 
