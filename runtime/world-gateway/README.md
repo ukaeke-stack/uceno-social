@@ -26,6 +26,7 @@ Standalone WebSocket runtime for an already-provisioned UCENO world instance.
 - `WORLD_INSTANCE_ID` (UUID registered in `virtual_world_instances`)
 - `DATABASE_URL` (server-only PostgreSQL connection string)
 - `WORLD_TOKEN_SECRET` (same server-only secret used to sign world JWTs)
+- `TREASURE_ASSIGNMENT_SECRET` (required server-only random secret of at least 32 characters before private personal/global treasure hunts can be enabled)
 - `WORLD_INSTANCE_CAPACITY` (optional, default 64; keep consistent with DB capacity)
 - `WORLD_BOUNDS` (optional, default 10000 world units)
 - `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (optional until spatial voice is provisioned; server-only credentials for pair-scoped audio rooms)
@@ -300,3 +301,12 @@ objects, furniture or vehicles. Assign the actual door pivot where applicable,
 keep object IDs stable, and export every city's saved generated district
 scenes. The exporter preserves other city entries, but the aggregate manifest
 is not complete until all ten cities have been exported.
+
+
+## Private treasure hunts and reward distribution
+
+Migration 038 adds authored spawn-point pools, per-user route assignments, clue payloads, and capped global claims. Migration 039 records private route discoveries. These migrations are additive and are not applied automatically by the gateway.
+
+The gateway can issue private personal/global hunt clues after authentication when TREASURE_ASSIGNMENT_SECRET is configured. It derives a stable route for each player, persists that route, validates discovery against the assigned authored interactable and server position, and sends only allow-listed clue fields. Spawn coordinates, interactable IDs and assignment IDs are not included in clue packets. A missing/weak assignment secret fails closed for the private route flow; legacy authored clue chains remain a separate compatibility path.
+
+Global hunts require a configured winner cap. The gateway serializes final claims on the hunt row and applies the stricter of max_global_winners and max_reward_claims. Rewards are recorded only as Earned Credits in the append-only ledger. Team hunts, inventory collectibles, seasonal content scheduling, and the client-side treasure UI remain separate implementation tasks; do not advertise them as enabled until their gateway and client flows are complete. Spawn locations and clue text must come from reviewed city exports and authored live-ops content, never synthetic placeholders.
