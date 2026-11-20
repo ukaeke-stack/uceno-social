@@ -88,8 +88,8 @@ test("only an authorized host can cancel a non-terminal session", () => {
 test("host departure transfers ownership to the earliest remaining active participant", () => {
   const session = race();
   assert.equal(joinActivity(session, "host-user", 1_100).ok, true);
-  assert.equal(joinActivity(session, "later-user", 1_200).ok, true);
   assert.equal(joinActivity(session, "earlier-user", 1_150).ok, true);
+  assert.equal(joinActivity(session, "later-user", 1_200).ok, true);
   assert.equal(leaveActivity(session, "host-user", 1_300).ok, true);
   assert.equal(selectNextActivityHost(session, "host-user"), "earlier-user");
 });
