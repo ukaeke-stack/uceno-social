@@ -10,8 +10,9 @@ export interface TeamRewardShare {
 
 /**
  * Split an Earned Credits reward proportionally to verified contribution.
- * Integer remainder is assigned deterministically by contribution descending,
- * then user ID ascending, so all shares sum exactly to the configured reward.
+ * Integer remainder uses the largest-remainder method: highest fractional
+ * remainder first, then contribution descending and user ID ascending. This
+ * preserves proportional fairness while conserving the complete reward.
  */
 export function calculateTeamRewardShares(
   totalReward: bigint,
@@ -42,9 +43,16 @@ export function calculateTeamRewardShares(
   }
   let remainder = totalReward - allocated;
   const ranked = [...members].sort((a, b) =>
-    b.points - a.points || a.userId.localeCompare(b.userId));
-  for (let index = 0; remainder > BigInt(0); index++, remainder--)
-    ranked[index % ranked.length]!.amount += BigInt(1);
+    a.remainder === b.remainder
+      ? b.points - a.points || a.userId.localeCompare(b.userId)
+      : a.remainder > b.remainder ? -1 : 1);
+  for (const member of ranked) {
+    if (remainder === BigInt(0)) break;
+    member.amount += BigInt(1);
+    remainder -= BigInt(1);
+  }
+  if (remainder !== BigInt(0))
+    throw new Error("team_treasure_reward_remainder_invariant_failed");
   return members.sort((a, b) => a.userId.localeCompare(b.userId)).map(member => ({
     userId: member.userId, contributionPoints: member.points, amount: member.amount
   }));
