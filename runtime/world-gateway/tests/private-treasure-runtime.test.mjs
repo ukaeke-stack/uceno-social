@@ -86,3 +86,10 @@ test("private treasure routes reject candidate pools above 10000 instead of usin
   assert.equal(hints.length, 0);
   assert.equal(assignmentWrites.length, 0);
 });
+
+test("private treasure entry points fail closed for non-string and short assignment secrets", async () => {
+  const db = { begin: async () => { throw new Error("database must not be queried"); } };
+  const player = { id: playerId, worldId, x: 0, y: 1.15, z: 0 };
+  assert.deepEqual(await loadPrivateTreasureHints(db, player, Date.now(), null), []);
+  assert.deepEqual(await loadPrivateTreasureHints(db, player, Date.now(), "a".repeat(31)), []);
+});
