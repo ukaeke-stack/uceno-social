@@ -82,7 +82,8 @@ export async function recordPrivateTreasureDiscovery(
     await ensureRoutes(tx, player, now, secret);
     const matches = await tx.unsafe(`SELECT hunt.id AS "huntId",
         hunt.distribution_mode AS "distributionMode", hunt.reward_earned_credits AS reward,
-        hunt.max_global_winners AS "maxGlobalWinners", hunt.max_reward_claims AS "maxRewardClaims",\n        progress.next_sequence AS sequence,
+        hunt.max_global_winners AS "maxGlobalWinners", hunt.max_reward_claims AS "maxRewardClaims",
+        progress.next_sequence AS sequence,
         point.id AS "spawnPointId"
       FROM virtual_world_treasure_assignments AS assignment
       JOIN virtual_world_treasure_spawn_points AS point
