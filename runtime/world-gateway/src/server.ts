@@ -15,6 +15,7 @@ import { isPersistentObjectState } from "./district-object-policy.js";
 import { loadInteractableRegistry, parseCityInteractableManifest, type RegisteredInteractable } from "./interactable-registry-policy.js";
 import { checkpointVersionForSession } from "./session-fence-policy.js";
 import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "./private-treasure-runtime.js";
+import { grantTreasureCollectibles } from "./treasure-collectible-runtime.js";
 import { shouldPublishWorldSnapshot, WORLD_RELAY_BATCH_SIZE, WORLD_RELAY_POLL_INTERVAL_MS } from "./world-relay-policy.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -622,7 +623,8 @@ async function recordTreasureDiscovery(player: Player, target: RegisteredInterac
         ${clue.huntId}::uuid,
         ${JSON.stringify({ finalClueId: clue.clueId, interactableId: target.id })}::jsonb)
       ON CONFLICT (idempotency_key) DO NOTHING`;
-    return { discovered: true, completed: true, rewardEarnedCredits: reward };
+    const collectibles = await grantTreasureCollectibles(tx, clue.huntId, player.id);
+    return { discovered: true, completed: true, rewardEarnedCredits: reward, collectibles };
   });
 }
 
