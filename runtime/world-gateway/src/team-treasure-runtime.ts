@@ -24,8 +24,10 @@ async function loadTeamRoute(tx: any, huntId: string, teamId: string, secret: st
       district_id AS "districtId", interactable_id AS "interactableId"
     FROM virtual_world_treasure_spawn_points
     WHERE hunt_id = $1::uuid AND enabled = TRUE
-    ORDER BY sequence, id LIMIT 10000`, [huntId]);
-  if (!points.length) return false;
+    ORDER BY sequence, id LIMIT 10001`, [huntId]);
+  // Fetch one sentinel row beyond the supported pool size so oversized
+  // authored content is rejected rather than silently truncated.
+  if (!points.length || points.length > 10000) return false;
   const count = Math.max(...points.map((point: any) => Number(point.sequence))) + 1;
   if (count < 2 || count > 100) return false;
   const route = selectPersonalTreasureRoute(huntId, teamId, points.map((point: any) => ({
