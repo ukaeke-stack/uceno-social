@@ -7,6 +7,7 @@ called a city landmark until its source record and binary are independently
 validated.
 """
 import json
+from collections import Counter
 import pathlib
 import re
 import time
@@ -322,7 +323,8 @@ def main():
             "rejection_records": rejected,
             "candidates": chosen,
         }
-        print(f"{city}: {len(raw_by_slug)} raw; {len(candidates)} complete-building candidates; rejected {len(rejected)}")
+        rejection_summary = dict(Counter(item["reason"] for item in rejected).most_common(6))
+        print(f"{city}: {len(raw_by_slug)} raw; {len(candidates)} complete-building candidates; rejected {len(rejected)}; top rejection reasons: {rejection_summary}")
 
     (OUT / "nine-city-candidates.json").write_text(json.dumps(report, indent=2) + "\n")
     lines = [
