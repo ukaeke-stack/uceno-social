@@ -137,9 +137,10 @@ export async function loadTeamTreasureHints(
       JOIN virtual_world_treasure_spawn_points AS point
         ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
       WHERE member.user_id = $1::uuid AND team.status = 'active'
+        AND (hunt.world_id IS NULL OR hunt.world_id = $3::uuid)
         AND hunt.enabled = TRUE AND hunt.starts_at <= to_timestamp($2)
         AND hunt.ends_at > to_timestamp($2) AND progress.completed_at IS NULL
-      ORDER BY hunt.starts_at, team.id LIMIT 20`, [player.id, now / 1000]);
+      ORDER BY hunt.starts_at, team.id LIMIT 20`, [player.id, now / 1000, player.worldId]);
     return rows.map((row: any) => ({ teamId: row.teamId, huntId: row.huntId,
       title: row.title, sequence: Number(row.sequence),
       clue: sanitizeTreasureCluePayload(row.clue) }));
@@ -175,10 +176,10 @@ export async function recordTeamTreasureDiscovery(
         AND point.district_id = $3 AND point.interactable_id = $4 AND point.enabled = TRUE
         AND sqrt(power($5 - point.position_x, 2) + power($6 - point.position_y, 2) +
           power($7 - point.position_z, 2)) <= point.interaction_radius
-        AND hunt.enabled = TRUE AND hunt.starts_at <= to_timestamp($8)
-        AND hunt.ends_at > to_timestamp($8)
+        AND hunt.enabled = TRUE AND (hunt.world_id IS NULL OR hunt.world_id = $9::uuid)
+        AND hunt.starts_at <= to_timestamp($8) AND hunt.ends_at > to_timestamp($8)
       ORDER BY team.id LIMIT 2 FOR UPDATE OF team, hunt, progress`,
-      [player.id, target.cityId, target.districtId, target.id, player.x, player.y, player.z, now / 1000]);
+      [player.id, target.cityId, target.districtId, target.id, player.x, player.y, player.z, now / 1000, player.worldId]);
     if (!matches.length) return { handled: false, discovered: false, completed: false, rewardEarnedCredits: "0" };
     if (matches.length > 1) return { handled: true, discovered: false, completed: false, rewardEarnedCredits: "0", code: "ambiguous_team_treasure_assignment" };
     const match = matches[0];
@@ -225,6 +226,7 @@ export async function recordTeamTreasureDiscovery(
     const shares = calculateTeamRewardShares(BigInt(rewardText), memberRows.map((row: any) => ({
       userId: row.userId, points: Number(row.points)
     })));
+    const playerShare = shares.find(share => share.userId === player.id)?.amount ?? 0n;
     for (const share of shares) {
       await tx.unsafe(`INSERT INTO virtual_world_treasure_team_reward_allocations
         (team_id, user_id, contribution_points, amount)
@@ -247,6 +249,6 @@ export async function recordTeamTreasureDiscovery(
       const memberRewards = await grantTreasureCollectibles(tx, match.huntId, member.userId);
       if (member.userId === player.id) collectibles = memberRewards;
     }
-    return { handled: true, discovered: true, completed: true, rewardEarnedCredits: rewardText, collectibles, teamId: match.teamId };
+    return { handled: true, discovered: true, completed: true, rewardEarnedCredits: playerShare.toString(), collectibles, teamId: match.teamId };
   });
 }
