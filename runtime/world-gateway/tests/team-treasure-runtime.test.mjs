@@ -143,8 +143,9 @@ test("team creation rejects more than 10000 authored spawn points instead of tru
     }
     return [];
   });
-  const result = await createTreasureTeam(db, huntId, userId, worldId, 5, now, secret);
-  assert.equal(result.ok, false);
-  assert.equal(result.code, "team_route_unavailable");
+  await assert.rejects(
+    () => createTreasureTeam(db, huntId, userId, worldId, 5, now, secret),
+    /team_treasure_authored_route_unavailable/
+  );
   assert.equal(db.calls.some(call => call.query.includes("INSERT INTO virtual_world_treasure_team_assignments")), false);
 });
