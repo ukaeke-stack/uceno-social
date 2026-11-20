@@ -16,6 +16,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
   scoped.searchParams.set("options", `-csearch_path=${schema},public`);
   const db = postgres(scoped.toString(), { max: 2, idle_timeout: 5 });
   const migration = readFileSync(new URL("../../../db/migrations/037_daily_missions_treasure_rewards.sql", import.meta.url), "utf8");
+  const distributionMigration = readFileSync(new URL("../../../db/migrations/038_treasure_distribution_and_private_routes.sql", import.meta.url), "utf8");
   const userId = randomUUID();
   const worldId = randomUUID();
   const activityId = randomUUID();
@@ -44,6 +45,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     )`);
     try {
       await db.unsafe(migration);
+      await db.unsafe(distributionMigration);
     } catch (error) {
       const position = Number(error?.position);
       const context = Number.isInteger(position) && position > 0
@@ -51,6 +53,14 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
         : "migration position unavailable";
       throw new Error(`Migration 037 failed: ${error instanceof Error ? error.message : String(error)}; SQL context: ${context}`);
     }
+    const distributionIndexes = [
+      "virtual_world_treasure_spawn_candidates_idx",
+      "virtual_world_treasure_assignments_user_idx",
+      "virtual_world_treasure_global_claims_recent_idx"
+    ];
+    const installedDistributionIndexes = await db`SELECT indexname FROM pg_indexes
+      WHERE schemaname = current_schema() AND indexname = ANY(${distributionIndexes})`;
+    assert.deepEqual(installedDistributionIndexes.map(row => row.indexname).sort(), distributionIndexes.sort());
     const expectedIndexes = [
       "virtual_world_daily_mission_active_lookup_idx",
       "virtual_world_daily_mission_template_event_idx",
@@ -98,6 +108,25 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
        position_x, position_y, position_z, interaction_radius)
       VALUES ($1, $2, 0, 'meridian', 'central', 'uceno:0123456789abcdef0123456789abcdef',
         1, 1.15, 1, 2)`, [clueId, huntId]);
+    const spawnA = randomUUID();
+    const spawnB = randomUUID();
+    await db`INSERT INTO virtual_world_treasure_spawn_points
+      (id, hunt_id, sequence, city_id, district_id, interactable_id,
+       position_x, position_y, position_z, interaction_radius)
+      VALUES
+      (${spawnA}::uuid, ${huntId}::uuid, 0, 'solsticebay', 'central', 'spawn-a', 1, 1.15, 1, 2),
+      (${spawnB}::uuid, ${huntId}::uuid, 0, 'solsticebay', 'central', 'spawn-b', 2, 1.15, 2, 2)`;
+    await db`INSERT INTO virtual_world_treasure_assignments
+      (hunt_id, user_id, sequence, spawn_point_id)
+      VALUES (${huntId}::uuid, ${userId}::uuid, 0, ${spawnA}::uuid)`;
+    await assert.rejects(() => db`INSERT INTO virtual_world_treasure_assignments
+      (hunt_id, user_id, sequence, spawn_point_id)
+      VALUES (${huntId}::uuid, ${userId}::uuid, 0, ${spawnB}::uuid)`);
+    await db`INSERT INTO virtual_world_treasure_global_claims (hunt_id, user_id)
+      VALUES (${huntId}::uuid, ${userId}::uuid)`;
+    await assert.rejects(() => db`INSERT INTO virtual_world_treasure_global_claims (hunt_id, user_id)
+      VALUES (${huntId}::uuid, ${userId}::uuid)`);
+
     await db.unsafe(`INSERT INTO virtual_world_treasure_progress
       (hunt_id, user_id, next_sequence) VALUES ($1, $2, 1)`, [huntId, userId]);
     await db.unsafe(`INSERT INTO virtual_world_treasure_discoveries
