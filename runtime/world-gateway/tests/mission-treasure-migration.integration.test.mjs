@@ -25,7 +25,9 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
   const scheduleMigration = readFileSync(new URL("../../../db/migrations/042_treasure_schedule_templates.sql", import.meta.url), "utf8");
   const userId = randomUUID();
   const secondUserId = randomUUID();
+  const thirdUserId = randomUUID();
   const teamId = randomUUID();
+  const competingHuntId = randomUUID();
   const worldId = randomUUID();
   const activityId = randomUUID();
   const resultSessionId = randomUUID();
@@ -99,7 +101,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       WHERE schemaname = current_schema() AND indexname = ANY(${expectedIndexes})`;
     assert.deepEqual(installedIndexes.map(row => row.indexname).sort(), expectedIndexes.sort());
 
-    await db.unsafe("INSERT INTO users(id) VALUES ($1), ($2)", [userId, secondUserId]);
+    await db.unsafe("INSERT INTO users(id) VALUES ($1), ($2), ($3)", [userId, secondUserId, thirdUserId]);
     await db.unsafe("INSERT INTO virtual_worlds(id) VALUES ($1)", [worldId]);
     await db.unsafe("INSERT INTO virtual_world_activity_sessions(id) VALUES ($1)", [resultSessionId]);
     const result = await db.unsafe(`INSERT INTO virtual_world_activity_results
@@ -303,6 +305,38 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     assert.equal(teamLedger.length, 2);
     const completedHints = await loadTeamTreasureHints(db, privatePlayer, Date.now());
     assert.equal(completedHints.length, 0);
+
+    // Two different teams in the same hunt may be joined concurrently by one
+    // player. Exactly one membership wins the database uniqueness constraint;
+    // the losing transaction must remain usable and return a normal conflict.
+    await db`INSERT INTO virtual_world_treasure_hunts
+      (id, code, title, world_id, starts_at, ends_at, enabled, reward_earned_credits, distribution_mode)
+      VALUES (${competingHuntId}::uuid, ${'team-race-' + competingHuntId.slice(0, 8)},
+        'Concurrent membership test', ${worldId}::uuid,
+        NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour', TRUE, 10, 'team')`;
+    for (let sequence = 0; sequence < 2; sequence++) {
+      const point = { id: randomUUID(), sequence, interactableId: 'race-' + sequence };
+      await db`INSERT INTO virtual_world_treasure_spawn_points
+        (id, hunt_id, sequence, city_id, district_id, interactable_id,
+         position_x, position_y, position_z, interaction_radius)
+        VALUES (${point.id}::uuid, ${competingHuntId}::uuid, ${sequence},
+          'solsticebay', 'central', ${point.interactableId}, ${sequence * 10}, 1.15, 0, 2)`;
+    }
+    const [teamA, teamB] = await Promise.all([
+      createTreasureTeam(db, competingHuntId, userId, worldId, 5, Date.now(), teamSecret),
+      createTreasureTeam(db, competingHuntId, secondUserId, worldId, 5, Date.now(), teamSecret)
+    ]);
+    assert.equal(teamA.ok, true);
+    assert.equal(teamB.ok, true);
+    const joinAttempts = await Promise.all([
+      joinTreasureTeam(db, teamA.teamId, thirdUserId, worldId, Date.now()),
+      joinTreasureTeam(db, teamB.teamId, thirdUserId, worldId, Date.now())
+    ]);
+    assert.equal(joinAttempts.filter(result => result.ok).length, 1);
+    assert.equal(joinAttempts.filter(result => result.code === 'already_in_another_team_for_hunt').length, 1);
+    const thirdUserMemberships = await db`SELECT team_id FROM virtual_world_treasure_team_members
+      WHERE hunt_id = ${competingHuntId}::uuid AND user_id = ${thirdUserId}::uuid`;
+    assert.equal(thirdUserMemberships.length, 1);
 
     await db.unsafe(`INSERT INTO virtual_world_treasure_progress
       (hunt_id, user_id, next_sequence) VALUES ($1, $2, 1)`, [huntId, userId]);
