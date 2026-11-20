@@ -534,6 +534,17 @@ function activityPayload(session: ActivitySession) {
 }
 
 async function isActiveTreasureInteractable(player: Player, target: RegisteredInteractable, now: number): Promise<boolean> {
+  // Older isolated test schemas and pre-migration deployments may not yet have
+  // the authored treasure tables. Do not let an optional feature break normal
+  // world interactions while migrations 037-040 are still unapplied.
+  const schemaReady = await sql`SELECT
+    to_regclass('virtual_world_treasure_clues') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_spawn_points') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_teams') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_team_members') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_team_assignments') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_team_progress') IS NOT NULL AS ready`;
+  if (schemaReady[0]?.ready !== true) return false;
   const rows = await sql`SELECT
     EXISTS (
       SELECT 1 FROM virtual_world_treasure_spawn_points AS point
