@@ -555,6 +555,17 @@ async function isActiveTreasureInteractable(player: Player, target: RegisteredIn
   return rows[0]?.active === true;
 }
 
+async function pushPrivateTreasureHints(player: Player): Promise<void> {
+  try {
+    const hints = await loadPrivateTreasureHints(sql, player, Date.now(), TREASURE_ASSIGNMENT_SECRET);
+    if (players.get(player.id) !== player || player.socket.readyState !== WebSocket.OPEN) return;
+    for (const hint of hints) send(player.socket, { type: "treasure_hunt_clue",
+      huntId: hint.huntId, title: hint.title, sequence: hint.sequence, clue: hint.clue });
+  } catch (error) {
+    console.error("private_treasure_hint_push_failed", player.id, error);
+  }
+}
+
 async function recordTreasureDiscovery(player: Player, target: RegisteredInteractable, now: number):
   Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; huntId?: string; collectibles?: { code: string; displayName: string; category: string; rarity: string; quantity: number }[] }> {
   const privateResult = await recordPrivateTreasureDiscovery(sql, player, target, now,
@@ -1766,11 +1777,7 @@ wss.on("connection", async (socket: WebSocket) => {
         player.grounded = true; player.seated = false; player.jumpQueued = false;
         send(socket, { type: "spatial_location_exited",
           state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
-    void loadPrivateTreasureHints(sql, player, Date.now(), TREASURE_ASSIGNMENT_SECRET).then(hints => {
-      if (players.get(player.id) !== player || socket.readyState !== WebSocket.OPEN) return;
-      for (const hint of hints) send(socket, { type: "treasure_hunt_clue", huntId: hint.huntId,
-        title: hint.title, sequence: hint.sequence, clue: hint.clue });
-    }).catch(error => console.error("private_treasure_hint_load_failed", player.id, error));
+    void pushPrivateTreasureHints(player);
         return;
       }
       if (msg && msg.type === "event_join") {
@@ -1875,11 +1882,7 @@ wss.on("connection", async (socket: WebSocket) => {
               send(socket, { type: "treasure_clue_discovered", objectId: target.id, huntId: treasure.huntId,
                 completed: treasure.completed, rewardEarnedCredits: treasure.rewardEarnedCredits,
                 collectibles: treasure.collectibles ?? [] });
-              void loadPrivateTreasureHints(sql, player, Date.now(), TREASURE_ASSIGNMENT_SECRET).then(hints => {
-                if (players.get(player.id) !== player || socket.readyState !== WebSocket.OPEN) return;
-                for (const hint of hints) send(socket, { type: "treasure_hunt_clue", huntId: hint.huntId,
-                  title: hint.title, sequence: hint.sequence, clue: hint.clue });
-              }).catch(error => console.error("private_treasure_hint_refresh_failed", player.id, error));
+              void pushPrivateTreasureHints(player);
             } else if (treasure.code) {
               send(socket, { type: "treasure_discovery_rejected", objectId: target.id, code: treasure.code });
             }
@@ -2515,7 +2518,10 @@ if (TREASURE_SCHEDULE_MATERIALIZER_ENABLED) {
     treasureScheduleInProgress = true;
     try {
       const created = await materializeScheduledTreasureHunts(sql, Date.now());
-      if (created > 0) console.info("treasure_schedules_materialized", { created });
+      if (created > 0) {
+        console.info("treasure_schedules_materialized", { created });
+        for (const player of players.values()) void pushPrivateTreasureHints(player);
+      }
     } catch (error) {
       console.error("treasure_schedule_materialization_failed", error);
     } finally {
