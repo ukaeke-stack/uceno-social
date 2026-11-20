@@ -105,6 +105,17 @@ test("scheduled hunts fail closed on malformed authored spawn points", async () 
   }
 });
 
+test("scheduled hunts reject more than 10000 authored spawn points instead of truncating", async () => {
+  const oversized = Array.from({ length: 10001 }, (_, index) => ({
+    ...points[index % points.length],
+    sequence: Math.floor(index / 101),
+    interactableId: "point-" + index
+  }));
+  const db = fakeDb(oversized, "team");
+  assert.equal(await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z")), 0);
+  assert.equal(db.state.created, false);
+});
+
 test("invalid schedule instants are rejected", async () => {
   await assert.rejects(() => materializeScheduledTreasureHunts(fakeDb(), Number.NaN),
     /invalid_treasure_schedule_instant/);
