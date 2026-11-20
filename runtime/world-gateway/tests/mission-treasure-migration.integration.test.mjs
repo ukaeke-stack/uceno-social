@@ -8,7 +8,7 @@ import { createTreasureTeam, joinTreasureTeam, loadTeamTreasureHints, recordTeam
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
-test("migration 037 applies cleanly and enforces mission, treasure and append-only ledger invariants", {
+test("migrations 037-042 apply cleanly and enforce mission, treasure, team, collectible and schedule invariants", {
   skip: !databaseUrl,
   timeout: 20000
 }, async () => {
@@ -57,19 +57,28 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (session_id, user_id)
     )`);
+    const migrations = [
+      ["037_daily_missions_treasure_rewards.sql", migration],
+      ["038_treasure_distribution_and_private_routes.sql", distributionMigration],
+      ["039_private_treasure_route_discoveries.sql", routeDiscoveryMigration],
+      ["040_treasure_team_rewards.sql", teamMigration],
+      ["041_treasure_collectible_inventory.sql", collectibleMigration],
+      ["042_treasure_schedule_templates.sql", scheduleMigration]
+    ];
+    let activeMigrationName = "unknown";
+    let activeMigrationSql = "";
     try {
-      await db.unsafe(migration);
-      await db.unsafe(distributionMigration);
-      await db.unsafe(routeDiscoveryMigration);
-      await db.unsafe(teamMigration);
-      await db.unsafe(collectibleMigration);
-      await db.unsafe(scheduleMigration);
+      for (const [name, sql] of migrations) {
+        activeMigrationName = name;
+        activeMigrationSql = sql;
+        await db.unsafe(sql);
+      }
     } catch (error) {
       const position = Number(error?.position);
       const context = Number.isInteger(position) && position > 0
-        ? migration.slice(Math.max(0, position - 100), position + 100)
+        ? activeMigrationSql.slice(Math.max(0, position - 100), position + 100)
         : "migration position unavailable";
-      throw new Error(`Migration 037 failed: ${error instanceof Error ? error.message : String(error)}; SQL context: ${context}`);
+      throw new Error(`Migration ${activeMigrationName} failed: ${error instanceof Error ? error.message : String(error)}; SQL context: ${context}`);
     }
     const distributionIndexes = [
       "virtual_world_treasure_spawn_candidates_idx",
