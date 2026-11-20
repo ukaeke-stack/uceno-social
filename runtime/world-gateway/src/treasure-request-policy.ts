@@ -11,12 +11,12 @@ export function consumeTreasureRequestBudget(
 ): boolean {
   if (!Number.isFinite(now) || !Number.isSafeInteger(limit) || limit < 1 ||
       !Number.isFinite(windowMs) || windowMs < 1) return false;
-  if (!Number.isFinite(budget.windowStartedAt) || now < budget.windowStartedAt ||
-      now - budget.windowStartedAt >= windowMs) {
+  // A backwards wall-clock jump must not grant a fresh burst. Fail closed
+  // until time catches up; otherwise clock rollback can bypass the rate limit.
+  if (!Number.isFinite(budget.windowStartedAt) || !Number.isSafeInteger(budget.requestCount) ||
+      budget.requestCount < 0 || now < budget.windowStartedAt) return false;
+  if (now - budget.windowStartedAt >= windowMs) {
     budget.windowStartedAt = now;
-    budget.requestCount = 0;
-  }
-  if (!Number.isSafeInteger(budget.requestCount) || budget.requestCount < 0) {
     budget.requestCount = 0;
   }
   if (budget.requestCount >= limit) return false;
