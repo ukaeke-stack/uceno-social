@@ -234,12 +234,10 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       (id, code, title, world_id, starts_at, ends_at, enabled, reward_earned_credits, distribution_mode)
       VALUES (${teamHuntId}::uuid, 'team-runtime-test', 'Team runtime test', ${worldId}::uuid,
         NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour', TRUE, 101, 'team')`;
-    const teamSpawnPoints = [];
     for (let sequence = 0; sequence < 2; sequence++) {
       for (let candidate = 0; candidate < 2; candidate++) {
         const point = { id: randomUUID(), sequence, interactableId: 'team-' + sequence + '-' + candidate,
           x: sequence * 10 + candidate, y: 1.15, z: candidate };
-        teamSpawnPoints.push(point);
         await db`INSERT INTO virtual_world_treasure_spawn_points
           (id, hunt_id, sequence, city_id, district_id, interactable_id, position_x, position_y, position_z, interaction_radius, clue_payload)
           VALUES (${point.id}::uuid, ${teamHuntId}::uuid, ${sequence}, 'solsticebay', 'central',
@@ -292,7 +290,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     assert.equal(finalDiscovery.handled, true);
     assert.equal(finalDiscovery.discovered, true);
     assert.equal(finalDiscovery.completed, true);
-    assert.equal(finalDiscovery.rewardEarnedCredits, '50');
+    assert.equal(finalDiscovery.rewardEarnedCredits, secondUserId < userId ? '51' : '50');
     const teamAllocations = await db`SELECT user_id AS "userId", amount::text AS amount
       FROM virtual_world_treasure_team_reward_allocations WHERE team_id = ${teamId}::uuid ORDER BY user_id`;
     assert.equal(teamAllocations.length, 2);
