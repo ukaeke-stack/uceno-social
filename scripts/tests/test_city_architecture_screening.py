@@ -35,6 +35,7 @@ class CityArchitectureScreeningTests(unittest.TestCase):
                          "not-building-category")
         detail = {
             "title": "Glass Office Tower",
+            "category": "buildings",
             "description": "realistic exterior office building",
             "category": "props",
             "style": "realistic",
@@ -101,6 +102,7 @@ class CityArchitectureScreeningTests(unittest.TestCase):
     def test_acquisition_rechecks_complete_building_title_and_footprint(self):
         detail = {
             "title": "Mill Sail Cross",
+            "category": "buildings",
             "description": "realistic exterior building",
             "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
             "stats": {"sizeMeters": [10.4, 10.4, 0.83]},
@@ -111,6 +113,7 @@ class CityArchitectureScreeningTests(unittest.TestCase):
     def test_acquisition_allows_component_words_in_building_description(self):
         detail = {
             "title": "Modern Residential Tower",
+            "category": "buildings",
             "description": "Glass windows, concrete walls, steel columns and floor slabs.",
             "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
             "stats": {"sizeMeters": [24, 62, 20]},
