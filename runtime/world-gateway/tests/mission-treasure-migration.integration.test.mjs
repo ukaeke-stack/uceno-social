@@ -21,6 +21,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
   const routeDiscoveryMigration = readFileSync(new URL("../../../db/migrations/039_private_treasure_route_discoveries.sql", import.meta.url), "utf8");
   const teamMigration = readFileSync(new URL("../../../db/migrations/040_treasure_team_rewards.sql", import.meta.url), "utf8");
   const collectibleMigration = readFileSync(new URL("../../../db/migrations/041_treasure_collectible_inventory.sql", import.meta.url), "utf8");
+  const scheduleMigration = readFileSync(new URL("../../../db/migrations/042_treasure_schedule_templates.sql", import.meta.url), "utf8");
   const userId = randomUUID();
   const secondUserId = randomUUID();
   const teamId = randomUUID();
@@ -59,6 +60,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       await db.unsafe(routeDiscoveryMigration);
       await db.unsafe(teamMigration);
       await db.unsafe(collectibleMigration);
+      await db.unsafe(scheduleMigration);
     } catch (error) {
       const position = Number(error?.position);
       const context = Number.isInteger(position) && position > 0
@@ -76,7 +78,9 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       "virtual_world_treasure_team_assignments_spawn_idx",
       "virtual_world_treasure_team_discoveries_member_idx",
       "virtual_world_collectible_catalog_live_idx",
-      "virtual_world_user_collectibles_inventory_idx"
+      "virtual_world_user_collectibles_inventory_idx",
+      "virtual_world_treasure_templates_live_idx",
+      "virtual_world_treasure_template_spawn_idx"
     ];
     const installedDistributionIndexes = await db`SELECT indexname FROM pg_indexes
       WHERE schemaname = current_schema() AND indexname = ANY(${distributionIndexes})`;
