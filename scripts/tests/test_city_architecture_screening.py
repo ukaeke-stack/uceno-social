@@ -168,6 +168,54 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         self.assertEqual(discovery.rejection_reason(facade, "MonsoonHarbour"),
                          "non-building-object-title")
 
+    def test_acquisition_rechecks_low_rise_hanok_for_solsticebay(self):
+        detail = {
+            "title": "Hanok Main House (Korean Hanok Village and Street)",
+            "category": "buildings",
+            "description": "A three bay timber framed hanok house in a Korean village.",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [11.2, 5.718, 7.963]},
+        }
+        self.assertEqual(
+            acquisition.validate_complete_building(detail, "SolsticeBay"),
+            (11.2, 5.718, 7.963),
+        )
+
+    def test_acquisition_rechecks_industrial_laboratory_for_atlasfrontier(self):
+        detail = {
+            "title": "Assay laboratory (Ore Processing and Haulage Plant)",
+            "category": "buildings",
+            "description": "A clad gable assay laboratory in an ore processing and haulage plant.",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [14.6, 9.351, 17.87]},
+        }
+        self.assertEqual(
+            acquisition.validate_complete_building(detail, "AtlasFrontier"),
+            (14.6, 9.351, 17.87),
+        )
+
+    def test_acquisition_rejects_buildings_unrelated_to_the_target_city(self):
+        detail = {
+            "title": "Coastal Hotel Building",
+            "category": "buildings",
+            "description": "A modern waterfront hotel building with exterior balconies.",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [18, 12, 14]},
+        }
+        with self.assertRaisesRegex(ValueError, "not relevant to the target city"):
+            acquisition.validate_complete_building(detail, "AtlasFrontier")
+
+    def test_acquisition_rejects_facade_only_front_assets(self):
+        detail = {
+            "title": "Chandlery Front (Marina and Yacht Club)",
+            "category": "buildings",
+            "description": "Marina chandlery shop front: a rendered wall with a full height glazed display.",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [6.004, 4.201, 1.6]},
+        }
+        with self.assertRaisesRegex(ValueError, "non-building object"):
+            acquisition.validate_complete_building(detail, "MonsoonHarbour")
+
     def test_acquisition_validates_complete_glb_2_binary_and_checksum(self):
         import hashlib
         import struct
