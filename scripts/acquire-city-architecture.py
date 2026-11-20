@@ -86,6 +86,12 @@ def dimensions(detail):
     return None
 
 def validate_complete_building(detail, city):
+    category = detail.get("category")
+    if isinstance(category, dict):
+        category = category.get("slug") or category.get("title") or category.get("name")
+    category_key = re.sub(r"[^a-z]", "", str(category or "").lower())
+    if category_key not in {"building", "buildings", "buildingsarchitecture", "architecture"}:
+        raise ValueError("Asset category is not a complete building")
     title = detail.get("title") or detail.get("name") or ""
     summary = detail.get("summary") or detail.get("description") or ""
     searchable = re.sub(r"[_-]+", " ", f"{title} {summary}".lower())
