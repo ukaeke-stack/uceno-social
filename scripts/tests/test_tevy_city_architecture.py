@@ -218,6 +218,14 @@ class TevyCityArchitectureTests(unittest.TestCase):
             request.assert_called_once()
             sleep.assert_not_called()
 
+    def test_complete_building_description_may_mention_its_facade(self):
+        candidate = record(
+            name="Harbour Control Office",
+            tags=["office", "commercial"],
+            description="Complete harbour office building with glass facade and waterfront frontage"
+        )
+        self.assertIsNone(tevy.screen(candidate, "MonsoonHarbour"))
+
     def test_frontier_building_is_not_misclassified_as_a_front_facade(self):
         candidate = record(
             name="Frontier Church With Steeple",
