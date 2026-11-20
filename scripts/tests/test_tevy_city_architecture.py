@@ -63,6 +63,14 @@ class TevyCityArchitectureTests(unittest.TestCase):
         item["deprecated"] = True
         self.assertEqual(tevy.screen(item, "NexusDelta"), "deprecated")
 
+    def test_generic_building_is_not_assigned_to_an_unrelated_city(self):
+        generic = record(name="Modern Office Building", tags=["building", "office"])
+        self.assertEqual(tevy.screen(generic, "AuroraHeights"), "insufficient-city-relevance")
+
+    def test_city_specific_building_candidate_passes_relevance_gate(self):
+        alpine = record(name="Alpine Ski Lodge", tags=["alpine", "mountain", "ski", "lodge"])
+        self.assertIsNone(tevy.screen(alpine, "AuroraHeights"))
+
     def test_city_relevance_scores_are_not_identical(self):
         coastal = record(name="Coastal Apartment Hotel", tags=["coastal", "apartment", "hotel"])
         industrial = record(name="Industrial Factory", tags=["industrial", "factory"])
