@@ -650,7 +650,10 @@ test("two real gateway processes: primary loss leaves the replacement process re
 
     await t.test("replacement remains ready after the primary process is terminated", async () => {
       await stopGateway(gatewayA);
-      assert.equal(gatewayA.signalCode, "SIGKILL", "primary gateway must have been terminated as an OS process");
+      assert.equal(gatewayA.signalCode, "SIGKILL",
+        "primary gateway must be killed by the test, not exit earlier; exitCode=" +
+        gatewayA.exitCode + "; signalCode=" + gatewayA.signalCode +
+        "; process output:\\n" + gatewayA.testOutput());
       await assert.rejects(fetch(`http://127.0.0.1:${portA}/health`), "terminated primary must stop serving HTTP");
       const replacement = await waitForReady(portB, gatewayB);
       assert.equal(replacement.instanceId, instanceB);
