@@ -18,6 +18,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
   const scoped = new URL(databaseUrl);
   scoped.searchParams.set("options", `-csearch_path=${schema},public`);
   const db = postgres(scoped.toString(), { max: 2, idle_timeout: 5 });
+  const replayDb = postgres(scoped.toString(), { max: 2, idle_timeout: 5 });
   const migration = readFileSync(new URL("../../../db/migrations/037_daily_missions_treasure_rewards.sql", import.meta.url), "utf8");
   const distributionMigration = readFileSync(new URL("../../../db/migrations/038_treasure_distribution_and_private_routes.sql", import.meta.url), "utf8");
   const routeDiscoveryMigration = readFileSync(new URL("../../../db/migrations/039_private_treasure_route_discoveries.sql", import.meta.url), "utf8");
@@ -674,9 +675,12 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
 
     // Replaying each team's final discovery after commit must not re-award
     // Earned Credits, collectible inventory, or catalog supply.
+    // Replay completed clues concurrently through independent PostgreSQL
+    // pools to exercise the database idempotency boundary, not just one client.
     const sharedCompletionReplays = await Promise.all(sharedSupplyRoutes.map(async (route, index) => {
       const point = route[1];
-      return recordTeamTreasureDiscovery(db,
+      const replayClient = index % 2 === 0 ? db : replayDb;
+      return recordTeamTreasureDiscovery(replayClient,
         { id: sharedSupplyPlayers[index].member, worldId,
           x: Number(point.x), y: Number(point.y), z: Number(point.z) },
         { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
@@ -752,6 +756,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       VALUES ($1, 'purchased', 'purchased_credits', 15, 'invalid-currency', 'daily_mission', $2)`,
       [userId, missionInstanceId]));
   } finally {
+    await replayDb.end({ timeout: 2 }).catch(() => undefined);
     await db.end({ timeout: 2 }).catch(() => undefined);
     await admin.unsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => undefined);
     await admin.end({ timeout: 2 });
