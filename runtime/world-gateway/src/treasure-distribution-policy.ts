@@ -78,7 +78,7 @@ export interface TreasureRewardPlan {
 }
 export function validateTreasureRewardPlan(plan: TreasureRewardPlan): boolean {
   if (!plan || !["personal", "team", "global"].includes(plan.mode) ||
-      typeof plan.rewardEarnedCredits !== "bigint" || plan.rewardEarnedCredits < 0n ||
+      typeof plan.rewardEarnedCredits !== "bigint" || plan.rewardEarnedCredits < BigInt(0) ||
       (plan.maxGlobalWinners !== null && (!Number.isSafeInteger(plan.maxGlobalWinners) ||
         plan.maxGlobalWinners < 1 || plan.maxGlobalWinners > 1_000_000)) ||
       (plan.maxRewardClaims !== null && (!Number.isSafeInteger(plan.maxRewardClaims) ||
