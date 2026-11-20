@@ -656,7 +656,7 @@ namespace UCENO.VirtualWorld
 
         private async Task SendTreasureRequestAsync(string type)
         {
-            try { await socket.SendText("{\\"type\\":\\"" + type + "\\"}"); }
+            try { await socket.SendText(JsonUtility.ToJson(new GatewaySimpleRequest { type = type })); }
             catch (Exception error)
             {
                 Debug.LogWarning("UCENO treasure request failed: " + error.Message);
