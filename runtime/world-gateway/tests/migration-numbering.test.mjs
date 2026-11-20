@@ -4,7 +4,7 @@ import { readdirSync } from "node:fs";
 
 test("database migration sequence numbers are unique across the repository", () => {
   const files = readdirSync(new URL("../../../db/migrations/", import.meta.url))
-    .filter(file => /^\\d{3}_.+\\.sql$/.test(file));
+    .filter(file => /^\d{3}_.+\.sql$/.test(file));
   const bySequence = new Map();
   for (const file of files) {
     const sequence = file.slice(0, 3);
