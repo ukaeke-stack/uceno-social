@@ -12,7 +12,7 @@ type TeamResult = { ok: boolean; code?: string; teamId?: string; status?: string
 type Hint = { teamId: string; huntId: string; title: string; sequence: number; clue: Record<string, string | number> };
 type Discovery = { handled: boolean; discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; huntId?: string; teamId?: string; collectibles?: CollectibleReward[] };
 
-const UUID = /^[0-9a-f-]{36}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_TEAM_MEMBERS = 20;
 
 function validSecret(secret: string): boolean {
@@ -49,7 +49,8 @@ export async function createTreasureTeam(
   db: Db, huntId: string, userId: string, worldId: string, requestedMaxMembers: number,
   now: number, secret: string
 ): Promise<TeamResult> {
-  if (!UUID.test(huntId) || !UUID.test(userId)) return { ok: false, code: "invalid_team_identity" };
+  if (!UUID.test(huntId) || !UUID.test(userId) || !UUID.test(worldId) || !Number.isFinite(now))
+    return { ok: false, code: "invalid_team_identity" };
   if (!validSecret(secret)) return { ok: false, code: "treasure_assignment_secret_unavailable" };
   if (!Number.isSafeInteger(requestedMaxMembers) || requestedMaxMembers < 2 ||
       requestedMaxMembers > MAX_TEAM_MEMBERS) return { ok: false, code: "invalid_team_capacity" };
@@ -98,7 +99,8 @@ export async function createTreasureTeam(
 export async function joinTreasureTeam(
   db: Db, teamId: string, userId: string, worldId: string, now: number
 ): Promise<TeamResult> {
-  if (!UUID.test(teamId) || !UUID.test(userId)) return { ok: false, code: "invalid_team_identity" };
+  if (!UUID.test(teamId) || !UUID.test(userId) || !UUID.test(worldId) || !Number.isFinite(now))
+    return { ok: false, code: "invalid_team_identity" };
   return db.begin(async tx => {
     const rows = await tx.unsafe(`SELECT team.id, team.hunt_id AS "huntId",
         team.status, team.max_members AS "maxMembers", hunt.enabled,
