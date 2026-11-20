@@ -532,6 +532,29 @@ function activityPayload(session: ActivitySession) {
   };
 }
 
+async function isActiveTreasureInteractable(player: Player, target: RegisteredInteractable, now: number): Promise<boolean> {
+  const rows = await sql`SELECT
+    EXISTS (
+      SELECT 1 FROM virtual_world_treasure_spawn_points AS point
+      JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = point.hunt_id
+      WHERE point.city_id = ${target.cityId} AND point.district_id = ${target.districtId}
+        AND point.interactable_id = ${target.id} AND point.enabled = TRUE
+        AND hunt.enabled = TRUE AND hunt.distribution_mode IN ('personal', 'global')
+        AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
+        AND hunt.starts_at <= to_timestamp(${now / 1000})
+        AND hunt.ends_at > to_timestamp(${now / 1000})
+    ) OR EXISTS (
+      SELECT 1 FROM virtual_world_treasure_clues AS clue
+      JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = clue.hunt_id
+      WHERE clue.city_id = ${target.cityId} AND clue.district_id = ${target.districtId}
+        AND clue.interactable_id = ${target.id}
+        AND hunt.enabled = TRUE AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
+        AND hunt.starts_at <= to_timestamp(${now / 1000})
+        AND hunt.ends_at > to_timestamp(${now / 1000})
+    ) AS active`;
+  return rows[0]?.active === true;
+}
+
 async function recordTreasureDiscovery(player: Player, target: RegisteredInteractable, now: number):
   Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; collectibles?: { code: string; displayName: string; category: string; rarity: string; quantity: number }[] }> {
   const privateResult = await recordPrivateTreasureDiscovery(sql, player, target, now,
@@ -1843,6 +1866,32 @@ wss.on("connection", async (socket: WebSocket) => {
         if (!isInteractionAllowed(distance, now - player.lastInteractionAt)) {
           send(socket, { type: "interaction_rejected", code: "out_of_range_or_rate_limited" }); return;
         }
+        if (msg.action === "use" &&
+            (target.kind === "object" || target.kind === "furniture" || target.kind === "vehicle") &&
+            await isActiveTreasureInteractable(player, target, now)) {
+          try {
+            const treasure = await recordTreasureDiscovery(player, target, now);
+            if (treasure.discovered) {
+              send(socket, { type: "treasure_clue_discovered", objectId: target.id,
+                completed: treasure.completed, rewardEarnedCredits: treasure.rewardEarnedCredits,
+                collectibles: treasure.collectibles ?? [] });
+              void loadPrivateTreasureHints(sql, player, Date.now(), TREASURE_ASSIGNMENT_SECRET).then(hints => {
+                if (players.get(player.id) !== player || socket.readyState !== WebSocket.OPEN) return;
+                for (const hint of hints) send(socket, { type: "treasure_hunt_clue", huntId: hint.huntId,
+                  title: hint.title, sequence: hint.sequence, clue: hint.clue });
+              }).catch(error => console.error("private_treasure_hint_refresh_failed", player.id, error));
+            } else if (treasure.code) {
+              send(socket, { type: "treasure_discovery_rejected", objectId: target.id, code: treasure.code });
+            }
+          } catch (error) {
+            console.error("treasure_discovery_persistence_failed", error);
+            send(socket, { type: "treasure_discovery_rejected", objectId: target.id, code: "persistence_failed" });
+          }
+          // Treasure state is per-player. Never persist or broadcast a shared
+          // opened/used state that reveals another player's hidden discovery.
+          player.lastInteractionAt = now;
+          return;
+        }
         const previousState = target.state;
         const previousActorId = target.actorId;
         const previousOccupantId = target.occupantId;
@@ -1875,27 +1924,6 @@ wss.on("connection", async (socket: WebSocket) => {
             console.error("Could not persist world object state:", error);
             send(socket, { type: "interaction_rejected", code: "state_persistence_failed" });
             return;
-          }
-        }
-        if (msg.action === "use") {
-          try {
-            const treasure = await recordTreasureDiscovery(player, target, now);
-            if (treasure.discovered) {
-              send(socket, { type: "treasure_clue_discovered", objectId: target.id,
-                completed: treasure.completed, rewardEarnedCredits: treasure.rewardEarnedCredits,
-                collectibles: treasure.collectibles ?? [] });
-              void loadPrivateTreasureHints(sql, player, Date.now(), TREASURE_ASSIGNMENT_SECRET).then(hints => {
-                if (players.get(player.id) !== player || socket.readyState !== WebSocket.OPEN) return;
-                for (const hint of hints) send(socket, { type: "treasure_hunt_clue", huntId: hint.huntId,
-                  title: hint.title, sequence: hint.sequence, clue: hint.clue });
-              }).catch(error => console.error("private_treasure_hint_refresh_failed", player.id, error));
-            }
-            else if (treasure.code) send(socket, {
-              type: "treasure_discovery_rejected", objectId: target.id, code: treasure.code
-            });
-          } catch (error) {
-            console.error("treasure_discovery_persistence_failed", error);
-            send(socket, { type: "treasure_discovery_rejected", objectId: target.id, code: "persistence_failed" });
           }
         }
         player.lastInteractionAt = now;
