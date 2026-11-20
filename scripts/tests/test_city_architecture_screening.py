@@ -127,6 +127,23 @@ class CityArchitectureScreeningTests(unittest.TestCase):
             asset("Glass Office Tower", [18, 34, 18]), "EclipseCentral")
         self.assertEqual(reason, "lumen-tower-candidate-below-35m")
 
+    def test_acquisition_validates_complete_glb_2_binary_and_checksum(self):
+        import hashlib
+        import struct
+        document = b'{"asset":{"version":"2.0"},"scenes":[{"nodes":[]}]}'
+        document += b" " * ((4 - len(document) % 4) % 4)
+        total = 12 + 8 + len(document)
+        binary = (b"glTF" + struct.pack("<II", 2, total) +
+                  struct.pack("<II", len(document), 0x4E4F534A) + document)
+        digest = hashlib.sha256(binary).hexdigest()
+        self.assertEqual(acquisition.verify_glb(binary, digest), digest)
+        with self.assertRaisesRegex(ValueError, "version-2"):
+            acquisition.verify_glb(binary[:8] + struct.pack("<I", total - 1) + binary[12:])
+        with self.assertRaisesRegex(ValueError, "SHA-256"):
+            acquisition.verify_glb(binary, "0" * 64)
+        with self.assertRaises(ValueError):
+            acquisition.verify_glb(b"glTF" + b"\\x00" * 8)
+
     def test_acquisition_rechecks_complete_building_title_and_footprint(self):
         detail = {
             "title": "Mill Sail Cross",
