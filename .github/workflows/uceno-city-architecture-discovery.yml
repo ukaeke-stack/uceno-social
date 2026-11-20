@@ -37,9 +37,14 @@ jobs:
         run: python -m unittest discover -s scripts/tests -p "test_*city_architecture*.py"
       - name: Discover, pin and checksum-verify CC0 Tevy building GLBs
         run: python scripts/discover-tevy-city-architecture.py
-      - name: Preserve legacy 3DAssets.dev diagnostic report
+      - name: Discover independent 3DAssets.dev city candidates
+        if: always()
         continue-on-error: true
         run: python scripts/discover-city-architecture.py
+      - name: Acquire and verify 3DAssets.dev full-building GLBs
+        if: always() && hashFiles('artifacts/city-architecture-candidates/nine-city-candidates.json') != ''
+        continue-on-error: true
+        run: python scripts/acquire-city-architecture.py
       - name: Preserve discovery and partial acquisition evidence
         if: always()
         uses: actions/upload-artifact@v4
