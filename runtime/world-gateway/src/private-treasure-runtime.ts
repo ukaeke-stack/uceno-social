@@ -6,7 +6,7 @@ type PlayerRef = { id: string; worldId: string; x: number; y: number; z: number 
 type TargetRef = { id: string; cityId: string; districtId: string };
 type Db = { begin<T>(fn: (tx: any) => Promise<T>): Promise<T>; unsafe(query: string, params?: unknown[]): Promise<any[]> };
 type Hint = { huntId: string; title: string; sequence: number; clue: unknown };
-type Discovery = { handled: boolean; discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; collectibles?: CollectibleReward[] };
+type Discovery = { handled: boolean; discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; collectibles?: CollectibleReward[]; huntId?: string };
 
 async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: string): Promise<Hint[]> {
   const hunts = await tx.unsafe(`SELECT id, title FROM virtual_world_treasure_hunts
@@ -122,23 +122,23 @@ export async function recordPrivateTreasureDiscovery(
       version = version + 1, updated_at = NOW()
       WHERE hunt_id = $1::uuid AND user_id = $2::uuid`,
       [match.huntId, player.id, completed, now / 1000]);
-    if (!completed) return { handled: true, discovered: true, completed: false, rewardEarnedCredits: "0" };
+    if (!completed) return { handled: true, discovered: true, completed: false, rewardEarnedCredits: "0", huntId: match.huntId };
     const isGlobal = match.distributionMode === "global";
     const rewardClaimCap = match.maxRewardClaims === null ? null : Number(match.maxRewardClaims);
     if (isGlobal || rewardClaimCap !== null) {
       const winnerCap = isGlobal && match.maxGlobalWinners !== null
         ? Number(match.maxGlobalWinners) : null;
       if (isGlobal && (winnerCap === null || !Number.isSafeInteger(winnerCap) || winnerCap < 1))
-        return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "global_treasure_winner_cap_missing" };
+        return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "global_treasure_winner_cap_missing", huntId: match.huntId };
       if (rewardClaimCap !== null && (!Number.isSafeInteger(rewardClaimCap) || rewardClaimCap < 1))
-        return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "treasure_reward_claim_cap_invalid" };
+        return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "treasure_reward_claim_cap_invalid", huntId: match.huntId };
       const caps = [winnerCap, rewardClaimCap].filter((value): value is number => value !== null);
       const cap = Math.min(...caps);
       const claims = await tx.unsafe(`SELECT COUNT(*)::integer AS total
         FROM virtual_world_treasure_global_claims WHERE hunt_id = $1::uuid`, [match.huntId]);
       if (Number(claims[0]?.total ?? 0) >= cap)
         return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0",
-          code: isGlobal ? "global_treasure_claim_limit_reached" : "treasure_reward_claim_limit_reached" };
+          code: isGlobal ? "global_treasure_claim_limit_reached" : "treasure_reward_claim_limit_reached", huntId: match.huntId };
       await tx.unsafe(`INSERT INTO virtual_world_treasure_global_claims (hunt_id, user_id)
         VALUES ($1::uuid, $2::uuid) ON CONFLICT (hunt_id, user_id) DO NOTHING`, [match.huntId, player.id]);
     }
@@ -147,7 +147,7 @@ export async function recordPrivateTreasureDiscovery(
       WHERE hunt_id = $1::uuid AND user_id = $2::uuid
         AND completed_at IS NOT NULL AND reward_issued_at IS NULL RETURNING hunt_id`,
       [match.huntId, player.id]);
-    if (!claimed.length) return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0" };
+    if (!claimed.length) return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", huntId: match.huntId };
     const reward = String(match.reward);
     if (!/^(0|[1-9][0-9]*)$/.test(reward) || reward.length > 19 ||
         (reward.length === 19 && reward > "9223372036854775807"))
@@ -159,6 +159,6 @@ export async function recordPrivateTreasureDiscovery(
       [player.id, reward, "private-treasure:" + match.huntId + ":" + player.id,
         match.huntId, JSON.stringify({ spawnPointId: match.spawnPointId })]);
     const collectibles = await grantTreasureCollectibles(tx, match.huntId, player.id);
-    return { handled: true, discovered: true, completed: true, rewardEarnedCredits: reward, collectibles };
+    return { handled: true, discovered: true, completed: true, rewardEarnedCredits: reward, collectibles, huntId: match.huntId };
   });
 }
