@@ -545,8 +545,7 @@ async function isActiveTreasureInteractable(player: Player, target: RegisteredIn
         AND hunt.starts_at <= to_timestamp(${now / 1000})
         AND hunt.ends_at > to_timestamp(${now / 1000})
     ) OR EXISTS (
-      SELECT 1 FROM virtual_world_treasure_team_assignments AS assignment
-      JOIN virtual_world_treasure_teams AS team ON team.id = assignment.team_id
+      SELECT 1 FROM virtual_world_treasure_teams AS team
       JOIN virtual_world_treasure_team_members AS member
         ON member.team_id = team.id AND member.user_id = ${player.id}::uuid
       JOIN virtual_world_treasure_team_progress AS progress
