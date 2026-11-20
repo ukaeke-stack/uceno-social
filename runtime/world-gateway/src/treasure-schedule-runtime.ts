@@ -109,7 +109,7 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
           AS input(id, sequence, city_id, district_id, interactable_id,
             x, y, z, radius, clue_payload)
           ON CONFLICT (hunt_id, sequence, interactable_id) DO NOTHING`,
-          [huntId, points.map(() => randomUUID()), points.map(point => Number(point.sequence)),
+          [huntId, points.map(() => randomUUID()), points.map((point: any) => Number(point.sequence)),
             points.map((point: any) => String(point.cityId)), points.map((point: any) => String(point.districtId)),
             points.map((point: any) => String(point.interactableId)), points.map((point: any) => Number(point.x)),
             points.map((point: any) => Number(point.y)), points.map((point: any) => Number(point.z)),
