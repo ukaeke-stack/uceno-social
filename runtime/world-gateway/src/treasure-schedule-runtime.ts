@@ -21,7 +21,7 @@ function resolveWindow(template: any, now: number): { startsAt: number; endsAt: 
 
 function hasQualifiedSpawnPool(points: any[], mode: string): boolean {
   if (!Array.isArray(points) || points.length < 2 || points.length > 10000) return false;
-  const clueCount = Math.max(...points.map(point => Number(point.sequence))) + 1;
+  const clueCount = Math.max(...points.map((point: any) => Number(point.sequence))) + 1;
   if (!Number.isInteger(clueCount) || clueCount < 2 || clueCount > 100) return false;
   const counts = new Map<number, number>();
   for (const point of points) counts.set(Number(point.sequence),
@@ -110,11 +110,11 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
             x, y, z, radius, clue_payload)
           ON CONFLICT (hunt_id, sequence, interactable_id) DO NOTHING`,
           [huntId, points.map(() => randomUUID()), points.map(point => Number(point.sequence)),
-            points.map(point => String(point.cityId)), points.map(point => String(point.districtId)),
-            points.map(point => String(point.interactableId)), points.map(point => Number(point.x)),
-            points.map(point => Number(point.y)), points.map(point => Number(point.z)),
-            points.map(point => Number(point.radius)),
-            points.map(point => JSON.stringify(point.clue ?? {}))]);
+            points.map((point: any) => String(point.cityId)), points.map((point: any) => String(point.districtId)),
+            points.map((point: any) => String(point.interactableId)), points.map((point: any) => Number(point.x)),
+            points.map((point: any) => Number(point.y)), points.map((point: any) => Number(point.z)),
+            points.map((point: any) => Number(point.radius)),
+            points.map((point: any) => JSON.stringify(point.clue ?? {}))]);
       }
       return insertedNew;
     });
