@@ -53,7 +53,7 @@ test("team creation refuses a weak assignment secret before opening a transactio
 test("joining a forming team activates it after the second member joins", async () => {
   const db = fakeDb((query) => {
     if (query.includes("FROM virtual_world_treasure_teams AS team")) return [{
-      id: teamId, huntId, status: "forming", maxMembers: 5, enabled: true,
+      id: teamId, huntId, status: "forming", maxMembers: 5, enabled: true, distributionMode: "team",
       startsAt: new Date(now - 1000), endsAt: new Date(now + 60000)
     }];
     if (query.includes("SELECT 1 FROM virtual_world_treasure_team_members")) return [];
@@ -70,7 +70,7 @@ test("joining a forming team activates it after the second member joins", async 
 test("joining a full team is rejected without inserting a member", async () => {
   const db = fakeDb((query) => {
     if (query.includes("FROM virtual_world_treasure_teams AS team")) return [{
-      id: teamId, huntId, status: "active", maxMembers: 2, enabled: true,
+      id: teamId, huntId, status: "active", maxMembers: 2, enabled: true, distributionMode: "team",
       startsAt: new Date(now - 1000), endsAt: new Date(now + 60000)
     }];
     if (query.includes("SELECT 1 FROM virtual_world_treasure_team_members")) return [];
