@@ -578,6 +578,100 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       FROM virtual_world_treasure_team_members WHERE team_id = ${losingTeamId}::uuid`;
     assert.equal(cappedInventory.some(row => losingMembers.some(member => member.userId === row.userId)), false);
 
+    // Competing teams in different hunts may complete together while sharing
+    // one finite catalog item. The catalog row lock must prevent cross-hunt
+    // over-minting even though each hunt has its own completion lock.
+    const sharedSupplyCollectibleId = randomUUID();
+    await db`INSERT INTO virtual_world_collectible_catalog
+      (id, code, display_name, category, rarity, max_supply, enabled)
+      VALUES (${sharedSupplyCollectibleId}::uuid, 'cross-hunt-team-badge',
+        'Cross-hunt Team Badge', 'badge', 'epic', 2, TRUE)`;
+    const sharedSupplyHunts = [randomUUID(), randomUUID()];
+    const sharedSupplyTeams = [];
+    const sharedSupplyPlayers = [
+      { owner: userId, member: secondUserId },
+      { owner: thirdUserId, member: fourthUserId }
+    ];
+    for (const [index, sharedHuntId] of sharedSupplyHunts.entries()) {
+      await db`INSERT INTO virtual_world_treasure_hunts
+        (id, code, title, world_id, starts_at, ends_at, enabled,
+         reward_earned_credits, distribution_mode)
+        VALUES (${sharedHuntId}::uuid, ${'shared-supply-' + index + '-' + sharedHuntId.slice(0, 8)},
+          'Cross-hunt finite collectible supply', ${worldId}::uuid,
+          NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour',
+          TRUE, 20, 'team')`;
+      await db`INSERT INTO virtual_world_treasure_reward_items
+        (hunt_id, collectible_id, quantity)
+        VALUES (${sharedHuntId}::uuid, ${sharedSupplyCollectibleId}::uuid, 1)`;
+      for (let sequence = 0; sequence < 2; sequence++) {
+        const point = { id: randomUUID(), sequence,
+          interactableId: 'shared-supply-' + index + '-' + sequence,
+          x: sequence * 10 + index, y: 1.15, z: index };
+        await db`INSERT INTO virtual_world_treasure_spawn_points
+          (id, hunt_id, sequence, city_id, district_id, interactable_id,
+           position_x, position_y, position_z, interaction_radius)
+          VALUES (${point.id}::uuid, ${sharedHuntId}::uuid, ${sequence},
+            'solsticebay', 'central', ${point.interactableId},
+            ${point.x}, ${point.y}, ${point.z}, 2)`;
+      }
+    }
+    for (let index = 0; index < sharedSupplyHunts.length; index++) {
+      const created = await createTreasureTeam(db, sharedSupplyHunts[index],
+        sharedSupplyPlayers[index].owner, worldId, 2, Date.now(), teamSecret);
+      assert.equal(created.ok, true);
+      const joined = await joinTreasureTeam(db, created.teamId,
+        sharedSupplyPlayers[index].member, worldId, Date.now());
+      assert.equal(joined.ok, true);
+      sharedSupplyTeams.push(created.teamId);
+    }
+    const sharedSupplyRoutes = await Promise.all(sharedSupplyTeams.map(async teamId => db`
+      SELECT assignment.sequence, point.interactable_id AS "interactableId",
+        point.city_id AS "cityId", point.district_id AS "districtId",
+        point.position_x AS x, point.position_y AS y, point.position_z AS z
+      FROM virtual_world_treasure_team_assignments AS assignment
+      JOIN virtual_world_treasure_spawn_points AS point
+        ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
+      WHERE assignment.team_id = ${teamId}::uuid ORDER BY assignment.sequence`));
+    assert.equal(sharedSupplyRoutes.every(route => route.length === 2), true);
+    const sharedFirstResults = await Promise.all(sharedSupplyRoutes.map((route, index) => {
+      const point = route[0];
+      return recordTeamTreasureDiscovery(db,
+        { id: sharedSupplyPlayers[index].owner, worldId,
+          x: Number(point.x), y: Number(point.y), z: Number(point.z) },
+        { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
+        Date.now(), teamSecret, instanceId, processId, 1);
+    }));
+    assert.equal(sharedFirstResults.every(result => result.discovered && !result.completed), true);
+    const sharedFinalResults = await Promise.all(sharedSupplyRoutes.map((route, index) => {
+      const point = route[1];
+      return recordTeamTreasureDiscovery(db,
+        { id: sharedSupplyPlayers[index].member, worldId,
+          x: Number(point.x), y: Number(point.y), z: Number(point.z) },
+        { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
+        Date.now(), teamSecret, instanceId, processId, 1);
+    }));
+    assert.equal(sharedFinalResults.every(result => result.completed), true);
+    assert.equal(sharedFinalResults.every(result => BigInt(result.rewardEarnedCredits) > 0n), true);
+    const sharedSupplyInventory = await db`SELECT user_id AS "userId", quantity
+      FROM virtual_world_user_collectibles
+      WHERE collectible_id = ${sharedSupplyCollectibleId}::uuid
+      ORDER BY user_id`;
+    assert.equal(sharedSupplyInventory.length, 2);
+    assert.deepEqual(sharedSupplyInventory.map(row => Number(row.quantity)), [1, 1]);
+    const sharedSupplyTeamByUser = new Map([
+      [sharedSupplyPlayers[0].owner, sharedSupplyTeams[0]],
+      [sharedSupplyPlayers[0].member, sharedSupplyTeams[0]],
+      [sharedSupplyPlayers[1].owner, sharedSupplyTeams[1]],
+      [sharedSupplyPlayers[1].member, sharedSupplyTeams[1]]
+    ]);
+    const teamsReceivingSharedSupply = new Set(
+      sharedSupplyInventory.map(row => sharedSupplyTeamByUser.get(row.userId))
+    );
+    assert.equal(teamsReceivingSharedSupply.size, 1);
+    const sharedSupplyCatalog = await db`SELECT minted_count FROM virtual_world_collectible_catalog
+      WHERE id = ${sharedSupplyCollectibleId}::uuid`;
+    assert.equal(Number(sharedSupplyCatalog[0].minted_count), 2);
+
     // Two different teams in the same hunt may be joined concurrently by one
     // player. Exactly one membership wins the database uniqueness constraint;
     // the losing transaction must remain usable and return a normal conflict.
