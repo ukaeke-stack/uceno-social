@@ -17,6 +17,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
   const db = postgres(scoped.toString(), { max: 2, idle_timeout: 5 });
   const migration = readFileSync(new URL("../../../db/migrations/037_daily_missions_treasure_rewards.sql", import.meta.url), "utf8");
   const distributionMigration = readFileSync(new URL("../../../db/migrations/038_treasure_distribution_and_private_routes.sql", import.meta.url), "utf8");
+  const routeDiscoveryMigration = readFileSync(new URL("../../../db/migrations/039_private_treasure_route_discoveries.sql", import.meta.url), "utf8");
   const userId = randomUUID();
   const worldId = randomUUID();
   const activityId = randomUUID();
@@ -46,6 +47,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     try {
       await db.unsafe(migration);
       await db.unsafe(distributionMigration);
+      await db.unsafe(routeDiscoveryMigration);
     } catch (error) {
       const position = Number(error?.position);
       const context = Number.isInteger(position) && position > 0
@@ -56,7 +58,8 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     const distributionIndexes = [
       "virtual_world_treasure_spawn_candidates_idx",
       "virtual_world_treasure_assignments_user_idx",
-      "virtual_world_treasure_global_claims_recent_idx"
+      "virtual_world_treasure_global_claims_recent_idx",
+      "virtual_world_treasure_route_discoveries_user_idx"
     ];
     const installedDistributionIndexes = await db`SELECT indexname FROM pg_indexes
       WHERE schemaname = current_schema() AND indexname = ANY(${distributionIndexes})`;
