@@ -51,9 +51,10 @@ function hasQualifiedSpawnPool(points: any[], mode: string): boolean {
   const counts = new Map<number, number>();
   const seenInteractables = new Set<string>();
   for (const point of points) {
-    const identity = JSON.stringify([point.cityId, point.districtId, point.interactableId]);
-    // A scheduled route must not count duplicate rows for the same in-world
-    // object as alternate clue locations or repeat one object across steps.
+    // Match the runtime route selector: interactable IDs are globally unique
+    // within a hunt, even when duplicate rows claim different district metadata.
+    // Otherwise a scheduled route can pass validation but fail at assignment.
+    const identity = point.interactableId;
     if (seenInteractables.has(identity)) return false;
     seenInteractables.add(identity);
     counts.set(Number(point.sequence), (counts.get(Number(point.sequence)) ?? 0) + 1);
