@@ -270,27 +270,29 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       WHERE assignment.team_id = ${createdTeamId}::uuid ORDER BY assignment.sequence`;
     assert.equal(teamAssignments.length, 2);
     const firstStep = teamAssignments[0];
-    const firstDiscovery = await recordTeamTreasureDiscovery(db,
-      { id: userId, worldId, x: Number(firstStep.x), y: Number(firstStep.y), z: Number(firstStep.z) },
-      { id: firstStep.interactableId, cityId: firstStep.cityId, districtId: firstStep.districtId },
-      Date.now(), teamSecret, instanceId, processId, 1);
-    assert.equal(firstDiscovery.handled, true);
-    assert.equal(firstDiscovery.discovered, true);
-    assert.equal(firstDiscovery.completed, false);
-    const duplicateDiscovery = await recordTeamTreasureDiscovery(db,
-      { id: secondUserId, worldId, x: Number(firstStep.x), y: Number(firstStep.y), z: Number(firstStep.z) },
-      { id: firstStep.interactableId, cityId: firstStep.cityId, districtId: firstStep.districtId },
-      Date.now(), teamSecret, instanceId, processId, 1);
-    assert.equal(duplicateDiscovery.discovered, false);
+    const firstPosition = { x: Number(firstStep.x), y: Number(firstStep.y), z: Number(firstStep.z) };
+    const [firstDiscovery, competingDiscovery] = await Promise.all([
+      recordTeamTreasureDiscovery(db,
+        { id: userId, worldId, ...firstPosition },
+        { id: firstStep.interactableId, cityId: firstStep.cityId, districtId: firstStep.districtId },
+        Date.now(), teamSecret, instanceId, processId, 1),
+      recordTeamTreasureDiscovery(db,
+        { id: secondUserId, worldId, ...firstPosition },
+        { id: firstStep.interactableId, cityId: firstStep.cityId, districtId: firstStep.districtId },
+        Date.now(), teamSecret, instanceId, processId, 1)
+    ]);
+    assert.equal([firstDiscovery, competingDiscovery].filter(result => result.discovered).length, 1);
+    const firstWinnerId = firstDiscovery.discovered ? userId : secondUserId;
+    const finalUserId = firstWinnerId === userId ? secondUserId : userId;
     const secondStep = teamAssignments[1];
     const finalDiscovery = await recordTeamTreasureDiscovery(db,
-      { id: secondUserId, worldId, x: Number(secondStep.x), y: Number(secondStep.y), z: Number(secondStep.z) },
+      { id: finalUserId, worldId, x: Number(secondStep.x), y: Number(secondStep.y), z: Number(secondStep.z) },
       { id: secondStep.interactableId, cityId: secondStep.cityId, districtId: secondStep.districtId },
       Date.now(), teamSecret, instanceId, processId, 1);
     assert.equal(finalDiscovery.handled, true);
     assert.equal(finalDiscovery.discovered, true);
     assert.equal(finalDiscovery.completed, true);
-    assert.equal(finalDiscovery.rewardEarnedCredits, secondUserId < userId ? '51' : '50');
+    assert.equal(finalDiscovery.rewardEarnedCredits, finalUserId < firstWinnerId ? '51' : '50');
     const teamAllocations = await db`SELECT user_id AS "userId", amount::text AS amount
       FROM virtual_world_treasure_team_reward_allocations WHERE team_id = ${createdTeamId}::uuid ORDER BY user_id`;
     assert.equal(teamAllocations.length, 2);
