@@ -19,8 +19,32 @@ function resolveWindow(template: any, now: number): { startsAt: number; endsAt: 
   }
 }
 
+function isQualifiedSpawnPoint(point: any): boolean {
+  if (!point || !Number.isInteger(point.sequence) || point.sequence < 0 || point.sequence > 99)
+    return false;
+  if (typeof point.cityId !== "string" || !/^[a-z0-9][a-z0-9_-]{1,63}$/.test(point.cityId))
+    return false;
+  if (typeof point.districtId !== "string" || point.districtId.length < 1 ||
+      point.districtId.length > 80 || typeof point.interactableId !== "string" ||
+      point.interactableId.length < 1 || point.interactableId.length > 128)
+    return false;
+  for (const coordinate of [point.x, point.y, point.z]) {
+    if (typeof coordinate !== "number" || !Number.isFinite(coordinate) ||
+        coordinate < -10000 || coordinate > 10000) return false;
+  }
+  if (typeof point.radius !== "number" || !Number.isFinite(point.radius) ||
+      point.radius < 0.5 || point.radius > 8) return false;
+  if (!point.clue || typeof point.clue !== "object" || Array.isArray(point.clue))
+    return false;
+  try {
+    return Buffer.byteLength(JSON.stringify(point.clue), "utf8") <= 16384;
+  } catch {
+    return false;
+  }
+}
+
 function hasQualifiedSpawnPool(points: any[], mode: string): boolean {
-  if (!Array.isArray(points) || points.length < 2 || points.length > 10000) return false;
+  if (!Array.isArray(points) || points.length < 2 || points.length > 10000 ||\n      !points.every(isQualifiedSpawnPoint)) return false;
   const clueCount = Math.max(...points.map((point: any) => Number(point.sequence))) + 1;
   if (!Number.isInteger(clueCount) || clueCount < 2 || clueCount > 100) return false;
   const counts = new Map<number, number>();
