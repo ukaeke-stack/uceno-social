@@ -149,3 +149,18 @@ test("team creation rejects more than 10000 authored spawn points instead of tru
   );
   assert.equal(db.calls.some(call => call.query.includes("INSERT INTO virtual_world_treasure_team_assignments")), false);
 });
+
+test("team assignment secrets are validated by UTF-8 byte length and runtime type", async () => {
+  let opened = false;
+  const db = { begin: fn => {
+    opened = true;
+    return fn({ unsafe: async () => [] });
+  }};
+  const nonString = await createTreasureTeam(db, huntId, userId, worldId, 5, now, { value: "x".repeat(40) });
+  assert.equal(nonString.code, "treasure_assignment_secret_unavailable");
+  assert.equal(opened, false);
+
+  const unicodeSecret = await createTreasureTeam(db, huntId, userId, worldId, 5, now, "é".repeat(16));
+  assert.equal(opened, true);
+  assert.equal(unicodeSecret.code, "team_hunt_unavailable");
+});
