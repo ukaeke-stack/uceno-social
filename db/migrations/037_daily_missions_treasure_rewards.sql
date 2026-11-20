@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS virtual_world_treasure_progress (
   PRIMARY KEY (hunt_id, user_id),
   CHECK (reward_issued_at IS NULL OR completed_at IS NOT NULL)
 );
+CREATE INDEX IF NOT EXISTS virtual_world_treasure_progress_user_active_idx
+  ON virtual_world_treasure_progress (user_id, updated_at DESC, hunt_id)
+  WHERE completed_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS virtual_world_treasure_discoveries (
   id UUID PRIMARY KEY,
