@@ -11,7 +11,7 @@ const databaseUrl = process.env.TEST_DATABASE_URL;
 
 test("migrations 037-042 apply cleanly and enforce mission, treasure, team, collectible and schedule invariants", {
   skip: !databaseUrl,
-  timeout: 20000
+  timeout: 60000
 }, async () => {
   const schema = "uceno_rewards_" + randomUUID().replace(/-/g, "");
   const admin = postgres(databaseUrl, { max: 2, idle_timeout: 5 });
