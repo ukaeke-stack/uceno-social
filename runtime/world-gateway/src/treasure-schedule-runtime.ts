@@ -94,15 +94,27 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
           huntId = retry[0].id;
         }
       }
-      for (const point of points) {
+      if (points.length) {
+        // One set-based insert per scheduled hunt avoids a database round-trip
+        // for every authored clue location (up to 10,000 per template).
         await tx.unsafe(`INSERT INTO virtual_world_treasure_spawn_points
           (id, hunt_id, sequence, city_id, district_id, interactable_id,
            position_x, position_y, position_z, interaction_radius, clue_payload, enabled)
-          VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, TRUE)
+          SELECT input.id, $1::uuid, input.sequence, input.city_id, input.district_id,
+            input.interactable_id, input.x, input.y, input.z, input.radius,
+            input.clue_payload::jsonb, TRUE
+          FROM unnest($2::uuid[], $3::integer[], $4::text[], $5::text[], $6::text[],
+            $7::double precision[], $8::double precision[], $9::double precision[],
+            $10::double precision[], $11::jsonb[])
+          AS input(id, sequence, city_id, district_id, interactable_id,
+            x, y, z, radius, clue_payload)
           ON CONFLICT (hunt_id, sequence, interactable_id) DO NOTHING`,
-          [randomUUID(), huntId, point.sequence, point.cityId, point.districtId,
-            point.interactableId, point.x, point.y, point.z, point.radius,
-            JSON.stringify(point.clue ?? {})]);
+          [huntId, points.map(() => randomUUID()), points.map(point => Number(point.sequence)),
+            points.map(point => String(point.cityId)), points.map(point => String(point.districtId)),
+            points.map(point => String(point.interactableId)), points.map(point => Number(point.x)),
+            points.map(point => Number(point.y)), points.map(point => Number(point.z)),
+            points.map(point => Number(point.radius)),
+            points.map(point => JSON.stringify(point.clue ?? {}))]);
       }
       return insertedNew;
     });
