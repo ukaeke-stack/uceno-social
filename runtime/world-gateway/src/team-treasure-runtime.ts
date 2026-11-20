@@ -228,14 +228,14 @@ export async function recordTeamTreasureDiscovery(
     const shares = calculateTeamRewardShares(BigInt(rewardText), memberRows.map((row: any) => ({
       userId: row.userId, points: Number(row.points)
     })));
-    const playerShare = shares.find(share => share.userId === player.id)?.amount ?? 0n;
+    const playerShare = shares.find(share => share.userId === player.id)?.amount ?? BigInt(0);
     for (const share of shares) {
       await tx.unsafe(`INSERT INTO virtual_world_treasure_team_reward_allocations
         (team_id, user_id, contribution_points, amount)
         VALUES ($1::uuid, $2::uuid, $3, $4::bigint)
         ON CONFLICT (team_id, user_id) DO NOTHING`,
         [match.teamId, share.userId, share.contributionPoints, share.amount.toString()]);
-      if (share.amount > 0n) await tx.unsafe(`INSERT INTO virtual_world_earned_credit_ledger
+      if (share.amount > BigInt(0)) await tx.unsafe(`INSERT INTO virtual_world_earned_credit_ledger
         (user_id, ledger_type, currency, amount, idempotency_key, source_type, source_treasure_hunt_id, metadata)
         VALUES ($1::uuid, 'earned', 'earned_credits', $2::bigint, $3, 'treasure_hunt', $4::uuid, $5::jsonb)
         ON CONFLICT (idempotency_key) DO NOTHING`,
