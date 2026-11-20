@@ -2165,7 +2165,10 @@ setInterval(async () => {
       try {
         if (!(row.instanceId === INSTANCE_ID && row.eventType === 'player_snapshot')) {
           if (row.eventType === 'player_snapshot') {
-            const payload = row.payload as { serverTime?: number; players?: unknown };
+            const payload = row.payload as {
+              serverTime?: number; players?: unknown;
+              sourceProcessId?: string; sourceGeneration?: number;
+            };
             if (payload && Array.isArray(payload.players) && Number.isFinite(payload.serverTime)) {
               // A process whose instance lease/heartbeat has expired is no longer
               // authoritative, even if it managed to append a delayed snapshot row.
@@ -2176,6 +2179,7 @@ setInterval(async () => {
               // cannot commit between validation and broadcast.
               if (typeof payload.sourceProcessId === "string" &&
                   /^[0-9a-f-]{36}$/i.test(payload.sourceProcessId) &&
+                  typeof payload.sourceGeneration === "number" &&
                   Number.isSafeInteger(payload.sourceGeneration) && payload.sourceGeneration >= 1) {
                 await sql.begin(async tx => {
                   const sourceAuthority = await tx`SELECT id FROM virtual_world_instances
