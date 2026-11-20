@@ -1532,7 +1532,9 @@ wss.on("connection", async (socket: WebSocket) => {
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
       if (msg && ["treasure_team_hunts_request", "treasure_team_create", "treasure_team_join"].includes(msg.type)) {
         if (!consumeTreasureRequestBudget(player.treasureRequestBudget, Date.now())) {
-          send(socket, { type: "treasure_team_rejected", code: "treasure_request_rate_limited" });
+          if (msg.type === "treasure_team_hunts_request")
+            send(socket, { type: "team_treasure_hunt_catalog", hunts: [], code: "treasure_request_rate_limited" });
+          else send(socket, { type: "treasure_team_rejected", code: "treasure_request_rate_limited" });
           return;
         }
       }
