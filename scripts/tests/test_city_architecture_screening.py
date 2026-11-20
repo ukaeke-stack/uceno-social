@@ -205,6 +205,30 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not relevant to the target city"):
             acquisition.validate_complete_building(detail, "AtlasFrontier")
 
+    def test_discovery_rejects_forecourt_canopy_and_shed_bay_components(self):
+        for title in [
+            "Forecourt canopy section, amber livery (Petrol Station and Forecourt Shop)",
+            "Fabrication shed bay, 4 m (Shipyard and Dry Dock)",
+        ]:
+            candidate = asset(title, [8.78, 7.45, 4.002],
+                              summary="realistic exterior building")
+            self.assertEqual(discovery.rejection_reason(candidate, "MonsoonHarbour"),
+                             "non-building-object-title", title)
+
+    def test_acquisition_rejects_forecourt_canopy_and_shed_bay_components(self):
+        for title in [
+            "Forecourt canopy section, amber livery (Petrol Station and Forecourt Shop)",
+            "Fabrication shed bay, 4 m (Shipyard and Dry Dock)",
+        ]:
+            detail = {
+                "title": title, "category": "buildings",
+                "description": "realistic exterior building",
+                "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+                "stats": {"sizeMeters": [8.78, 7.45, 4.002]},
+            }
+            with self.assertRaisesRegex(ValueError, "non-building object"):
+                acquisition.validate_complete_building(detail, "MonsoonHarbour")
+
     def test_acquisition_rejects_facade_only_front_assets(self):
         detail = {
             "title": "Chandlery Front (Marina and Yacht Club)",
