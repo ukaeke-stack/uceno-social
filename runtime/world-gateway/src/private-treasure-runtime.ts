@@ -23,6 +23,12 @@ async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: str
     if (!points.length) continue;
     const clueCount = Math.max(...points.map((p: any) => Number(p.sequence))) + 1;
     if (clueCount < 2 || clueCount > 100) continue;
+    const candidatesPerSequence = new Map<number, number>();
+    for (const point of points) candidatesPerSequence.set(Number(point.sequence),
+      (candidatesPerSequence.get(Number(point.sequence)) ?? 0) + 1);
+    // A private route needs at least two real authored alternatives at every step.
+    if (Array.from({ length: clueCount }, (_, sequence) =>
+      candidatesPerSequence.get(sequence) ?? 0).some(count => count < 2)) continue;
     let route;
     try {
       route = selectPersonalTreasureRoute(hunt.id, player.id, points.map((p: any) => ({
@@ -116,7 +122,11 @@ export async function recordPrivateTreasureDiscovery(
       [match.huntId, player.id, completed, now / 1000]);
     if (!completed) return { handled: true, discovered: true, completed: false, rewardEarnedCredits: "0" };
     if (match.distributionMode === "global") {
-      const caps = [match.maxGlobalWinners, match.maxRewardClaims].filter((v: unknown) => v !== null).map(Number);\n      const cap = caps.length ? Math.min(...caps) : 0;
+      const winnerCap = match.maxGlobalWinners === null ? 0 : Number(match.maxGlobalWinners);
+      if (!Number.isSafeInteger(winnerCap) || winnerCap < 1)
+        return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "global_treasure_winner_cap_missing" };
+      const caps = [winnerCap, match.maxRewardClaims].filter((v: unknown) => v !== null).map(Number);
+      const cap = Math.min(...caps);
       if (!Number.isSafeInteger(cap) || cap < 1)
         return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "global_treasure_winner_cap_missing" };
       const claims = await tx.unsafe(`SELECT COUNT(*)::integer AS total
