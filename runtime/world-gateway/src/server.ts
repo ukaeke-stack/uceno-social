@@ -2530,6 +2530,8 @@ if (TREASURE_SCHEDULE_MATERIALIZER_ENABLED && TREASURE_ASSIGNMENT_SECRET.length 
       treasureScheduleInProgress = false;
     }
   }, 60_000);
+} else if (TREASURE_SCHEDULE_MATERIALIZER_ENABLED) {
+  console.error("treasure_schedule_materializer_disabled", "TREASURE_ASSIGNMENT_SECRET must contain at least 32 characters");
 }
 
 let objectRefreshInProgress = false;
