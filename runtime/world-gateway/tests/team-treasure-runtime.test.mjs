@@ -18,6 +18,24 @@ function fakeDb(handler) {
   return { calls, begin: fn => fn(tx) };
 }
 
+test("team create and join reject malformed UUIDs and non-finite time before database access", async () => {
+  let opened = false;
+  const db = { begin: fn => { opened = true; return fn({ unsafe: async () => [] }); } };
+  const malformed = "------------------------------------";
+  for (const result of [
+    await createTreasureTeam(db, malformed, userId, worldId, 5, now, secret),
+    await createTreasureTeam(db, huntId, userId, malformed, 5, now, secret),
+    await createTreasureTeam(db, huntId, userId, worldId, 5, Number.NaN, secret),
+    await joinTreasureTeam(db, malformed, userId, worldId, now),
+    await joinTreasureTeam(db, teamId, userId, malformed, now),
+    await joinTreasureTeam(db, teamId, userId, worldId, Number.NaN)
+  ]) {
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "invalid_team_identity");
+  }
+  assert.equal(opened, false);
+});
+
 test("team creation persists one shared assignment per authored clue step", async () => {
   const points = [
     { id: "223e4567-e89b-42d3-a456-426614174020", sequence: 0, cityId: "solsticebay", districtId: "central", interactableId: "fountain-a" },
