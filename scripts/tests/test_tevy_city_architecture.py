@@ -130,6 +130,14 @@ class TevyCityArchitectureTests(unittest.TestCase):
         self.assertEqual(len(slugs), len(set(slugs)))
         self.assertEqual(sum(len(items) for items in allocations.values()), 4)
 
+    def test_lod_metadata_rejects_non_hex_checksums_and_path_traversal(self):
+        item = record()
+        item["files"][0]["sha256"] = "g" * 64
+        self.assertEqual(tevy.screen(item, "NexusDelta"), "missing-or-invalid-lod-checksum")
+        item = record()
+        item["files"][0]["path"] = "/models/sample-building/v1/lod0.glb/../../outside"
+        self.assertEqual(tevy.screen(item, "NexusDelta"), "unpinned-or-unsafe-glb-lod-path")
+
     def test_glb_checksum_and_header_are_verified(self):
         import hashlib
         import struct
