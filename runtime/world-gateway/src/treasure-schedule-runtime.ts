@@ -57,7 +57,7 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
         FROM virtual_world_treasure_hunt_templates
         WHERE id = $1::uuid AND enabled = TRUE
         FOR SHARE`, [template.id]);
-      if (!current[0]) return false;
+      if (!current[0] || current[0].distributionMode === "team") return false;
       const points = await tx.unsafe(`SELECT sequence, city_id AS "cityId",
           district_id AS "districtId", interactable_id AS "interactableId",
           position_x AS x, position_y AS y, position_z AS z,
