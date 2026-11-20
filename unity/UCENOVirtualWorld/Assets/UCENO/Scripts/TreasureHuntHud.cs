@@ -124,7 +124,7 @@ namespace UCENO.VirtualWorld
 
             float width = Mathf.Min(Screen.width - 24f, 480f * scale);
             float height = Mathf.Min(Screen.height - 36f, 620f * scale);
-            Rect panel = new Rect(Screen.width - width - 12f, 62f * scale, width, height);
+            Rect panel = new Rect(12f, 100f * scale, width, height);
             GUILayout.BeginArea(panel, GUI.skin.box);
             GUILayout.Label("UCENO TREASURE HUNTS");
             GUILayout.Label(status, GUI.skin.label);
