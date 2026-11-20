@@ -124,3 +124,27 @@ test("join membership uniqueness conflict returns without aborting the transacti
   assert.equal(result.code, "already_in_another_team_for_hunt");
   assert.equal(db.calls.some(call => call.query.includes("SET status = $2")), false);
 });
+
+test("team creation rejects more than 10000 authored spawn points instead of truncating", async () => {
+  const oversized = Array.from({ length: 10001 }, (_, index) => ({
+    id: "223e4567-e89b-42d3-a456-" + String(index).padStart(12, "0"),
+    sequence: index % 2,
+    cityId: "solsticebay",
+    districtId: "central",
+    interactableId: "interactable-" + index
+  }));
+  const db = fakeDb((query) => {
+    if (query.includes("FROM virtual_world_treasure_hunts")) return [{ id: huntId }];
+    if (query.includes("FROM virtual_world_treasure_team_members AS member")) return [];
+    if (query.includes("INSERT INTO virtual_world_treasure_team_members")) return [{ userId }];
+    if (query.includes("FROM virtual_world_treasure_spawn_points")) {
+      assert.match(query, /LIMIT 10001/);
+      return oversized;
+    }
+    return [];
+  });
+  const result = await createTreasureTeam(db, huntId, userId, worldId, 5, now, secret);
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "team_route_unavailable");
+  assert.equal(db.calls.some(call => call.query.includes("INSERT INTO virtual_world_treasure_team_assignments")), false);
+});
