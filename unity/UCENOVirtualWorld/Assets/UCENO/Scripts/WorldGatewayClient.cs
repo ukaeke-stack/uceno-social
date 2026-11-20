@@ -343,7 +343,7 @@ namespace UCENO.VirtualWorld
         public event Action<GatewayActivitySessionState> ActivityStateChanged;
         public event Action<string> ActivityRejected;
         public event Action<string, string, int, GatewayTreasureClue> TreasureClueReceived;
-        public event Action<string, bool, string, GatewayTreasureCollectible[]> TreasureDiscoveryReceived;
+        public event Action<string, string, bool, string, GatewayTreasureCollectible[]> TreasureDiscoveryReceived;
         public event Action<GatewayTreasureInventoryItem[]> TreasureInventoryReceived;
         public event Action<GatewayTreasureHistoryItem[]> TreasureHistoryReceived;
         public event Action<string> TreasureRejected;
@@ -1013,7 +1013,7 @@ namespace UCENO.VirtualWorld
 
             if (packet.type == "treasure_clue_discovered")
             {
-                TreasureDiscoveryReceived?.Invoke(packet.objectId ?? "", packet.completed,
+                TreasureDiscoveryReceived?.Invoke(packet.huntId ?? "", packet.objectId ?? "", packet.completed,
                     packet.rewardEarnedCredits ?? "0", packet.collectibles ?? Array.Empty<GatewayTreasureCollectible>());
                 return;
             }
