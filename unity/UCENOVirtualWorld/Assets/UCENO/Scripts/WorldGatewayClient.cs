@@ -368,6 +368,7 @@ namespace UCENO.VirtualWorld
             localAvatar = FindObjectOfType<AvatarLocomotionDriver>();
             contentDelivery = FindObjectOfType<WorldContentDelivery>();
             if (contentDelivery == null) contentDelivery = gameObject.AddComponent<WorldContentDelivery>();
+            if (FindObjectOfType<TreasureHuntHud>() == null) gameObject.AddComponent<TreasureHuntHud>();
             if (remoteAvatarPrefab == null || session == null || localPlayer == null)
             {
                 ConnectionStatus = "NOT CONFIGURED";
