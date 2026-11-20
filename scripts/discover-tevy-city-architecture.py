@@ -75,10 +75,14 @@ def screen(record, city):
     lods = {f.get("lod"): f for f in files if isinstance(f, dict)}
     if not {0, 1, 2}.issubset(lods):
         return "missing-three-lod-levels"
-    if any(not isinstance(lods[i].get("sha256"), str) or len(lods[i]["sha256"]) != 64 for i in (0, 1, 2)):
-        return "missing-lod-checksum"
-    if any(not str(lods[i].get("path", "")).endswith(".glb") for i in (0, 1, 2)):
-        return "missing-glb-lod"
+    if any(not isinstance(lods[i].get("sha256"), str) or
+           re.fullmatch(r"[0-9a-fA-F]{64}", lods[i]["sha256"]) is None
+           for i in (0, 1, 2)):
+        return "missing-or-invalid-lod-checksum"
+    if any(re.fullmatch(
+        rf"/models/{re.escape(slug)}/v[1-9][0-9]*/lod{i}\\.glb",
+        str(lods[i].get("path", ""))) is None for i in (0, 1, 2)):
+        return "unpinned-or-unsafe-glb-lod-path"
     if lods[0].get("bytes", MAX_BYTES + 1) > MAX_BYTES:
         return "lod0-over-25-mib"
     text = " ".join([record.get("name", ""), record.get("description", ""), " ".join(record.get("tags") or [])]).lower()
@@ -243,6 +247,9 @@ def main():
         for record in allocations[city]:
             slug = record["slug"]
             meta = get_json(f"{BASE}/models/{slug}.json")
+            detail_reason = screen(meta, city)
+            if detail_reason:
+                raise ValueError(f"{slug}: detail metadata failed city asset screen: {detail_reason}")
             if meta.get("license") != "CC0-1.0" or meta.get("deprecated") or meta.get("slug", slug) != slug:
                 raise ValueError(f"{slug}: detail metadata identity/licence/deprecation mismatch")
             version = int(meta.get("version", 0))
@@ -257,7 +264,8 @@ def main():
                 if not file_info:
                     raise ValueError(f"{slug}: missing LOD{lod} detail metadata")
                 path = file_info.get("path")
-                if not path or not path.startswith(f"/models/{slug}/v{version}/lod{lod}.glb"):
+                expected_path = f"/models/{slug}/v{version}/lod{lod}.glb"
+                if path != expected_path:
                     raise ValueError(f"{slug}: unpinned or unexpected LOD{lod} path")
                 data = get_bytes(BASE + path)
                 digest, extensions = verify_glb(data, file_info.get("sha256", ""))
