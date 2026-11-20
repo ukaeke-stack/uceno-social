@@ -71,6 +71,14 @@ class TevyCityArchitectureTests(unittest.TestCase):
         alpine = record(name="Alpine Ski Lodge", tags=["alpine", "mountain", "ski", "lodge"])
         self.assertIsNone(tevy.screen(alpine, "AuroraHeights"))
 
+    def test_airport_does_not_count_as_the_city_theme_word_port(self):
+        airport = record(name="Airport Hangar", tags=["aviation", "hangar"], description="regional airport hangar")
+        self.assertEqual(tevy.screen(airport, "MonsoonHarbour"), "insufficient-city-relevance")
+
+    def test_city_relevance_uses_word_boundaries(self):
+        airport = record(name="Airport Hangar", tags=["aviation", "hangar"], description="regional airport hangar")
+        self.assertEqual(tevy.score(airport, "MonsoonHarbour"), tevy.score(airport, "SolsticeBay"))
+
     def test_city_relevance_scores_are_not_identical(self):
         coastal = record(name="Coastal Apartment Hotel", tags=["coastal", "apartment", "hotel"])
         industrial = record(name="Industrial Factory", tags=["industrial", "factory"])
