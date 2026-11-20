@@ -53,6 +53,9 @@ def contains_term(text, term):
     return re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text) is not None
 
 def screen(record, city):
+    slug = record.get("slug")
+    if not isinstance(slug, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{1,79}", slug):
+        return "invalid-model-slug"
     if record.get("category") != "buildings":
         return "not-building-category"
     if record.get("license") != "CC0-1.0":
@@ -139,8 +142,8 @@ def main():
         for record in selected:
             slug = record["slug"]
             meta = get_json(f"{BASE}/models/{slug}.json")
-            if meta.get("license") != "CC0-1.0" or meta.get("deprecated"):
-                raise ValueError(f"{slug}: detail metadata licence/deprecation mismatch")
+            if meta.get("license") != "CC0-1.0" or meta.get("deprecated") or meta.get("slug", slug) != slug:
+                raise ValueError(f"{slug}: detail metadata identity/licence/deprecation mismatch")
             version = int(meta.get("version", 0))
             if version < 1:
                 raise ValueError(f"{slug}: invalid version")
