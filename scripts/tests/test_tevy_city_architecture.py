@@ -101,6 +101,22 @@ class TevyCityArchitectureTests(unittest.TestCase):
         self.assertEqual([item["slug"] for item in allocations["RareCity"]], ["shared"])
         self.assertEqual([item["slug"] for item in allocations["BroadCity"]], ["broad-1", "broad-2"])
 
+    def test_asset_allocator_maximizes_unique_coverage_without_fixed_city_order(self):
+        rare = record(name="Desert Adobe Courtyard Hotel",
+                      tags=["desert", "adobe", "courtyard", "hotel"],
+                      description="desert adobe courtyard hotel")
+        broad = record(name="Modern Waterfront Apartment Tower",
+                       tags=["waterfront", "apartment", "tower"],
+                       description="coastal waterfront residential apartment tower")
+        pools = {
+            "SolsticeBay": [broad, rare],
+            "SaffronDunes": [rare, broad],
+        }
+        allocations = tevy.allocate_city_candidates(pools, 1)
+        slugs = {city: [item["slug"] for item in items] for city, items in allocations.items()}
+        self.assertEqual(sum(len(items) for items in slugs.values()), 2)
+        self.assertEqual(len({item for items in slugs.values() for item in items}), 2)
+
     def test_city_asset_allocation_never_reuses_a_model_slug(self):
         pools = {
             "CityA": [{"slug": "shared"}, {"slug": "a-only"}],
