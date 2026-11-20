@@ -32,6 +32,14 @@ test("route selection rejects missing sequence pools and weak secrets", () => {
     /treasure_assignment_secret_too_short/);
 });
 
+test("assignment secrets are measured by UTF-8 bytes and reject non-strings", () => {
+  assert.throws(() => selectPersonalTreasureRoute(hunt, userA, candidates, 4, "a".repeat(31)),
+    /treasure_assignment_secret_too_short/);
+  assert.equal(selectPersonalTreasureRoute(hunt, userA, candidates, 4, "é".repeat(16)).length, 4);
+  assert.throws(() => selectPersonalTreasureRoute(hunt, userA, candidates, 4, null),
+    /treasure_assignment_secret_too_short/);
+});
+
 test("global reward plans require a finite winner cap", () => {
   assert.equal(validateTreasureRewardPlan({mode:"global",rewardEarnedCredits:5n,maxGlobalWinners:null,maxRewardClaims:null}), false);
   assert.equal(validateTreasureRewardPlan({mode:"global",rewardEarnedCredits:5n,maxGlobalWinners:100,maxRewardClaims:null}), true);
