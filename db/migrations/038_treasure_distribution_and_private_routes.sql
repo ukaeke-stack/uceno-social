@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS virtual_world_treasure_spawn_points (
 CREATE INDEX IF NOT EXISTS virtual_world_treasure_spawn_candidates_idx
   ON virtual_world_treasure_spawn_points (hunt_id, sequence, city_id, district_id)
   WHERE enabled = TRUE;
+CREATE INDEX IF NOT EXISTS virtual_world_treasure_spawn_location_idx
+  ON virtual_world_treasure_spawn_points (city_id, district_id, interactable_id, hunt_id)
+  WHERE enabled = TRUE;
 
 -- One route assignment per user/hunt/step. The selected spawn point is never
 -- returned in another user's payload. Unique constraints make route creation
