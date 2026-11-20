@@ -35,6 +35,8 @@ test("team creation persists one shared assignment per authored clue step", asyn
   const result = await createTreasureTeam(db, huntId, userId, worldId, 5, now, secret);
   assert.equal(result.ok, true);
   assert.equal(result.status, "forming");
+  const huntLock = db.calls.find(call => call.query.includes("FROM virtual_world_treasure_hunts"));
+  assert.match(huntLock.query, /FOR SHARE/);
   assert.equal(db.calls.filter(call => call.query.includes("INSERT INTO virtual_world_treasure_team_assignments")).length, 1);
   const routeInsert = db.calls.find(call => call.query.includes("INSERT INTO virtual_world_treasure_team_assignments"));
   assert.equal(routeInsert.params[2].length, 2);
@@ -82,4 +84,23 @@ test("joining a full team is rejected without inserting a member", async () => {
   assert.equal(result.ok, false);
   assert.equal(result.code, "team_full");
   assert.equal(db.calls.some(call => call.query.includes("INSERT INTO virtual_world_treasure_team_members")), false);
+});
+
+test("concurrent team creation returns the winning membership and removes its empty team", async () => {
+  let membershipLookups = 0;
+  const db = fakeDb((query) => {
+    if (query.includes("FROM virtual_world_treasure_hunts")) return [{ id: huntId }];
+    if (query.includes("FROM virtual_world_treasure_team_members AS member")) {
+      membershipLookups++;
+      return membershipLookups === 1 ? [] : [{ id: "223e4567-e89b-42d3-a456-426614174099", status: "active" }];
+    }
+    if (query.includes("INSERT INTO virtual_world_treasure_team_members")) return [];
+    return [];
+  });
+  const result = await createTreasureTeam(db, huntId, userId, worldId, 5, now, secret);
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "already_in_treasure_team");
+  assert.equal(result.teamId, "223e4567-e89b-42d3-a456-426614174099");
+  assert.equal(db.calls.some(call => call.query.includes("DELETE FROM virtual_world_treasure_teams")), true);
+  assert.equal(db.calls.some(call => call.query.includes("FROM virtual_world_treasure_spawn_points")), false);
 });
