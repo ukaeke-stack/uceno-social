@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS virtual_world_treasure_team_members (
 );
 CREATE INDEX IF NOT EXISTS virtual_world_treasure_team_members_rank_idx
   ON virtual_world_treasure_team_members (team_id, contribution_points DESC, user_id);
+CREATE INDEX IF NOT EXISTS virtual_world_treasure_team_members_user_idx
+  ON virtual_world_treasure_team_members (user_id, joined_at DESC, team_id);
 
 CREATE TABLE IF NOT EXISTS virtual_world_treasure_team_assignments (
   hunt_id UUID NOT NULL,
