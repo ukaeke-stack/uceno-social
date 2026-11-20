@@ -94,6 +94,24 @@ class TevyCityArchitectureTests(unittest.TestCase):
         industrial = record(name="Industrial Factory", tags=["industrial", "factory"])
         self.assertGreater(tevy.score(coastal, "SolsticeBay"), tevy.score(industrial, "SolsticeBay"))
 
+    def test_rare_city_candidate_pool_is_allocated_before_broad_pools(self):
+        rare = [{"slug": "shared"}]
+        broad = [{"slug": "shared"}, {"slug": "broad-1"}, {"slug": "broad-2"}]
+        allocations = tevy.allocate_city_candidates({"BroadCity": broad, "RareCity": rare}, 2)
+        self.assertEqual([item["slug"] for item in allocations["RareCity"]], ["shared"])
+        self.assertEqual([item["slug"] for item in allocations["BroadCity"]], ["broad-1", "broad-2"])
+
+    def test_city_asset_allocation_never_reuses_a_model_slug(self):
+        pools = {
+            "CityA": [{"slug": "shared"}, {"slug": "a-only"}],
+            "CityB": [{"slug": "shared"}, {"slug": "b-only"}],
+            "CityC": [{"slug": "shared"}, {"slug": "c-only"}],
+        }
+        allocations = tevy.allocate_city_candidates(pools, 2)
+        slugs = [item["slug"] for items in allocations.values() for item in items]
+        self.assertEqual(len(slugs), len(set(slugs)))
+        self.assertEqual(sum(len(items) for items in allocations.values()), 3)
+
     def test_glb_checksum_and_header_are_verified(self):
         import hashlib
         import struct
