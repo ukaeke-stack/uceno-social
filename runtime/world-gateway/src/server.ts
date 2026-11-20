@@ -539,11 +539,22 @@ async function isActiveTreasureInteractable(player: Player, target: RegisteredIn
   // world interactions while migrations 037-040 are still unapplied.
   const schemaReady = await sql`SELECT
     to_regclass('virtual_world_treasure_clues') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_progress') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_discoveries') IS NOT NULL AND
+    to_regclass('virtual_world_earned_credit_ledger') IS NOT NULL AND
     to_regclass('virtual_world_treasure_spawn_points') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_assignments') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_global_claims') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_route_discoveries') IS NOT NULL AND
     to_regclass('virtual_world_treasure_teams') IS NOT NULL AND
     to_regclass('virtual_world_treasure_team_members') IS NOT NULL AND
     to_regclass('virtual_world_treasure_team_assignments') IS NOT NULL AND
-    to_regclass('virtual_world_treasure_team_progress') IS NOT NULL AS ready`;
+    to_regclass('virtual_world_treasure_team_progress') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_team_discoveries') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_team_reward_allocations') IS NOT NULL AND
+    to_regclass('virtual_world_collectible_catalog') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_reward_items') IS NOT NULL AND
+    to_regclass('virtual_world_user_collectibles') IS NOT NULL AS ready`;
   if (schemaReady[0]?.ready !== true) return false;
   const rows = await sql`SELECT
     EXISTS (
