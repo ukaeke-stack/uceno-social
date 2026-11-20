@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { selectPersonalTreasureRoute } from "./treasure-distribution-policy.js";
+import { sanitizeTreasureCluePayload, selectPersonalTreasureRoute } from "./treasure-distribution-policy.js";
 
 type PlayerRef = { id: string; worldId: string; x: number; y: number; z: number };
 type TargetRef = { id: string; cityId: string; districtId: string };
@@ -50,7 +50,7 @@ async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: str
       WHERE progress.hunt_id = $1::uuid AND progress.user_id = $2::uuid
         AND progress.completed_at IS NULL LIMIT 1`, [hunt.id, player.id]);
     if (current[0]) hints.push({ huntId: hunt.id, title: hunt.title,
-      sequence: Number(current[0].sequence), clue: current[0].clue ?? {} });
+      sequence: Number(current[0].sequence), clue: sanitizeTreasureCluePayload(current[0].clue) });
   }
   return hints;
 }
@@ -76,7 +76,7 @@ export async function recordPrivateTreasureDiscovery(
     await ensureRoutes(tx, player, now, secret);
     const matches = await tx.unsafe(`SELECT hunt.id AS "huntId",
         hunt.distribution_mode AS "distributionMode", hunt.reward_earned_credits AS reward,
-        hunt.max_global_winners AS "maxGlobalWinners", progress.next_sequence AS sequence,
+        hunt.max_global_winners AS "maxGlobalWinners", hunt.max_reward_claims AS "maxRewardClaims",\n        progress.next_sequence AS sequence,
         point.id AS "spawnPointId"
       FROM virtual_world_treasure_assignments AS assignment
       JOIN virtual_world_treasure_spawn_points AS point
@@ -116,7 +116,7 @@ export async function recordPrivateTreasureDiscovery(
       [match.huntId, player.id, completed, now / 1000]);
     if (!completed) return { handled: true, discovered: true, completed: false, rewardEarnedCredits: "0" };
     if (match.distributionMode === "global") {
-      const cap = match.maxGlobalWinners === null ? 0 : Number(match.maxGlobalWinners);
+      const caps = [match.maxGlobalWinners, match.maxRewardClaims].filter((v: unknown) => v !== null).map(Number);\n      const cap = caps.length ? Math.min(...caps) : 0;
       if (!Number.isSafeInteger(cap) || cap < 1)
         return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "global_treasure_winner_cap_missing" };
       const claims = await tx.unsafe(`SELECT COUNT(*)::integer AS total
