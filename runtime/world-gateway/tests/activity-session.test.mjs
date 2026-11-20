@@ -143,3 +143,16 @@ test("join and start reject timestamps that move the activity lifecycle backward
   assert.equal(session.phase, "lobby");
   assert.equal(startActivity(session, true, 1_400).ok, true);
 });
+
+
+test("join and cancellation respect the latest participant event timestamp", () => {
+  const lobby = race(1_000);
+  assert.equal(joinActivity(lobby, "user-a", 1_100).ok, true);
+  assert.deepEqual(joinActivity(lobby, "user-b", 1_099), { ok: false, code: "invalid_timestamp" });
+  assert.equal(lobby.participants.has("user-b"), false);
+
+  assert.equal(joinActivity(lobby, "user-b", 1_101).ok, true);
+  assert.deepEqual(cancelActivity(lobby, true, 1_100), { ok: false, code: "invalid_timestamp" });
+  assert.equal(lobby.phase, "lobby");
+  assert.equal(cancelActivity(lobby, true, 1_101).ok, true);
+});
