@@ -98,6 +98,13 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         self.assertEqual(acquisition.validate_complete_building(detail, "NexusDelta"),
                          (18.0, 24.0, 16.0))
 
+    def test_asset_screening_uses_word_boundaries_for_terms(self):
+        self.assertEqual(discovery.words_present("airport terminal", ("port",)), [])
+        self.assertEqual(discovery.words_present("wallpaper texture", ("wall",)), [])
+        self.assertEqual(discovery.words_present("high-rise office tower", ("high rise",)), ["high rise"])
+        self.assertEqual(acquisition.words_present("airport terminal", ("port",)), [])
+        self.assertEqual(acquisition.words_present("wallpaper texture", ("wall",)), [])
+
     def test_component_title_is_rejected_even_if_description_says_building(self):
         component = asset(
             "Office Tower Wall", [8, 12, 0.2],
