@@ -2514,7 +2514,7 @@ const heartbeat = async () => {
 setInterval(heartbeat, 3000);
 
 let treasureScheduleInProgress = false;
-if (TREASURE_SCHEDULE_MATERIALIZER_ENABLED) {
+if (TREASURE_SCHEDULE_MATERIALIZER_ENABLED && TREASURE_ASSIGNMENT_SECRET.length >= 32) {
   setInterval(async () => {
     if (!processAuthority || Date.now() >= processLeaseUntil || treasureScheduleInProgress) return;
     treasureScheduleInProgress = true;
