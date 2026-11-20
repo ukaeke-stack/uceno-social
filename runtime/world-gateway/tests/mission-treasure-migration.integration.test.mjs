@@ -116,6 +116,53 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
 
     await db.unsafe("INSERT INTO users(id) VALUES ($1), ($2), ($3), ($4)", [userId, secondUserId, thirdUserId, fourthUserId]);
     await db.unsafe("INSERT INTO virtual_worlds(id) VALUES ($1)", [worldId]);
+
+    // Scheduled-hunt creation must be idempotent across concurrent workers:
+    // only one generated hunt may claim a template's cadence key.
+    const scheduleTemplateId = randomUUID();
+    const scheduleTemplateCode = 'schedule-' + scheduleTemplateId.slice(0, 8);
+    await db`INSERT INTO virtual_world_treasure_hunt_templates
+      (id, code, title, world_id, cadence, time_zone, distribution_mode,
+       max_global_winners, enabled)
+      VALUES (${scheduleTemplateId}::uuid, ${scheduleTemplateCode},
+        'Concurrent scheduled hunt', ${worldId}::uuid, 'daily',
+        'Africa/Lagos', 'global', 25, TRUE)`;
+    const scheduleKey = 'daily:2026-11-20';
+    const scheduledInsertions = await Promise.allSettled([0, 1].map(index =>
+      db`INSERT INTO virtual_world_treasure_hunts
+        (id, code, title, world_id, starts_at, ends_at, enabled,
+         reward_earned_credits, distribution_mode, template_id, schedule_key)
+        VALUES (${randomUUID()}::uuid,
+          ${'scheduled-' + index + '-' + scheduleTemplateId.slice(0, 8)},
+          'Generated scheduled hunt', ${worldId}::uuid,
+          NOW(), NOW() + INTERVAL '1 day', TRUE, 10, 'global',
+          ${scheduleTemplateId}::uuid, ${scheduleKey})`
+    ));
+    assert.equal(scheduledInsertions.filter(result => result.status === 'fulfilled').length, 1);
+    assert.equal(scheduledInsertions.filter(result => result.status === 'rejected').length, 1);
+    const generatedScheduleRows = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_treasure_hunts
+      WHERE template_id = ${scheduleTemplateId}::uuid AND schedule_key = ${scheduleKey}`;
+    assert.equal(generatedScheduleRows[0].total, 1);
+
+    const scheduleSpawnId = randomUUID();
+    await db`INSERT INTO virtual_world_treasure_template_spawn_points
+      (id, template_id, sequence, city_id, district_id, interactable_id,
+       position_x, position_y, position_z, interaction_radius)
+      VALUES (${scheduleSpawnId}::uuid, ${scheduleTemplateId}::uuid, 0,
+        'solsticebay', 'central', 'scheduled-gate', 1, 1.15, 1, 2)`;
+    await assert.rejects(() => db`INSERT INTO virtual_world_treasure_template_spawn_points
+      (id, template_id, sequence, city_id, district_id, interactable_id,
+       position_x, position_y, position_z, interaction_radius)
+      VALUES (${randomUUID()}::uuid, ${scheduleTemplateId}::uuid, 1,
+        'solsticebay', 'central', 'invalid-radius', 1, 1.15, 1, 50)`);
+    await assert.rejects(() => db`INSERT INTO virtual_world_treasure_hunt_templates
+      (id, code, title, cadence, time_zone, active_from, active_until,
+       distribution_mode, max_global_winners)
+      VALUES (${randomUUID()}::uuid, ${'bad-season-' + scheduleTemplateId.slice(0, 8)},
+        'Invalid seasonal template', 'seasonal', 'Africa/Lagos',
+        NOW(), NULL, 'global', 10)`);
+
     await db.unsafe("INSERT INTO virtual_world_activity_sessions(id) VALUES ($1)", [resultSessionId]);
     const result = await db.unsafe(`INSERT INTO virtual_world_activity_results
       (session_id, world_id, user_id, status, checkpoint_index)
