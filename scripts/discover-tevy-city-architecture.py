@@ -43,7 +43,8 @@ NON_OCCUPIABLE = (
     "gas tanks", "storage tank", "primary crusher", "crusher plant",
     "reactor room", "electrical substation", "conveyor transfer tower", "conveyor",
     "refinery column", "column unit", "process column", "distillation column",
-    "industrial column"
+    "industrial column", "front", "facade", "frontage", "shopfront",
+    "shop front", "storefront", "izakaya front"
 )
 EXCLUDE = ("horror", "abandoned", "post-apocalyptic", "medieval", "fantasy", "zombie", "military", "battle", "weapon", "ruin", "derelict", "western", "wild west", "christmas", "seasonal")
 GENERIC = ("building", "house", "apartment", "block", "tower", "office", "hotel", "terminal", "campus", "factory", "warehouse", "hangar", "school", "hospital", "library", "museum", "station", "hall", "residential", "commercial", "civic", "industrial", "hotel", "fuel station")
