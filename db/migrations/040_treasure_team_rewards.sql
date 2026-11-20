@@ -79,5 +79,7 @@ CREATE TABLE IF NOT EXISTS virtual_world_treasure_team_reward_allocations (
   contribution_points INTEGER NOT NULL CHECK (contribution_points > 0),
   amount BIGINT NOT NULL CHECK (amount >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (team_id, user_id)
+  PRIMARY KEY (team_id, user_id),
+  FOREIGN KEY (team_id, user_id)
+    REFERENCES virtual_world_treasure_team_members(team_id, user_id) ON DELETE RESTRICT
 );
