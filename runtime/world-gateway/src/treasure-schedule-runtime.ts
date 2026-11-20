@@ -43,11 +43,8 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
     ORDER BY id LIMIT 200`, [now / 1000]);
   let created = 0;
   for (const template of templates) {
-    const window = resolveWindow(template, now);
-    if (!window) continue;
-    const scheduleKey = template.cadence + ":" + window.periodKey;
-    const code = template.code + "-" + template.cadence + "-" + window.periodKey.replace(/[^0-9]/g, "");
-    if (code.length > 64) continue;
+    // Cheap outer eligibility check; the locked row is revalidated below.
+    if (!resolveWindow(template, now)) continue;
     const result = await db.begin(async tx => {
       const lock = await tx.unsafe(`SELECT pg_try_advisory_xact_lock(hashtext('uceno_treasure_schedule_materializer')) AS locked`);
       if (lock[0]?.locked !== true) return false;
