@@ -74,6 +74,15 @@ def tag_slugs(detail):
     return [str(tag.get("slug") or tag.get("title") or "").lower()
             if isinstance(tag, dict) else str(tag).lower() for tag in tags]
 
+def words_present(text, terms):
+    value = re.sub(r"[_-]+", " ", str(text or "").lower())
+    found = []
+    for term in terms:
+        normalized = re.sub(r"[_-]+", " ", str(term).lower())
+        if re.search(r"(?<!\\w)" + re.escape(normalized) + r"(?!\\w)", value):
+            found.append(term)
+    return found
+
 def dimensions(detail):
     stats = detail.get("stats") or {}
     dims = stats.get("sizeMeters")
@@ -132,15 +141,15 @@ def validate_complete_building(detail, city):
         raise ValueError("Not identified as an exterior asset")
     # Recheck the title and measured scale rather than rejecting every
     # complete building merely because its source pack is tagged modular.
-    if any(term in title_searchable for term in NON_BUILDING_TITLE_TERMS):
+    if words_present(title_searchable, NON_BUILDING_TITLE_TERMS):
         raise ValueError("Title identifies a prop or non-building object")
-    if not any(term in title_searchable for term in WHOLE_BUILDING_TITLE_TERMS):
+    if not words_present(title_searchable, WHOLE_BUILDING_TITLE_TERMS):
         raise ValueError("Title does not identify a complete building")
     # Component terms in a descriptive paragraph (e.g. "stone walls and
     # large windows") do not make a complete building a modular part.
-    if any(term in title_searchable for term in PART_TERMS):
+    if words_present(title_searchable, PART_TERMS):
         raise ValueError("Individual building component or prop rejected")
-    if any(term in searchable for term in IRRELEVANT_TERMS):
+    if words_present(searchable, IRRELEVANT_TERMS):
         raise ValueError("Unrelated theme or setting rejected")
     dims = dimensions(detail)
     if dims is None:
@@ -152,7 +161,7 @@ def validate_complete_building(detail, city):
     if city == "EclipseCentral":
         if height < ECLIPSE_MIN_HEIGHT_M:
             raise ValueError(f"Lumen Tower candidate below 35 m: height={height}")
-        if not any(term in searchable for term in TOWER_TERMS):
+        if not words_present(searchable, TOWER_TERMS):
             raise ValueError("Eclipse Central candidate is not a skyscraper/office tower")
     return dims
 
