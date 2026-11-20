@@ -41,6 +41,8 @@ namespace UCENO.VirtualWorld
             new Dictionary<string, AsyncOperationHandle<IList<UnityEngine.Object>>>(StringComparer.Ordinal);
         private readonly Dictionary<string, AsyncOperationHandle<long>> pendingSizeHandles =
             new Dictionary<string, AsyncOperationHandle<long>>(StringComparer.Ordinal);
+        private readonly Dictionary<string, AsyncOperationHandle<IList<IResourceLocation>>> pendingLocationHandles =
+            new Dictionary<string, AsyncOperationHandle<IList<IResourceLocation>>>(StringComparer.Ordinal);
         private readonly Dictionary<string, AsyncOperationHandle> pendingDependencyHandles =
             new Dictionary<string, AsyncOperationHandle>(StringComparer.Ordinal);
         private readonly Dictionary<string, AsyncOperationHandle<SceneInstance>> residentSceneHandles =
@@ -236,6 +238,8 @@ namespace UCENO.VirtualWorld
                 if (handle.IsValid()) Addressables.Release(handle);
             foreach (AsyncOperationHandle<long> handle in pendingSizeHandles.Values)
                 if (handle.IsValid()) Addressables.Release(handle);
+            foreach (AsyncOperationHandle<IList<IResourceLocation>> handle in pendingLocationHandles.Values)
+                if (handle.IsValid()) Addressables.Release(handle);
             foreach (AsyncOperationHandle handle in pendingDependencyHandles.Values)
                 if (handle.IsValid()) Addressables.Release(handle);
             foreach (AsyncOperationHandle<SceneInstance> handle in residentSceneHandles.Values)
@@ -426,6 +430,24 @@ namespace UCENO.VirtualWorld
             if (readyLabels.Contains(label))
             {
                 completed?.Invoke(true, null);
+                yield break;
+            }
+
+            // A zero-byte download size is also returned for an unknown key.
+            // Resolve the label first so a typo cannot be reported as ready.
+            AsyncOperationHandle<IList<IResourceLocation>> locations =
+                Addressables.LoadResourceLocationsAsync(label);
+            pendingLocationHandles[label] = locations;
+            yield return locations;
+            pendingLocationHandles.Remove(label);
+            bool hasLocations = locations.Status == AsyncOperationStatus.Succeeded &&
+                locations.Result != null && locations.Result.Count > 0;
+            if (locations.IsValid()) Addressables.Release(locations);
+            if (!hasLocations)
+            {
+                StatusChanged?.Invoke("No Addressables entries were found for " + label + ".");
+                ContentFailed?.Invoke(label);
+                completed?.Invoke(false, "No Addressables entries were found for this content label.");
                 yield break;
             }
 
