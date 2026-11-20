@@ -75,7 +75,7 @@ QUERIES = {
 }
 UA = "UCENO-city-architecture-discovery/2.0"
 MAX_BYTES = 25 * 1024 * 1024
-MIN_HEIGHT_M = 8.0
+MIN_HEIGHT_M = 5.0
 MIN_FOOTPRINT_M = 4.0
 MIN_HORIZONTAL_SPAN_M = 4.0
 ECLIPSE_MIN_HEIGHT_M = 35.0
@@ -102,16 +102,48 @@ WHOLE_BUILDING_TITLE_TERMS = (
     "mixed use", "mixed-use", "arena", "factory", "house", "school", "hospital",
     "residential building", "apartment", "museum", "library", "city hall",
     "train station", "railway station", "airport terminal", "university", "stadium",
+    "laboratory", "workshop", "garage", "depot", "station", "hangar", "church",
+    "mosque", "clinic", "warehouse", "barn", "shed", "hut", "cottage", "villa",
+    "clubhouse", "restaurant", "shop", "store", "market", "supermarket", "motel",
+    "farmhouse", "fire station", "police station", "office building", "chalet",
+    "lodge", "resort", "bank", "cinema", "theatre", "theater", "power plant",
 )
 NON_BUILDING_TITLE_TERMS = (
     "windmill", "wind turbine", "mill sail", "sculpture", "statue", "fountain",
     "sign", "monument", "bridge", "wall panel", "facade panel", "module", "prop",
+    "frontage", "shopfront", "shop front", "building front", "roof section",
+    "tower section", "gantry", "silo", "glazed dome", "staging tower",
+    "observation tower", "site office",
 )
 POSITIVE_TERMS = (
     "building", "skyscraper", "tower", "high rise", "high-rise", "office",
     "residential", "hotel", "campus", "terminal", "civic", "commercial",
     "mixed use", "mixed-use", "arena", "factory", "waterfront",
 )
+CITY_RELEVANCE = {
+    "SolsticeBay": ("waterfront", "coastal", "harbour", "harbor", "marina", "beach",
+                    "residential", "apartment", "villa", "korean", "hanok", "village",
+                    "island", "ferry"),
+    "VerdantReach": ("green", "garden", "sustainable", "biophilic", "eco", "campus",
+                     "university", "park", "botanical", "residential", "vertical garden"),
+    "NexusDelta": ("skyscraper", "high rise", "high-rise", "office", "commercial",
+                   "mixed use", "mixed-use", "city block", "urban", "glass", "bank",
+                   "cinema", "supermarket", "market"),
+    "AuroraHeights": ("alpine", "mountain", "ski", "snow", "resort", "lodge", "chalet",
+                      "village", "timber", "mountain", "ski lodge"),
+    "SaffronDunes": ("desert", "adobe", "arid", "sand", "solar", "oasis", "mosque",
+                     "mudbrick", "courtyard", "arabic", "middle eastern"),
+    "MonsoonHarbour": ("harbour", "harbor", "port", "waterfront", "coastal", "tropical",
+                       "marina", "ferry", "terminal", "quay", "dock", "island", "village"),
+    "EclipseCentral": ("skyscraper", "supertall", "high rise", "high-rise", "tower",
+                       "office", "commercial", "skyline", "city"),
+    "OriginPlains": ("university", "campus", "school", "library", "museum", "civic",
+                     "hospital", "classroom", "college", "courthouse", "research",
+                     "education"),
+    "AtlasFrontier": ("industrial", "factory", "warehouse", "hangar", "logistics",
+                      "workshop", "manufacturing", "terminal", "plant", "steel",
+                      "power station", "laboratory", "assay"),
+}
 
 def get(url):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
@@ -200,6 +232,9 @@ def rejection_reason(item, city):
             return "not-a-skyscraper-or-office-tower"
     if city != "EclipseCentral" and not words_present(searchable, POSITIVE_TERMS):
         return "not-recognized-as-a-whole-building"
+    relevance_text = searchable + " " + " ".join(tags)
+    if not words_present(relevance_text, CITY_RELEVANCE.get(city, ())):
+        return "insufficient-city-relevance"
     size = as_number((item.get("stats") or {}).get("fileSize"))
     if size is not None and size > MAX_BYTES:
         return "over-25-mib-android-acquisition-cap"
