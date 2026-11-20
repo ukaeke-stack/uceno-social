@@ -81,10 +81,13 @@ export function createActivitySession(input: {
 
 export function joinActivity(session: ActivitySession, userId: string, now = Date.now()): ActivityResult {
   if (!userId || userId.length > 128) return { ok: false, code: "invalid_user_id" };
-  if (!Number.isFinite(now)) return { ok: false, code: "invalid_timestamp" };
+  if (!Number.isFinite(now) || now < session.createdAt)
+    return { ok: false, code: "invalid_timestamp" };
   const existing = session.participants.get(userId);
   if (existing && existing.status !== "left" && existing.status !== "dnf")
     return { ok: true, session }; // idempotent join
+  if (existing && now < existing.lastActionAt)
+    return { ok: false, code: "invalid_timestamp" };
   if (session.phase !== "lobby") return { ok: false, code: "session_not_accepting_participants" };
   const activeCount = [...session.participants.values()].filter(p => p.status !== "left" && p.status !== "dnf").length;
   if (activeCount >= session.maxParticipants) return { ok: false, code: "session_full" };
@@ -102,7 +105,9 @@ export function startActivity(session: ActivitySession, actorIsAuthorizedHost: b
   if (session.phase !== "lobby") return { ok: false, code: "invalid_phase_transition" };
   const participants = [...session.participants.values()].filter(p => p.status === "joined");
   if (participants.length < 2) return { ok: false, code: "not_enough_participants" };
-  if (!Number.isFinite(now) || now < session.createdAt) return { ok: false, code: "invalid_timestamp" };
+  const latestJoinAt = participants.reduce((latest, participant) =>
+    Math.max(latest, participant.joinedAt), session.createdAt);
+  if (!Number.isFinite(now) || now < latestJoinAt) return { ok: false, code: "invalid_timestamp" };
 
   session.phase = "active";
   session.startedAt = now;
