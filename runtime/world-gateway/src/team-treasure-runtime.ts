@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { calculateTeamRewardShares } from "./team-treasure-policy.js";
 import { selectPersonalTreasureRoute, sanitizeTreasureCluePayload } from "./treasure-distribution-policy.js";
-import { grantTreasureCollectibles, type CollectibleReward } from "./treasure-collectible-runtime.js";
+import { grantTreasureCollectiblesToUsers, type CollectibleReward } from "./treasure-collectible-runtime.js";
 
 type Db = {
   begin<T>(fn: (tx: any) => Promise<T>): Promise<T>;
@@ -262,11 +262,10 @@ export async function recordTeamTreasureDiscovery(
     }
     const teamMembers = await tx.unsafe(`SELECT user_id AS "userId" FROM virtual_world_treasure_team_members
       WHERE team_id = $1::uuid ORDER BY user_id`, [match.teamId]);
-    let collectibles: CollectibleReward[] = [];
-    for (const member of teamMembers) {
-      const memberRewards = await grantTreasureCollectibles(tx, match.huntId, member.userId);
-      if (member.userId === player.id) collectibles = memberRewards;
-    }
+    const collectibleRewards = await grantTreasureCollectiblesToUsers(
+      tx, match.huntId, teamMembers.map((member: any) => member.userId)
+    );
+    const collectibles: CollectibleReward[] = collectibleRewards.get(player.id) ?? [];
     return { handled: true, discovered: true, completed: true, rewardEarnedCredits: playerShare.toString(), collectibles, huntId: match.huntId, teamId: match.teamId };
   });
 }
