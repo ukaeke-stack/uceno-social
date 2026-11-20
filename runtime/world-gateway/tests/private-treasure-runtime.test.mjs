@@ -52,3 +52,37 @@ test("private treasure candidate pools are fetched once for all active hunts", a
     call.query.includes("INSERT INTO virtual_world_treasure_assignments")).length, 1);
   assert.equal(hints.length, 2);
 });
+
+test("private treasure routes reject candidate pools above 10000 instead of using a truncated prefix", async () => {
+  const assignmentWrites = [];
+  const oversized = Array.from({ length: 10001 }, (_, index) => ({
+    huntId: huntA,
+    id: "spawn-" + index,
+    sequence: index % 2,
+    cityId: "solstice",
+    districtId: "central",
+    interactableId: "interactable-" + index
+  }));
+  const db = {
+    begin: async fn => fn({
+      unsafe: async (query, params = []) => {
+        if (query.includes("FROM virtual_world_treasure_hunts") &&
+            query.includes("NOT EXISTS")) return [{ id: huntA, title: "Oversized" }];
+        if (query.includes("FROM virtual_world_treasure_spawn_points")) {
+          assert.match(query, /hunt_rank <= 10001/);
+          return oversized;
+        }
+        if (query.includes("INSERT INTO virtual_world_treasure_assignments")) {
+          assignmentWrites.push(params);
+          return [];
+        }
+        if (query.includes("FROM virtual_world_treasure_progress AS progress")) return [];
+        throw new Error("unexpected query: " + query);
+      }
+    })
+  };
+  const hints = await loadPrivateTreasureHints(db,
+    { id: playerId, worldId, x: 0, y: 1.15, z: 0 }, Date.now(), secret);
+  assert.equal(hints.length, 0);
+  assert.equal(assignmentWrites.length, 0);
+});
