@@ -27,6 +27,11 @@ class TevyCityArchitectureTests(unittest.TestCase):
     def test_cc0_full_scale_building_with_three_lods_passes(self):
         self.assertIsNone(tevy.screen(record(), "NexusDelta"))
 
+    def test_building_category_object_is_normalized(self):
+        item = record()
+        item["category"] = {"slug": "buildings", "title": "Buildings"}
+        self.assertIsNone(tevy.screen(item, "NexusDelta"))
+
     def test_model_slug_cannot_escape_asset_output_directory(self):
         item = record()
         item["slug"] = "../outside"
