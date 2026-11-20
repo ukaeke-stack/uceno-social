@@ -53,6 +53,8 @@ const checks = [
   ["Addressables package is declared", manifest.dependencies?.["com.unity.addressables"] === "2.7.6"],
   ["Addressables catalog refreshes versioned remote content", /CheckForCatalogUpdates\(false\)/.test(delivery) && /UpdateCatalogs\(catalogCheck.Result, false\)/.test(delivery)],
   ["On-demand dependency size is checked", /GetDownloadSizeAsync\(label\)/.test(delivery)],
+  ["Unknown or empty Addressables labels fail before zero-byte success", /LoadResourceLocationsAsync\(label\)/.test(delivery) && /locations.Result.Count > 0/.test(delivery) && /No Addressables entries were found/.test(delivery)],
+  ["Pending resource-location handles are released during shutdown", /pendingLocationHandles/.test(delivery) && /foreach \(AsyncOperationHandle<IList<IResourceLocation>> handle in pendingLocationHandles.Values\)/.test(delivery)],
   ["Dependencies download asynchronously", /DownloadDependenciesAsync\(label, false\)/.test(delivery)],
   ["Concurrent requests for one label share a single download operation", /EnsureContentSharedRoutine/.test(delivery) && /ensureInProgress/.test(delivery) && /ensureWaiters/.test(delivery)],
   ["Pending download-size and dependency handles are released during shutdown", /pendingSizeHandles/.test(delivery) && /pendingDependencyHandles/.test(delivery) && /foreach \(AsyncOperationHandle<long> handle in pendingSizeHandles.Values\)/.test(delivery) && /foreach \(AsyncOperationHandle handle in pendingDependencyHandles.Values\)/.test(delivery)],
