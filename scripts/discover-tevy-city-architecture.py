@@ -29,7 +29,22 @@ CITIES = {
     "OriginPlains": ("university", "campus", "school", "library", "museum", "civic", "hospital", "classroom", "college", "office"),
     "AtlasFrontier": ("industrial", "factory", "warehouse", "hangar", "logistics", "workshop", "manufacturing", "terminal", "plant", "office"),
 }
-NON_OCCUPIABLE = ("power pylon", "transmission pylon", "pylon", "tv tower", "television tower", "broadcast tower", "radio tower", "harbour crane", "harbor crane", "crane", "chairlift", "ski lift", "tower crown", "glass tower crown", "lobby floor", "cooling tower", "launch tower", "drop tower", "wind turbine", "turbine", "lighthouse", "airport control tower", "control tower", "ferris wheel", "observation wheel", "roller coaster", "amusement ride", "theme park ride", "refinery column", "column unit", "process column", "distillation column", "industrial column")
+NON_OCCUPIABLE = (
+    "power pylon", "transmission pylon", "pylon", "tv tower", "television tower",
+    "broadcast tower", "radio tower", "harbour crane", "harbor crane", "crane",
+    "chairlift", "ski lift", "tower crown", "glass tower crown", "lobby floor",
+    "cooling tower", "launch tower", "drop tower", "wind turbine", "windmill",
+    "turbine", "lighthouse", "airport control tower", "control tower", "ferris wheel",
+    "observation wheel", "roller coaster", "amusement ride", "theme park ride",
+    "chain swing", "bumper car", "carousel", "escalator", "quay wall", "quay slipway",
+    "slipway", "passenger boarding bridge", "boarding bridge", "station entrance canopy",
+    "metro platform", "platform end", "loading dock", "giant corner led screen",
+    "led screen", "grain silo", "silo set", "water tower", "gas storage tank",
+    "gas tanks", "storage tank", "primary crusher", "crusher plant",
+    "reactor room", "electrical substation", "conveyor transfer tower", "conveyor",
+    "refinery column", "column unit", "process column", "distillation column",
+    "industrial column"
+)
 EXCLUDE = ("horror", "abandoned", "post-apocalyptic", "medieval", "fantasy", "zombie", "military", "battle", "weapon", "ruin", "derelict", "western", "wild west", "christmas", "seasonal")
 GENERIC = ("building", "house", "apartment", "block", "tower", "office", "hotel", "terminal", "campus", "factory", "warehouse", "hangar", "school", "hospital", "library", "museum", "station", "hall", "residential", "commercial", "civic", "industrial", "hotel", "fuel station")
 
