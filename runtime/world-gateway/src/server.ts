@@ -400,7 +400,7 @@ type Player = {
   lastInputAt: number; inputCount: number; inputWindowAt: number;
   lastSequence: number; lastCheckpointAt: number; lastAuthorizationCheck: number; authorizationCheckInProgress: boolean;
   lastInteractionAt: number;
-  treasureRequestWindowAt: number; treasureRequestCount: number;
+  treasureRequestBudget: { windowStartedAt: number; requestCount: number };
   lastWardrobeRefreshAt: number;
   voiceActive: boolean;
   lastVoiceSignalAt: number;
@@ -1204,7 +1204,7 @@ async function loadPlayer(userId: string, worldId: string, cityId: string, token
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
-    lastInteractionAt: 0, treasureRequestWindowAt: Date.now(), treasureRequestCount: 0, lastWardrobeRefreshAt: 0, voiceActive: false, lastVoiceSignalAt: 0, voiceSignalWindowAt: Date.now(), voiceSignalCount: 0, homeId: null, homeAnchor: null, eventId: null, avatarAppearance, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null,
+    lastInteractionAt: 0, treasureRequestBudget: { windowStartedAt: Date.now(), requestCount: 0 }, lastWardrobeRefreshAt: 0, voiceActive: false, lastVoiceSignalAt: 0, voiceSignalWindowAt: Date.now(), voiceSignalCount: 0, homeId: null, homeAnchor: null, eventId: null, avatarAppearance, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null,
     activeDistrictId: null, pendingDistrict: null
   };
 }
@@ -1531,7 +1531,7 @@ wss.on("connection", async (socket: WebSocket) => {
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
       if (msg && ["treasure_team_hunts_request", "treasure_team_create", "treasure_team_join"].includes(msg.type)) {
-        if (!consumeTreasureRequestBudget(player, Date.now())) {
+        if (!consumeTreasureRequestBudget(player.treasureRequestBudget, Date.now())) {
           send(socket, { type: "treasure_team_rejected", code: "treasure_request_rate_limited" });
           return;
         }
