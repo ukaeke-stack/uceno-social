@@ -264,6 +264,14 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     assert.equal(String(privateReward[0].amount), '25');
 
     const teamHuntId = randomUUID();
+    const teamCollectibleId = randomUUID();
+    await db`INSERT INTO virtual_world_collectible_catalog
+      (id, code, display_name, category, rarity, max_supply, enabled)
+      VALUES (${teamCollectibleId}::uuid, 'team-completion-badge', 'Team Completion Badge',
+        'badge', 'epic', 2, TRUE)`;
+    await db`INSERT INTO virtual_world_treasure_reward_items
+      (hunt_id, collectible_id, quantity)
+      VALUES (${teamHuntId}::uuid, ${teamCollectibleId}::uuid, 1)`;
     const teamSecret = 'team-runtime-integration-secret-at-least-32-bytes';
     await db`INSERT INTO virtual_world_treasure_hunts
       (id, code, title, world_id, starts_at, ends_at, enabled, reward_earned_credits, distribution_mode)
@@ -334,6 +342,16 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const teamLedger = await db`SELECT user_id AS "userId", amount::text AS amount
       FROM virtual_world_earned_credit_ledger WHERE idempotency_key LIKE ${'team-treasure:' + createdTeamId + ':%'}`;
     assert.equal(teamLedger.length, 2);
+    const teamInventory = await db`SELECT user_id AS "userId", quantity
+      FROM virtual_world_user_collectibles
+      WHERE collectible_id = ${teamCollectibleId}::uuid
+        AND source_treasure_hunt_id = ${teamHuntId}::uuid
+      ORDER BY user_id`;
+    assert.deepEqual(teamInventory.map(row => row.userId).sort(), [userId, secondUserId].sort());
+    assert.deepEqual(teamInventory.map(row => Number(row.quantity)), [1, 1]);
+    const teamCatalogSupply = await db`SELECT minted_count FROM virtual_world_collectible_catalog
+      WHERE id = ${teamCollectibleId}::uuid`;
+    assert.equal(Number(teamCatalogSupply[0].minted_count), 2);
     const completedHints = await loadTeamTreasureHints(db, privatePlayer, Date.now());
     assert.equal(completedHints.length, 0);
 
