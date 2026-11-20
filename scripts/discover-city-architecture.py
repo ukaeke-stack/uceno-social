@@ -138,7 +138,12 @@ def tag_slugs(item):
 
 def words_present(text, terms):
     value = re.sub(r"[_-]+", " ", str(text or "").lower())
-    return [term for term in terms if term in value]
+    found = []
+    for term in terms:
+        normalized = re.sub(r"[_-]+", " ", str(term).lower())
+        if re.search(r"(?<!\\w)" + re.escape(normalized) + r"(?!\\w)", value):
+            found.append(term)
+    return found
 
 def dimensions(item):
     stats = item.get("stats") or {}
