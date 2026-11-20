@@ -444,6 +444,49 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       FROM virtual_world_treasure_team_progress WHERE team_id = ${recoveryTeam.teamId}::uuid`;
     assert.equal(Number(fencedProgress[0].nextSequence), 1);
 
+    // Inject a failure after the Earned Credits ledger writes but before
+    // collectible inventory is inserted. The whole completion transaction
+    // must roll back, including progress, allocations and ledger rows.
+    const failDuringCollectibleGrantDb = {
+      begin: fn => db.begin(async tx => {
+        const guardedTx = new Proxy(tx, {
+          get(target, property) {
+            if (property === 'unsafe') return (query, ...args) => {
+              if (typeof query === 'string' &&
+                  query.includes('INSERT INTO virtual_world_user_collectibles')) {
+                throw new Error('simulated_collectible_grant_failure');
+              }
+              return target.unsafe(query, ...args);
+            };
+            const value = Reflect.get(target, property, target);
+            return typeof value === 'function' ? value.bind(target) : value;
+          },
+          apply(target, thisArg, args) {
+            return Reflect.apply(target, thisArg, args);
+          }
+        });
+        return fn(guardedTx);
+      })
+    };
+    await assert.rejects(() => recordTeamTreasureDiscovery(failDuringCollectibleGrantDb,
+      { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
+      { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
+      Date.now(), teamSecret, instanceId, takeoverProcessId, 2), /simulated_collectible_grant_failure/);
+    const partialFailureState = await db`SELECT
+        (SELECT next_sequence FROM virtual_world_treasure_team_progress WHERE team_id = ${recoveryTeam.teamId}::uuid)::integer AS "nextSequence",
+        (SELECT status FROM virtual_world_treasure_teams WHERE id = ${recoveryTeam.teamId}::uuid) AS "teamStatus",
+        (SELECT COUNT(*) FROM virtual_world_earned_credit_ledger
+          WHERE idempotency_key LIKE ${'team-treasure:' + recoveryTeam.teamId + ':%'})::integer AS ledger,
+        (SELECT COUNT(*) FROM virtual_world_treasure_team_reward_allocations
+          WHERE team_id = ${recoveryTeam.teamId}::uuid)::integer AS allocations,
+        (SELECT COUNT(*) FROM virtual_world_user_collectibles
+          WHERE source_treasure_hunt_id = ${recoveryHuntId}::uuid)::integer AS inventory`;
+    assert.equal(partialFailureState[0].nextSequence, 1);
+    assert.equal(partialFailureState[0].teamStatus, 'active');
+    assert.equal(partialFailureState[0].ledger, 0);
+    assert.equal(partialFailureState[0].allocations, 0);
+    assert.equal(partialFailureState[0].inventory, 0);
+
     const failBeforeCommitDb = {
       begin: fn => db.begin(async tx => {
         const result = await fn(tx);
