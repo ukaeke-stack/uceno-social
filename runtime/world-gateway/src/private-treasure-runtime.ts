@@ -8,6 +8,10 @@ type Db = { begin<T>(fn: (tx: any) => Promise<T>): Promise<T>; unsafe(query: str
 type Hint = { huntId: string; title: string; sequence: number; clue: unknown };
 type Discovery = { handled: boolean; discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; collectibles?: CollectibleReward[]; huntId?: string };
 
+function validAssignmentSecret(secret: unknown): secret is string {
+  return typeof secret === "string" && Buffer.byteLength(secret, "utf8") >= 32;
+}
+
 async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: string): Promise<Hint[]> {
   // Existing assignments are immutable and inserted transactionally. Skip their
   // candidate pools on reconnects and repeat discoveries.
@@ -104,7 +108,7 @@ async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: str
 export async function loadPrivateTreasureHints(
   db: Db, player: PlayerRef, now: number, secret: string
 ): Promise<Hint[]> {
-  if (secret.length < 32) return [];
+  if (!validAssignmentSecret(secret)) return [];
   return db.begin(async tx => ensureRoutes(tx, player, now, secret));
 }
 
@@ -112,7 +116,7 @@ export async function recordPrivateTreasureDiscovery(
   db: Db, player: PlayerRef, target: TargetRef, now: number, secret: string,
   instanceId: string, processId: string, generation: number
 ): Promise<Discovery> {
-  if (secret.length < 32) return { handled: false, discovered: false, completed: false, rewardEarnedCredits: "0" };
+  if (!validAssignmentSecret(secret)) return { handled: false, discovered: false, completed: false, rewardEarnedCredits: "0" };
   return db.begin(async tx => {
     const owner = await tx.unsafe(`SELECT id FROM virtual_world_instances
       WHERE id = $1::uuid AND owner_process_id = $2::uuid
