@@ -32,13 +32,12 @@ async function loadTeamRoute(tx: any, huntId: string, teamId: string, secret: st
     id: point.id, sequence: Number(point.sequence), cityId: point.cityId,
     districtId: point.districtId, interactableId: point.interactableId
   })), count, secret);
-  for (const step of route) {
-    await tx.unsafe(`INSERT INTO virtual_world_treasure_team_assignments
-      (hunt_id, team_id, sequence, spawn_point_id)
-      VALUES ($1::uuid, $2::uuid, $3, $4::uuid)
-      ON CONFLICT (team_id, sequence) DO NOTHING`,
-      [huntId, teamId, step.sequence, step.spawnPointId]);
-  }
+  await tx.unsafe(`INSERT INTO virtual_world_treasure_team_assignments
+    (hunt_id, team_id, sequence, spawn_point_id)
+    SELECT $1::uuid, $2::uuid, input.sequence, input.spawn_point_id
+    FROM unnest($3::integer[], $4::uuid[]) AS input(sequence, spawn_point_id)
+    ON CONFLICT (team_id, sequence) DO NOTHING`,
+    [huntId, teamId, route.map(step => step.sequence), route.map(step => step.spawnPointId)]);
   await tx.unsafe(`INSERT INTO virtual_world_treasure_team_progress (hunt_id, team_id)
     VALUES ($1::uuid, $2::uuid) ON CONFLICT (team_id) DO NOTHING`, [huntId, teamId]);
   return true;
