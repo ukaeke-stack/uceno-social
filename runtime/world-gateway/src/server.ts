@@ -1505,6 +1505,30 @@ wss.on("connection", async (socket: WebSocket) => {
       if (players.get(player.id) !== player || player.socket !== socket) return;
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
+      if (msg && msg.type === "treasure_team_hunts_request") {
+        if (TREASURE_ASSIGNMENT_SECRET.length < 32) {
+          send(socket, { type: "team_treasure_hunt_catalog", hunts: [], code: "treasure_assignment_secret_unavailable" });
+          return;
+        }
+        try {
+          const hunts = await sql`SELECT hunt.id AS "huntId", hunt.title, hunt.ends_at AS "endsAt",
+              COUNT(DISTINCT point.sequence)::integer AS "clueCount"
+            FROM virtual_world_treasure_hunts AS hunt
+            JOIN virtual_world_treasure_spawn_points AS point ON point.hunt_id = hunt.id AND point.enabled = TRUE
+            WHERE hunt.enabled = TRUE AND hunt.distribution_mode = 'team'
+              AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
+              AND hunt.starts_at <= NOW() AND hunt.ends_at > NOW()
+            GROUP BY hunt.id, hunt.title, hunt.ends_at
+            HAVING MIN(point.sequence) = 0 AND MAX(point.sequence) + 1 = COUNT(DISTINCT point.sequence)
+              AND COUNT(DISTINCT point.sequence) BETWEEN 2 AND 100
+            ORDER BY hunt.ends_at ASC, hunt.id LIMIT 20`;
+          send(socket, { type: "team_treasure_hunt_catalog", hunts });
+        } catch (error) {
+          console.error("team_treasure_hunt_catalog_failed", player.id, error);
+          send(socket, { type: "team_treasure_hunt_catalog", hunts: [], code: "team_hunts_unavailable" });
+        }
+        return;
+      }
       if (msg && msg.type === "treasure_team_create") {
         if (player.homeId || player.eventId || player.returnState || typeof msg.huntId !== "string" ||
             (msg.maxMembers !== undefined && (!Number.isSafeInteger(msg.maxMembers) || msg.maxMembers < 2 || msg.maxMembers > 20))) {
