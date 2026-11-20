@@ -15,7 +15,7 @@ BASE = "https://tevy.dev"
 INDEX_URL = f"{BASE}/models.json"
 OUT = pathlib.Path("artifacts/tevy-city-architecture")
 MAX_BYTES = 25 * 1024 * 1024
-PER_CITY = 2
+PER_CITY = 12
 CITIES = {
     "SolsticeBay": ("waterfront", "coastal", "harbour", "harbor", "marina", "hotel", "residential", "apartment", "tower"),
     "VerdantReach": ("green", "garden", "sustainable", "eco", "biophilic", "park", "campus", "residential", "apartment", "office"),
