@@ -18,6 +18,7 @@ import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "./priv
 import { createTreasureTeam, joinTreasureTeam, loadTeamTreasureHints, recordTeamTreasureDiscovery } from "./team-treasure-runtime.js";
 import { grantTreasureCollectibles } from "./treasure-collectible-runtime.js";
 import { materializeScheduledTreasureHunts } from "./treasure-schedule-runtime.js";
+import { consumeTreasureRequestBudget } from "./treasure-request-policy.js";
 import { shouldPublishWorldSnapshot, WORLD_RELAY_BATCH_SIZE, WORLD_RELAY_POLL_INTERVAL_MS } from "./world-relay-policy.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -399,6 +400,7 @@ type Player = {
   lastInputAt: number; inputCount: number; inputWindowAt: number;
   lastSequence: number; lastCheckpointAt: number; lastAuthorizationCheck: number; authorizationCheckInProgress: boolean;
   lastInteractionAt: number;
+  treasureRequestWindowAt: number; treasureRequestCount: number;
   lastWardrobeRefreshAt: number;
   voiceActive: boolean;
   lastVoiceSignalAt: number;
@@ -1202,7 +1204,7 @@ async function loadPlayer(userId: string, worldId: string, cityId: string, token
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
-    lastInteractionAt: 0, lastWardrobeRefreshAt: 0, voiceActive: false, lastVoiceSignalAt: 0, voiceSignalWindowAt: Date.now(), voiceSignalCount: 0, homeId: null, homeAnchor: null, eventId: null, avatarAppearance, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null,
+    lastInteractionAt: 0, treasureRequestWindowAt: Date.now(), treasureRequestCount: 0, lastWardrobeRefreshAt: 0, voiceActive: false, lastVoiceSignalAt: 0, voiceSignalWindowAt: Date.now(), voiceSignalCount: 0, homeId: null, homeAnchor: null, eventId: null, avatarAppearance, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null,
     activeDistrictId: null, pendingDistrict: null
   };
 }
@@ -1528,6 +1530,12 @@ wss.on("connection", async (socket: WebSocket) => {
       if (players.get(player.id) !== player || player.socket !== socket) return;
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
+      if (msg && ["treasure_team_hunts_request", "treasure_team_create", "treasure_team_join"].includes(msg.type)) {
+        if (!consumeTreasureRequestBudget(player, Date.now())) {
+          send(socket, { type: "treasure_team_rejected", code: "treasure_request_rate_limited" });
+          return;
+        }
+      }
       if (msg && msg.type === "treasure_team_hunts_request") {
         if (TREASURE_ASSIGNMENT_SECRET.length < 32) {
           send(socket, { type: "team_treasure_hunt_catalog", hunts: [], code: "treasure_assignment_secret_unavailable" });
