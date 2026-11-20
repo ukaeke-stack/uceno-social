@@ -167,8 +167,8 @@ def rejection_reason(item, city):
         return "missing-realistic-style"
     if "exterior" not in tags and "exterior" not in searchable.lower():
         return "not-marked-exterior"
-    if "modular" in tags:
-        return "modular-kit-component"
+    # A modular tag alone does not prove the file is only a kit part.
+    # Whole-building titles, scale and part-title checks below decide that.
     if words_present(title_searchable, NON_BUILDING_TITLE_TERMS):
         return "non-building-object-title"
     if not words_present(title_searchable, WHOLE_BUILDING_TITLE_TERMS):
