@@ -105,6 +105,17 @@ test("scheduled hunts fail closed on malformed authored spawn points", async () 
   }
 });
 
+test("scheduled hunts reject a repeated interactable even when its district metadata differs", async () => {
+  const duplicate = points.map(point => ({ ...point }));
+  duplicate[1].interactableId = duplicate[0].interactableId;
+  duplicate[1].cityId = "nexusdelta";
+  duplicate[1].districtId = "another-district";
+  const db = fakeDb(duplicate, "personal");
+  assert.equal(await materializeScheduledTreasureHunts(
+    db, Date.parse("2026-11-20T12:00:00Z")), 0);
+  assert.equal(db.state.created, false);
+});
+
 test("scheduled hunts reject duplicate in-world interactables across clue rows", async () => {
   const duplicate = points.map(point => ({ ...point }));
   duplicate[1].interactableId = duplicate[0].interactableId;
