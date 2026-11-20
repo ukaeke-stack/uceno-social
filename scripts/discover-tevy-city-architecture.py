@@ -57,7 +57,11 @@ def screen(record, city):
     slug = record.get("slug")
     if not isinstance(slug, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{1,79}", slug):
         return "invalid-model-slug"
-    if record.get("category") != "buildings":
+    category = record.get("category")
+    if isinstance(category, dict):
+        category = category.get("slug") or category.get("title") or category.get("name")
+    category_key = re.sub(r"[^a-z]", "", str(category or "").lower())
+    if category_key not in {"building", "buildings"}:
         return "not-building-category"
     if record.get("license") != "CC0-1.0":
         return "not-explicit-cc0"
