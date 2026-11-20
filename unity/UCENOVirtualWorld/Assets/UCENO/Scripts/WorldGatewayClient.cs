@@ -70,6 +70,8 @@ namespace UCENO.VirtualWorld
         public string action;
     }
 
+    [Serializable] internal sealed class GatewaySimpleRequest { public string type; }
+
     [Serializable] internal sealed class GatewayWardrobeRefreshRequest
     {
         public string type = "wardrobe_refresh";
