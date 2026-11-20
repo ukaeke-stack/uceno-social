@@ -97,7 +97,7 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
           interaction_radius AS radius, clue_payload AS clue
         FROM virtual_world_treasure_template_spawn_points
         WHERE template_id = $1::uuid AND enabled = TRUE
-        ORDER BY sequence, id LIMIT 10000`, [template.id]);
+        ORDER BY sequence, id LIMIT 10001`, [template.id]);
       if (!hasQualifiedSpawnPool(points, current[0].distributionMode)) return false;
       const existing = await tx.unsafe(`SELECT id FROM virtual_world_treasure_hunts
         WHERE template_id = $1::uuid AND schedule_key = $2 LIMIT 1`,
