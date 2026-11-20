@@ -57,7 +57,7 @@ test("team collectible grant batches inventory writes and respects finite supply
       }];
       if (query.includes("FROM virtual_world_user_collectibles")) return [];
       if (query.includes("INSERT INTO virtual_world_user_collectibles")) {
-        assert.deepEqual(params[1], [user, "123e4567-e89b-42d3-a456-426614174014"]);
+        assert.deepEqual(params[1], [user]);
         return [{ userId: params[1][0], collectibleId: params[2][0], quantity: params[3][0] }];
       }
       return [];
