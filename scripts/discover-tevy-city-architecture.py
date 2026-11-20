@@ -10,6 +10,7 @@ import pathlib
 import re
 import time
 from collections import deque
+import urllib.error
 import urllib.request
 
 BASE = "https://tevy.dev"
@@ -32,14 +33,35 @@ NON_OCCUPIABLE = ("power pylon", "transmission pylon", "pylon", "tv tower", "tel
 EXCLUDE = ("horror", "abandoned", "post-apocalyptic", "medieval", "fantasy", "zombie", "military", "battle", "weapon", "ruin", "derelict", "western", "wild west", "christmas", "seasonal")
 GENERIC = ("building", "house", "apartment", "block", "tower", "office", "hotel", "terminal", "campus", "factory", "warehouse", "hangar", "school", "hospital", "library", "museum", "station", "hall", "residential", "commercial", "civic", "industrial", "hotel", "fuel station")
 
+def open_with_retries(request, timeout, attempts=4):
+    """Retry transient catalogue/CDN failures without hiding permanent errors."""
+    transient_statuses = {408, 425, 429, 500, 502, 503, 504}
+    for attempt in range(1, attempts + 1):
+        try:
+            return urllib.request.urlopen(request, timeout=timeout)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in transient_statuses or attempt >= attempts:
+                raise
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            try:
+                delay = float(retry_after)
+            except (TypeError, ValueError):
+                delay = min(2 ** (attempt - 1), 8)
+            time.sleep(min(max(delay, 0.25), 15))
+        except urllib.error.URLError:
+            if attempt >= attempts:
+                raise
+            time.sleep(min(2 ** (attempt - 1), 8))
+    raise RuntimeError("catalogue request retries exhausted")
+
 def get_json(url):
     req = urllib.request.Request(url, headers={"User-Agent": "UCENO-city-architecture/1.0", "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=60) as response:
+    with open_with_retries(req, timeout=60) as response:
         return json.loads(response.read().decode("utf-8"))
 
 def get_bytes(url):
     req = urllib.request.Request(url, headers={"User-Agent": "UCENO-city-architecture/1.0"})
-    with urllib.request.urlopen(req, timeout=120) as response:
+    with open_with_retries(req, timeout=120) as response:
         return response.read(MAX_BYTES + 1)
 
 def dimensions(record):
