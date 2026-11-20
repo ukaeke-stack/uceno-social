@@ -269,14 +269,14 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       (id, code, display_name, category, rarity, max_supply, enabled)
       VALUES (${teamCollectibleId}::uuid, 'team-completion-badge', 'Team Completion Badge',
         'badge', 'epic', 2, TRUE)`;
-    await db`INSERT INTO virtual_world_treasure_reward_items
-      (hunt_id, collectible_id, quantity)
-      VALUES (${teamHuntId}::uuid, ${teamCollectibleId}::uuid, 1)`;
     const teamSecret = 'team-runtime-integration-secret-at-least-32-bytes';
     await db`INSERT INTO virtual_world_treasure_hunts
       (id, code, title, world_id, starts_at, ends_at, enabled, reward_earned_credits, distribution_mode)
       VALUES (${teamHuntId}::uuid, 'team-runtime-test', 'Team runtime test', ${worldId}::uuid,
         NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour', TRUE, 101, 'team')`;
+    await db`INSERT INTO virtual_world_treasure_reward_items
+      (hunt_id, collectible_id, quantity)
+      VALUES (${teamHuntId}::uuid, ${teamCollectibleId}::uuid, 1)`;
     for (let sequence = 0; sequence < 2; sequence++) {
       for (let candidate = 0; candidate < 2; candidate++) {
         const point = { id: randomUUID(), sequence, interactableId: 'team-' + sequence + '-' + candidate,
