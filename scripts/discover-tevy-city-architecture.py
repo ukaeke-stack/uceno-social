@@ -169,8 +169,17 @@ def main():
         print(f"{city}: {len(candidates)} eligible catalogue buildings; acquired {len(acquired)}")
     report["total_models"] = sum(len(v["selected_and_acquired"]) for v in report["cities"].values())
     (OUT / "tevy-acquisition-manifest.json").write_text(json.dumps(report, indent=2) + "\n")
-    if any(not v["selected_and_acquired"] for v in report["cities"].values()):
-        raise SystemExit("At least one city lacks a unique acquired building candidate; no coverage claim allowed")
+    shortfalls = {
+        city: len(value["selected_and_acquired"])
+        for city, value in report["cities"].items()
+        if len(value["selected_and_acquired"]) < PER_CITY
+    }
+    if shortfalls:
+        raise SystemExit(
+            f"Incomplete city asset acquisition: each city requires {PER_CITY} "
+            f"unique verified building candidates; acquired counts: {shortfalls}. "
+            "Partial evidence is retained, but no complete-pack coverage claim is allowed."
+        )
 
 if __name__ == "__main__":
     main()
