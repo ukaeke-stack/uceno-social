@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "../dist/private-treasure-runtime.js";
+import { createTreasureTeam, joinTreasureTeam, loadTeamTreasureHints, recordTeamTreasureDiscovery } from "../dist/team-treasure-runtime.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -226,6 +227,81 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       WHERE idempotency_key = ${'private-treasure:' + privateHuntId + ':' + userId}`;
     assert.equal(privateReward.length, 1);
     assert.equal(String(privateReward[0].amount), '25');
+
+    const teamHuntId = randomUUID();
+    const teamSecret = 'team-runtime-integration-secret-at-least-32-bytes';
+    await db`INSERT INTO virtual_world_treasure_hunts
+      (id, code, title, world_id, starts_at, ends_at, enabled, reward_earned_credits, distribution_mode)
+      VALUES (${teamHuntId}::uuid, 'team-runtime-test', 'Team runtime test', ${worldId}::uuid,
+        NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour', TRUE, 101, 'team')`;
+    const teamSpawnPoints = [];
+    for (let sequence = 0; sequence < 2; sequence++) {
+      for (let candidate = 0; candidate < 2; candidate++) {
+        const point = { id: randomUUID(), sequence, interactableId: 'team-' + sequence + '-' + candidate,
+          x: sequence * 10 + candidate, y: 1.15, z: candidate };
+        teamSpawnPoints.push(point);
+        await db`INSERT INTO virtual_world_treasure_spawn_points
+          (id, hunt_id, sequence, city_id, district_id, interactable_id, position_x, position_y, position_z, interaction_radius, clue_payload)
+          VALUES (${point.id}::uuid, ${teamHuntId}::uuid, ${sequence}, 'solsticebay', 'central',
+            ${point.interactableId}, ${point.x}, ${point.y}, ${point.z}, 2,
+            ${JSON.stringify({ title: 'Team clue ' + (sequence + 1), hint: 'Work together' })}::jsonb)`;
+      }
+    }
+    const createdTeam = await createTreasureTeam(db, teamHuntId, userId, worldId, 4, Date.now(), teamSecret);
+    assert.equal(createdTeam.ok, true);
+    assert.equal(createdTeam.status, 'forming');
+    const teamId = createdTeam.teamId;
+    const joinedTeam = await joinTreasureTeam(db, teamId, secondUserId, worldId, Date.now());
+    assert.equal(joinedTeam.ok, true);
+    assert.equal(joinedTeam.status, 'active');
+    assert.equal(joinedTeam.members, 2);
+    const hintsForOwner = await loadTeamTreasureHints(db, privatePlayer, Date.now());
+    const hintsForMember = await loadTeamTreasureHints(db,
+      { id: secondUserId, worldId, x: 0, y: 1.15, z: 0 }, Date.now());
+    assert.equal(hintsForOwner.length, 1);
+    assert.equal(hintsForMember.length, 1);
+    assert.equal(hintsForOwner[0].sequence, 0);
+    assert.equal(hintsForMember[0].teamId, teamId);
+    const teamAssignments = await db`SELECT assignment.sequence, point.id AS id,
+        point.interactable_id AS "interactableId", point.position_x AS x,
+        point.position_y AS y, point.position_z AS z, point.city_id AS "cityId",
+        point.district_id AS "districtId"
+      FROM virtual_world_treasure_team_assignments AS assignment
+      JOIN virtual_world_treasure_spawn_points AS point
+        ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
+      WHERE assignment.team_id = ${teamId}::uuid ORDER BY assignment.sequence`;
+    assert.equal(teamAssignments.length, 2);
+    const firstStep = teamAssignments[0];
+    const firstDiscovery = await recordTeamTreasureDiscovery(db,
+      { id: userId, worldId, x: Number(firstStep.x), y: Number(firstStep.y), z: Number(firstStep.z) },
+      { id: firstStep.interactableId, cityId: firstStep.cityId, districtId: firstStep.districtId },
+      Date.now(), teamSecret, instanceId, processId, 1);
+    assert.equal(firstDiscovery.handled, true);
+    assert.equal(firstDiscovery.discovered, true);
+    assert.equal(firstDiscovery.completed, false);
+    const duplicateDiscovery = await recordTeamTreasureDiscovery(db,
+      { id: secondUserId, worldId, x: Number(firstStep.x), y: Number(firstStep.y), z: Number(firstStep.z) },
+      { id: firstStep.interactableId, cityId: firstStep.cityId, districtId: firstStep.districtId },
+      Date.now(), teamSecret, instanceId, processId, 1);
+    assert.equal(duplicateDiscovery.discovered, false);
+    const secondStep = teamAssignments[1];
+    const finalDiscovery = await recordTeamTreasureDiscovery(db,
+      { id: secondUserId, worldId, x: Number(secondStep.x), y: Number(secondStep.y), z: Number(secondStep.z) },
+      { id: secondStep.interactableId, cityId: secondStep.cityId, districtId: secondStep.districtId },
+      Date.now(), teamSecret, instanceId, processId, 1);
+    assert.equal(finalDiscovery.handled, true);
+    assert.equal(finalDiscovery.discovered, true);
+    assert.equal(finalDiscovery.completed, true);
+    assert.equal(finalDiscovery.rewardEarnedCredits, '50');
+    const teamAllocations = await db`SELECT user_id AS "userId", amount::text AS amount
+      FROM virtual_world_treasure_team_reward_allocations WHERE team_id = ${teamId}::uuid ORDER BY user_id`;
+    assert.equal(teamAllocations.length, 2);
+    assert.equal(teamAllocations.reduce((sum, row) => sum + BigInt(row.amount), 0n), 101n);
+    const teamLedger = await db`SELECT user_id AS "userId", amount::text AS amount
+      FROM virtual_world_earned_credit_ledger WHERE idempotency_key LIKE ${'team-treasure:' + teamId + ':%'}`;
+    assert.equal(teamLedger.length, 2);
+    const completedHints = await loadTeamTreasureHints(db, privatePlayer, Date.now());
+    assert.equal(completedHints.length, 0);
 
     await db.unsafe(`INSERT INTO virtual_world_treasure_progress
       (hunt_id, user_id, next_sequence) VALUES ($1, $2, 1)`, [huntId, userId]);
