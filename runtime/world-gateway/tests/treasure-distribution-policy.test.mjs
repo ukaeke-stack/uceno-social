@@ -46,3 +46,17 @@ test("player-facing clue payload strips coordinates and internal spawn identifie
     interactable_id: "secret-object", spawnPointId: "private-id"
   }), { title: "Old fountain", hint: "Look near the water", difficulty: 2 });
 });
+
+test("a private route never repeats an interactable when alternatives exist", () => {
+  const repeatedInteractableCandidates = Array.from({ length: 8 }, (_, i) => ({
+    id: `223e4567-e89b-42d3-a456-4266141740${String(i + 20).padStart(2,"0")}`,
+    sequence: Math.floor(i / 2), cityId: "solsticebay", districtId: "central",
+    interactableId: i % 2 === 0 ? "shared-object" : `unique-object-${Math.floor(i / 2)}`
+  }));
+  const route = selectPersonalTreasureRoute(hunt, userA, repeatedInteractableCandidates, 4, secret);
+  assert.equal(new Set(route.map(item => item.sequence)).size, 4);
+  const selectedIds = route.map(item => repeatedInteractableCandidates.find(
+    candidate => candidate.id === item.spawnPointId
+  ).interactableId);
+  assert.equal(new Set(selectedIds).size, 4);
+});
