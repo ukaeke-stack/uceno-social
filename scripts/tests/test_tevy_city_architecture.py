@@ -191,6 +191,33 @@ class TevyCityArchitectureTests(unittest.TestCase):
         self.assertEqual(len(slugs), len(set(slugs)))
         self.assertEqual(sum(len(items) for items in allocations.values()), 3)
 
+    def test_catalogue_requests_retry_transient_http_failures(self):
+        import io
+        import urllib.error
+        from unittest import mock
+        failure = urllib.error.HTTPError(
+            "https://tevy.dev/models.json", 503, "temporarily unavailable", {}, None
+        )
+        with mock.patch("urllib.request.urlopen",
+                        side_effect=[failure, io.BytesIO(b'{"models": []}')]) as request, \
+             mock.patch.object(tevy.time, "sleep") as sleep:
+            self.assertEqual(tevy.get_json("https://tevy.dev/models.json"), {"models": []})
+            self.assertEqual(request.call_count, 2)
+            sleep.assert_called_once()
+
+    def test_catalogue_requests_do_not_retry_permanent_http_errors(self):
+        import urllib.error
+        from unittest import mock
+        failure = urllib.error.HTTPError(
+            "https://tevy.dev/models.json", 404, "not found", {}, None
+        )
+        with mock.patch("urllib.request.urlopen", side_effect=failure) as request, \
+             mock.patch.object(tevy.time, "sleep") as sleep:
+            with self.assertRaises(urllib.error.HTTPError):
+                tevy.get_json("https://tevy.dev/models.json")
+            request.assert_called_once()
+            sleep.assert_not_called()
+
     def test_lod_metadata_rejects_non_hex_checksums_and_path_traversal(self):
         item = record()
         item["files"][0]["sha256"] = "g" * 64
