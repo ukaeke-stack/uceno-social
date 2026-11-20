@@ -2177,16 +2177,18 @@ setInterval(async () => {
               // Bind each durable snapshot to the exact process generation that
               // produced it, and hold the owner row through fan-out so takeover
               // cannot commit between validation and broadcast.
-              if (typeof payload.sourceProcessId === "string" &&
-                  /^[0-9a-f-]{36}$/i.test(payload.sourceProcessId) &&
-                  typeof payload.sourceGeneration === "number" &&
-                  Number.isSafeInteger(payload.sourceGeneration) && payload.sourceGeneration >= 1) {
+              const sourceProcessId = payload.sourceProcessId;
+              const sourceGeneration = payload.sourceGeneration;
+              if (typeof sourceProcessId === "string" &&
+                  /^[0-9a-f-]{36}$/i.test(sourceProcessId) &&
+                  typeof sourceGeneration === "number" &&
+                  Number.isSafeInteger(sourceGeneration) && sourceGeneration >= 1) {
                 await sql.begin(async tx => {
                   const sourceAuthority = await tx`SELECT id FROM virtual_world_instances
                     WHERE id = ${row.instanceId}::uuid
                       AND status IN ('ready', 'draining')
-                      AND owner_process_id = ${payload.sourceProcessId}::uuid
-                      AND owner_generation = ${payload.sourceGeneration}
+                      AND owner_process_id = ${sourceProcessId}::uuid
+                      AND owner_generation = ${sourceGeneration}
                       AND owner_lease_expires_at > clock_timestamp()
                       AND heartbeat_at > NOW() - INTERVAL '30 seconds'
                     FOR SHARE`;
