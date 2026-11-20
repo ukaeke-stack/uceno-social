@@ -27,6 +27,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
   const userId = randomUUID();
   const secondUserId = randomUUID();
   const thirdUserId = randomUUID();
+  const fourthUserId = randomUUID();
   const teamId = randomUUID();
   const competingHuntId = randomUUID();
   const worldId = randomUUID();
@@ -112,7 +113,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       WHERE schemaname = current_schema() AND indexname = ANY(${expectedIndexes})`;
     assert.deepEqual(installedIndexes.map(row => row.indexname).sort(), expectedIndexes.sort());
 
-    await db.unsafe("INSERT INTO users(id) VALUES ($1), ($2), ($3)", [userId, secondUserId, thirdUserId]);
+    await db.unsafe("INSERT INTO users(id) VALUES ($1), ($2), ($3), ($4)", [userId, secondUserId, thirdUserId, fourthUserId]);
     await db.unsafe("INSERT INTO virtual_worlds(id) VALUES ($1)", [worldId]);
     await db.unsafe("INSERT INTO virtual_world_activity_sessions(id) VALUES ($1)", [resultSessionId]);
     const result = await db.unsafe(`INSERT INTO virtual_world_activity_results
@@ -335,6 +336,79 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     assert.equal(teamLedger.length, 2);
     const completedHints = await loadTeamTreasureHints(db, privatePlayer, Date.now());
     assert.equal(completedHints.length, 0);
+
+    // Distinct teams must complete concurrently without serializing ordinary
+    // discoveries on the hunt row, while the final reward cap remains strict.
+    const cappedHuntId = randomUUID();
+    await db`INSERT INTO virtual_world_treasure_hunts
+      (id, code, title, world_id, starts_at, ends_at, enabled,
+       reward_earned_credits, max_reward_claims, distribution_mode)
+      VALUES (${cappedHuntId}::uuid, ${'team-cap-' + cappedHuntId.slice(0, 8)},
+        'Concurrent reward-cap test', ${worldId}::uuid,
+        NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour',
+        TRUE, 101, 1, 'team')`;
+    for (let sequence = 0; sequence < 2; sequence++) {
+      for (let candidate = 0; candidate < 2; candidate++) {
+        const point = { id: randomUUID(), sequence, interactableId: 'cap-' + sequence + '-' + candidate,
+          x: sequence * 10 + candidate, y: 1.15, z: candidate };
+        await db`INSERT INTO virtual_world_treasure_spawn_points
+          (id, hunt_id, sequence, city_id, district_id, interactable_id,
+           position_x, position_y, position_z, interaction_radius)
+          VALUES (${point.id}::uuid, ${cappedHuntId}::uuid, ${sequence}, 'solsticebay',
+            'central', ${point.interactableId}, ${point.x}, ${point.y}, ${point.z}, 2)`;
+      }
+    }
+    const [capTeamA, capTeamB] = await Promise.all([
+      createTreasureTeam(db, cappedHuntId, userId, worldId, 2, Date.now(), teamSecret),
+      createTreasureTeam(db, cappedHuntId, thirdUserId, worldId, 2, Date.now(), teamSecret)
+    ]);
+    assert.equal(capTeamA.ok, true);
+    assert.equal(capTeamB.ok, true);
+    const [capJoinA, capJoinB] = await Promise.all([
+      joinTreasureTeam(db, capTeamA.teamId, secondUserId, worldId, Date.now()),
+      joinTreasureTeam(db, capTeamB.teamId, fourthUserId, worldId, Date.now())
+    ]);
+    assert.equal(capJoinA.ok, true);
+    assert.equal(capJoinB.ok, true);
+    const capRoutes = await Promise.all([capTeamA.teamId, capTeamB.teamId].map(async teamId => db`
+      SELECT assignment.sequence, point.interactable_id AS "interactableId",
+        point.city_id AS "cityId", point.district_id AS "districtId",
+        point.position_x AS x, point.position_y AS y, point.position_z AS z
+      FROM virtual_world_treasure_team_assignments AS assignment
+      JOIN virtual_world_treasure_spawn_points AS point
+        ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
+      WHERE assignment.team_id = ${teamId}::uuid ORDER BY assignment.sequence`));
+    assert.equal(capRoutes.every(route => route.length === 2), true);
+    const capPlayers = [
+      { owner: userId, member: secondUserId, route: capRoutes[0] },
+      { owner: thirdUserId, member: fourthUserId, route: capRoutes[1] }
+    ];
+    const firstCapDiscoveries = await Promise.all(capPlayers.map(({ owner, route }) => {
+      const point = route[0];
+      return recordTeamTreasureDiscovery(db,
+        { id: owner, worldId, x: Number(point.x), y: Number(point.y), z: Number(point.z) },
+        { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
+        Date.now(), teamSecret, instanceId, processId, 1);
+    }));
+    assert.equal(firstCapDiscoveries.every(result => result.discovered && !result.completed), true);
+    const finalCapDiscoveries = await Promise.all(capPlayers.map(({ member, route }) => {
+      const point = route[1];
+      return recordTeamTreasureDiscovery(db,
+        { id: member, worldId, x: Number(point.x), y: Number(point.y), z: Number(point.z) },
+        { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
+        Date.now(), teamSecret, instanceId, processId, 1);
+    }));
+    assert.equal(finalCapDiscoveries.every(result => result.completed), true);
+    assert.equal(finalCapDiscoveries.filter(result => result.code === 'team_treasure_claim_limit_reached').length, 1);
+    assert.equal(finalCapDiscoveries.filter(result => BigInt(result.rewardEarnedCredits) > 0n).length, 1);
+    const cappedClaims = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_treasure_global_claims WHERE hunt_id = ${cappedHuntId}::uuid`;
+    assert.equal(cappedClaims[0].total, 1);
+    const cappedLedger = await db`SELECT COUNT(*)::integer AS total, COALESCE(SUM(amount), 0)::text AS amount
+      FROM virtual_world_earned_credit_ledger
+      WHERE source_treasure_hunt_id = ${cappedHuntId}::uuid`;
+    assert.equal(cappedLedger[0].total, 2);
+    assert.equal(BigInt(cappedLedger[0].amount), 101n);
 
     // Two different teams in the same hunt may be joined concurrently by one
     // player. Exactly one membership wins the database uniqueness constraint;

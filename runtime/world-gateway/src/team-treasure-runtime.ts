@@ -192,7 +192,7 @@ export async function recordTeamTreasureDiscovery(
           power($7 - point.position_z, 2)) <= point.interaction_radius
         AND hunt.enabled = TRUE AND (hunt.world_id IS NULL OR hunt.world_id = $9::uuid)
         AND hunt.starts_at <= to_timestamp($8) AND hunt.ends_at > to_timestamp($8)
-      ORDER BY team.id LIMIT 2 FOR UPDATE OF team, hunt, progress`,
+      ORDER BY team.id LIMIT 2 FOR UPDATE OF team, progress FOR SHARE OF hunt`,
       [player.id, target.cityId, target.districtId, target.id, player.x, player.y, player.z, now / 1000, player.worldId]);
     if (!matches.length) return { handled: false, discovered: false, completed: false, rewardEarnedCredits: "0" };
     if (matches.length > 1) return { handled: true, discovered: false, completed: false, rewardEarnedCredits: "0", code: "ambiguous_team_treasure_assignment" };
@@ -221,6 +221,10 @@ export async function recordTeamTreasureDiscovery(
 
     await tx.unsafe(`UPDATE virtual_world_treasure_teams SET status = 'completed'
       WHERE id = $1::uuid AND status = 'active'`, [match.teamId]);
+    // Ordinary clue discoveries share the hunt row lock. Serialize only the
+    // final claim-cap section so independent teams can progress concurrently
+    // without allowing two completions to consume the same remaining slot.
+    await tx.unsafe(`SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))`, [match.huntId]);
     const claims = await tx.unsafe(`SELECT COUNT(*)::integer AS total
       FROM virtual_world_treasure_global_claims WHERE hunt_id = $1::uuid`, [match.huntId]);
     const cap = match.maxRewardClaims === null ? null : Number(match.maxRewardClaims);
