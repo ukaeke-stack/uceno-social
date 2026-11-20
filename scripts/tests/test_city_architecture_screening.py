@@ -14,19 +14,36 @@ discovery = load_script("uceno_city_discovery", "discover-city-architecture.py")
 acquisition = load_script("uceno_city_acquisition", "acquire-city-architecture.py")
 
 
-def asset(title, dimensions, summary="realistic exterior building", tags=None):
-    return {
+def asset(title, dimensions, summary="realistic exterior building", tags=None, style=None):
+    value = {
         "title": title,
         "summary": summary,
         "tags": tags or [{"slug": "realistic"}, {"slug": "exterior"}],
         "stats": {"sizeMeters": dimensions, "fileSize": 250000, "triangles": 80000},
     }
+    if style is not None:
+        value["style"] = style
+    return value
 
 
 class CityArchitectureScreeningTests(unittest.TestCase):
     def test_complete_office_tower_is_a_candidate(self):
         self.assertIsNone(discovery.rejection_reason(
             asset("Glass Office Tower", [24, 62, 20]), "NexusDelta"))
+
+    def test_realistic_style_field_is_accepted_without_requiring_duplicate_tag(self):
+        candidate = asset("Glass Office Tower", [24, 62, 20],
+                          tags=[{"slug": "exterior"}], style="Realistic")
+        self.assertIsNone(discovery.rejection_reason(candidate, "NexusDelta"))
+        detail = {
+            "title": "Glass Office Tower",
+            "description": "modern exterior office building",
+            "style": "realistic",
+            "tags": [{"slug": "exterior"}],
+            "stats": {"sizeMeters": [24, 62, 20]},
+        }
+        self.assertEqual(acquisition.validate_complete_building(detail, "NexusDelta"),
+                         (24.0, 62.0, 20.0))
 
     def test_building_description_may_mention_walls_windows_and_columns(self):
         building = asset(
