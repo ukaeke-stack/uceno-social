@@ -530,12 +530,12 @@ function activityPayload(session: ActivitySession) {
 }
 
 async function recordTreasureDiscovery(player: Player, target: RegisteredInteractable, now: number):
-  Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string }> {
+  Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; collectibles?: { code: string; displayName: string; category: string; rarity: string; quantity: number }[] }> {
   const privateResult = await recordPrivateTreasureDiscovery(sql, player, target, now,
     TREASURE_ASSIGNMENT_SECRET, INSTANCE_ID, PROCESS_ID, processGeneration);
   if (privateResult.handled) return { discovered: privateResult.discovered,
     completed: privateResult.completed, rewardEarnedCredits: privateResult.rewardEarnedCredits,
-    code: privateResult.code };
+    code: privateResult.code, collectibles: privateResult.collectibles };
   return sql.begin(async tx => {
     const owner = await tx`SELECT id FROM virtual_world_instances
       WHERE id = ${INSTANCE_ID}::uuid AND owner_process_id = ${PROCESS_ID}::uuid
@@ -1832,7 +1832,8 @@ wss.on("connection", async (socket: WebSocket) => {
             const treasure = await recordTreasureDiscovery(player, target, now);
             if (treasure.discovered) {
               send(socket, { type: "treasure_clue_discovered", objectId: target.id,
-                completed: treasure.completed, rewardEarnedCredits: treasure.rewardEarnedCredits });
+                completed: treasure.completed, rewardEarnedCredits: treasure.rewardEarnedCredits,
+                collectibles: treasure.collectibles ?? [] });
               void loadPrivateTreasureHints(sql, player, Date.now(), TREASURE_ASSIGNMENT_SECRET).then(hints => {
                 if (players.get(player.id) !== player || socket.readyState !== WebSocket.OPEN) return;
                 for (const hint of hints) send(socket, { type: "treasure_hunt_clue", huntId: hint.huntId,
