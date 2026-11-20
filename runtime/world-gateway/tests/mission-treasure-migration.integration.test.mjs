@@ -248,8 +248,8 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     const createdTeam = await createTreasureTeam(db, teamHuntId, userId, worldId, 4, Date.now(), teamSecret);
     assert.equal(createdTeam.ok, true);
     assert.equal(createdTeam.status, 'forming');
-    const teamId = createdTeam.teamId;
-    const joinedTeam = await joinTreasureTeam(db, teamId, secondUserId, worldId, Date.now());
+    const createdTeamId = createdTeam.createdTeamId;
+    const joinedTeam = await joinTreasureTeam(db, createdTeamId, secondUserId, worldId, Date.now());
     assert.equal(joinedTeam.ok, true);
     assert.equal(joinedTeam.status, 'active');
     assert.equal(joinedTeam.members, 2);
@@ -259,7 +259,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     assert.equal(hintsForOwner.length, 1);
     assert.equal(hintsForMember.length, 1);
     assert.equal(hintsForOwner[0].sequence, 0);
-    assert.equal(hintsForMember[0].teamId, teamId);
+    assert.equal(hintsForMember[0].createdTeamId, createdTeamId);
     const teamAssignments = await db`SELECT assignment.sequence, point.id AS id,
         point.interactable_id AS "interactableId", point.position_x AS x,
         point.position_y AS y, point.position_z AS z, point.city_id AS "cityId",
@@ -267,7 +267,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       FROM virtual_world_treasure_team_assignments AS assignment
       JOIN virtual_world_treasure_spawn_points AS point
         ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
-      WHERE assignment.team_id = ${teamId}::uuid ORDER BY assignment.sequence`;
+      WHERE assignment.team_id = ${createdTeamId}::uuid ORDER BY assignment.sequence`;
     assert.equal(teamAssignments.length, 2);
     const firstStep = teamAssignments[0];
     const firstDiscovery = await recordTeamTreasureDiscovery(db,
@@ -292,11 +292,11 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     assert.equal(finalDiscovery.completed, true);
     assert.equal(finalDiscovery.rewardEarnedCredits, secondUserId < userId ? '51' : '50');
     const teamAllocations = await db`SELECT user_id AS "userId", amount::text AS amount
-      FROM virtual_world_treasure_team_reward_allocations WHERE team_id = ${teamId}::uuid ORDER BY user_id`;
+      FROM virtual_world_treasure_team_reward_allocations WHERE team_id = ${createdTeamId}::uuid ORDER BY user_id`;
     assert.equal(teamAllocations.length, 2);
     assert.equal(teamAllocations.reduce((sum, row) => sum + BigInt(row.amount), 0n), 101n);
     const teamLedger = await db`SELECT user_id AS "userId", amount::text AS amount
-      FROM virtual_world_earned_credit_ledger WHERE idempotency_key LIKE ${'team-treasure:' + teamId + ':%'}`;
+      FROM virtual_world_earned_credit_ledger WHERE idempotency_key LIKE ${'team-treasure:' + createdTeamId + ':%'}`;
     assert.equal(teamLedger.length, 2);
     const completedHints = await loadTeamTreasureHints(db, privatePlayer, Date.now());
     assert.equal(completedHints.length, 0);
