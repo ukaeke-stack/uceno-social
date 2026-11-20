@@ -9,12 +9,15 @@ type Hint = { huntId: string; title: string; sequence: number; clue: unknown };
 type Discovery = { handled: boolean; discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; collectibles?: CollectibleReward[]; huntId?: string };
 
 async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: string): Promise<Hint[]> {
+  // Existing assignments are immutable and inserted transactionally. Skip their
+  // candidate pools on reconnects and repeat discoveries.
   const hunts = await tx.unsafe(`SELECT id, title FROM virtual_world_treasure_hunts
     WHERE enabled = TRUE AND distribution_mode IN ('personal', 'global')
       AND (world_id IS NULL OR world_id = $1::uuid)
       AND starts_at <= to_timestamp($2) AND ends_at > to_timestamp($2)
-    ORDER BY starts_at, id LIMIT 20`, [player.worldId, now / 1000]);
-  const hints: Hint[] = [];
+      AND NOT EXISTS (SELECT 1 FROM virtual_world_treasure_assignments AS existing
+        WHERE existing.hunt_id = virtual_world_treasure_hunts.id AND existing.user_id = $3::uuid)
+    ORDER BY starts_at, id LIMIT 20`, [player.worldId, now / 1000, player.id]);
   for (const hunt of hunts) {
     const points = await tx.unsafe(`SELECT id, sequence, city_id AS "cityId",
         district_id AS "districtId", interactable_id AS "interactableId"
@@ -46,20 +49,23 @@ async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: str
     }
     await tx.unsafe(`INSERT INTO virtual_world_treasure_progress (hunt_id, user_id)
       VALUES ($1::uuid, $2::uuid) ON CONFLICT (hunt_id, user_id) DO NOTHING`, [hunt.id, player.id]);
-    const current = await tx.unsafe(`SELECT progress.next_sequence AS sequence,
-        point.clue_payload AS clue
-      FROM virtual_world_treasure_progress AS progress
-      JOIN virtual_world_treasure_assignments AS assignment
-        ON assignment.hunt_id = progress.hunt_id AND assignment.user_id = progress.user_id
-        AND assignment.sequence = progress.next_sequence
-      JOIN virtual_world_treasure_spawn_points AS point
-        ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
-      WHERE progress.hunt_id = $1::uuid AND progress.user_id = $2::uuid
-        AND progress.completed_at IS NULL LIMIT 1`, [hunt.id, player.id]);
-    if (current[0]) hints.push({ huntId: hunt.id, title: hunt.title,
-      sequence: Number(current[0].sequence), clue: sanitizeTreasureCluePayload(current[0].clue) });
   }
-  return hints;
+  const current = await tx.unsafe(`SELECT hunt.id AS "huntId", hunt.title,
+      progress.next_sequence AS sequence, point.clue_payload AS clue
+    FROM virtual_world_treasure_progress AS progress
+    JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = progress.hunt_id
+    JOIN virtual_world_treasure_assignments AS assignment
+      ON assignment.hunt_id = progress.hunt_id AND assignment.user_id = progress.user_id
+      AND assignment.sequence = progress.next_sequence
+    JOIN virtual_world_treasure_spawn_points AS point
+      ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
+    WHERE progress.user_id = $1::uuid AND progress.completed_at IS NULL
+      AND hunt.enabled = TRUE AND hunt.distribution_mode IN ('personal', 'global')
+      AND (hunt.world_id IS NULL OR hunt.world_id = $2::uuid)
+      AND hunt.starts_at <= to_timestamp($3) AND hunt.ends_at > to_timestamp($3)
+    ORDER BY hunt.starts_at, hunt.id LIMIT 20`, [player.id, player.worldId, now / 1000]);
+  return current.map((row: any) => ({ huntId: row.huntId, title: row.title,
+    sequence: Number(row.sequence), clue: sanitizeTreasureCluePayload(row.clue) }));
 }
 
 export async function loadPrivateTreasureHints(
