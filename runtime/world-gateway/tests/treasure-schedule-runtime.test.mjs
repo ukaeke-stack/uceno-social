@@ -15,7 +15,7 @@ const points = [
     x: 4, y: 1.15, z: 4, radius: 2, clue: { hint: "Alternate second" } }
 ];
 
-function fakeDb(spawnPoints = points) {
+function fakeDb(spawnPoints = points, distributionMode = "personal") {
   const state = { created: false, copied: 0 };
   const template = { id: templateId, code: "daily-arch", title: "Arch Hunt",
     worldId: null, cadence: "daily", timeZone: "Africa/Lagos",
@@ -31,7 +31,7 @@ function fakeDb(spawnPoints = points) {
         async unsafe(query) {
           if (query.includes("pg_try_advisory_xact_lock")) return [{ locked: true }];
           if (query.includes("FROM virtual_world_treasure_hunt_templates")) return [{
-            reward: "20", distributionMode: "personal", maxGlobalWinners: null, maxRewardClaims: null
+            reward: "20", distributionMode, maxGlobalWinners: null, maxRewardClaims: null
           }];
           if (query.includes("FROM virtual_world_treasure_template_spawn_points")) return spawnPoints;
           if (query.includes("FROM virtual_world_treasure_hunts")) return state.created ? [{ id: huntId }] : [];
@@ -60,6 +60,12 @@ test("daily treasure templates materialize once and copy authored route candidat
   assert.equal(await materializeScheduledTreasureHunts(db, now), 0);
 });
 
+test("team templates materialize when every clue step has one authored location", async () => {
+  const onePerStep = points.filter(point => point.interactableId === "a" || point.interactableId === "c");
+  const db = fakeDb(onePerStep, "team");
+  assert.equal(await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z")), 1);
+  assert.equal(db.state.copied, 2);
+});
 test("personal templates without alternate authored locations fail closed", async () => {
   const db = fakeDb(points.filter(point => point.sequence !== 1 || point.interactableId === "c"));
   assert.equal(await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z")), 0);
