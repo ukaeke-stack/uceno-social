@@ -41,7 +41,8 @@ function fakeDb(spawnPoints = points, distributionMode = "personal") {
             return [{ id: huntId }];
           }
           if (query.includes("INSERT INTO virtual_world_treasure_spawn_points")) {
-            state.copied++;
+            state.copied += params[1]?.length ?? 0;
+            state.spawnInsertBatches = (state.spawnInsertBatches ?? 0) + 1;
             return [];
           }
           throw new Error("unexpected transaction query: " + query);
@@ -57,6 +58,7 @@ test("daily treasure templates materialize once and copy authored route candidat
   const now = Date.parse("2026-11-20T12:00:00Z");
   assert.equal(await materializeScheduledTreasureHunts(db, now), 1);
   assert.equal(db.state.copied, 4);
+  assert.equal(db.state.spawnInsertBatches, 1);
   assert.equal(await materializeScheduledTreasureHunts(db, now), 0);
 });
 
@@ -65,6 +67,7 @@ test("team templates materialize when every clue step has one authored location"
   const db = fakeDb(onePerStep, "team");
   assert.equal(await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z")), 1);
   assert.equal(db.state.copied, 2);
+  assert.equal(db.state.spawnInsertBatches, 1);
 });
 test("personal templates without alternate authored locations fail closed", async () => {
   const db = fakeDb(points.filter(point => point.sequence !== 1 || point.interactableId === "c"));
