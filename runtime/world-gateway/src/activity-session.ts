@@ -150,7 +150,10 @@ export function recordCheckpoint(session: ActivitySession, userId: string, check
 
 export function leaveActivity(session: ActivitySession, userId: string, now = Date.now()): ActivityResult {
   const participant = session.participants.get(userId);
-  if (!participant || participant.status === "left") return { ok: true, session };
+  if (!participant || participant.status === "left" || participant.status === "dnf")
+    return { ok: true, session }; // terminal participant leave is idempotent
+  if (session.phase === "completed" || session.phase === "cancelled")
+    return { ok: false, code: "session_already_terminal" };
   if (participant.status === "finished") return { ok: false, code: "participant_already_finished" };
   if (!Number.isFinite(now) || now < session.createdAt || now < participant.lastActionAt ||
       (session.startedAt !== null && now < session.startedAt))
