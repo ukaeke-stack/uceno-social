@@ -2140,7 +2140,8 @@ setInterval(async () => {
       for (const [worldId, worldPlayers] of byWorld) {
         void sql`INSERT INTO virtual_world_realtime_events (world_id, instance_id, event_type, payload)
           VALUES (${worldId}::uuid, ${INSTANCE_ID}::uuid, 'player_snapshot',
-            ${JSON.stringify({ serverTime: now, players: worldPlayers })}::jsonb)`
+            ${JSON.stringify({ serverTime: now, players: worldPlayers,
+              sourceProcessId: PROCESS_ID, sourceGeneration: processGeneration })}::jsonb)`
           .catch(error => console.error('world_snapshot_relay_publish_failed', error));
       }
     }
@@ -2168,16 +2169,29 @@ setInterval(async () => {
             if (payload && Array.isArray(payload.players) && Number.isFinite(payload.serverTime)) {
               // A process whose instance lease/heartbeat has expired is no longer
               // authoritative, even if it managed to append a delayed snapshot row.
-              const sourceAuthority = await sql`SELECT 1 FROM virtual_world_instances
-                WHERE id = ${row.instanceId}::uuid
-                  AND status IN ('ready', 'draining')
-                  AND heartbeat_at > NOW() - INTERVAL '30 seconds'
-                LIMIT 1`;
-              if (sourceAuthority[0]) {
-                const packet = JSON.stringify({ type: 'snapshot', serverTime: payload.serverTime, players: payload.players });
-                for (const peer of players.values()) {
-                  if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
-                }
+              // A recent heartbeat alone is insufficient: a process lease may
+              // have expired while its last heartbeat is still within 30 seconds.
+              // Bind each durable snapshot to the exact process generation that
+              // produced it, and hold the owner row through fan-out so takeover
+              // cannot commit between validation and broadcast.
+              if (typeof payload.sourceProcessId === "string" &&
+                  /^[0-9a-f-]{36}$/i.test(payload.sourceProcessId) &&
+                  Number.isSafeInteger(payload.sourceGeneration) && payload.sourceGeneration >= 1) {
+                await sql.begin(async tx => {
+                  const sourceAuthority = await tx`SELECT id FROM virtual_world_instances
+                    WHERE id = ${row.instanceId}::uuid
+                      AND status IN ('ready', 'draining')
+                      AND owner_process_id = ${payload.sourceProcessId}::uuid
+                      AND owner_generation = ${payload.sourceGeneration}
+                      AND owner_lease_expires_at > clock_timestamp()
+                      AND heartbeat_at > NOW() - INTERVAL '30 seconds'
+                    FOR SHARE`;
+                  if (!sourceAuthority[0]) return;
+                  const packet = JSON.stringify({ type: 'snapshot', serverTime: payload.serverTime, players: payload.players });
+                  for (const peer of players.values()) {
+                    if (peer.worldId === row.worldId && peer.socket.readyState === WebSocket.OPEN) peer.socket.send(packet);
+                  }
+                });
               }
             }
           } else if (row.eventType === 'activity_state') {
