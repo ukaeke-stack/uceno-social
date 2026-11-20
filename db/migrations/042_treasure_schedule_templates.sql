@@ -48,5 +48,4 @@ ALTER TABLE virtual_world_treasure_hunts
     REFERENCES virtual_world_treasure_hunt_templates(id) ON DELETE RESTRICT,
   ADD COLUMN IF NOT EXISTS schedule_key TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS virtual_world_treasure_hunt_schedule_once_idx
-  ON virtual_world_treasure_hunts (template_id, schedule_key)
-  WHERE template_id IS NOT NULL AND schedule_key IS NOT NULL;
+  ON virtual_world_treasure_hunts (template_id, schedule_key);
