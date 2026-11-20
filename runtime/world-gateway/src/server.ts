@@ -538,6 +538,7 @@ async function isActiveTreasureInteractable(player: Player, target: RegisteredIn
   // the authored treasure tables. Do not let an optional feature break normal
   // world interactions while migrations 037-040 are still unapplied.
   const schemaReady = await sql`SELECT
+    to_regclass('virtual_world_treasure_hunts') IS NOT NULL AND
     to_regclass('virtual_world_treasure_clues') IS NOT NULL AND
     to_regclass('virtual_world_treasure_progress') IS NOT NULL AND
     to_regclass('virtual_world_treasure_discoveries') IS NOT NULL AND
