@@ -28,7 +28,7 @@ function fakeDb(spawnPoints = points, distributionMode = "personal") {
     },
     async begin(fn) {
       return fn({
-        async unsafe(query) {
+        async unsafe(query, params = []) {
           if (query.includes("pg_try_advisory_xact_lock")) return [{ locked: true }];
           if (query.includes("FROM virtual_world_treasure_hunt_templates")) return [{
             reward: "20", distributionMode, maxGlobalWinners: null, maxRewardClaims: null
