@@ -76,6 +76,35 @@ test("personal templates without alternate authored locations fail closed", asyn
   assert.equal(db.state.created, false);
 });
 
+test("scheduled hunts fail closed on malformed authored spawn points", async () => {
+  const malformed = [
+    { sequence: -1 },
+    { sequence: 100 },
+    { sequence: 0.5 },
+    { cityId: "../outside-city" },
+    { districtId: "" },
+    { interactableId: "x".repeat(129) },
+    { x: Number.NaN },
+    { y: 10001 },
+    { z: Infinity },
+    { radius: 0.49 },
+    { radius: 8.01 },
+    { clue: [] },
+    { clue: null },
+    { clue: { hint: "x".repeat(17000) } }
+  ];
+  for (const override of malformed) {
+    const candidatePoints = points.map(point => ({ ...point }));
+    candidatePoints[0] = { ...candidatePoints[0], ...override };
+    const db = fakeDb(candidatePoints);
+    assert.equal(await materializeScheduledTreasureHunts(
+      db, Date.parse("2026-11-20T12:00:00Z")), 0,
+      "must reject malformed spawn point: " + JSON.stringify(override, (_key, value) =>
+        typeof value === "number" && !Number.isFinite(value) ? String(value) : value));
+    assert.equal(db.state.created, false);
+  }
+});
+
 test("invalid schedule instants are rejected", async () => {
   await assert.rejects(() => materializeScheduledTreasureHunts(fakeDb(), Number.NaN),
     /invalid_treasure_schedule_instant/);
