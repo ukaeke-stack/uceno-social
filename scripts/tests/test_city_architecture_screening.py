@@ -18,6 +18,7 @@ def asset(title, dimensions, summary="realistic exterior building", tags=None, s
     value = {
         "title": title,
         "summary": summary,
+        "category": "buildings",
         "tags": tags or [{"slug": "realistic"}, {"slug": "exterior"}],
         "stats": {"sizeMeters": dimensions, "fileSize": 250000, "triangles": 80000},
     }
@@ -27,6 +28,22 @@ def asset(title, dimensions, summary="realistic exterior building", tags=None, s
 
 
 class CityArchitectureScreeningTests(unittest.TestCase):
+    def test_non_building_categories_are_rejected_even_when_search_returns_a_building_title(self):
+        candidate = asset("Glass Office Tower", [24, 62, 20])
+        candidate["category"] = "props"
+        self.assertEqual(discovery.rejection_reason(candidate, "NexusDelta"),
+                         "not-building-category")
+        detail = {
+            "title": "Glass Office Tower",
+            "description": "realistic exterior office building",
+            "category": "props",
+            "style": "realistic",
+            "tags": [{"slug": "exterior"}],
+            "stats": {"sizeMeters": [24, 62, 20]},
+        }
+        with self.assertRaisesRegex(ValueError, "category"):
+            acquisition.validate_complete_building(detail, "NexusDelta")
+
     def test_complete_office_tower_is_a_candidate(self):
         self.assertIsNone(discovery.rejection_reason(
             asset("Glass Office Tower", [24, 62, 20]), "NexusDelta"))
