@@ -218,6 +218,15 @@ class TevyCityArchitectureTests(unittest.TestCase):
             request.assert_called_once()
             sleep.assert_not_called()
 
+    def test_izakaya_front_facade_is_not_acquired_as_a_building(self):
+        candidate = record(
+            name="Izakaya Front",
+            tags=["office", "commercial"],
+            description="NexusDelta urban commercial building frontage"
+        )
+        self.assertEqual(tevy.screen(candidate, "NexusDelta"),
+                         "non-occupiable-infrastructure")
+
     def test_acquired_catalogue_infrastructure_is_not_misclassified_as_buildings(self):
         rejected_titles = [
             "Quay Wall Straight with Bollard", "Passenger Boarding Bridge",
