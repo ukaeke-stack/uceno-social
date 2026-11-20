@@ -10,7 +10,7 @@ type Player = { id: string; worldId: string; x: number; y: number; z: number };
 type Target = { id: string; cityId: string; districtId: string };
 type TeamResult = { ok: boolean; code?: string; teamId?: string; status?: string; members?: number; maxMembers?: number };
 type Hint = { teamId: string; huntId: string; title: string; sequence: number; clue: Record<string, string | number> };
-type Discovery = { handled: boolean; discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; teamId?: string; collectibles?: CollectibleReward[] };
+type Discovery = { handled: boolean; discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; huntId?: string; teamId?: string; collectibles?: CollectibleReward[] };
 
 const UUID = /^[0-9a-f-]{36}$/i;
 const MAX_TEAM_MEMBERS = 20;
@@ -203,7 +203,7 @@ export async function recordTeamTreasureDiscovery(
       completed_at = CASE WHEN $2 THEN to_timestamp($3) ELSE NULL END,
       version = version + 1, updated_at = NOW() WHERE team_id = $1::uuid`,
       [match.teamId, completed, now / 1000]);
-    if (!completed) return { handled: true, discovered: true, completed: false, rewardEarnedCredits: "0", teamId: match.teamId };
+    if (!completed) return { handled: true, discovered: true, completed: false, rewardEarnedCredits: "0", huntId: match.huntId, teamId: match.teamId };
 
     await tx.unsafe(`UPDATE virtual_world_treasure_teams SET status = 'completed'
       WHERE id = $1::uuid AND status = 'active'`, [match.teamId]);
@@ -211,9 +211,9 @@ export async function recordTeamTreasureDiscovery(
       FROM virtual_world_treasure_global_claims WHERE hunt_id = $1::uuid`, [match.huntId]);
     const cap = match.maxRewardClaims === null ? null : Number(match.maxRewardClaims);
     if (cap !== null && (!Number.isSafeInteger(cap) || cap < 1))
-      return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "team_treasure_claim_cap_invalid", teamId: match.teamId };
+      return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "team_treasure_claim_cap_invalid", huntId: match.huntId, teamId: match.teamId };
     if (cap !== null && Number(claims[0]?.total ?? 0) >= cap)
-      return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "team_treasure_claim_limit_reached", teamId: match.teamId };
+      return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "team_treasure_claim_limit_reached", huntId: match.huntId, teamId: match.teamId };
     await tx.unsafe(`INSERT INTO virtual_world_treasure_global_claims (hunt_id, user_id)
       VALUES ($1::uuid, $2::uuid) ON CONFLICT (hunt_id, user_id) DO NOTHING`,
       [match.huntId, match.ownerUserId]);
@@ -249,6 +249,6 @@ export async function recordTeamTreasureDiscovery(
       const memberRewards = await grantTreasureCollectibles(tx, match.huntId, member.userId);
       if (member.userId === player.id) collectibles = memberRewards;
     }
-    return { handled: true, discovered: true, completed: true, rewardEarnedCredits: playerShare.toString(), collectibles, teamId: match.teamId };
+    return { handled: true, discovered: true, completed: true, rewardEarnedCredits: playerShare.toString(), collectibles, huntId: match.huntId, teamId: match.teamId };
   });
 }
