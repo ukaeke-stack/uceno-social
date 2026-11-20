@@ -105,9 +105,11 @@ class TevyCityArchitectureTests(unittest.TestCase):
         rare = record(name="Desert Adobe Courtyard Hotel",
                       tags=["desert", "adobe", "courtyard", "hotel"],
                       description="desert adobe courtyard hotel")
+        rare["slug"] = "desert-adobe"
         broad = record(name="Modern Waterfront Apartment Tower",
                        tags=["waterfront", "apartment", "tower"],
                        description="coastal waterfront residential apartment tower")
+        broad["slug"] = "waterfront-tower"
         pools = {
             "SolsticeBay": [broad, rare],
             "SaffronDunes": [rare, broad],
