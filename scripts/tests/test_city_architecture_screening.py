@@ -35,7 +35,6 @@ class CityArchitectureScreeningTests(unittest.TestCase):
                          "not-building-category")
         detail = {
             "title": "Glass Office Tower",
-            "category": "buildings",
             "description": "realistic exterior office building",
             "category": "props",
             "style": "realistic",
@@ -55,6 +54,7 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         self.assertIsNone(discovery.rejection_reason(candidate, "NexusDelta"))
         detail = {
             "title": "Glass Office Tower",
+            "category": "buildings",
             "description": "modern exterior office building",
             "style": "realistic",
             "tags": [{"slug": "exterior"}],
