@@ -16,7 +16,7 @@ const points = [
 ];
 
 function fakeDb(spawnPoints = points, distributionMode = "personal", currentOverrides = {}) {
-  const state = { created: false, copied: 0 };
+  const state = { created: false, copied: 0, sourcePoints: spawnPoints };
   const template = { id: templateId, code: "daily-arch", title: "Arch Hunt",
     worldId: null, cadence: "daily", timeZone: "Africa/Lagos",
     activeFrom: null, activeUntil: null };
@@ -33,7 +33,7 @@ function fakeDb(spawnPoints = points, distributionMode = "personal", currentOver
         async unsafe(query, params = []) {
           if (query.includes("pg_try_advisory_xact_lock")) return [{ locked: true }];
           if (query.includes("FROM virtual_world_treasure_hunt_templates")) return [currentTemplate];
-          if (query.includes("FROM virtual_world_treasure_template_spawn_points")) return spawnPoints;
+          if (query.includes("FROM virtual_world_treasure_template_spawn_points")) return state.sourcePoints;
           if (query.includes("FROM virtual_world_treasure_hunts")) return state.created ? [{ id: huntId }] : [];
           if (query.includes("INSERT INTO virtual_world_treasure_hunts")) {
             if (state.created) return [];
@@ -60,8 +60,9 @@ test("daily treasure templates materialize once and copy authored route candidat
   assert.equal(await materializeScheduledTreasureHunts(db, now), 1);
   assert.equal(db.state.copied, 4);
   assert.equal(db.state.spawnInsertBatches, 1);
+  db.state.sourcePoints = [...points, { ...points[0], sequence: 0, interactableId: "new-template-location" }];
   assert.equal(await materializeScheduledTreasureHunts(db, now), 0);
-  assert.equal(db.state.copied, 4, "an existing hunt must keep its original authored-location snapshot");
+  assert.equal(db.state.copied, 4, "an existing hunt must keep its original authored-location snapshot after template edits");
 });
 
 test("team templates materialize when every clue step has one authored location", async () => {
