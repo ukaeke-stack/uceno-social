@@ -126,6 +126,7 @@ class CityArchitectureScreeningTests(unittest.TestCase):
     def test_acquisition_accepts_full_scale_office_tower(self):
         detail = {
             "title": "Glass Office Tower",
+            "category": "buildings",
             "description": "realistic exterior office building",
             "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
             "stats": {"sizeMeters": [24, 62, 20]},
