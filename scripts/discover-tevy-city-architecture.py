@@ -247,7 +247,9 @@ def main():
         for record in allocations[city]:
             slug = record["slug"]
             meta = get_json(f"{BASE}/models/{slug}.json")
-            detail_reason = screen(meta, city)
+            detail_record = dict(meta)
+            detail_record.setdefault("slug", slug)
+            detail_reason = screen(detail_record, city)
             if detail_reason:
                 raise ValueError(f"{slug}: detail metadata failed city asset screen: {detail_reason}")
             if meta.get("license") != "CC0-1.0" or meta.get("deprecated") or meta.get("slug", slug) != slug:
