@@ -15,6 +15,7 @@ import { isPersistentObjectState } from "./district-object-policy.js";
 import { loadInteractableRegistry, parseCityInteractableManifest, type RegisteredInteractable } from "./interactable-registry-policy.js";
 import { checkpointVersionForSession } from "./session-fence-policy.js";
 import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "./private-treasure-runtime.js";
+import { createTreasureTeam, joinTreasureTeam, loadTeamTreasureHints, recordTeamTreasureDiscovery } from "./team-treasure-runtime.js";
 import { grantTreasureCollectibles } from "./treasure-collectible-runtime.js";
 import { materializeScheduledTreasureHunts } from "./treasure-schedule-runtime.js";
 import { shouldPublishWorldSnapshot, WORLD_RELAY_BATCH_SIZE, WORLD_RELAY_POLL_INTERVAL_MS } from "./world-relay-policy.js";
@@ -544,6 +545,20 @@ async function isActiveTreasureInteractable(player: Player, target: RegisteredIn
         AND hunt.starts_at <= to_timestamp(${now / 1000})
         AND hunt.ends_at > to_timestamp(${now / 1000})
     ) OR EXISTS (
+      SELECT 1 FROM virtual_world_treasure_team_assignments AS assignment
+      JOIN virtual_world_treasure_teams AS team ON team.id = assignment.team_id
+      JOIN virtual_world_treasure_team_members AS member
+        ON member.team_id = team.id AND member.user_id = ${player.id}::uuid
+      JOIN virtual_world_treasure_spawn_points AS point
+        ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
+      JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = team.hunt_id
+      WHERE point.city_id = ${target.cityId} AND point.district_id = ${target.districtId}
+        AND point.interactable_id = ${target.id} AND point.enabled = TRUE
+        AND team.status = 'active' AND hunt.enabled = TRUE
+        AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
+        AND hunt.starts_at <= to_timestamp(${now / 1000})
+        AND hunt.ends_at > to_timestamp(${now / 1000})
+    ) OR EXISTS (
       SELECT 1 FROM virtual_world_treasure_clues AS clue
       JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = clue.hunt_id
       WHERE clue.city_id = ${target.cityId} AND clue.district_id = ${target.districtId}
@@ -562,13 +577,23 @@ async function pushPrivateTreasureHints(player: Player): Promise<void> {
     if (players.get(player.id) !== player || player.socket.readyState !== WebSocket.OPEN) return;
     for (const hint of hints) send(player.socket, { type: "treasure_hunt_clue",
       huntId: hint.huntId, title: hint.title, sequence: hint.sequence, clue: hint.clue });
+    const teamHints = await loadTeamTreasureHints(sql, player, Date.now());
+    if (players.get(player.id) !== player || player.socket.readyState !== WebSocket.OPEN) return;
+    for (const hint of teamHints) send(player.socket, { type: "team_treasure_hunt_clue",
+      teamId: hint.teamId, huntId: hint.huntId, title: hint.title,
+      sequence: hint.sequence, clue: hint.clue });
   } catch (error) {
     console.error("private_treasure_hint_push_failed", player.id, error);
   }
 }
 
 async function recordTreasureDiscovery(player: Player, target: RegisteredInteractable, now: number):
-  Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; huntId?: string; collectibles?: { code: string; displayName: string; category: string; rarity: string; quantity: number }[] }> {
+  Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; huntId?: string; teamId?: string; collectibles?: { code: string; displayName: string; category: string; rarity: string; quantity: number }[] }> {
+  const teamResult = await recordTeamTreasureDiscovery(sql, player, target, now,
+    TREASURE_ASSIGNMENT_SECRET, INSTANCE_ID, PROCESS_ID, processGeneration);
+  if (teamResult.handled) return { discovered: teamResult.discovered,
+    completed: teamResult.completed, rewardEarnedCredits: teamResult.rewardEarnedCredits,
+    code: teamResult.code, teamId: teamResult.teamId, collectibles: teamResult.collectibles };
   const privateResult = await recordPrivateTreasureDiscovery(sql, player, target, now,
     TREASURE_ASSIGNMENT_SECRET, INSTANCE_ID, PROCESS_ID, processGeneration);
   if (privateResult.handled) return { discovered: privateResult.discovered,
@@ -1477,6 +1502,43 @@ wss.on("connection", async (socket: WebSocket) => {
       if (players.get(player.id) !== player || player.socket !== socket) return;
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
+      if (msg && msg.type === "treasure_team_create") {
+        if (player.homeId || player.eventId || player.returnState || typeof msg.huntId !== "string" ||
+            (msg.maxMembers !== undefined && (!Number.isSafeInteger(msg.maxMembers) || msg.maxMembers < 2 || msg.maxMembers > 20))) {
+          send(socket, { type: "treasure_team_rejected", code: "invalid_team_request" }); return;
+        }
+        try {
+          const result = await createTreasureTeam(sql, msg.huntId, player.id, player.worldId,
+            msg.maxMembers === undefined ? 5 : msg.maxMembers, Date.now(), TREASURE_ASSIGNMENT_SECRET);
+          send(socket, { type: result.ok ? "treasure_team_created" : "treasure_team_rejected", ...result });
+          if (result.ok) void pushPrivateTreasureHints(player);
+        } catch (error) {
+          console.error("treasure_team_create_failed", player.id, error);
+          send(socket, { type: "treasure_team_rejected", code: "team_creation_failed" });
+        }
+        return;
+      }
+      if (msg && msg.type === "treasure_team_join") {
+        if (player.homeId || player.eventId || player.returnState || typeof msg.teamId !== "string") {
+          send(socket, { type: "treasure_team_rejected", code: "invalid_team_request" }); return;
+        }
+        try {
+          const result = await joinTreasureTeam(sql, msg.teamId, player.id, player.worldId, Date.now());
+          send(socket, { type: result.ok ? "treasure_team_joined" : "treasure_team_rejected", ...result });
+          if (result.ok) {
+            void pushPrivateTreasureHints(player);
+            if (result.status === "active") {
+              const memberRows = await sql`SELECT user_id AS "userId" FROM virtual_world_treasure_team_members WHERE team_id = ${msg.teamId}::uuid`;
+              for (const member of memberRows) { const online = players.get(member.userId);
+                if (online && online !== player) void pushPrivateTreasureHints(online); }
+            }
+          }
+        } catch (error) {
+          console.error("treasure_team_join_failed", player.id, error);
+          send(socket, { type: "treasure_team_rejected", code: "team_join_failed" });
+        }
+        return;
+      }
       if (msg && msg.type === "treasure_inventory_request") {
         try {
           const items = await sql`SELECT catalog.code, catalog.display_name AS "displayName",
@@ -1882,9 +1944,14 @@ wss.on("connection", async (socket: WebSocket) => {
             const treasure = await recordTreasureDiscovery(player, target, now);
             if (treasure.discovered) {
               send(socket, { type: "treasure_clue_discovered", objectId: target.id, huntId: treasure.huntId,
-                completed: treasure.completed, rewardEarnedCredits: treasure.rewardEarnedCredits,
-                collectibles: treasure.collectibles ?? [] });
+                teamId: treasure.teamId, completed: treasure.completed,
+                rewardEarnedCredits: treasure.rewardEarnedCredits, collectibles: treasure.collectibles ?? [] });
               void pushPrivateTreasureHints(player);
+              if (treasure.teamId) {
+                const teamMembers = await sql`SELECT user_id AS "userId" FROM virtual_world_treasure_team_members WHERE team_id = ${treasure.teamId}::uuid`;
+                for (const member of teamMembers) { const online = players.get(member.userId);
+                  if (online && online !== player) void pushPrivateTreasureHints(online); }
+              }
             } else if (treasure.code) {
               send(socket, { type: "treasure_discovery_rejected", objectId: target.id, code: treasure.code });
             }
