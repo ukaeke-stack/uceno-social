@@ -149,7 +149,11 @@ def allocate_city_candidates(candidate_pools, per_city=PER_CITY):
             edge = add_edge(asset_nodes[slug], city_nodes[city], 1,
                             -score(record, city))
             assignment_edges[slug].append((city, edge))
-        add_edge(city_nodes[city], sink, per_city, 0)
+        # Convex slot costs make the assignment max-min fair: every city
+        # gets its first qualified asset before any city receives a second,
+        # while city relevance score breaks ties within the same coverage tier.
+        for slot in range(per_city):
+            add_edge(city_nodes[city], sink, 1, slot * 1000)
 
     # Successive shortest augmenting paths over the residual graph allow an
     # earlier broad-city assignment to be rerouted when that model fits another
@@ -226,7 +230,6 @@ def main():
         raise RuntimeError("Unexpected tevy models.json schema")
     report = {"source": INDEX_URL, "catalogue_generated": index.get("generated"), "queried_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "policy": "CC0-1.0 complete building category, dimensions, three versioned GLB LODs, <=25 MiB LOD0, SHA-256 and GLB 2.0 validation; visual review and Unity import remain pending", "cities": {}}
     all_eligible = [m for m in models if isinstance(m, dict)]
-    all_eligible = [m for m in models if isinstance(m, dict)]
     candidate_pools = {}
     rejection_pools = {}
     for city in CITIES:
@@ -242,9 +245,8 @@ def main():
         candidate_pools[city] = candidates
         rejection_pools[city] = rejected
 
-    # The previous fixed city order let the first three broad catalogues claim
-    # models needed by scarce city themes. Allocate rare pools first so one
-    # city's generic overlap cannot starve a city with fewer eligible assets.
+    # A global max-flow assignment with fair city slots prevents broad catalogues
+    # from consuming every shared candidate while a smaller city remains empty.
     allocations = allocate_city_candidates(candidate_pools)
     for city in sorted(CITIES, key=lambda name: (len(candidate_pools[name]), name)):
         acquired = []
