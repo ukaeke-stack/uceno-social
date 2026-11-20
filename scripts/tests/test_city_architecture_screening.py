@@ -134,6 +134,40 @@ class CityArchitectureScreeningTests(unittest.TestCase):
             asset("Glass Office Tower", [18, 34, 18]), "EclipseCentral")
         self.assertEqual(reason, "lumen-tower-candidate-below-35m")
 
+    def test_complete_low_rise_building_can_qualify_at_realistic_scale(self):
+        hanok = asset(
+            "Hanok Main House (Korean Hanok Village and Street)",
+            [11.2, 5.718, 7.963],
+            summary="A three bay timber framed hanok house in a Korean village.",
+            tags=[{"slug": "realistic"}, {"slug": "exterior"}]
+        )
+        self.assertIsNone(discovery.rejection_reason(hanok, "SolsticeBay"))
+
+    def test_industrial_laboratory_is_eligible_for_atlas_frontier(self):
+        laboratory = asset(
+            "Assay laboratory (Ore Processing and Haulage Plant)",
+            [14.6, 9.351, 17.87],
+            summary="A clad gable assay laboratory in an ore processing and haulage plant.",
+            tags=[{"slug": "realistic"}, {"slug": "exterior"}]
+        )
+        self.assertIsNone(discovery.rejection_reason(laboratory, "AtlasFrontier"))
+
+    def test_city_relevance_rejects_an_unrelated_complete_building(self):
+        coastal = asset(
+            "Coastal Hotel Building", [18, 12, 14],
+            summary="A modern waterfront hotel building with exterior balconies."
+        )
+        self.assertEqual(discovery.rejection_reason(coastal, "AtlasFrontier"),
+                         "insufficient-city-relevance")
+
+    def test_facade_front_asset_is_rejected_even_when_parent_pack_mentions_buildings(self):
+        facade = asset(
+            "Chandlery Front (Marina and Yacht Club)", [6.004, 4.201, 1.6],
+            summary="Marina chandlery shop front: a rendered wall with a full height glazed display."
+        )
+        self.assertEqual(discovery.rejection_reason(facade, "MonsoonHarbour"),
+                         "non-building-object-title")
+
     def test_acquisition_validates_complete_glb_2_binary_and_checksum(self):
         import hashlib
         import struct
