@@ -84,6 +84,20 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         )
         self.assertIsNone(discovery.rejection_reason(building, "NexusDelta"))
 
+    def test_modular_tag_does_not_reject_a_complete_full_scale_building(self):
+        candidate = asset("Modular Residential Building", [18, 24, 16],
+                          tags=[{"slug": "realistic"}, {"slug": "exterior"}, {"slug": "modular"}])
+        self.assertIsNone(discovery.rejection_reason(candidate, "NexusDelta"))
+        detail = {
+            "title": "Modular Residential Building",
+            "category": "buildings",
+            "description": "realistic exterior complete apartment building",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}, {"slug": "modular"}],
+            "stats": {"sizeMeters": [18, 24, 16]},
+        }
+        self.assertEqual(acquisition.validate_complete_building(detail, "NexusDelta"),
+                         (18.0, 24.0, 16.0))
+
     def test_component_title_is_rejected_even_if_description_says_building(self):
         component = asset(
             "Office Tower Wall", [8, 12, 0.2],
