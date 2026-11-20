@@ -20,6 +20,8 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
   const routeDiscoveryMigration = readFileSync(new URL("../../../db/migrations/039_private_treasure_route_discoveries.sql", import.meta.url), "utf8");
   const teamMigration = readFileSync(new URL("../../../db/migrations/040_treasure_team_rewards.sql", import.meta.url), "utf8");
   const userId = randomUUID();
+  const secondUserId = randomUUID();
+  const teamId = randomUUID();
   const worldId = randomUUID();
   const activityId = randomUUID();
   const resultSessionId = randomUUID();
@@ -80,7 +82,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       WHERE schemaname = current_schema() AND indexname = ANY(${expectedIndexes})`;
     assert.deepEqual(installedIndexes.map(row => row.indexname).sort(), expectedIndexes.sort());
 
-    await db.unsafe("INSERT INTO users(id) VALUES ($1)", [userId]);
+    await db.unsafe("INSERT INTO users(id) VALUES ($1), ($2)", [userId, secondUserId]);
     await db.unsafe("INSERT INTO virtual_worlds(id) VALUES ($1)", [worldId]);
     await db.unsafe("INSERT INTO virtual_world_activity_sessions(id) VALUES ($1)", [resultSessionId]);
     const result = await db.unsafe(`INSERT INTO virtual_world_activity_results
@@ -135,6 +137,25 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       VALUES (${huntId}::uuid, ${userId}::uuid)`;
     await assert.rejects(() => db`INSERT INTO virtual_world_treasure_global_claims (hunt_id, user_id)
       VALUES (${huntId}::uuid, ${userId}::uuid)`);
+    await db.unsafe(`INSERT INTO virtual_world_treasure_teams (id, hunt_id, owner_user_id)
+      VALUES ($1, $2, $3)`, [teamId, huntId, userId]);
+    await db.unsafe(`INSERT INTO virtual_world_treasure_team_members
+      (hunt_id, team_id, user_id, contribution_points)
+      VALUES ($1, $2, $3, 3), ($1, $2, $4, 2)`,
+      [huntId, teamId, userId, secondUserId]);
+    await db.unsafe(`INSERT INTO virtual_world_treasure_team_assignments
+      (hunt_id, team_id, sequence, spawn_point_id) VALUES ($1, $2, 0, $3)`,
+      [huntId, teamId, spawnA]);
+    await db.unsafe(`INSERT INTO virtual_world_treasure_team_progress (hunt_id, team_id)
+      VALUES ($1, $2)`, [huntId, teamId]);
+    await db.unsafe(`INSERT INTO virtual_world_treasure_team_discoveries
+      (id, hunt_id, team_id, sequence, spawn_point_id, discovered_by)
+      VALUES ($1, $2, $3, 0, $4, $5)`,
+      [randomUUID(), huntId, teamId, spawnA, userId]);
+    await db.unsafe(`INSERT INTO virtual_world_treasure_team_reward_allocations
+      (team_id, user_id, contribution_points, amount)
+      VALUES ($1, $2, 3, 15), ($1, $3, 2, 10)`,
+      [teamId, userId, secondUserId]);
 
     await db.unsafe(`INSERT INTO virtual_world_treasure_progress
       (hunt_id, user_id, next_sequence) VALUES ($1, $2, 1)`, [huntId, userId]);
