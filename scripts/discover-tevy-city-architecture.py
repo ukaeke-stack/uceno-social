@@ -7,6 +7,7 @@ is pinned to a published version and checked against the catalogue SHA-256.
 import hashlib
 import json
 import pathlib
+import re
 import time
 import urllib.request
 
@@ -47,6 +48,10 @@ def dimensions(record):
     except (KeyError, TypeError, ValueError):
         return None
 
+def contains_term(text, term):
+    # Match complete words/phrases; "airport" must not match "port".
+    return re.search(r"(?<!\\w)" + re.escape(term) + r"(?!\\w)", text) is not None
+
 def screen(record, city):
     if record.get("category") != "buildings":
         return "not-building-category"
@@ -80,13 +85,13 @@ def screen(record, city):
     # A generic building is not automatically suitable for every city.
     # Require at least one explicit city-theme term before acquisition so
     # catalogue scarcity cannot silently mislabel assets across districts.
-    if not any(term in text for term in CITIES[city]):
+    if city not in CITIES or not any(contains_term(text, term) for term in CITIES[city]):
         return "insufficient-city-relevance"
     return None
 
 def score(record, city):
     text = " ".join([record.get("name", ""), record.get("description", ""), " ".join(record.get("tags") or [])]).lower()
-    city_hits = sum(1 for term in CITIES[city] if term in text)
+    city_hits = sum(1 for term in CITIES[city] if contains_term(text, term))
     generic_hits = sum(1 for term in GENERIC if term in text)
     y = dimensions(record)[1]
     return city_hits * 10 + min(generic_hits, 5) * 2 + (5 if y >= 35 else 0)
