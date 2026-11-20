@@ -1,0 +1,21 @@
+{
+  "name": "Shrub 03",
+  "asset_id": "shrub_03",
+  "source": "https://polyhaven.com/a/shrub_03",
+  "license": "CC0 1.0",
+  "authors": {
+    "Rico Cilliers": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 16955,
+  "lods": true,
+  "files": [
+    "shrub_03.fbx",
+    "textures/shrub_03_nor_gl_1k.exr",
+    "textures/shrub_03_alpha_1k.png",
+    "textures/shrub_03_diff_1k.jpg",
+    "textures/shrub_03_rough_1k.exr"
+  ],
+  "runtime_api_dependency": false
+}

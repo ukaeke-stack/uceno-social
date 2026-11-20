@@ -1,0 +1,21 @@
+{
+  "name": "Gothic Bed 01",
+  "asset_id": "GothicBed_01",
+  "source": "https://polyhaven.com/a/GothicBed_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Kirill Sannikov": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 18741,
+  "lods": false,
+  "files": [
+    "gothic_bed_01.fbx",
+    "textures/GothicBed_01_diff_1k.jpg",
+    "textures/GothicBed_01_metallic_1k.exr",
+    "textures/GothicBed_01_nor_gl_1k.exr",
+    "textures/GothicBed_01_roughness_1k.jpg"
+  ],
+  "runtime_api_dependency": false
+}

@@ -1,0 +1,31 @@
+{
+  "name": "Modular Urban Apartments Facade",
+  "asset_id": "modular_urban_apartments_facade",
+  "source": "https://polyhaven.com/a/modular_urban_apartments_facade",
+  "license": "CC0 1.0",
+  "authors": {
+    "James Ray Cock": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 118215,
+  "lods": false,
+  "files": [
+    "modular_urban_apartments_facade.fbx",
+    "textures/modular_urban_apartments_facade_trim_01_diff_1k.png",
+    "textures/modular_urban_apartments_facade_objects_alpha_1k.png",
+    "textures/modular_urban_apartments_facade_plaster_diff_1k.png",
+    "textures/modular_urban_apartments_facade_trim_02_nor_gl_1k.png",
+    "textures/modular_urban_apartments_facade_trim_01_nor_gl_1k.png",
+    "textures/modular_urban_apartments_facade_objects_nor_gl_1k.png",
+    "textures/modular_urban_apartments_facade_objects_diff_1k.png",
+    "textures/modular_urban_apartments_facade_objects_rough_1k.png",
+    "textures/modular_urban_apartments_facade_objects_metal_1k.png",
+    "textures/modular_urban_apartments_facade_plaster_rough_1k.png",
+    "textures/modular_urban_apartments_facade_plaster_nor_gl_1k.png",
+    "textures/modular_urban_apartments_facade_trim_02_rough_1k.png",
+    "textures/modular_urban_apartments_facade_trim_01_rough_1k.png",
+    "textures/modular_urban_apartments_facade_trim_02_diff_1k.png"
+  ],
+  "runtime_api_dependency": false
+}

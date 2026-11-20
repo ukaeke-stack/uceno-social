@@ -1,0 +1,22 @@
+{
+  "name": "Street Lamp 01",
+  "asset_id": "street_lamp_01",
+  "source": "https://polyhaven.com/a/street_lamp_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Josh Dean": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 30610,
+  "lods": false,
+  "files": [
+    "street_lamp_01.fbx",
+    "textures/street_lamp_01_metal_1k.exr",
+    "textures/street_lamp_01_rough_1k.exr",
+    "textures/street_lamp_01_diff_1k.jpg",
+    "textures/street_lamp_01_opacity_1k.png",
+    "textures/street_lamp_01_nor_gl_1k.exr"
+  ],
+  "runtime_api_dependency": false
+}

@@ -1,0 +1,21 @@
+{
+  "name": "Round Wooden Table 01",
+  "asset_id": "round_wooden_table_01",
+  "source": "https://polyhaven.com/a/round_wooden_table_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Ulan Cabanilla": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 8640,
+  "lods": false,
+  "files": [
+    "round_wooden_table_01.fbx",
+    "textures/round_wooden_table_01_nor_gl_1k.exr",
+    "textures/round_wooden_table_01_metal_1k.exr",
+    "textures/round_wooden_table_01_diff_1k.jpg",
+    "textures/round_wooden_table_01_rough_1k.jpg"
+  ],
+  "runtime_api_dependency": false
+}

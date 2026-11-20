@@ -1,0 +1,21 @@
+{
+  "name": "Arm Chair 01",
+  "asset_id": "ArmChair_01",
+  "source": "https://polyhaven.com/a/ArmChair_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Kirill Sannikov": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 5626,
+  "lods": false,
+  "files": [
+    "arm_chair_01.fbx",
+    "textures/Armchair_01_diff_1k.jpg",
+    "textures/Armchair_01_metallic_1k.exr",
+    "textures/Armchair_01_nor_gl_1k.exr",
+    "textures/Armchair_01_roughness_1k.jpg"
+  ],
+  "runtime_api_dependency": false
+}

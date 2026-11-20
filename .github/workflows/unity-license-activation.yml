@@ -1,0 +1,23 @@
+
+name: Request Unity CI Activation File
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  activation:
+    name: Request Unity activation file
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request activation file
+        id: getLicense
+        uses: game-ci/unity-request-activation-file@v2
+
+      - name: Upload activation file
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-activation-file
+          path: ${{ steps.getLicense.outputs.filePath }}

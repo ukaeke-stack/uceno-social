@@ -1,0 +1,58 @@
+## Remote content delivery acceptance tests
+
+- [ ] Unity Package Manager resolves the pinned Addressables package in Unity 6000.3.27f1.
+- [ ] The bootstrap initializes Addressables without a configured remote catalog for local Editor tests.
+- [ ] A configured versioned HTTPS remote catalog loads successfully.
+- [ ] Before a home-entry request is sent, the client preloads `home-interiors`; confirm the player stays in the current area during download.
+- [ ] Before an event-venue request is sent, the client preloads `world-event-venues`; confirm the player stays in the current area during download.
+- [ ] Confirm the gateway request is sent only after the required label reports success.
+- [ ] Confirm the server still controls admission and can reject a request after preload.
+- [ ] Joining a sports session preloads `activity-sports` before the join packet is sent.
+- [ ] Joining a checkpoint race preloads `activity-racing` before the join packet is sent.
+- [ ] Joining a dance session preloads `activity-dance` before the join packet is sent.
+- [ ] Joining an adventure session preloads `activity-adventure` before the join packet is sent.
+- [ ] If activity content fails to download, confirm no join packet is sent and the player stays in the current area.
+- [ ] Unknown activity kinds do not guess a content label; the server remains authoritative.
+- [ ] Successful downloads are cached and revisiting the same area does not download the same bundles again.
+- [ ] Interrupt the connection mid-download; confirm no home/event admission request is sent and the player remains in the current area.
+- [ ] Restore connectivity and retry travel; confirm the size/cache check runs again and successful download allows the gateway request.
+- [ ] Reject travel at the server after a successful preload; confirm the client remains in the current area and displays the rejection.
+- [ ] A missing label/catalog produces a clear error rather than a blank world or crash.
+- [ ] Low-storage and HTTP errors are surfaced without marking the label ready.
+- [ ] Developer preload downloads configured labels in sequence and is unavailable in release UI.
+- [ ] A new catalog version updates content without requiring a full APK reinstall.
+- [ ] Android and WebGL use separately built platform bundles.
+- [ ] Measure initial APK size against the same build with world bundles included; record actual reduction rather than assuming a target.
+- [ ] Configure two non-overlapping server districts and matching Addressables labels; gateway startup accepts the configuration.
+- [ ] Verify malformed, duplicate, overlapping, out-of-bounds and unsafe-label district configurations prevent gateway startup.
+- [ ] Walk toward a district boundary; confirm the server pauses horizontal movement and sends the server-authored district ID/label/nonce.
+- [ ] Confirm Unity downloads the required district label and acknowledges with the matching nonce before the server allows movement across the boundary.
+- [ ] Interrupt district download; confirm the player remains at the boundary and can retry without entering an incomplete district.
+- [ ] Turn back while district content is downloading; confirm the gateway cancels the pending transition and the client clears stale download state.
+- [ ] Attempt to acknowledge with a wrong district ID or nonce; confirm the gateway does not release the movement gate.
+- [ ] Re-enter a previously visited district; confirm Addressables cache avoids downloading the same bundles again.
+- [ ] Confirm district geometry and content labels match between every deployed gateway instance and its platform-specific Addressables catalog.
+- [ ] Verify asset quality and frame time in the same Android device profile; size reduction must not silently downgrade world visuals.
+
+- [ ] Enter a district and confirm its labeled assets are loaded into memory, not merely downloaded.
+- [ ] Cross into a second district; confirm both districts remain resident during the handover and the previous district is released only after server acceptance.
+- [ ] Turn back or cancel a pending district transition; confirm any newly acquired pending lease is released.
+- [ ] Enter and exit a home/event venue; confirm its content lease is acquired on entry and released on exit.
+- [ ] Acquire the same label from two consumers; confirm the Addressables handle remains loaded until both consumers release it.
+- [ ] Attempt to load a fifth distinct resident label with the default cap; confirm the load is rejected without evicting any active area's assets.
+- [ ] Confirm releasing a lease releases the Addressables handle and triggers Unity's unused-asset sweep while preserving the persistent downloaded-bundle cache.
+- [ ] Profile actual resident memory and frame time on a low-memory Android device; the four-label cap is not a substitute for byte-level profiling.
+- [ ] Verify district labels resolve to Addressable scenes and home/event/activity labels resolve to loadable asset collections; each content type must use its matching lifecycle.
+- [ ] Leave the last configured district or enter a separate home/event context; confirm the gateway notifies Unity and the active district assets are released.
+
+- [ ] Run the Unity editor scene builder with imported source assets and Addressables Settings present; confirm it creates the boot scene plus four additive district scenes.
+- [ ] Confirm shared terrain, road, player, camera and session objects remain in the boot scene while district buildings, plants, vehicles, civic square and parking geometry are partitioned by world Z.
+- [ ] Confirm the collision export includes colliders from all four district regions before geometry is moved into additive scenes.
+- [ ] Confirm each generated district scene is in the remote Addressables group, uses Pack Separately, has the matching district label as its address, and uses remote build/load path variables.
+- [ ] Enter each configured district; confirm its additive scene activates before the gateway accepts the boundary acknowledgement.
+- [ ] Leave each district; confirm Addressables unloads the additive scene after the final residency lease is released.
+- [ ] Cross district boundaries in both directions; confirm the outgoing scene remains loaded until the incoming scene is active and accepted.
+- [ ] Confirm a failed scene load does not send district_content_ready and the player remains held at the boundary with retry available.
+- [ ] Build Android and WebGL Addressables catalogs separately and verify each uses platform-compatible bundles and matching gateway labels.
+- [ ] Run the canonical `config/world-districts.json` fixture test and confirm all four gateway rectangles and labels match the Unity scene builder partitions.
+- [ ] Destroy/recreate the world content manager while an additive district scene is loading; confirm a successfully completed pending load is unloaded and no incomplete SceneInstance is passed to UnloadSceneAsync.

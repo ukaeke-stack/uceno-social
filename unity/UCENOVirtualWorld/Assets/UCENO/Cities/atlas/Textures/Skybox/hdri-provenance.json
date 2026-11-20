@@ -1,0 +1,36 @@
+{
+  "city_id": "atlas",
+  "city_label": "Atlas Frontier",
+  "asset_id": "wide_street_02",
+  "name": "Wide Street 02",
+  "creator_contributions": {
+    "Sergej Majboroda": "All"
+  },
+  "source_page": "https://polyhaven.com/a/wide_street_02",
+  "api_file_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/wide_street_02_1k.hdr",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "api_terms": "https://polyhaven.com/our-api",
+  "format": "Radiance HDR (.hdr)",
+  "resolution_tier": "1k",
+  "expected_size_bytes": 1519162,
+  "verified_md5": "2d37b07ac348e8dd57f9f97c23022f76",
+  "verified_sha256": "2d496622629e51276846e1149afd9040fa889cb3a26bed4c7d4d6c31ebaed9ad",
+  "actual_size_bytes": 1519162,
+  "width": 1024,
+  "height": 512,
+  "file": "unity/UCENOVirtualWorld/Assets/UCENO/Cities/atlas/Textures/Skybox/atlas_environment.hdr",
+  "catalogue_description": "Free 16K unclipped HDRI of a wide sunlit urban street with clear, high-contrast morning/afternoon light, long tree and lamppost shadows, and a crisp blue sky.",
+  "category": "Streets & Town/Streets & Alleys/City Streets",
+  "tags": [
+    "asphalt",
+    "city",
+    "road",
+    "street",
+    "sun",
+    "backplates"
+  ],
+  "acquisition_status": "downloaded-and-md5-verified",
+  "unity_import_status": "not-yet-imported",
+  "visual_acceptance_status": "pending"
+}

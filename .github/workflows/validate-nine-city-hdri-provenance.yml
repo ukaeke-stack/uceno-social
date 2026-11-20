@@ -1,0 +1,30 @@
+name: Validate nine city HDRI provenance
+on:
+  push:
+    branches: [feature/uceno-unity-foundation]
+    paths:
+      - "scripts/validate-nine-city-hdri-provenance.py"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Cities/**/Textures/Skybox/**"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json"
+      - ".github/workflows/validate-nine-city-hdri-provenance.yml"
+  pull_request:
+    branches: [feature/uceno-unity-foundation]
+    paths:
+      - "scripts/validate-nine-city-hdri-provenance.py"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Cities/**/Textures/Skybox/**"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json"
+      - ".github/workflows/validate-nine-city-hdri-provenance.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify all nine source records, file sizes, checksums and Radiance headers
+        run: python scripts/validate-nine-city-hdri-provenance.py

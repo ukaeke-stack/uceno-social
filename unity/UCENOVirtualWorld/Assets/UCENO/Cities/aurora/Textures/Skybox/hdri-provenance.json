@@ -1,0 +1,43 @@
+{
+  "city_id": "aurora",
+  "city_label": "Aurora Heights",
+  "asset_id": "potsdamer_platz",
+  "name": "Potsdamer Platz",
+  "creator_contributions": {
+    "Greg Zaal": "All"
+  },
+  "source_page": "https://polyhaven.com/a/potsdamer_platz",
+  "api_file_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/potsdamer_platz_1k.hdr",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "api_terms": "https://polyhaven.com/our-api",
+  "format": "Radiance HDR (.hdr)",
+  "resolution_tier": "1k",
+  "expected_size_bytes": 1540678,
+  "verified_md5": "d568c71e3cf00329f3ca32582f99338b",
+  "verified_sha256": "7afe4c2f9700ee78c7477c53fa355463d7dda1fdede401432d6b5f9ff0a95696",
+  "actual_size_bytes": 1540678,
+  "width": 1024,
+  "height": 512,
+  "file": "unity/UCENOVirtualWorld/Assets/UCENO/Cities/aurora/Textures/Skybox/aurora_environment.hdr",
+  "catalogue_description": "Free, unclipped 16K HDRI of Potsdamer Platz, Berlin. Soft overcast morning/afternoon natural light, low-contrast urban scene with roads, benches and glass towers.",
+  "category": "Streets & Town/Squares & Plazas/Historic & European Squares",
+  "tags": [
+    "europe",
+    "architecture",
+    "road",
+    "building",
+    "bench",
+    "street",
+    "city",
+    "skyscraper",
+    "pavement",
+    "intersection",
+    "metropolis",
+    "berlin",
+    "germany"
+  ],
+  "acquisition_status": "downloaded-and-md5-verified",
+  "unity_import_status": "not-yet-imported",
+  "visual_acceptance_status": "pending"
+}

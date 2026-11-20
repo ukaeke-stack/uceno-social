@@ -1,0 +1,57 @@
+name: UCENO Unity Asset Source Validation
+
+on:
+  push:
+    branches:
+      - feature/uceno-unity-foundation
+    paths:
+      - 'unity/UCENOVirtualWorld/**'
+      - 'runtime/world-gateway/config/world-cities.json'
+      - 'runtime/world-gateway/src/city-catalog-policy.ts'
+      - 'runtime/world-gateway/tests/city-catalog-policy.test.mjs'
+      - 'scripts/validate_uceno_unity_assets.py'
+      - 'scripts/download_polyhaven_assets.py'
+      - '.github/workflows/uceno-unity-assets-validation.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uceno-unity-assets-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-source-assets:
+    name: Validate imported free assets and scene wiring
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate CC0 asset manifests, file sizes and Unity source wiring
+        run: python scripts/validate_uceno_unity_assets.py
+
+      - name: Require imported Humanoid animation release gate
+        run: |
+          grep -q 'CopyFromOther' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
+          grep -q 'RequiredClips' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
+          grep -q 'Assets/UCENO/Animations/Imported' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
+          grep -q 'sourceAvatar != baseAvatar' unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs
+          grep -q 'CreateHumanoidController' unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs
+          grep -q 'AddGestureState' unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs
+          grep -q 'LODGroup' unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs
+          grep -q 'ETC2_RGBA8' unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityMobileAssetPostprocessor.cs
+          grep -q 'meshCompression = ModelImporterMeshCompression.Medium' unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityMobileAssetPostprocessor.cs
+          grep -q 'runtimeAnimatorController == null' unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs
+          ! grep -q 'Mathf.Sin(cycle)' unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarLocomotionDriver.cs
+          for clip in idle walk run talk turn wave cheer dance interact sit; do
+            grep -q "FindClip(clips, \"$clip\")" unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs
+          done
+
+      - name: Check asset downloader syntax
+        run: python -m py_compile scripts/download_polyhaven_assets.py

@@ -1,0 +1,299 @@
+import importlib.util
+import pathlib
+import unittest
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+def load_script(name, filename):
+    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / filename)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+discovery = load_script("uceno_city_discovery", "discover-city-architecture.py")
+acquisition = load_script("uceno_city_acquisition", "acquire-city-architecture.py")
+
+
+def asset(title, dimensions, summary="realistic exterior building", tags=None, style=None):
+    value = {
+        "title": title,
+        "summary": summary,
+        "category": "buildings",
+        "tags": tags or [{"slug": "realistic"}, {"slug": "exterior"}],
+        "stats": {"sizeMeters": dimensions, "fileSize": 250000, "triangles": 80000},
+    }
+    if style is not None:
+        value["style"] = style
+    return value
+
+
+class CityArchitectureScreeningTests(unittest.TestCase):
+    def test_non_building_categories_are_rejected_even_when_search_returns_a_building_title(self):
+        candidate = asset("Glass Office Tower", [24, 62, 20])
+        candidate["category"] = "props"
+        self.assertEqual(discovery.rejection_reason(candidate, "NexusDelta"),
+                         "not-building-category")
+        detail = {
+            "title": "Glass Office Tower",
+            "description": "realistic exterior office building",
+            "category": "props",
+            "style": "realistic",
+            "tags": [{"slug": "exterior"}],
+            "stats": {"sizeMeters": [24, 62, 20]},
+        }
+        with self.assertRaisesRegex(ValueError, "category"):
+            acquisition.validate_complete_building(detail, "NexusDelta")
+
+    def test_provider_building_category_object_is_normalized(self):
+        candidate = asset("Glass Office Tower", [24, 62, 20])
+        candidate["category"] = {"slug": "buildings", "title": "Buildings & Architecture"}
+        self.assertIsNone(discovery.rejection_reason(candidate, "NexusDelta"))
+        detail = {
+            "title": "Glass Office Tower",
+            "category": {"slug": "buildings", "title": "Buildings & Architecture"},
+            "description": "realistic exterior office building",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [24, 62, 20]},
+        }
+        self.assertEqual(acquisition.validate_complete_building(detail, "NexusDelta"),
+                         (24.0, 62.0, 20.0))
+
+    def test_complete_office_tower_is_a_candidate(self):
+        self.assertIsNone(discovery.rejection_reason(
+            asset("Glass Office Tower", [24, 62, 20]), "NexusDelta"))
+
+    def test_realistic_style_field_is_accepted_without_requiring_duplicate_tag(self):
+        candidate = asset("Glass Office Tower", [24, 62, 20],
+                          tags=[{"slug": "exterior"}], style="Realistic")
+        self.assertIsNone(discovery.rejection_reason(candidate, "NexusDelta"))
+        detail = {
+            "title": "Glass Office Tower",
+            "category": "buildings",
+            "description": "modern exterior office building",
+            "style": "realistic",
+            "tags": [{"slug": "exterior"}],
+            "stats": {"sizeMeters": [24, 62, 20]},
+        }
+        self.assertEqual(acquisition.validate_complete_building(detail, "NexusDelta"),
+                         (24.0, 62.0, 20.0))
+
+    def test_building_description_may_mention_walls_windows_and_columns(self):
+        building = asset(
+            "Modern Residential Tower", [24, 62, 20],
+            summary="Glass windows, concrete walls, steel columns, floor slabs and balconies."
+        )
+        self.assertIsNone(discovery.rejection_reason(building, "NexusDelta"))
+
+    def test_modular_tag_does_not_reject_a_complete_full_scale_building(self):
+        candidate = asset("Modular Residential Building", [18, 24, 16],
+                          tags=[{"slug": "realistic"}, {"slug": "exterior"}, {"slug": "modular"}])
+        self.assertIsNone(discovery.rejection_reason(candidate, "NexusDelta"))
+        detail = {
+            "title": "Modular Residential Building",
+            "category": "buildings",
+            "description": "realistic exterior complete apartment building",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}, {"slug": "modular"}],
+            "stats": {"sizeMeters": [18, 24, 16]},
+        }
+        self.assertEqual(acquisition.validate_complete_building(detail, "NexusDelta"),
+                         (18.0, 24.0, 16.0))
+
+    def test_asset_screening_uses_word_boundaries_for_terms(self):
+        self.assertEqual(discovery.words_present("airport terminal", ("port",)), [])
+        self.assertEqual(discovery.words_present("wallpaper texture", ("wall",)), [])
+        self.assertEqual(discovery.words_present("high-rise office tower", ("high rise",)), ["high rise"])
+        self.assertEqual(acquisition.words_present("airport terminal", ("port",)), [])
+        self.assertEqual(acquisition.words_present("wallpaper texture", ("wall",)), [])
+
+    def test_component_title_is_rejected_even_if_description_says_building(self):
+        component = asset(
+            "Office Tower Wall", [8, 12, 0.2],
+            summary="Realistic exterior building component"
+        )
+        self.assertEqual(
+            discovery.rejection_reason(component, "NexusDelta"),
+            "individual-building-part-or-prop",
+        )
+
+    def test_windmill_cross_is_not_a_complete_city_building(self):
+        reason = discovery.rejection_reason(
+            asset("Mill Sail Cross", [10.4, 10.4, 0.83]), "SolsticeBay")
+        self.assertIn(reason, {
+            "non-building-object-title",
+            "title-does-not-identify-a-complete-building",
+            "too-small-or-too-narrow-to-be-a-complete-building",
+        })
+
+    def test_thin_facade_like_object_is_rejected(self):
+        reason = discovery.rejection_reason(
+            asset("Modern Office Tower", [18, 42, 0.9]), "NexusDelta")
+        self.assertEqual(reason, "too-small-or-too-narrow-to-be-a-complete-building")
+
+    def test_eclipse_central_requires_35_metre_tower(self):
+        reason = discovery.rejection_reason(
+            asset("Glass Office Tower", [18, 34, 18]), "EclipseCentral")
+        self.assertEqual(reason, "lumen-tower-candidate-below-35m")
+
+    def test_complete_low_rise_building_can_qualify_at_realistic_scale(self):
+        hanok = asset(
+            "Hanok Main House (Korean Hanok Village and Street)",
+            [11.2, 5.718, 7.963],
+            summary="A three bay timber framed hanok house in a Korean village.",
+            tags=[{"slug": "realistic"}, {"slug": "exterior"}]
+        )
+        self.assertIsNone(discovery.rejection_reason(hanok, "SolsticeBay"))
+
+    def test_industrial_laboratory_is_eligible_for_atlas_frontier(self):
+        laboratory = asset(
+            "Assay laboratory (Ore Processing and Haulage Plant)",
+            [14.6, 9.351, 17.87],
+            summary="A clad gable assay laboratory in an ore processing and haulage plant.",
+            tags=[{"slug": "realistic"}, {"slug": "exterior"}]
+        )
+        self.assertIsNone(discovery.rejection_reason(laboratory, "AtlasFrontier"))
+
+    def test_city_relevance_rejects_an_unrelated_complete_building(self):
+        coastal = asset(
+            "Coastal Hotel Building", [18, 12, 14],
+            summary="A modern waterfront hotel building with exterior balconies."
+        )
+        self.assertEqual(discovery.rejection_reason(coastal, "AtlasFrontier"),
+                         "insufficient-city-relevance")
+
+    def test_facade_front_asset_is_rejected_even_when_parent_pack_mentions_buildings(self):
+        facade = asset(
+            "Chandlery Front (Marina and Yacht Club)", [6.004, 4.201, 1.6],
+            summary="Marina chandlery shop front: a rendered wall with a full height glazed display."
+        )
+        self.assertEqual(discovery.rejection_reason(facade, "MonsoonHarbour"),
+                         "non-building-object-title")
+
+    def test_acquisition_rechecks_low_rise_hanok_for_solsticebay(self):
+        detail = {
+            "title": "Hanok Main House (Korean Hanok Village and Street)",
+            "category": "buildings",
+            "description": "A three bay timber framed hanok house in a Korean village.",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [11.2, 5.718, 7.963]},
+        }
+        self.assertEqual(
+            acquisition.validate_complete_building(detail, "SolsticeBay"),
+            (11.2, 5.718, 7.963),
+        )
+
+    def test_acquisition_rechecks_industrial_laboratory_for_atlasfrontier(self):
+        detail = {
+            "title": "Assay laboratory (Ore Processing and Haulage Plant)",
+            "category": "buildings",
+            "description": "A clad gable assay laboratory in an ore processing and haulage plant.",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [14.6, 9.351, 17.87]},
+        }
+        self.assertEqual(
+            acquisition.validate_complete_building(detail, "AtlasFrontier"),
+            (14.6, 9.351, 17.87),
+        )
+
+    def test_acquisition_rejects_buildings_unrelated_to_the_target_city(self):
+        detail = {
+            "title": "Coastal Hotel Building",
+            "category": "buildings",
+            "description": "A modern waterfront hotel building with exterior balconies.",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [18, 12, 14]},
+        }
+        with self.assertRaisesRegex(ValueError, "not relevant to the target city"):
+            acquisition.validate_complete_building(detail, "AtlasFrontier")
+
+    def test_discovery_rejects_forecourt_canopy_and_shed_bay_components(self):
+        for title in [
+            "Forecourt canopy section, amber livery (Petrol Station and Forecourt Shop)",
+            "Fabrication shed bay, 4 m (Shipyard and Dry Dock)",
+        ]:
+            candidate = asset(title, [8.78, 7.45, 4.002],
+                              summary="realistic exterior building")
+            self.assertEqual(discovery.rejection_reason(candidate, "MonsoonHarbour"),
+                             "non-building-object-title", title)
+
+    def test_acquisition_rejects_forecourt_canopy_and_shed_bay_components(self):
+        for title in [
+            "Forecourt canopy section, amber livery (Petrol Station and Forecourt Shop)",
+            "Fabrication shed bay, 4 m (Shipyard and Dry Dock)",
+        ]:
+            detail = {
+                "title": title, "category": "buildings",
+                "description": "realistic exterior building",
+                "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+                "stats": {"sizeMeters": [8.78, 7.45, 4.002]},
+            }
+            with self.assertRaisesRegex(ValueError, "non-building object"):
+                acquisition.validate_complete_building(detail, "MonsoonHarbour")
+
+    def test_acquisition_rejects_facade_only_front_assets(self):
+        detail = {
+            "title": "Chandlery Front (Marina and Yacht Club)",
+            "category": "buildings",
+            "description": "Marina chandlery shop front: a rendered wall with a full height glazed display.",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [6.004, 4.201, 1.6]},
+        }
+        with self.assertRaisesRegex(ValueError, "non-building object"):
+            acquisition.validate_complete_building(detail, "MonsoonHarbour")
+
+    def test_acquisition_validates_complete_glb_2_binary_and_checksum(self):
+        import hashlib
+        import struct
+        document = b'{"asset":{"version":"2.0"},"scenes":[{"nodes":[]}]}'
+        document += b" " * ((4 - len(document) % 4) % 4)
+        total = 12 + 8 + len(document)
+        binary = (b"glTF" + struct.pack("<II", 2, total) +
+                  struct.pack("<II", len(document), 0x4E4F534A) + document)
+        digest = hashlib.sha256(binary).hexdigest()
+        self.assertEqual(acquisition.verify_glb(binary, digest), digest)
+        with self.assertRaisesRegex(ValueError, "version-2"):
+            acquisition.verify_glb(binary[:8] + struct.pack("<I", total - 1) + binary[12:])
+        with self.assertRaisesRegex(ValueError, "SHA-256"):
+            acquisition.verify_glb(binary, "0" * 64)
+        with self.assertRaises(ValueError):
+            acquisition.verify_glb(b"glTF" + b"\x00" * 8)
+
+    def test_acquisition_rechecks_complete_building_title_and_footprint(self):
+        detail = {
+            "title": "Mill Sail Cross",
+            "category": "buildings",
+            "description": "realistic exterior building",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [10.4, 10.4, 0.83]},
+        }
+        with self.assertRaises(ValueError):
+            acquisition.validate_complete_building(detail, "SolsticeBay")
+
+    def test_acquisition_allows_component_words_in_building_description(self):
+        detail = {
+            "title": "Modern Residential Tower",
+            "category": "buildings",
+            "description": "Glass windows, concrete walls, steel columns and floor slabs.",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [24, 62, 20]},
+        }
+        self.assertEqual(
+            acquisition.validate_complete_building(detail, "NexusDelta"),
+            (24.0, 62.0, 20.0),
+        )
+
+    def test_acquisition_accepts_full_scale_office_tower(self):
+        detail = {
+            "title": "Glass Office Tower",
+            "category": "buildings",
+            "description": "realistic exterior office building",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [24, 62, 20]},
+        }
+        self.assertEqual(
+            acquisition.validate_complete_building(detail, "NexusDelta"),
+            (24.0, 62.0, 20.0),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,180 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  createActivitySession, joinActivity, startActivity, recordCheckpoint,
+  leaveActivity, cancelActivity, selectNextActivityHost
+} from "../dist/activity-session.js";
+
+const WORLD = "123e4567-e89b-12d3-a456-426614174000";
+function race(now = 1_000) {
+  const created = createActivitySession({
+    id: "race-test-001", worldId: WORLD, instanceId: "instance-test",
+    kind: "checkpoint_race", checkpointCount: 2, now
+  });
+  assert.equal(created.ok, true);
+  if (!created.ok) throw new Error(created.code);
+  return created.session;
+}
+function joinTwo(session, now = 1_100) {
+  assert.equal(joinActivity(session, "user-a", now).ok, true);
+  assert.equal(joinActivity(session, "user-b", now + 1).ok, true);
+}
+
+test("rejects invalid session identifiers and checkpoint counts", () => {
+  assert.equal(createActivitySession({
+    id: "x", worldId: WORLD, instanceId: "i", kind: "checkpoint_race"
+  }).ok, false);
+  assert.equal(createActivitySession({
+    id: "race-test-001", worldId: WORLD, instanceId: "i",
+    kind: "checkpoint_race", checkpointCount: 101
+  }).ok, false);
+});
+
+test("join is idempotent and session requires two participants to start", () => {
+  const session = race();
+  assert.equal(startActivity(session, true, 1_050).ok, false);
+  assert.equal(joinActivity(session, "user-a", 1_100).ok, true);
+  const version = session.version;
+  assert.equal(joinActivity(session, "user-a", 1_101).ok, true);
+  assert.equal(session.version, version);
+  assert.equal(joinActivity(session, "user-b", 1_102).ok, true);
+  assert.equal(startActivity(session, true, 1_200).ok, true);
+  assert.equal(session.phase, "active");
+});
+
+test("rejects unauthorized host and out-of-order checkpoint claims", () => {
+  const session = race();
+  joinTwo(session);
+  assert.equal(startActivity(session, false, 1_200).ok, false);
+  assert.equal(startActivity(session, true, 1_200).ok, true);
+  assert.equal(recordCheckpoint(session, "user-a", 1, 1_300).ok, false);
+  assert.equal(recordCheckpoint(session, "unknown-user", 0, 1_301).ok, false);
+  assert.equal(recordCheckpoint(session, "user-a", 0, 1_400).ok, true);
+});
+
+test("race completes only after all active participants finish", () => {
+  const session = race();
+  joinTwo(session);
+  assert.equal(startActivity(session, true, 1_200).ok, true);
+  assert.equal(recordCheckpoint(session, "user-a", 0, 1_300).ok, true);
+  assert.equal(recordCheckpoint(session, "user-a", 1, 1_400).ok, true);
+  assert.equal(session.phase, "active");
+  assert.equal(recordCheckpoint(session, "user-b", 0, 1_500).ok, true);
+  assert.equal(recordCheckpoint(session, "user-b", 1, 1_600).ok, true);
+  assert.equal(session.phase, "completed");
+  assert.equal(session.completedAt, 1_600);
+  assert.equal(recordCheckpoint(session, "user-a", 1, 1_700).ok, false);
+});
+
+test("disconnect during an active race marks DNF and can close the session", () => {
+  const session = race();
+  joinTwo(session);
+  assert.equal(startActivity(session, true, 1_200).ok, true);
+  assert.equal(leaveActivity(session, "user-a", 1_300).ok, true);
+  assert.equal(session.participants.get("user-a")?.status, "dnf");
+  assert.equal(leaveActivity(session, "user-b", 1_301).ok, true);
+  assert.equal(session.phase, "completed");
+});
+
+test("only an authorized host can cancel a non-terminal session", () => {
+  const session = race();
+  assert.equal(cancelActivity(session, false, 1_100).ok, false);
+  assert.equal(cancelActivity(session, true, 1_100).ok, true);
+  assert.equal(session.phase, "cancelled");
+  assert.equal(cancelActivity(session, true, 1_200).ok, false);
+});
+
+
+test("host departure transfers ownership to the earliest remaining active participant", () => {
+  const session = race();
+  assert.equal(joinActivity(session, "host-user", 1_100).ok, true);
+  assert.equal(joinActivity(session, "earlier-user", 1_150).ok, true);
+  assert.equal(joinActivity(session, "later-user", 1_200).ok, true);
+  assert.equal(leaveActivity(session, "host-user", 1_300).ok, true);
+  assert.equal(selectNextActivityHost(session, "host-user"), "earlier-user");
+});
+
+test("host departure returns no replacement when no active participant remains", () => {
+  const session = race();
+  assert.equal(joinActivity(session, "host-user", 1_100).ok, true);
+  assert.equal(leaveActivity(session, "host-user", 1_200).ok, true);
+  assert.equal(selectNextActivityHost(session, "host-user"), null);
+});
+
+
+test("leave rejects timestamps before creation, start, or the participant's last action", () => {
+  const lobby = race(1_000);
+  assert.equal(joinActivity(lobby, "user-a", 1_100).ok, true);
+  assert.deepEqual(leaveActivity(lobby, "user-a", 999), { ok: false, code: "invalid_timestamp" });
+  assert.equal(lobby.participants.get("user-a")?.status, "joined");
+
+  const active = race(1_000);
+  joinTwo(active);
+  assert.equal(startActivity(active, true, 1_200).ok, true);
+  assert.deepEqual(leaveActivity(active, "user-a", 1_199), { ok: false, code: "invalid_timestamp" });
+  assert.equal(active.participants.get("user-a")?.status, "joined");
+});
+
+test("cancel rejects timestamps before the activity lifecycle begins", () => {
+  const lobby = race(1_000);
+  assert.deepEqual(cancelActivity(lobby, true, 999), { ok: false, code: "invalid_timestamp" });
+  assert.equal(lobby.phase, "lobby");
+
+  joinTwo(lobby);
+  assert.equal(startActivity(lobby, true, 1_200).ok, true);
+  assert.deepEqual(cancelActivity(lobby, true, 1_199), { ok: false, code: "invalid_timestamp" });
+  assert.equal(lobby.phase, "active");
+});
+
+
+test("join and start reject timestamps that move the activity lifecycle backwards", () => {
+  const session = race(1_000);
+  assert.deepEqual(joinActivity(session, "user-a", 999), { ok: false, code: "invalid_timestamp" });
+  assert.equal(session.participants.has("user-a"), false);
+
+  assert.equal(joinActivity(session, "user-a", 1_100).ok, true);
+  assert.equal(leaveActivity(session, "user-a", 1_200).ok, true);
+  assert.deepEqual(joinActivity(session, "user-a", 1_199), { ok: false, code: "invalid_timestamp" });
+  assert.equal(session.participants.get("user-a")?.status, "left");
+
+  joinActivity(session, "user-b", 1_300);
+  joinActivity(session, "user-c", 1_400);
+  assert.deepEqual(startActivity(session, true, 1_399), { ok: false, code: "invalid_timestamp" });
+  assert.equal(session.phase, "lobby");
+  assert.equal(startActivity(session, true, 1_400).ok, true);
+});
+
+
+test("join and cancellation respect the latest participant event timestamp", () => {
+  const lobby = race(1_000);
+  assert.equal(joinActivity(lobby, "user-a", 1_100).ok, true);
+  assert.deepEqual(joinActivity(lobby, "user-b", 1_099), { ok: false, code: "invalid_timestamp" });
+  assert.equal(lobby.participants.has("user-b"), false);
+
+  assert.equal(joinActivity(lobby, "user-b", 1_101).ok, true);
+  assert.deepEqual(cancelActivity(lobby, true, 1_100), { ok: false, code: "invalid_timestamp" });
+  assert.equal(lobby.phase, "lobby");
+  assert.equal(cancelActivity(lobby, true, 1_101).ok, true);
+});
+
+
+test("leave is idempotent for DNF participants and blocked after session cancellation", () => {
+  const active = race();
+  joinTwo(active);
+  assert.equal(startActivity(active, true, 1_200).ok, true);
+  assert.equal(leaveActivity(active, "user-a", 1_300).ok, true);
+  const dnfVersion = active.version;
+  assert.equal(leaveActivity(active, "user-a", 1_400).ok, true);
+  assert.equal(active.version, dnfVersion);
+  assert.equal(active.participants.get("user-a")?.lastActionAt, 1_300);
+
+  const cancelled = race();
+  joinTwo(cancelled);
+  assert.equal(cancelActivity(cancelled, true, 1_200).ok, true);
+  const cancelledVersion = cancelled.version;
+  assert.deepEqual(leaveActivity(cancelled, "user-a", 1_300), {
+    ok: false, code: "session_already_terminal"
+  });
+  assert.equal(cancelled.version, cancelledVersion);
+  assert.equal(cancelled.participants.get("user-a")?.status, "joined");
+});

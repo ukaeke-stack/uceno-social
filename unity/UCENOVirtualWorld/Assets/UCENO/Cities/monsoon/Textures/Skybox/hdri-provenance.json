@@ -1,0 +1,42 @@
+{
+  "city_id": "monsoon",
+  "city_label": "Monsoon Harbour",
+  "asset_id": "shanghai_bund",
+  "name": "Shanghai Bund",
+  "creator_contributions": {
+    "Greg Zaal": "All"
+  },
+  "source_page": "https://polyhaven.com/a/shanghai_bund",
+  "api_file_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/shanghai_bund_1k.hdr",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "api_terms": "https://polyhaven.com/our-api",
+  "format": "Radiance HDR (.hdr)",
+  "resolution_tier": "1k",
+  "expected_size_bytes": 1640377,
+  "verified_md5": "682071576d231d9ed36309cbe511309f",
+  "verified_sha256": "77276a6b67cbf09611efc46e55871eead34e1fc6fa107db412207b91cf74697e",
+  "actual_size_bytes": 1640377,
+  "width": 1024,
+  "height": 512,
+  "file": "unity/UCENOVirtualWorld/Assets/UCENO/Cities/monsoon/Textures/Skybox/monsoon_environment.hdr",
+  "catalogue_description": "Free 16K HDRI (unclipped) capturing Shanghai Bund at night: high-contrast neon skyline, warm promenade lighting, partly cloudy sky and vivid river reflections.",
+  "category": "Coast & Water/Harbours & Piers/Promenades & Seafronts",
+  "tags": [
+    "skyscraper",
+    "skyline",
+    "china",
+    "neon",
+    "promenade",
+    "building",
+    "architecture",
+    "street",
+    "city",
+    "square",
+    "balcony",
+    "shanghai"
+  ],
+  "acquisition_status": "downloaded-and-md5-verified",
+  "unity_import_status": "not-yet-imported",
+  "visual_acceptance_status": "pending"
+}

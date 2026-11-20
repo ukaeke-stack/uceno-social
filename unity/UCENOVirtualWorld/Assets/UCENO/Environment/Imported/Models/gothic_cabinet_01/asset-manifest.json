@@ -1,0 +1,21 @@
+{
+  "name": "Gothic Cabinet 01",
+  "asset_id": "GothicCabinet_01",
+  "source": "https://polyhaven.com/a/GothicCabinet_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Kirill Sannikov": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 12170,
+  "lods": false,
+  "files": [
+    "gothic_cabinet_01.fbx",
+    "textures/GothicCabinet_01_nor_gl_1k.exr",
+    "textures/GothicCabinet_01_roughness_1k.jpg",
+    "textures/GothicCabinet_01_metallic_1k.exr",
+    "textures/GothicCabinet_01_diff_1k.jpg"
+  ],
+  "runtime_api_dependency": false
+}
