@@ -239,7 +239,6 @@ namespace UCENO.VirtualWorld
         public GatewaySnapshotPlayer[] players;
         public GatewayActivitySessionState session;
         public GatewayActivityDiscoverySession[] sessions;
-        public string instanceId;
         public string endpoint;
         public string sessionId;
         public string huntId;
