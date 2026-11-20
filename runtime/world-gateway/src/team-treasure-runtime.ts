@@ -105,7 +105,7 @@ export async function joinTreasureTeam(
       FROM virtual_world_treasure_teams AS team
       JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = team.hunt_id
       WHERE team.id = $1::uuid AND (hunt.world_id IS NULL OR hunt.world_id = $2::uuid)
-      FOR UPDATE OF team, hunt`, [teamId, worldId]);
+      FOR UPDATE OF team FOR SHARE OF hunt`, [teamId, worldId]);
     if (!rows.length) return { ok: false, code: "team_not_found" };
     const team = rows[0];
     if (team.enabled !== true || team.distributionMode !== "team" || new Date(team.startsAt).getTime() > now ||
@@ -118,15 +118,12 @@ export async function joinTreasureTeam(
       FROM virtual_world_treasure_team_members WHERE team_id = $1::uuid`, [teamId]);
     const count = Number(countRows[0]?.total ?? 0);
     if (count >= Number(team.maxMembers)) return { ok: false, code: "team_full" };
-    try {
-      await tx.unsafe(`INSERT INTO virtual_world_treasure_team_members
-        (hunt_id, team_id, user_id) VALUES ($1::uuid, $2::uuid, $3::uuid)`,
-        [team.huntId, teamId, userId]);
-    } catch (error) {
-      if (String(error).includes("unique") || String(error).includes("duplicate"))
-        return { ok: false, code: "already_in_another_team_for_hunt" };
-      throw error;
-    }
+    const insertedMember = await tx.unsafe(`INSERT INTO virtual_world_treasure_team_members
+      (hunt_id, team_id, user_id) VALUES ($1::uuid, $2::uuid, $3::uuid)
+      ON CONFLICT (hunt_id, user_id) DO NOTHING RETURNING user_id`,
+      [team.huntId, teamId, userId]);
+    if (!insertedMember.length)
+      return { ok: false, code: "already_in_another_team_for_hunt" };
     const nextCount = count + 1;
     const status = nextCount >= 2 ? "active" : "forming";
     await tx.unsafe(`UPDATE virtual_world_treasure_teams SET status = $2
