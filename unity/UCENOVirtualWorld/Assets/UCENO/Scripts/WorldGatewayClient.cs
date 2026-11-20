@@ -160,6 +160,47 @@ namespace UCENO.VirtualWorld
     [Serializable] internal sealed class GatewayActivityTransferRequest { public string sessionId; }
     [Serializable] internal sealed class GatewayActivityTransferResponse { public string ticket; public string endpoint; public string instanceId; public string sessionId; public string error; }
 
+    [Serializable] public sealed class GatewayTreasureClue
+    {
+        public string title;
+        public string hint;
+        public string description;
+        public string mediaAssetId;
+        public string clueType;
+        public int difficulty;
+    }
+
+    [Serializable] public sealed class GatewayTreasureCollectible
+    {
+        public string code;
+        public string displayName;
+        public string category;
+        public string rarity;
+        public int quantity;
+    }
+
+    [Serializable] public sealed class GatewayTreasureInventoryItem
+    {
+        public string code;
+        public string displayName;
+        public string category;
+        public string rarity;
+        public int quantity;
+        public string awardedAt;
+    }
+
+    [Serializable] public sealed class GatewayTreasureHistoryItem
+    {
+        public string huntId;
+        public string title;
+        public string distributionMode;
+        public int discoveredClues;
+        public string completedAt;
+        public string rewardIssuedAt;
+        public string rewardEarnedCredits;
+        public int totalClues;
+    }
+
     [Serializable] internal sealed class GatewayPacket
     {
         public string type;
@@ -199,6 +240,15 @@ namespace UCENO.VirtualWorld
         public string instanceId;
         public string endpoint;
         public string sessionId;
+        public string huntId;
+        public string title;
+        public int sequence;
+        public GatewayTreasureClue clue;
+        public bool completed;
+        public string rewardEarnedCredits;
+        public GatewayTreasureCollectible[] collectibles;
+        public GatewayTreasureInventoryItem[] items;
+        public GatewayTreasureHistoryItem[] hunts;
     }
 
     /// <summary>
@@ -291,6 +341,11 @@ namespace UCENO.VirtualWorld
         public event Action<string> SpatialLocationRejected;
         public event Action<GatewayActivitySessionState> ActivityStateChanged;
         public event Action<string> ActivityRejected;
+        public event Action<string, string, int, GatewayTreasureClue> TreasureClueReceived;
+        public event Action<string, bool, string, GatewayTreasureCollectible[]> TreasureDiscoveryReceived;
+        public event Action<GatewayTreasureInventoryItem[]> TreasureInventoryReceived;
+        public event Action<GatewayTreasureHistoryItem[]> TreasureHistoryReceived;
+        public event Action<string> TreasureRejected;
         public event Action<string, string> ActivityRouteRequired;
         public event Action<string, bool> VoicePeerPresenceChanged;
         public event Action<string, string, string, string, string, int> VoiceSignalReceived;
@@ -585,6 +640,25 @@ namespace UCENO.VirtualWorld
             spatialTransitionStatus = "Activity content ready. Requesting admission...";
             _ = SendActivityRequestAsync(new GatewayActivityRequest { type = "activity_join", id = activityId });
             spatialTransitionPending = false;
+        }
+
+        public bool RequestTreasureInventory() => SendTreasureRequest("treasure_inventory_request");
+        public bool RequestTreasureHistory() => SendTreasureRequest("treasure_history_request");
+
+        private bool SendTreasureRequest(string type)
+        {
+            if (!connected || socket == null) return false;
+            _ = SendTreasureRequestAsync(type);
+            return true;
+        }
+
+        private async Task SendTreasureRequestAsync(string type)
+        {
+            try { await socket.SendText("{\\"type\\":\\"" + type + "\\"}"); }
+            catch (Exception error)
+            {
+                Debug.LogWarning("UCENO treasure request failed: " + error.Message);
+            }
         }
 
         public bool RequestActivityStart(string activityId) =>
@@ -926,6 +1000,40 @@ namespace UCENO.VirtualWorld
                 spatialTransitionStatus = "The server denied travel. You remain in the current area.";
                 Debug.LogWarning("UCENO spatial location request rejected: " + packet.code);
                 SpatialLocationRejected?.Invoke(packet.code ?? "request_rejected");
+                return;
+            }
+
+            if (packet.type == "treasure_hunt_clue")
+            {
+                TreasureClueReceived?.Invoke(packet.huntId ?? "", packet.title ?? "",
+                    packet.sequence, packet.clue);
+                return;
+            }
+
+            if (packet.type == "treasure_clue_discovered")
+            {
+                TreasureDiscoveryReceived?.Invoke(packet.objectId ?? "", packet.completed,
+                    packet.rewardEarnedCredits ?? "0", packet.collectibles ?? Array.Empty<GatewayTreasureCollectible>());
+                return;
+            }
+
+            if (packet.type == "treasure_discovery_rejected")
+            {
+                TreasureRejected?.Invoke(packet.code ?? "treasure_discovery_rejected");
+                return;
+            }
+
+            if (packet.type == "treasure_inventory")
+            {
+                TreasureInventoryReceived?.Invoke(packet.items ?? Array.Empty<GatewayTreasureInventoryItem>());
+                if (!string.IsNullOrEmpty(packet.code)) TreasureRejected?.Invoke(packet.code);
+                return;
+            }
+
+            if (packet.type == "treasure_hunt_history")
+            {
+                TreasureHistoryReceived?.Invoke(packet.hunts ?? Array.Empty<GatewayTreasureHistoryItem>());
+                if (!string.IsNullOrEmpty(packet.code)) TreasureRejected?.Invoke(packet.code);
                 return;
             }
 
