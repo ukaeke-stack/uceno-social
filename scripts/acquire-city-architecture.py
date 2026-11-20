@@ -99,7 +99,7 @@ def verify_glb(data, expected_sha=None):
     if chunk_type != 0x4E4F534A or 20 + chunk_length > len(data):
         raise ValueError("GLB JSON chunk is missing or malformed")
     try:
-        document = json.loads(data[20:20 + chunk_length].decode("utf-8").rstrip(" \\x00"))
+        document = json.loads(data[20:20 + chunk_length].decode("utf-8").rstrip(" \x00"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("GLB JSON chunk is invalid") from exc
     if document.get("asset", {}).get("version") != "2.0":
