@@ -77,6 +77,11 @@ def screen(record, city):
         return "non-occupiable-infrastructure"
     if any(term in text for term in EXCLUDE):
         return "unwanted-theme"
+    # A generic building is not automatically suitable for every city.
+    # Require at least one explicit city-theme term before acquisition so
+    # catalogue scarcity cannot silently mislabel assets across districts.
+    if not any(term in text for term in CITIES[city]):
+        return "insufficient-city-relevance"
     return None
 
 def score(record, city):
