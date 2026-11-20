@@ -549,6 +549,10 @@ async function isActiveTreasureInteractable(player: Player, target: RegisteredIn
       JOIN virtual_world_treasure_teams AS team ON team.id = assignment.team_id
       JOIN virtual_world_treasure_team_members AS member
         ON member.team_id = team.id AND member.user_id = ${player.id}::uuid
+      JOIN virtual_world_treasure_team_progress AS progress
+        ON progress.team_id = team.id AND progress.completed_at IS NULL
+      JOIN virtual_world_treasure_team_assignments AS assignment
+        ON assignment.team_id = team.id AND assignment.sequence = progress.next_sequence
       JOIN virtual_world_treasure_spawn_points AS point
         ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
       JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = team.hunt_id
