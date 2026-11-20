@@ -142,7 +142,7 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "SHA-256"):
             acquisition.verify_glb(binary, "0" * 64)
         with self.assertRaises(ValueError):
-            acquisition.verify_glb(b"glTF" + b"\\x00" * 8)
+            acquisition.verify_glb(b"glTF" + b"\x00" * 8)
 
     def test_acquisition_rechecks_complete_building_title_and_footprint(self):
         detail = {
