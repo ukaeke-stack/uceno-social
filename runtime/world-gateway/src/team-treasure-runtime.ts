@@ -57,7 +57,7 @@ export async function createTreasureTeam(
       WHERE id = $1::uuid AND enabled = TRUE AND distribution_mode = 'team'
         AND (world_id IS NULL OR world_id = $2::uuid)
         AND starts_at <= to_timestamp($3) AND ends_at > to_timestamp($3)
-      FOR UPDATE`, [huntId, worldId, now / 1000]);
+      FOR SHARE`, [huntId, worldId, now / 1000]);
     if (!hunts.length) return { ok: false, code: "team_hunt_unavailable" };
     const existing = await tx.unsafe(`SELECT team.id, team.status
       FROM virtual_world_treasure_team_members AS member
@@ -71,9 +71,22 @@ export async function createTreasureTeam(
       (id, hunt_id, owner_user_id, status, max_members)
       VALUES ($1::uuid, $2::uuid, $3::uuid, 'forming', $4)`,
       [teamId, huntId, userId, requestedMaxMembers]);
-    await tx.unsafe(`INSERT INTO virtual_world_treasure_team_members
-      (hunt_id, team_id, user_id) VALUES ($1::uuid, $2::uuid, $3::uuid)`,
+    const memberInserted = await tx.unsafe(`INSERT INTO virtual_world_treasure_team_members
+      (hunt_id, team_id, user_id) VALUES ($1::uuid, $2::uuid, $3::uuid)
+      ON CONFLICT (hunt_id, user_id) DO NOTHING RETURNING user_id`,
       [huntId, teamId, userId]);
+    if (!memberInserted.length) {
+      // Another concurrent create request for this same player won the unique
+      // (hunt_id, user_id) claim. Remove this empty team and return its winner.
+      await tx.unsafe(`DELETE FROM virtual_world_treasure_teams WHERE id = $1::uuid`, [teamId]);
+      const raced = await tx.unsafe(`SELECT team.id, team.status
+        FROM virtual_world_treasure_team_members AS member
+        JOIN virtual_world_treasure_teams AS team ON team.id = member.team_id
+        WHERE member.hunt_id = $1::uuid AND member.user_id = $2::uuid LIMIT 1`,
+        [huntId, userId]);
+      return { ok: false, code: "already_in_treasure_team",
+        ...(raced[0] ? { teamId: raced[0].id, status: raced[0].status } : {}) };
+    }
     if (!await loadTeamRoute(tx, huntId, teamId, secret))
       throw new Error("team_treasure_authored_route_unavailable");
     return { ok: true, teamId, status: "forming", members: 1, maxMembers: requestedMaxMembers };
