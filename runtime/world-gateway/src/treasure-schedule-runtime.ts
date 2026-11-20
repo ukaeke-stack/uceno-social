@@ -51,13 +51,24 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
     const result = await db.begin(async tx => {
       const lock = await tx.unsafe(`SELECT pg_try_advisory_xact_lock(hashtext('uceno_treasure_schedule_materializer')) AS locked`);
       if (lock[0]?.locked !== true) return false;
-      const current = await tx.unsafe(`SELECT id, reward_earned_credits AS reward,
+      const current = await tx.unsafe(`SELECT id, code, title, world_id AS "worldId",
+          cadence, time_zone AS "timeZone", active_from AS "activeFrom",
+          active_until AS "activeUntil", reward_earned_credits AS reward,
           distribution_mode AS "distributionMode", max_global_winners AS "maxGlobalWinners",
           max_reward_claims AS "maxRewardClaims"
         FROM virtual_world_treasure_hunt_templates
         WHERE id = $1::uuid AND enabled = TRUE
         FOR SHARE`, [template.id]);
       if (!current[0]) return false;
+      // Recompute from the locked, current template. The outer scan is only a
+      // candidate list; operators may edit cadence, timezone, title or dates
+      // between that scan and this transaction.
+      const currentWindow = resolveWindow(current[0], now);
+      if (!currentWindow) return false;
+      const currentScheduleKey = current[0].cadence + ":" + currentWindow.periodKey;
+      const currentCode = current[0].code + "-" + current[0].cadence + "-" +
+        currentWindow.periodKey.replace(/[^0-9]/g, "");
+      if (currentCode.length > 64) return false;
       const points = await tx.unsafe(`SELECT sequence, city_id AS "cityId",
           district_id AS "districtId", interactable_id AS "interactableId",
           position_x AS x, position_y AS y, position_z AS z,
@@ -68,7 +79,7 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
       if (!hasQualifiedSpawnPool(points, current[0].distributionMode)) return false;
       const existing = await tx.unsafe(`SELECT id FROM virtual_world_treasure_hunts
         WHERE template_id = $1::uuid AND schedule_key = $2 LIMIT 1`,
-        [template.id, scheduleKey]);
+        [template.id, currentScheduleKey]);
       let huntId: string;
       let insertedNew = false;
       if (existing[0]) huntId = existing[0].id;
@@ -80,16 +91,16 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
           VALUES ($1::uuid, $2, $3, $4::uuid, to_timestamp($5), to_timestamp($6),
             $7::bigint, TRUE, $8, $9, $10, $11::uuid, $12)
           ON CONFLICT (template_id, schedule_key) DO NOTHING RETURNING id`,
-          [randomUUID(), code, template.title, template.worldId, window.startsAt / 1000,
-            window.endsAt / 1000, String(current[0].reward), current[0].distributionMode,
-            current[0].maxGlobalWinners, current[0].maxRewardClaims, template.id, scheduleKey]);
+          [randomUUID(), currentCode, current[0].title, current[0].worldId, currentWindow.startsAt / 1000,
+            currentWindow.endsAt / 1000, String(current[0].reward), current[0].distributionMode,
+            current[0].maxGlobalWinners, current[0].maxRewardClaims, template.id, currentScheduleKey]);
         if (inserted[0]) {
           huntId = inserted[0].id;
           insertedNew = true;
         } else {
           const retry = await tx.unsafe(`SELECT id FROM virtual_world_treasure_hunts
             WHERE template_id = $1::uuid AND schedule_key = $2 LIMIT 1`,
-            [template.id, scheduleKey]);
+            [template.id, currentScheduleKey]);
           if (!retry[0]) return false;
           huntId = retry[0].id;
         }
