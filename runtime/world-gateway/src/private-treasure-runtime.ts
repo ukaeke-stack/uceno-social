@@ -18,6 +18,10 @@ async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: str
       AND NOT EXISTS (SELECT 1 FROM virtual_world_treasure_assignments AS existing
         WHERE existing.hunt_id = virtual_world_treasure_hunts.id AND existing.user_id = $3::uuid)
     ORDER BY starts_at, id LIMIT 20`, [player.worldId, now / 1000, player.id]);
+  const assignmentHunts: string[] = [];
+  const assignmentUsers: string[] = [];
+  const assignmentSequences: number[] = [];
+  const assignmentPoints: string[] = [];
   for (const hunt of hunts) {
     const points = await tx.unsafe(`SELECT id, sequence, city_id AS "cityId",
         district_id AS "districtId", interactable_id AS "interactableId"
@@ -41,14 +45,26 @@ async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: str
       })), clueCount, secret);
     } catch { continue; }
     for (const assignment of route) {
-      await tx.unsafe(`INSERT INTO virtual_world_treasure_assignments
-        (hunt_id, user_id, sequence, spawn_point_id)
-        VALUES ($1::uuid, $2::uuid, $3, $4::uuid)
-        ON CONFLICT (hunt_id, user_id, sequence) DO NOTHING`,
-        [hunt.id, player.id, assignment.sequence, assignment.spawnPointId]);
+      assignmentHunts.push(hunt.id);
+      assignmentUsers.push(player.id);
+      assignmentSequences.push(assignment.sequence);
+      assignmentPoints.push(assignment.spawnPointId);
     }
+  }
+  if (assignmentHunts.length) {
+    // Persist every newly derived route in two batched statements rather than
+    // issuing one database round-trip per clue step.
+    await tx.unsafe(`INSERT INTO virtual_world_treasure_assignments
+      (hunt_id, user_id, sequence, spawn_point_id)
+      SELECT input.hunt_id, input.user_id, input.sequence, input.spawn_point_id
+      FROM unnest($1::uuid[], $2::uuid[], $3::integer[], $4::uuid[])
+        AS input(hunt_id, user_id, sequence, spawn_point_id)
+      ON CONFLICT (hunt_id, user_id, sequence) DO NOTHING`,
+      [assignmentHunts, assignmentUsers, assignmentSequences, assignmentPoints]);
     await tx.unsafe(`INSERT INTO virtual_world_treasure_progress (hunt_id, user_id)
-      VALUES ($1::uuid, $2::uuid) ON CONFLICT (hunt_id, user_id) DO NOTHING`, [hunt.id, player.id]);
+      SELECT hunt_id, $2::uuid FROM unnest($1::uuid[]) AS hunt_ids(hunt_id)
+      ON CONFLICT (hunt_id, user_id) DO NOTHING`,
+      [[...new Set(assignmentHunts)], player.id]);
   }
   const current = await tx.unsafe(`SELECT hunt.id AS "huntId", hunt.title,
       progress.next_sequence AS sequence, point.clue_payload AS clue
