@@ -1992,10 +1992,20 @@ wss.on("connection", async (socket: WebSocket) => {
                 if (treasure.completed) {
                   const allocations = await sql`SELECT user_id AS "userId", amount::text AS amount
                     FROM virtual_world_treasure_team_reward_allocations WHERE team_id = ${treasure.teamId}::uuid`;
-                  for (const allocation of allocations) {
-                    const recipient = players.get(allocation.userId);
-                    if (recipient) send(recipient.socket, { type: "team_treasure_reward",
-                      huntId: treasure.huntId, teamId: treasure.teamId, rewardEarnedCredits: allocation.amount });
+                  if (allocations.length) {
+                    for (const allocation of allocations) {
+                      const recipient = players.get(allocation.userId);
+                      if (recipient) send(recipient.socket, { type: "team_treasure_reward",
+                        huntId: treasure.huntId, teamId: treasure.teamId, rewardEarnedCredits: allocation.amount });
+                    }
+                  } else {
+                    // A completed hunt may exhaust its authored claim cap. Still
+                    // notify every member so clients clear the now-terminal clue.
+                    for (const member of teamMembers) {
+                      const recipient = players.get(member.userId);
+                      if (recipient) send(recipient.socket, { type: "team_treasure_reward",
+                        huntId: treasure.huntId, teamId: treasure.teamId, rewardEarnedCredits: "0" });
+                    }
                   }
                 }
               }
