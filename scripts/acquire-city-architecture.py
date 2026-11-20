@@ -44,7 +44,7 @@ CITY_RELEVANCE = {
                      "university", "park", "botanical", "residential", "vertical garden"),
     "NexusDelta": ("skyscraper", "high rise", "high-rise", "office", "commercial",
                    "mixed use", "mixed-use", "city block", "urban", "glass", "bank",
-                   "cinema", "supermarket", "market"),
+                   "cinema", "supermarket", "market", "residential"),
     "AuroraHeights": ("alpine", "mountain", "ski", "snow", "resort", "lodge", "chalet",
                       "village", "timber", "mountain", "ski lodge"),
     "SaffronDunes": ("desert", "adobe", "arid", "sand", "solar", "oasis", "mosque",
