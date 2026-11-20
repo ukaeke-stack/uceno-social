@@ -44,6 +44,20 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "category"):
             acquisition.validate_complete_building(detail, "NexusDelta")
 
+    def test_provider_building_category_object_is_normalized(self):
+        candidate = asset("Glass Office Tower", [24, 62, 20])
+        candidate["category"] = {"slug": "buildings", "title": "Buildings & Architecture"}
+        self.assertIsNone(discovery.rejection_reason(candidate, "NexusDelta"))
+        detail = {
+            "title": "Glass Office Tower",
+            "category": {"slug": "buildings", "title": "Buildings & Architecture"},
+            "description": "realistic exterior office building",
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": [24, 62, 20]},
+        }
+        self.assertEqual(acquisition.validate_complete_building(detail, "NexusDelta"),
+                         (24.0, 62.0, 20.0))
+
     def test_complete_office_tower_is_a_candidate(self):
         self.assertIsNone(discovery.rejection_reason(
             asset("Glass Office Tower", [24, 62, 20]), "NexusDelta"))
