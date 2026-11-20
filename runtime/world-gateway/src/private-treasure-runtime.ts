@@ -123,18 +123,22 @@ export async function recordPrivateTreasureDiscovery(
       WHERE hunt_id = $1::uuid AND user_id = $2::uuid`,
       [match.huntId, player.id, completed, now / 1000]);
     if (!completed) return { handled: true, discovered: true, completed: false, rewardEarnedCredits: "0" };
-    if (match.distributionMode === "global") {
-      const winnerCap = match.maxGlobalWinners === null ? 0 : Number(match.maxGlobalWinners);
-      if (!Number.isSafeInteger(winnerCap) || winnerCap < 1)
+    const isGlobal = match.distributionMode === "global";
+    const rewardClaimCap = match.maxRewardClaims === null ? null : Number(match.maxRewardClaims);
+    if (isGlobal || rewardClaimCap !== null) {
+      const winnerCap = isGlobal && match.maxGlobalWinners !== null
+        ? Number(match.maxGlobalWinners) : null;
+      if (isGlobal && (winnerCap === null || !Number.isSafeInteger(winnerCap) || winnerCap < 1))
         return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "global_treasure_winner_cap_missing" };
-      const caps = [winnerCap, match.maxRewardClaims].filter((v: unknown) => v !== null).map(Number);
+      if (rewardClaimCap !== null && (!Number.isSafeInteger(rewardClaimCap) || rewardClaimCap < 1))
+        return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "treasure_reward_claim_cap_invalid" };
+      const caps = [winnerCap, rewardClaimCap].filter((value): value is number => value !== null);
       const cap = Math.min(...caps);
-      if (!Number.isSafeInteger(cap) || cap < 1)
-        return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "global_treasure_winner_cap_missing" };
       const claims = await tx.unsafe(`SELECT COUNT(*)::integer AS total
         FROM virtual_world_treasure_global_claims WHERE hunt_id = $1::uuid`, [match.huntId]);
       if (Number(claims[0]?.total ?? 0) >= cap)
-        return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "global_treasure_claim_limit_reached" };
+        return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0",
+          code: isGlobal ? "global_treasure_claim_limit_reached" : "treasure_reward_claim_limit_reached" };
       await tx.unsafe(`INSERT INTO virtual_world_treasure_global_claims (hunt_id, user_id)
         VALUES ($1::uuid, $2::uuid) ON CONFLICT (hunt_id, user_id) DO NOTHING`, [match.huntId, player.id]);
     }
