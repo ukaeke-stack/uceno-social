@@ -96,7 +96,7 @@ export function sanitizeTreasureCluePayload(value: unknown): Record<string, stri
     const item = source[key];
     if (typeof item !== "string" || item.length === 0) continue;
     const max = key === "description" ? 800 : key === "hint" ? 500 : 120;
-    if (item.length <= max && !/[\\u0000-\\u001f]/.test(item)) output[key] = item;
+    if (item.length <= max && !Array.from(item).some(character => character.charCodeAt(0) < 32)) output[key] = item;
   }
   if (Number.isInteger(source.difficulty) && Number(source.difficulty) >= 1 &&
       Number(source.difficulty) <= 5) output.difficulty = Number(source.difficulty);
