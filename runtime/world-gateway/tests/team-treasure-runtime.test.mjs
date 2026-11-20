@@ -61,12 +61,15 @@ test("joining a forming team activates it after the second member joins", async 
     }];
     if (query.includes("SELECT 1 FROM virtual_world_treasure_team_members")) return [];
     if (query.includes("COUNT(*)::integer AS total")) return [{ total: 1 }];
+    if (query.includes("INSERT INTO virtual_world_treasure_team_members")) return [{ userId }];
     return [];
   });
   const result = await joinTreasureTeam(db, teamId, userId, worldId, now);
   assert.equal(result.ok, true);
   assert.equal(result.status, "active");
   assert.equal(result.members, 2);
+  const teamLock = db.calls.find(call => call.query.includes("FROM virtual_world_treasure_teams AS team"));
+  assert.match(teamLock.query, /FOR UPDATE OF team FOR SHARE OF hunt/);
   assert.equal(db.calls.some(call => call.query.includes("SET status = $2")), true);
 });
 
@@ -103,4 +106,21 @@ test("concurrent team creation returns the winning membership and removes its em
   assert.equal(result.teamId, "223e4567-e89b-42d3-a456-426614174099");
   assert.equal(db.calls.some(call => call.query.includes("DELETE FROM virtual_world_treasure_teams")), true);
   assert.equal(db.calls.some(call => call.query.includes("FROM virtual_world_treasure_spawn_points")), false);
+});
+
+test("join membership uniqueness conflict returns without aborting the transaction", async () => {
+  const db = fakeDb((query) => {
+    if (query.includes("FROM virtual_world_treasure_teams AS team")) return [{
+      id: teamId, huntId, status: "forming", maxMembers: 5, enabled: true, distributionMode: "team",
+      startsAt: new Date(now - 1000), endsAt: new Date(now + 60000)
+    }];
+    if (query.includes("SELECT 1 FROM virtual_world_treasure_team_members")) return [];
+    if (query.includes("COUNT(*)::integer AS total")) return [{ total: 1 }];
+    if (query.includes("INSERT INTO virtual_world_treasure_team_members")) return [];
+    return [];
+  });
+  const result = await joinTreasureTeam(db, teamId, userId, worldId, now);
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "already_in_another_team_for_hunt");
+  assert.equal(db.calls.some(call => call.query.includes("SET status = $2")), false);
 });
