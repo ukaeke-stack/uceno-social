@@ -16,7 +16,7 @@ test("private treasure candidate pools are fetched once for all active hunts", a
       for (const alternative of [0, 1]) {
         points.push({
           huntId,
-          id: `223e4567-e89b-42d3-a456-4266141740${prefix === "a" ? sequence * 2 + alternative : sequence * 2 + alternative + 4}`,
+          id: `223e4567-e89b-42d3-a456-4266141740${String(prefix === "a" ? sequence * 2 + alternative : sequence * 2 + alternative + 4).padStart(2, "0")}`,
           sequence,
           cityId: "solstice",
           districtId: "central",
