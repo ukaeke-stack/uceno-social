@@ -91,8 +91,9 @@ def validate_complete_building(detail, city):
     searchable = re.sub(r"[_-]+", " ", f"{title} {summary}".lower())
     title_searchable = re.sub(r"[_-]+", " ", str(title).lower())
     tags = tag_slugs(detail)
-    if "realistic" not in tags:
-        raise ValueError("Missing realistic tag")
+    style = str(detail.get("style") or "").lower()
+    if "realistic" not in tags and style != "realistic":
+        raise ValueError("Missing realistic style")
     if "exterior" not in tags and "exterior" not in searchable:
         raise ValueError("Not identified as an exterior asset")
     if "modular" in tags:
