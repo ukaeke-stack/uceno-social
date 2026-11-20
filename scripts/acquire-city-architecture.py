@@ -16,7 +16,7 @@ BASE = "https://3dassets.dev/api/v1"
 INPUT = pathlib.Path("artifacts/city-architecture-candidates/nine-city-candidates.json")
 OUT = pathlib.Path("artifacts/city-architecture-models")
 MAX_BYTES = 25 * 1024 * 1024
-PER_CITY = 2
+PER_CITY = 12
 MIN_HEIGHT_M = 8.0
 MIN_FOOTPRINT_M = 4.0
 MIN_HORIZONTAL_SPAN_M = 4.0
@@ -190,8 +190,16 @@ def main():
     print(f"Acquired {manifest['total_models']} full-building GLB files across {len(manifest['cities'])} cities")
     if manifest["total_models"] == 0:
         raise SystemExit("No qualifying full-building models acquired; failing rather than reporting success")
-    if any(not models for models in manifest["cities"].values()):
-        raise SystemExit("Incomplete full-building city coverage; artifact retained for diagnosis.")
+    shortfalls = {
+        city: len(models) for city, models in manifest["cities"].items()
+        if len(models) < PER_CITY
+    }
+    if shortfalls:
+        raise SystemExit(
+            f"Incomplete full-building acquisition: each city requires {PER_CITY} "
+            f"unique candidates; acquired counts: {shortfalls}. "
+            "Partial binaries and rejection evidence remain available for review."
+        )
 
 if __name__ == "__main__":
     main()
