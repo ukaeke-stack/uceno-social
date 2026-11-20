@@ -15,11 +15,13 @@ const points = [
     x: 4, y: 1.15, z: 4, radius: 2, clue: { hint: "Alternate second" } }
 ];
 
-function fakeDb(spawnPoints = points, distributionMode = "personal") {
+function fakeDb(spawnPoints = points, distributionMode = "personal", currentOverrides = {}) {
   const state = { created: false, copied: 0 };
   const template = { id: templateId, code: "daily-arch", title: "Arch Hunt",
     worldId: null, cadence: "daily", timeZone: "Africa/Lagos",
     activeFrom: null, activeUntil: null };
+  const currentTemplate = { ...template, reward: "20", distributionMode,
+    maxGlobalWinners: null, maxRewardClaims: null, ...currentOverrides };
   const db = {
     state,
     async unsafe(query) {
@@ -30,14 +32,13 @@ function fakeDb(spawnPoints = points, distributionMode = "personal") {
       return fn({
         async unsafe(query, params = []) {
           if (query.includes("pg_try_advisory_xact_lock")) return [{ locked: true }];
-          if (query.includes("FROM virtual_world_treasure_hunt_templates")) return [{
-            reward: "20", distributionMode, maxGlobalWinners: null, maxRewardClaims: null
-          }];
+          if (query.includes("FROM virtual_world_treasure_hunt_templates")) return [currentTemplate];
           if (query.includes("FROM virtual_world_treasure_template_spawn_points")) return spawnPoints;
           if (query.includes("FROM virtual_world_treasure_hunts")) return state.created ? [{ id: huntId }] : [];
           if (query.includes("INSERT INTO virtual_world_treasure_hunts")) {
             if (state.created) return [];
             state.created = true;
+            state.insertParams = params;
             return [{ id: huntId }];
           }
           if (query.includes("INSERT INTO virtual_world_treasure_spawn_points")) {
@@ -78,4 +79,19 @@ test("personal templates without alternate authored locations fail closed", asyn
 test("invalid schedule instants are rejected", async () => {
   await assert.rejects(() => materializeScheduledTreasureHunts(fakeDb(), Number.NaN),
     /invalid_treasure_schedule_instant/);
+});
+
+test("materializer uses the locked current template after an operator edits its schedule", async () => {
+  const worldId = "223e4567-e89b-42d3-a456-426614174055";
+  const db = fakeDb(points, "team", {
+    title: "Revised Weekly Hunt",
+    worldId,
+    cadence: "weekly",
+    timeZone: "UTC"
+  });
+  assert.equal(await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z")), 1);
+  assert.match(db.state.insertParams[1], /-weekly-/);
+  assert.equal(db.state.insertParams[2], "Revised Weekly Hunt");
+  assert.equal(db.state.insertParams[3], worldId);
+  assert.match(db.state.insertParams[11], /^weekly:/);
 });
