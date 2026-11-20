@@ -25,3 +25,11 @@ test("team rewards reject invalid or contribution-free membership", () => {
   assert.throws(() => calculateTeamRewardShares(10n, [{ userId: a, points: 0 }, { userId: b, points: 0 }]));
   assert.throws(() => calculateTeamRewardShares(10n, [{ userId: a, points: 1 }, { userId: a, points: 2 }]));
 });
+
+test("team reward remainder follows fractional share rather than simply highest contribution", () => {
+  const shares = calculateTeamRewardShares(5n, [
+    { userId: a, points: 4 }, { userId: b, points: 3 }, { userId: c, points: 3 }
+  ]);
+  assert.deepEqual(shares.map(item => item.amount), [2n, 2n, 1n]);
+  assert.equal(shares.reduce((sum, item) => sum + item.amount, 0n), 5n);
+});
