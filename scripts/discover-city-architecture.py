@@ -363,6 +363,49 @@ def main():
                 if slug:
                     raw_by_slug[slug] = item
 
+        # If the filtered catalogue search underfills a city, retry a small
+        # set of its strongest city-specific searches without category/style/tag
+        # filters. The strict local validator below remains authoritative, and
+        # acquisition independently rechecks licence, dimensions and GLB bytes.
+        initial_qualifying = sum(
+            1 for slug, item in raw_by_slug.items()
+            if slug not in globally_seen and rejection_reason(item, city) is None
+        )
+        if initial_qualifying < 12:
+            for query in queries[:4]:
+                params = urllib.parse.urlencode({
+                    "q": query, "sort": "relevance", "limit": 100, "page": 1
+                })
+                broad_results = unwrap(get(f"{BASE}/assets?{params}"))
+                added = 0
+                for item in broad_results:
+                    slug = item.get("slug") or item.get("id")
+                    if slug and slug not in raw_by_slug:
+                        raw_by_slug[slug] = item
+                        added += 1
+                query_diagnostics.append({
+                    "query": query,
+                    "search_mode": "broad-underfill-retry",
+                    "result_count": len(broad_results),
+                    "new_records": added,
+                    "pages_checked": [{"page": 1, "result_count": len(broad_results)}],
+                    "fallback_without_category_or_style": True,
+                    "sample_records": [{
+                        "slug": item.get("slug") or item.get("id"),
+                        "title": item.get("title") or item.get("name"),
+                        "category": item.get("category"),
+                        "style": item.get("style"),
+                        "tags": tag_slugs(item),
+                        "stats": item.get("stats"),
+                        "summary": item.get("summary") or item.get("description"),
+                    } for item in broad_results[:8]],
+                })
+                if sum(
+                    1 for slug, candidate in raw_by_slug.items()
+                    if slug not in globally_seen and rejection_reason(candidate, city) is None
+                ) >= 30:
+                    break
+
         candidates, rejected = [], []
         for slug, item in raw_by_slug.items():
             if slug in globally_seen:
