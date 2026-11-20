@@ -138,8 +138,8 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
       if (points.length && insertedNew) {
         // Snapshot authored locations only when this scheduled hunt is first
         // created. Later template edits must not silently mutate a live hunt.
-        // One set-based insert avoids a round-trip for every authored clue
-        // for every authored clue location (up to 10,000 per template).
+        // One set-based insert avoids a round-trip per authored clue location
+        // (up to 10,000 per template).
         await tx.unsafe(`INSERT INTO virtual_world_treasure_spawn_points
           (id, hunt_id, sequence, city_id, district_id, interactable_id,
            position_x, position_y, position_z, interaction_radius, clue_payload, enabled)
