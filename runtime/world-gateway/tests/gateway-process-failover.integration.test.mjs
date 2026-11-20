@@ -399,6 +399,11 @@ test("two real gateway processes: primary loss leaves the replacement process re
     const readyB = await waitForReady(portB, gatewayB);
     assert.equal(readyA.instanceId, instanceA);
     assert.equal(readyB.instanceId, instanceB);
+    const sourceA = await admin.unsafe(`SELECT owner_process_id AS "processId", owner_generation AS generation
+      FROM "${schema}".virtual_world_instances WHERE id = $1::uuid`, [instanceA]);
+    assert.equal(sourceA.length, 1);
+    assert.ok(sourceA[0].processId);
+    assert.equal(Number(sourceA[0].generation), 1);
     assert.equal(readyA.registeredInteractables, expectedRegisteredInteractables,
       "gateway A must load every city-district anchor and both test scene objects from the city manifest");
     assert.equal(readyB.registeredInteractables, expectedRegisteredInteractables,
@@ -589,6 +594,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
         VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb, NOW() - INTERVAL '1 minute')
       `, [worldId, instanceA, {
         serverTime: Date.now(),
+        sourceProcessId: sourceA[0].processId,
+        sourceGeneration: Number(sourceA[0].generation),
         players: [{ userId, x: 4, y: 1.15, z: 4, yaw: 0 }]
       }]);
       const recoveredSnapshot = await receiveSocketMessage(recoverySocket.socket, "snapshot", 8000,
@@ -623,7 +630,9 @@ test("two real gateway processes: primary loss leaves the replacement process re
         (world_id, instance_id, event_type, payload, created_at)
         VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb, NOW() - INTERVAL '1 minute')
         RETURNING id`,
-        [worldId, instanceA, { serverTime: Date.now(), players: [{ userId, x: 19, y: 1.15, z: -7, yaw: 0 }] }]);
+        [worldId, instanceA, { serverTime: Date.now(), sourceProcessId: sourceA[0].processId,
+          sourceGeneration: Number(sourceA[0].generation),
+          players: [{ userId, x: 19, y: 1.15, z: -7, yaw: 0 }] }]);
       const replayedEventId = Number(inserted[0].id);
       gatewayB = startGateway(portB, instanceB, scoped.toString(), registryManifestFile, collisionManifestFile);
       const restarted = await waitForReady(portB, gatewayB);
@@ -723,6 +732,17 @@ test("two real gateway processes: primary loss leaves the replacement process re
 
       // A delayed durable relay event from the fenced host must not reach
       // clients after the replacement has committed generation 2.
+      // Keep the last heartbeat recent but expire the database lease. A
+      // heartbeat-only relay check would incorrectly trust this stale owner.
+      await admin.unsafe(`UPDATE "${schema}".virtual_world_instances
+        SET heartbeat_at = NOW(), owner_lease_expires_at = NOW() - INTERVAL '1 second'
+        WHERE id = $1::uuid`, [instanceA]);
+      const staleLease = await admin.unsafe(`SELECT heartbeat_at > NOW() - INTERVAL '30 seconds' AS heartbeat_fresh,
+          owner_lease_expires_at <= clock_timestamp() AS lease_expired
+        FROM "${schema}".virtual_world_instances WHERE id = $1::uuid`, [instanceA]);
+      assert.equal(staleLease[0].heartbeat_fresh, true);
+      assert.equal(staleLease[0].lease_expired, true);
+
       const staleRelayPackets = [];
       const staleSnapshotPackets = [];
       const captureStaleRelay = raw => {
@@ -751,6 +771,8 @@ test("two real gateway processes: primary loss leaves the replacement process re
         VALUES ($1::uuid, $2::uuid, 'player_snapshot', $3::jsonb)
       `, [worldId, instanceA, {
         serverTime: Date.now(),
+        sourceProcessId: sourceA[0].processId,
+        sourceGeneration: Number(sourceA[0].generation),
         players: [{ userId, x: 999, y: 1.15, z: 999, yaw: 0 }]
       }]);
       await delay(1800);
@@ -758,7 +780,7 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal(staleRelayPackets.length, 0,
         "stale generation-1 activity relay must not be broadcast by generation-2 gateway");
       assert.equal(staleSnapshotPackets.length, 0,
-        "snapshots from an instance with an expired heartbeat must not reach replacement clients");
+        "snapshots from a process with an expired lease must not reach replacement clients");
 
       // Race two independent database claims against a second stale activity.
       // PostgreSQL must serialize the row update so exactly one candidate wins.
