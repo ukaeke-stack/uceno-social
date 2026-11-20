@@ -74,7 +74,7 @@ namespace UCENO.VirtualWorld
             status = "A private clue is ready. Other players do not receive this route.";
         }
 
-        private void HandleDiscovery(string objectId, bool completed, string reward,
+        private void HandleDiscovery(string huntId, string objectId, bool completed, string reward,
             GatewayTreasureCollectible[] collectibles)
         {
             string message = completed
@@ -90,6 +90,7 @@ namespace UCENO.VirtualWorld
                 }
             }
             status = message;
+            if (completed) clues.RemoveAll(item => item.huntId == huntId);
             if (completed) gateway?.RequestTreasureHistory();
             gateway?.RequestTreasureInventory();
         }
