@@ -61,6 +61,7 @@ test("daily treasure templates materialize once and copy authored route candidat
   assert.equal(db.state.copied, 4);
   assert.equal(db.state.spawnInsertBatches, 1);
   assert.equal(await materializeScheduledTreasureHunts(db, now), 0);
+  assert.equal(db.state.copied, 4, "an existing hunt must keep its original authored-location snapshot");
 });
 
 test("team templates materialize when every clue step has one authored location", async () => {
