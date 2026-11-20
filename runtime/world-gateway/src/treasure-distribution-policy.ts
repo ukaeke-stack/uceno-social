@@ -66,6 +66,8 @@ export function selectPersonalTreasureRoute(
     // distinct spawn-point rows can refer to the same in-world interactable.
     for (let step = 0; step < group.length && selectedInteractables.has(candidate.interactableId); step++)
       candidate = group[(offset + step + 1) % group.length]!;
+    if (selectedInteractables.has(candidate.interactableId))
+      throw new Error("treasure_route_repeats_interactable");
     selectedInteractables.add(candidate.interactableId);
     result.push({ sequence, spawnPointId: candidate.id });
   }
