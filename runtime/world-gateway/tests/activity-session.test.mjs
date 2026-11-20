@@ -125,3 +125,21 @@ test("cancel rejects timestamps before the activity lifecycle begins", () => {
   assert.deepEqual(cancelActivity(lobby, true, 1_199), { ok: false, code: "invalid_timestamp" });
   assert.equal(lobby.phase, "active");
 });
+
+
+test("join and start reject timestamps that move the activity lifecycle backwards", () => {
+  const session = race(1_000);
+  assert.deepEqual(joinActivity(session, "user-a", 999), { ok: false, code: "invalid_timestamp" });
+  assert.equal(session.participants.has("user-a"), false);
+
+  assert.equal(joinActivity(session, "user-a", 1_100).ok, true);
+  assert.equal(leaveActivity(session, "user-a", 1_200).ok, true);
+  assert.deepEqual(joinActivity(session, "user-a", 1_199), { ok: false, code: "invalid_timestamp" });
+  assert.equal(session.participants.get("user-a")?.status, "left");
+
+  joinActivity(session, "user-b", 1_300);
+  joinActivity(session, "user-c", 1_400);
+  assert.deepEqual(startActivity(session, true, 1_399), { ok: false, code: "invalid_timestamp" });
+  assert.equal(session.phase, "lobby");
+  assert.equal(startActivity(session, true, 1_400).ok, true);
+});
