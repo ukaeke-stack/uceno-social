@@ -365,6 +365,14 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
         'Concurrent reward-cap test', ${worldId}::uuid,
         NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour',
         TRUE, 101, 1, 'team')`;
+    const cappedCollectibleId = randomUUID();
+    await db`INSERT INTO virtual_world_collectible_catalog
+      (id, code, display_name, category, rarity, max_supply, enabled)
+      VALUES (${cappedCollectibleId}::uuid, 'competing-team-badge', 'Competing Team Badge',
+        'badge', 'rare', 2, TRUE)`;
+    await db`INSERT INTO virtual_world_treasure_reward_items
+      (hunt_id, collectible_id, quantity)
+      VALUES (${cappedHuntId}::uuid, ${cappedCollectibleId}::uuid, 1)`;
     for (let sequence = 0; sequence < 2; sequence++) {
       for (let candidate = 0; candidate < 2; candidate++) {
         const point = { id: randomUUID(), sequence, interactableId: 'cap-' + sequence + '-' + candidate,
@@ -427,6 +435,21 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       WHERE source_treasure_hunt_id = ${cappedHuntId}::uuid`;
     assert.equal(cappedLedger[0].total, 2);
     assert.equal(BigInt(cappedLedger[0].amount), 101n);
+    const cappedInventory = await db`SELECT user_id AS "userId", quantity
+      FROM virtual_world_user_collectibles
+      WHERE collectible_id = ${cappedCollectibleId}::uuid
+        AND source_treasure_hunt_id = ${cappedHuntId}::uuid
+      ORDER BY user_id`;
+    assert.equal(cappedInventory.length, 2);
+    assert.deepEqual(cappedInventory.map(row => Number(row.quantity)), [1, 1]);
+    const cappedCatalog = await db`SELECT minted_count FROM virtual_world_collectible_catalog
+      WHERE id = ${cappedCollectibleId}::uuid`;
+    assert.equal(Number(cappedCatalog[0].minted_count), 2);
+    const losingTeamId = finalCapDiscoveries[0].rewardEarnedCredits === "0"
+      ? capTeamA.teamId : capTeamB.teamId;
+    const losingMembers = await db`SELECT user_id AS "userId"
+      FROM virtual_world_treasure_team_members WHERE team_id = ${losingTeamId}::uuid`;
+    assert.equal(cappedInventory.some(row => losingMembers.some(member => member.userId === row.userId)), false);
 
     // Two different teams in the same hunt may be joined concurrently by one
     // player. Exactly one membership wins the database uniqueness constraint;
