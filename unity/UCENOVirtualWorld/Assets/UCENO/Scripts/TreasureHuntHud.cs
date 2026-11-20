@@ -16,12 +16,18 @@ namespace UCENO.VirtualWorld
         private bool visible;
         private bool showInventory;
         private bool showHistory;
+        private GatewayTreasureTeamHunt[] teamHunts = new GatewayTreasureTeamHunt[0];
+        private string teamIdInput = "";
+        private string activeTeamId = "";
+        private string teamStatus = "No active team.";
         private string status = "Treasure hunts are waiting for the world gateway.";
         private Vector2 scroll;
 
         private sealed class ClueEntry
         {
             public string huntId;
+            public string teamId;
+            public bool isTeam;
             public string title;
             public int sequence;
             public GatewayTreasureClue clue;
@@ -32,6 +38,10 @@ namespace UCENO.VirtualWorld
             if (gateway == null) gateway = FindObjectOfType<WorldGatewayClient>();
             if (gateway == null) return;
             gateway.TreasureClueReceived += HandleClue;
+            gateway.TeamTreasureClueReceived += HandleTeamClue;
+            gateway.TreasureTeamHuntsReceived += HandleTeamHunts;
+            gateway.TreasureTeamStateReceived += HandleTeamState;
+            gateway.TreasureTeamRewardReceived += HandleTeamReward;
             gateway.TreasureDiscoveryReceived += HandleDiscovery;
             gateway.TreasureInventoryReceived += HandleInventory;
             gateway.TreasureHistoryReceived += HandleHistory;
@@ -42,6 +52,10 @@ namespace UCENO.VirtualWorld
         {
             if (gateway == null) return;
             gateway.TreasureClueReceived -= HandleClue;
+            gateway.TeamTreasureClueReceived -= HandleTeamClue;
+            gateway.TreasureTeamHuntsReceived -= HandleTeamHunts;
+            gateway.TreasureTeamStateReceived -= HandleTeamState;
+            gateway.TreasureTeamRewardReceived -= HandleTeamReward;
             gateway.TreasureDiscoveryReceived -= HandleDiscovery;
             gateway.TreasureInventoryReceived -= HandleInventory;
             gateway.TreasureHistoryReceived -= HandleHistory;
@@ -59,12 +73,13 @@ namespace UCENO.VirtualWorld
             if (!visible || gateway == null) return;
             gateway.RequestTreasureInventory();
             gateway.RequestTreasureHistory();
+            gateway.RequestTreasureTeamHunts();
         }
 
         private void HandleClue(string huntId, string title, int sequence, GatewayTreasureClue clue)
         {
             if (string.IsNullOrWhiteSpace(huntId) || clue == null) return;
-            int index = clues.FindIndex(item => item.huntId == huntId);
+            int index = clues.FindIndex(item => item.huntId == huntId && !item.isTeam);
             ClueEntry entry = new ClueEntry {
                 huntId = huntId, title = title ?? "Treasure hunt",
                 sequence = sequence, clue = clue
@@ -72,6 +87,37 @@ namespace UCENO.VirtualWorld
             if (index >= 0) clues[index] = entry;
             else clues.Add(entry);
             status = "A private clue is ready. Other players do not receive this route.";
+        }
+
+        private void HandleTeamClue(string teamId, string huntId, int sequence, GatewayTreasureClue clue)
+        {
+            if (string.IsNullOrWhiteSpace(teamId) || string.IsNullOrWhiteSpace(huntId) || clue == null) return;
+            int index = clues.FindIndex(item => item.isTeam && item.teamId == teamId);
+            ClueEntry entry = new ClueEntry { teamId = teamId, isTeam = true, huntId = huntId,
+                title = "Team treasure hunt", sequence = sequence, clue = clue };
+            if (index >= 0) clues[index] = entry; else clues.Add(entry);
+            teamStatus = "Shared team clue updated. Team: " + teamId;
+        }
+
+        private void HandleTeamHunts(GatewayTreasureTeamHunt[] hunts)
+        {
+            teamHunts = hunts ?? new GatewayTreasureTeamHunt[0];
+        }
+
+        private void HandleTeamState(bool ok, string teamId, string state, int members, int maxMembers, string code)
+        {
+            if (!string.IsNullOrEmpty(teamId)) activeTeamId = teamId;
+            teamStatus = ok ? "Team " + (state ?? "forming") + " (" + members + "/" + maxMembers + "). ID: " + teamId
+                : "Team request rejected: " + (string.IsNullOrEmpty(code) ? "unknown_error" : code);
+            gateway?.RequestTreasureTeamHunts();
+        }
+
+        private void HandleTeamReward(string huntId, string teamId, string reward)
+        {
+            teamStatus = "Team hunt completed. Your Earned Credits share: " + (reward ?? "0");
+            clues.RemoveAll(item => item.isTeam && item.teamId == teamId);
+            gateway?.RequestTreasureInventory();
+            gateway?.RequestTreasureHistory();
         }
 
         private void HandleDiscovery(string huntId, string objectId, bool completed, string reward,
@@ -90,7 +136,7 @@ namespace UCENO.VirtualWorld
                 }
             }
             status = message;
-            if (completed) clues.RemoveAll(item => item.huntId == huntId);
+            if (completed) clues.RemoveAll(item => item.huntId == huntId && !item.isTeam);
             if (completed) gateway?.RequestTreasureHistory();
             gateway?.RequestTreasureInventory();
         }
@@ -166,13 +212,33 @@ namespace UCENO.VirtualWorld
             }
             else
             {
-                GUILayout.Label("YOUR PRIVATE CLUES");
+                GUILayout.Label("TEAM HUNTS");
+                GUILayout.Label(teamStatus, GUI.skin.label);
+                if (teamHunts.Length == 0) GUILayout.Label("No currently eligible authored team hunts.");
+                foreach (GatewayTreasureTeamHunt hunt in teamHunts)
+                {
+                    if (hunt == null) continue;
+                    GUILayout.BeginHorizontal(GUI.skin.box);
+                    GUILayout.Label(hunt.title + "  |  " + hunt.clueCount + " clues");
+                    if (GUILayout.Button("CREATE TEAM", GUILayout.Width(110f * scale)))
+                        gateway?.RequestCreateTreasureTeam(hunt.huntId, 5);
+                    GUILayout.EndHorizontal();
+                }
+                GUILayout.BeginHorizontal();
+                teamIdInput = GUILayout.TextField(teamIdInput, GUILayout.MinWidth(160f * scale));
+                if (GUILayout.Button("JOIN TEAM", GUILayout.Width(100f * scale)))
+                    gateway?.RequestJoinTreasureTeam(teamIdInput.Trim());
+                GUILayout.EndHorizontal();
+                if (!string.IsNullOrEmpty(activeTeamId)) GUILayout.Label("Share this team ID: " + activeTeamId);
+                GUILayout.Space(8f);
+                GUILayout.Label("ACTIVE CLUES");
+                if (clues.Count == 0) GUILayout.Label("No active personal or team clues.");
                 if (clues.Count == 0) GUILayout.Label("No active personal clues. New hunts appear when schedules are enabled.");
                 foreach (ClueEntry entry in clues)
                 {
                     if (entry == null || entry.clue == null) continue;
                     GUILayout.BeginVertical(GUI.skin.box);
-                    GUILayout.Label(entry.title + "  |  clue " + (entry.sequence + 1));
+                    GUILayout.Label((entry.isTeam ? "TEAM " + entry.teamId : "PERSONAL") + "  |  clue " + (entry.sequence + 1));
                     if (!string.IsNullOrEmpty(entry.clue.title)) GUILayout.Label(entry.clue.title);
                     if (!string.IsNullOrEmpty(entry.clue.hint)) GUILayout.Label(entry.clue.hint);
                     if (!string.IsNullOrEmpty(entry.clue.description)) GUILayout.Label(entry.clue.description);
