@@ -77,6 +77,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       "virtual_world_treasure_route_discoveries_user_idx",
       "virtual_world_treasure_teams_hunt_idx",
       "virtual_world_treasure_team_members_rank_idx",
+      "virtual_world_treasure_team_members_user_idx",
       "virtual_world_treasure_team_assignments_spawn_idx",
       "virtual_world_treasure_team_discoveries_member_idx",
       "virtual_world_collectible_catalog_live_idx",
@@ -91,7 +92,8 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
       "virtual_world_daily_mission_active_lookup_idx",
       "virtual_world_daily_mission_template_event_idx",
       "virtual_world_treasure_hunt_active_lookup_idx",
-      "virtual_world_treasure_clue_location_lookup_idx"
+      "virtual_world_treasure_clue_location_lookup_idx",
+      "virtual_world_treasure_progress_user_active_idx"
     ];
     const installedIndexes = await db`SELECT indexname FROM pg_indexes
       WHERE schemaname = current_schema() AND indexname = ANY(${expectedIndexes})`;
