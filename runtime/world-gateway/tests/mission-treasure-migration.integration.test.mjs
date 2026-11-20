@@ -422,6 +422,28 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       { id: recoveryFirst.interactableId, cityId: recoveryFirst.cityId, districtId: recoveryFirst.districtId },
       Date.now(), teamSecret, instanceId, processId, 1);
     assert.equal(recoveryFirstResult.discovered, true);
+
+    // A replacement process takes ownership while the old process still has
+    // an unexpired local view of its lease. The database generation fence
+    // must reject the old process before it can consume the final clue.
+    const takeoverProcessId = randomUUID();
+    await db`UPDATE virtual_world_instances
+      SET owner_process_id = ${takeoverProcessId}::uuid,
+          owner_generation = 2,
+          owner_lease_expires_at = NOW() + INTERVAL '1 hour'
+      WHERE id = ${instanceId}::uuid`;
+    const staleOwnerAttempt = await recordTeamTreasureDiscovery(db,
+      { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
+      { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
+      Date.now(), teamSecret, instanceId, processId, 1);
+    assert.equal(staleOwnerAttempt.handled, true);
+    assert.equal(staleOwnerAttempt.discovered, false);
+    assert.equal(staleOwnerAttempt.completed, false);
+    assert.equal(staleOwnerAttempt.code, 'stale_gateway_owner');
+    const fencedProgress = await db`SELECT next_sequence AS "nextSequence"
+      FROM virtual_world_treasure_team_progress WHERE team_id = ${recoveryTeam.teamId}::uuid`;
+    assert.equal(Number(fencedProgress[0].nextSequence), 1);
+
     const failBeforeCommitDb = {
       begin: fn => db.begin(async tx => {
         const result = await fn(tx);
@@ -432,7 +454,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     await assert.rejects(() => recordTeamTreasureDiscovery(failBeforeCommitDb,
       { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
       { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
-      Date.now(), teamSecret, instanceId, processId, 1), /simulated_reward_commit_failure/);
+      Date.now(), teamSecret, instanceId, takeoverProcessId, 2), /simulated_reward_commit_failure/);
     const rolledBackProgress = await db`SELECT next_sequence AS "nextSequence", completed_at AS "completedAt"
       FROM virtual_world_treasure_team_progress WHERE team_id = ${recoveryTeam.teamId}::uuid`;
     const rolledBackTeam = await db`SELECT status FROM virtual_world_treasure_teams
@@ -454,7 +476,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const recoveredCompletion = await recordTeamTreasureDiscovery(db,
       { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
       { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
-      Date.now(), teamSecret, instanceId, processId, 1);
+      Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
     assert.equal(recoveredCompletion.completed, true);
     assert.equal(BigInt(recoveredCompletion.rewardEarnedCredits) > 0n, true);
     const recoveredLedger = await db`SELECT COUNT(*)::integer AS total,
@@ -473,7 +495,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const recoveredReplay = await recordTeamTreasureDiscovery(db,
       { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
       { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
-      Date.now(), teamSecret, instanceId, processId, 1);
+      Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
     assert.equal(recoveredReplay.discovered, false);
     const finalRecoveryCounts = await db`SELECT
         (SELECT COUNT(*) FROM virtual_world_earned_credit_ledger
