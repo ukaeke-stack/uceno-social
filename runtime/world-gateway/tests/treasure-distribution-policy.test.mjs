@@ -70,8 +70,8 @@ test("a private route never repeats an interactable when alternatives exist", ()
 });
 
 test("personal routes reject repeated in-world interactables across clue steps", () => {
-  assert.throws(() => selectPersonalTreasureRoute(huntId, userId, [
-    { id: a, sequence: 0, cityId: "solstice", districtId: "central", interactableId: "same-object" },
-    { id: b, sequence: 1, cityId: "solstice", districtId: "central", interactableId: "same-object" }
+  assert.throws(() => selectPersonalTreasureRoute(hunt, userA, [
+    { id: "223e4567-e89b-42d3-a456-426614174031", sequence: 0, cityId: "solstice", districtId: "central", interactableId: "same-object" },
+    { id: "223e4567-e89b-42d3-a456-426614174032", sequence: 1, cityId: "solstice", districtId: "central", interactableId: "same-object" }
   ], 2, secret), /treasure_route_repeats_interactable/);
 });
