@@ -24,12 +24,17 @@ async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: str
   const assignmentPoints: string[] = [];
   // Load every eligible hunt's authored candidate pool in one query. The
   // previous per-hunt query multiplied database round-trips by active hunts.
-  const candidateRows = hunts.length ? await tx.unsafe(`SELECT hunt_id AS "huntId",
-      id, sequence, city_id AS "cityId", district_id AS "districtId",
-      interactable_id AS "interactableId"
-    FROM virtual_world_treasure_spawn_points
-    WHERE hunt_id = ANY($1::uuid[]) AND enabled = TRUE
-    ORDER BY hunt_id, sequence, id`, [hunts.map((hunt: any) => hunt.id)]) : [];
+  const candidateRows = hunts.length ? await tx.unsafe(`SELECT "huntId", id, sequence,
+      "cityId", "districtId", "interactableId"
+    FROM (
+      SELECT hunt_id AS "huntId", id, sequence, city_id AS "cityId",
+        district_id AS "districtId", interactable_id AS "interactableId",
+        row_number() OVER (PARTITION BY hunt_id ORDER BY sequence, id) AS hunt_rank
+      FROM virtual_world_treasure_spawn_points
+      WHERE hunt_id = ANY($1::uuid[]) AND enabled = TRUE
+    ) AS ranked
+    WHERE hunt_rank <= 10000
+    ORDER BY "huntId", sequence, id`, [hunts.map((hunt: any) => hunt.id)]) : [];
   const pointsByHunt = new Map<string, any[]>();
   for (const point of candidateRows) {
     const group = pointsByHunt.get(point.huntId) ?? [];
