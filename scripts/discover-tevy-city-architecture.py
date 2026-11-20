@@ -306,7 +306,17 @@ def main():
                 target.write_bytes(data)
                 lod_records.append({"lod": lod, "file": f"{city}/{target.name}", "bytes": len(data), "sha256": digest, "triangles": file_info.get("triangles"), "extensions_used": extensions})
             acquired.append({"slug": slug, "name": meta.get("name"), "version": version, "license": meta.get("license"), "dimensions_m": meta.get("dimensions"), "preview": BASE + meta.get("preview", ""), "source_url": f"{BASE}/models/{slug}", "lods": lod_records, "status": "binary-verified; visual-review-pending; unity-import-pending"})
-        report["cities"][city] = {"eligible_catalogue_count": len(candidate_pools[city]), "rejection_counts": rejection_pools[city], "selected_and_acquired": acquired}
+        report["cities"][city] = {
+            "eligible_catalogue_count": len(candidate_pools[city]),
+            "allocated_candidates": [{
+                "slug": record["slug"],
+                "name": record.get("name"),
+                "relevance_score": score(record, city),
+                "dimensions_m": record.get("dimensions"),
+            } for record in allocations[city]],
+            "rejection_counts": rejection_pools[city],
+            "selected_and_acquired": acquired,
+        }
         print(f"{city}: {len(candidate_pools[city])} eligible catalogue buildings; acquired {len(acquired)}")
     report["total_models"] = sum(len(v["selected_and_acquired"]) for v in report["cities"].values())
     (OUT / "tevy-acquisition-manifest.json").write_text(json.dumps(report, indent=2) + "\n")
