@@ -45,7 +45,7 @@ async function loadTeamRoute(tx: any, huntId: string, teamId: string, secret: st
 }
 
 export async function createTreasureTeam(
-  db: Db, huntId: string, userId: string, requestedMaxMembers: number,
+  db: Db, huntId: string, userId: string, worldId: string, requestedMaxMembers: number,
   now: number, secret: string
 ): Promise<TeamResult> {
   if (!UUID.test(huntId) || !UUID.test(userId)) return { ok: false, code: "invalid_team_identity" };
@@ -56,8 +56,9 @@ export async function createTreasureTeam(
   return db.begin(async tx => {
     const hunts = await tx.unsafe(`SELECT id FROM virtual_world_treasure_hunts
       WHERE id = $1::uuid AND enabled = TRUE AND distribution_mode = 'team'
-        AND starts_at <= to_timestamp($2) AND ends_at > to_timestamp($2)
-      FOR UPDATE`, [huntId, now / 1000]);
+        AND (world_id IS NULL OR world_id = $2::uuid)
+        AND starts_at <= to_timestamp($3) AND ends_at > to_timestamp($3)
+      FOR UPDATE`, [huntId, worldId, now / 1000]);
     if (!hunts.length) return { ok: false, code: "team_hunt_unavailable" };
     const existing = await tx.unsafe(`SELECT team.id, team.status
       FROM virtual_world_treasure_team_members AS member
@@ -81,7 +82,7 @@ export async function createTreasureTeam(
 }
 
 export async function joinTreasureTeam(
-  db: Db, teamId: string, userId: string, now: number
+  db: Db, teamId: string, userId: string, worldId: string, now: number
 ): Promise<TeamResult> {
   if (!UUID.test(teamId) || !UUID.test(userId)) return { ok: false, code: "invalid_team_identity" };
   return db.begin(async tx => {
@@ -90,7 +91,8 @@ export async function joinTreasureTeam(
         hunt.starts_at AS "startsAt", hunt.ends_at AS "endsAt"
       FROM virtual_world_treasure_teams AS team
       JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = team.hunt_id
-      WHERE team.id = $1::uuid FOR UPDATE OF team, hunt`, [teamId]);
+      WHERE team.id = $1::uuid AND (hunt.world_id IS NULL OR hunt.world_id = $2::uuid)
+      FOR UPDATE OF team, hunt`, [teamId, worldId]);
     if (!rows.length) return { ok: false, code: "team_not_found" };
     const team = rows[0];
     if (team.enabled !== true || new Date(team.startsAt).getTime() > now ||
@@ -238,7 +240,13 @@ export async function recordTeamTreasureDiscovery(
     }
     await tx.unsafe(`UPDATE virtual_world_treasure_teams SET status = 'completed'
       WHERE id = $1::uuid AND status = 'active'`, [match.teamId]);
-    const collectibles = await grantTreasureCollectibles(tx, match.huntId, player.id);
+    const teamMembers = await tx.unsafe(`SELECT user_id AS "userId" FROM virtual_world_treasure_team_members
+      WHERE team_id = $1::uuid ORDER BY user_id`, [match.teamId]);
+    let collectibles: CollectibleReward[] = [];
+    for (const member of teamMembers) {
+      const memberRewards = await grantTreasureCollectibles(tx, match.huntId, member.userId);
+      if (member.userId === player.id) collectibles = memberRewards;
+    }
     return { handled: true, discovered: true, completed: true, rewardEarnedCredits: rewardText, collectibles, teamId: match.teamId };
   });
 }
