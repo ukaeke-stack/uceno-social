@@ -102,8 +102,8 @@ def validate_complete_building(detail, city):
         raise ValueError("Missing realistic style")
     if "exterior" not in tags and "exterior" not in searchable:
         raise ValueError("Not identified as an exterior asset")
-    if "modular" in tags:
-        raise ValueError("Modular kit part rejected")
+    # Recheck the title and measured scale rather than rejecting every
+    # complete building merely because its source pack is tagged modular.
     if any(term in title_searchable for term in NON_BUILDING_TITLE_TERMS):
         raise ValueError("Title identifies a prop or non-building object")
     if not any(term in title_searchable for term in WHOLE_BUILDING_TITLE_TERMS):
