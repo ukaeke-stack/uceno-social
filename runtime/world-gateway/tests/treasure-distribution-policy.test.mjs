@@ -1,0 +1,39 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { selectPersonalTreasureRoute, validateTreasureRewardPlan } from "../dist/treasure-distribution-policy.js";
+
+const hunt = "123e4567-e89b-42d3-a456-426614174010";
+const userA = "123e4567-e89b-42d3-a456-426614174011";
+const userB = "123e4567-e89b-42d3-a456-426614174012";
+const secret = "test-only-secret-that-is-at-least-32-characters";
+const candidates = Array.from({ length: 12 }, (_, i) => ({
+  id: `123e4567-e89b-42d3-a456-4266141740${String(20+i).padStart(2,"0")}`,
+  sequence: Math.floor(i / 3), cityId: "solsticebay", districtId: "central",
+  interactableId: `asset-${i}`
+}));
+
+test("personal routes are stable for retries and contain one authored point per step", () => {
+  const a = selectPersonalTreasureRoute(hunt, userA, candidates, 4, secret);
+  assert.deepEqual(selectPersonalTreasureRoute(hunt, userA, candidates, 4, secret), a);
+  assert.deepEqual(a.map(x => x.sequence), [0,1,2,3]);
+  assert.equal(new Set(a.map(x => x.spawnPointId)).size, 4);
+});
+
+test("different users receive independently keyed routes", () => {
+  const a = selectPersonalTreasureRoute(hunt, userA, candidates, 4, secret);
+  const b = selectPersonalTreasureRoute(hunt, userB, candidates, 4, secret);
+  assert.notDeepEqual(a, b);
+});
+
+test("route selection rejects missing sequence pools and weak secrets", () => {
+  assert.throws(() => selectPersonalTreasureRoute(hunt, userA, candidates.slice(0, 9), 4, secret),
+    /treasure_spawn_sequence_unavailable/);
+  assert.throws(() => selectPersonalTreasureRoute(hunt, userA, candidates, 4, "short"),
+    /treasure_assignment_secret_too_short/);
+});
+
+test("global reward plans require a finite winner cap", () => {
+  assert.equal(validateTreasureRewardPlan({mode:"global",rewardEarnedCredits:5n,maxGlobalWinners:null,maxRewardClaims:null}), false);
+  assert.equal(validateTreasureRewardPlan({mode:"global",rewardEarnedCredits:5n,maxGlobalWinners:100,maxRewardClaims:null}), true);
+  assert.equal(validateTreasureRewardPlan({mode:"personal",rewardEarnedCredits:5n,maxGlobalWinners:null,maxRewardClaims:null}), true);
+});
