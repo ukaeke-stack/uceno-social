@@ -312,10 +312,11 @@ test("two real gateway processes: primary loss leaves the replacement process re
       host_generation BIGINT NOT NULL, expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".virtual_world_activity_results (
+      id BIGSERIAL PRIMARY KEY,
       session_id UUID NOT NULL, world_id UUID NOT NULL, user_id UUID NOT NULL,
       placement INTEGER, status TEXT NOT NULL, checkpoint_index INTEGER NOT NULL DEFAULT 0,
       finish_time DOUBLE PRECISION, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (session_id, user_id)
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE (session_id, user_id)
     )`);
     await admin.unsafe(`CREATE TABLE "${schema}".users (
       id UUID PRIMARY KEY, moderation_status TEXT NOT NULL DEFAULT 'active',
