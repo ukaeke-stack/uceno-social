@@ -27,6 +27,16 @@ class TevyCityArchitectureTests(unittest.TestCase):
     def test_cc0_full_scale_building_with_three_lods_passes(self):
         self.assertIsNone(tevy.screen(record(), "NexusDelta"))
 
+    def test_model_slug_cannot_escape_asset_output_directory(self):
+        item = record()
+        item["slug"] = "../outside"
+        self.assertEqual(tevy.screen(item, "NexusDelta"), "invalid-model-slug")
+
+    def test_model_slug_must_be_present_and_safe(self):
+        item = record()
+        item["slug"] = ""
+        self.assertEqual(tevy.screen(item, "NexusDelta"), "invalid-model-slug")
+
     def test_non_occupiable_infrastructure_is_rejected(self):
         for name in ("Power Pylon", "Lattice TV Tower", "Harbour Crane", "Chairlift Bottom Station", "Glass Tower Crown", "High-Voltage Pylon", "Cooling Tower", "Launch Tower and Pad", "Glass Tower Lobby Floor", "Drop Tower", "Wind Turbine", "Lighthouse", "Airport Control Tower", "Ferris Wheel", "Observation Wheel", "Roller Coaster", "Amusement Ride", "Theme Park Ride", "Refinery Column Unit", "Distillation Column", "Industrial Process Column"):
             with self.subTest(name=name):
