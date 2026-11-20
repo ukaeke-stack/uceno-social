@@ -9,6 +9,7 @@ import json
 import pathlib
 import re
 import time
+from collections import deque
 import urllib.request
 
 BASE = "https://tevy.dev"
@@ -100,20 +101,93 @@ def score(record, city):
     return city_hits * 10 + min(generic_hits, 5) * 2 + (5 if y >= 35 else 0)
 
 def allocate_city_candidates(candidate_pools, per_city=PER_CITY):
-    """Reserve scarce city-specific candidates before filling broad city pools."""
-    used = set()
-    allocations = {}
-    for city in sorted(candidate_pools, key=lambda name: (len(candidate_pools[name]), name)):
-        selected = []
+    """Maximize unique city asset coverage, preferring each model's best-fit city."""
+    if not isinstance(per_city, int) or per_city < 1:
+        raise ValueError("per_city must be a positive integer")
+    cities = sorted(candidate_pools)
+    records_by_slug = {}
+    for city in cities:
         for record in candidate_pools[city]:
             slug = record.get("slug")
-            if not isinstance(slug, str) or slug in used:
+            if isinstance(slug, str) and slug:
+                records_by_slug.setdefault(slug, record)
+    slugs = sorted(records_by_slug)
+    source = 0
+    asset_start = 1
+    city_start = asset_start + len(slugs)
+    sink = city_start + len(cities)
+    graph = [[] for _ in range(sink + 1)]
+
+    def add_edge(origin, destination, capacity, cost):
+        forward = {"to": destination, "capacity": capacity, "cost": cost,
+                   "reverse": len(graph[destination])}
+        backward = {"to": origin, "capacity": 0, "cost": -cost,
+                    "reverse": len(graph[origin])}
+        graph[origin].append(forward)
+        graph[destination].append(backward)
+        return forward
+
+    asset_nodes = {slug: asset_start + index for index, slug in enumerate(slugs)}
+    city_nodes = {city: city_start + index for index, city in enumerate(cities)}
+    for slug, node in asset_nodes.items():
+        add_edge(source, node, 1, 0)
+
+    assignment_edges = {slug: [] for slug in slugs}
+    for city in cities:
+        for record in candidate_pools[city]:
+            slug = record.get("slug")
+            if slug not in asset_nodes:
                 continue
-            selected.append(record)
-            used.add(slug)
-            if len(selected) >= per_city:
+            edge = add_edge(asset_nodes[slug], city_nodes[city], 1,
+                            -score(record, city))
+            assignment_edges[slug].append((city, edge))
+        add_edge(city_nodes[city], sink, per_city, 0)
+
+    # Successive shortest augmenting paths over the residual graph allow an
+    # earlier broad-city assignment to be rerouted when that model fits another
+    # city better. This avoids order-dependent greedy starvation.
+    while True:
+        distances = [float("inf")] * len(graph)
+        previous_node = [-1] * len(graph)
+        previous_edge = [-1] * len(graph)
+        queued = [False] * len(graph)
+        distances[source] = 0
+        queue = deque([source])
+        queued[source] = True
+        while queue:
+            node = queue.popleft()
+            queued[node] = False
+            for edge_index, edge in enumerate(graph[node]):
+                if edge["capacity"] <= 0:
+                    continue
+                candidate_distance = distances[node] + edge["cost"]
+                if candidate_distance >= distances[edge["to"]]:
+                    continue
+                distances[edge["to"]] = candidate_distance
+                previous_node[edge["to"]] = node
+                previous_edge[edge["to"]] = edge_index
+                if not queued[edge["to"]]:
+                    queue.append(edge["to"])
+                    queued[edge["to"]] = True
+        if previous_node[sink] < 0:
+            break
+        node = sink
+        while node != source:
+            parent = previous_node[node]
+            edge = graph[parent][previous_edge[node]]
+            edge["capacity"] -= 1
+            graph[node][edge["reverse"]]["capacity"] += 1
+            node = parent
+
+    allocations = {city: [] for city in cities}
+    for slug, choices in assignment_edges.items():
+        for city, edge in choices:
+            if edge["capacity"] == 0:
+                allocations[city].append(records_by_slug[slug])
                 break
-        allocations[city] = selected
+    for city in cities:
+        allocations[city].sort(key=lambda record: (
+            -score(record, city), -dimensions(record)[1], record.get("slug", "")))
     return allocations
 
 
