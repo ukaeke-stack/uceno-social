@@ -16,6 +16,7 @@ import { loadInteractableRegistry, parseCityInteractableManifest, type Registere
 import { checkpointVersionForSession } from "./session-fence-policy.js";
 import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "./private-treasure-runtime.js";
 import { grantTreasureCollectibles } from "./treasure-collectible-runtime.js";
+import { materializeScheduledTreasureHunts } from "./treasure-schedule-runtime.js";
 import { shouldPublishWorldSnapshot, WORLD_RELAY_BATCH_SIZE, WORLD_RELAY_POLL_INTERVAL_MS } from "./world-relay-policy.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -31,6 +32,7 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL || "";
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "";
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "";
 const TREASURE_ASSIGNMENT_SECRET = process.env.TREASURE_ASSIGNMENT_SECRET || "";
+const TREASURE_SCHEDULE_MATERIALIZER_ENABLED = process.env.TREASURE_SCHEDULE_MATERIALIZER_ENABLED === "true";
 const TICK_RATE = 20;
 const TICK_MS = 1000 / TICK_RATE;
 const MAX_CLIENTS = Number(process.env.WORLD_INSTANCE_CAPACITY || 64);
@@ -2431,6 +2433,22 @@ const heartbeat = async () => {
   }
 };
 setInterval(heartbeat, 3000);
+
+let treasureScheduleInProgress = false;
+if (TREASURE_SCHEDULE_MATERIALIZER_ENABLED) {
+  setInterval(async () => {
+    if (!processAuthority || Date.now() >= processLeaseUntil || treasureScheduleInProgress) return;
+    treasureScheduleInProgress = true;
+    try {
+      const created = await materializeScheduledTreasureHunts(sql, Date.now());
+      if (created > 0) console.info("treasure_schedules_materialized", { created });
+    } catch (error) {
+      console.error("treasure_schedule_materialization_failed", error);
+    } finally {
+      treasureScheduleInProgress = false;
+    }
+  }, 60_000);
+}
 
 let objectRefreshInProgress = false;
 setInterval(async () => {
