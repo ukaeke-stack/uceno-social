@@ -782,6 +782,11 @@ test("two real gateway processes: primary loss leaves the replacement process re
       assert.equal(staleSnapshotPackets.length, 0,
         "snapshots from a process with an expired lease must not reach replacement clients");
 
+      // Restore the stale heartbeat condition for the following independent
+      // activity-takeover race; the previous assertion intentionally made it fresh.
+      await admin.unsafe(`UPDATE "${schema}".virtual_world_instances
+        SET heartbeat_at = NOW() - INTERVAL '1 minute' WHERE id = $1::uuid`, [instanceA]);
+
       // Race two independent database claims against a second stale activity.
       // PostgreSQL must serialize the row update so exactly one candidate wins.
       // Race two independent replacement gateway OS processes against one stale activity.
