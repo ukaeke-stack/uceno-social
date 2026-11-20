@@ -94,12 +94,21 @@ class TevyCityArchitectureTests(unittest.TestCase):
         industrial = record(name="Industrial Factory", tags=["industrial", "factory"])
         self.assertGreater(tevy.score(coastal, "SolsticeBay"), tevy.score(industrial, "SolsticeBay"))
 
-    def test_rare_city_candidate_pool_is_allocated_before_broad_pools(self):
-        rare = [{"slug": "shared"}]
-        broad = [{"slug": "shared"}, {"slug": "broad-1"}, {"slug": "broad-2"}]
-        allocations = tevy.allocate_city_candidates({"BroadCity": broad, "RareCity": rare}, 2)
-        self.assertEqual([item["slug"] for item in allocations["RareCity"]], ["shared"])
-        self.assertEqual([item["slug"] for item in allocations["BroadCity"]], ["broad-1", "broad-2"])
+    def test_asset_allocator_assigns_models_to_the_best_fit_city(self):
+        rare = record(name="Desert Adobe Courtyard Hotel",
+                      tags=["desert", "adobe", "courtyard", "hotel"],
+                      description="desert adobe courtyard hotel")
+        rare["slug"] = "desert-adobe"
+        broad = record(name="Coastal Waterfront Apartment Tower",
+                       tags=["coastal", "waterfront", "apartment", "tower"],
+                       description="coastal waterfront residential apartment tower")
+        broad["slug"] = "coastal-tower"
+        allocations = tevy.allocate_city_candidates({
+            "SolsticeBay": [broad, rare],
+            "SaffronDunes": [rare, broad]
+        }, 1)
+        self.assertEqual([item["slug"] for item in allocations["SolsticeBay"]], ["coastal-tower"])
+        self.assertEqual([item["slug"] for item in allocations["SaffronDunes"]], ["desert-adobe"])
 
     def test_asset_allocator_maximizes_unique_coverage_without_fixed_city_order(self):
         rare = record(name="Desert Adobe Courtyard Hotel",
@@ -120,15 +129,21 @@ class TevyCityArchitectureTests(unittest.TestCase):
         self.assertEqual(len({item for items in slugs.values() for item in items}), 2)
 
     def test_city_asset_allocation_never_reuses_a_model_slug(self):
+        shared = record(name="Modern Office Tower", tags=["office", "tower"])
+        shared["slug"] = "shared-tower"
+        coastal = record(name="Coastal Apartment Hotel", tags=["coastal", "apartment", "hotel"])
+        coastal["slug"] = "coastal-hotel"
+        industrial = record(name="Industrial Warehouse Factory", tags=["industrial", "warehouse", "factory"])
+        industrial["slug"] = "industrial-warehouse"
         pools = {
-            "CityA": [{"slug": "shared"}, {"slug": "a-only"}],
-            "CityB": [{"slug": "shared"}, {"slug": "b-only"}],
-            "CityC": [{"slug": "shared"}, {"slug": "c-only"}],
+            "SolsticeBay": [shared, coastal, industrial],
+            "SaffronDunes": [shared, coastal, industrial],
+            "AtlasFrontier": [shared, coastal, industrial],
         }
         allocations = tevy.allocate_city_candidates(pools, 2)
         slugs = [item["slug"] for items in allocations.values() for item in items]
         self.assertEqual(len(slugs), len(set(slugs)))
-        self.assertEqual(sum(len(items) for items in allocations.values()), 4)
+        self.assertEqual(sum(len(items) for items in allocations.values()), 3)
 
     def test_lod_metadata_rejects_non_hex_checksums_and_path_traversal(self):
         item = record()
