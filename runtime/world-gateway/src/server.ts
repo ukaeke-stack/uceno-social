@@ -14,6 +14,7 @@ import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.j
 import { isPersistentObjectState } from "./district-object-policy.js";
 import { loadInteractableRegistry, parseCityInteractableManifest, type RegisteredInteractable } from "./interactable-registry-policy.js";
 import { checkpointVersionForSession } from "./session-fence-policy.js";
+import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "./private-treasure-runtime.js";
 import { shouldPublishWorldSnapshot, WORLD_RELAY_BATCH_SIZE, WORLD_RELAY_POLL_INTERVAL_MS } from "./world-relay-policy.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -28,6 +29,7 @@ const TOKEN_SECRET = process.env.WORLD_TOKEN_SECRET || "";
 const LIVEKIT_URL = process.env.LIVEKIT_URL || "";
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "";
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "";
+const TREASURE_ASSIGNMENT_SECRET = process.env.TREASURE_ASSIGNMENT_SECRET || "";
 const TICK_RATE = 20;
 const TICK_MS = 1000 / TICK_RATE;
 const MAX_CLIENTS = Number(process.env.WORLD_INSTANCE_CAPACITY || 64);
@@ -529,6 +531,11 @@ function activityPayload(session: ActivitySession) {
 
 async function recordTreasureDiscovery(player: Player, target: RegisteredInteractable, now: number):
   Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string }> {
+  const privateResult = await recordPrivateTreasureDiscovery(sql, player, target, now,
+    TREASURE_ASSIGNMENT_SECRET, INSTANCE_ID, PROCESS_ID, processGeneration);
+  if (privateResult.handled) return { discovered: privateResult.discovered,
+    completed: privateResult.completed, rewardEarnedCredits: privateResult.rewardEarnedCredits,
+    code: privateResult.code };
   return sql.begin(async tx => {
     const owner = await tx`SELECT id FROM virtual_world_instances
       WHERE id = ${INSTANCE_ID}::uuid AND owner_process_id = ${PROCESS_ID}::uuid
@@ -1686,6 +1693,11 @@ wss.on("connection", async (socket: WebSocket) => {
         player.grounded = true; player.seated = false; player.jumpQueued = false;
         send(socket, { type: "spatial_location_exited",
           state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
+    void loadPrivateTreasureHints(sql, player, Date.now(), TREASURE_ASSIGNMENT_SECRET).then(hints => {
+      if (players.get(player.id) !== player || socket.readyState !== WebSocket.OPEN) return;
+      for (const hint of hints) send(socket, { type: "treasure_hunt_clue", huntId: hint.huntId,
+        title: hint.title, sequence: hint.sequence, clue: hint.clue });
+    }).catch(error => console.error("private_treasure_hint_load_failed", player.id, error));
         return;
       }
       if (msg && msg.type === "event_join") {
@@ -1818,10 +1830,15 @@ wss.on("connection", async (socket: WebSocket) => {
         if (msg.action === "use") {
           try {
             const treasure = await recordTreasureDiscovery(player, target, now);
-            if (treasure.discovered) send(socket, {
-              type: "treasure_clue_discovered", objectId: target.id,
-              completed: treasure.completed, rewardEarnedCredits: treasure.rewardEarnedCredits
-            });
+            if (treasure.discovered) {
+              send(socket, { type: "treasure_clue_discovered", objectId: target.id,
+                completed: treasure.completed, rewardEarnedCredits: treasure.rewardEarnedCredits });
+              void loadPrivateTreasureHints(sql, player, Date.now(), TREASURE_ASSIGNMENT_SECRET).then(hints => {
+                if (players.get(player.id) !== player || socket.readyState !== WebSocket.OPEN) return;
+                for (const hint of hints) send(socket, { type: "treasure_hunt_clue", huntId: hint.huntId,
+                  title: hint.title, sequence: hint.sequence, clue: hint.clue });
+              }).catch(error => console.error("private_treasure_hint_refresh_failed", player.id, error));
+            }
             else if (treasure.code) send(socket, {
               type: "treasure_discovery_rejected", objectId: target.id, code: treasure.code
             });
