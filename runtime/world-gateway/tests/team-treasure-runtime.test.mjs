@@ -28,6 +28,7 @@ test("team creation persists one shared assignment per authored clue step", asyn
   const db = fakeDb((query) => {
     if (query.includes("FROM virtual_world_treasure_hunts")) return [{ id: huntId }];
     if (query.includes("FROM virtual_world_treasure_team_members AS member")) return [];
+    if (query.includes("INSERT INTO virtual_world_treasure_team_members")) return [{ userId }];
     if (query.includes("FROM virtual_world_treasure_spawn_points")) return points;
     return [];
   });
