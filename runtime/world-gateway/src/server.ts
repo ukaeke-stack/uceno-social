@@ -1441,6 +1441,52 @@ wss.on("connection", async (socket: WebSocket) => {
       if (players.get(player.id) !== player || player.socket !== socket) return;
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
+      if (msg && msg.type === "treasure_inventory_request") {
+        try {
+          const items = await sql`SELECT catalog.code, catalog.display_name AS "displayName",
+              catalog.category, catalog.rarity, inventory.quantity,
+              inventory.awarded_at AS "awardedAt"
+            FROM virtual_world_user_collectibles AS inventory
+            JOIN virtual_world_collectible_catalog AS catalog
+              ON catalog.id = inventory.collectible_id
+            WHERE inventory.user_id = ${player.id}::uuid
+            ORDER BY inventory.awarded_at DESC, inventory.id DESC LIMIT 100`;
+          send(socket, { type: "treasure_inventory", items });
+        } catch (error) {
+          console.error("treasure_inventory_load_failed", player.id, error);
+          send(socket, { type: "treasure_inventory", items: [], code: "inventory_unavailable" });
+        }
+        return;
+      }
+      if (msg && msg.type === "treasure_history_request") {
+        try {
+          const history = await sql`SELECT hunt.id AS "huntId", hunt.title,
+              hunt.distribution_mode AS "distributionMode",
+              progress.next_sequence AS "discoveredClues",
+              progress.completed_at AS "completedAt",
+              progress.reward_issued_at AS "rewardIssuedAt",
+              COALESCE(ledger.amount, 0)::text AS "rewardEarnedCredits",
+              (SELECT COUNT(*)::integer FROM virtual_world_treasure_assignments AS assignment
+                WHERE assignment.hunt_id = hunt.id AND assignment.user_id = ${player.id}::uuid) AS "privateClueCount",
+              (SELECT COUNT(*)::integer FROM virtual_world_treasure_clues AS clue
+                WHERE clue.hunt_id = hunt.id) AS "legacyClueCount"
+            FROM virtual_world_treasure_progress AS progress
+            JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = progress.hunt_id
+            LEFT JOIN virtual_world_earned_credit_ledger AS ledger
+              ON ledger.user_id = progress.user_id AND ledger.source_treasure_hunt_id = hunt.id
+            WHERE progress.user_id = ${player.id}::uuid
+            ORDER BY progress.completed_at DESC NULLS LAST, progress.updated_at DESC LIMIT 100`;
+          send(socket, { type: "treasure_hunt_history", hunts: history.map((hunt: any) => ({
+            ...hunt,
+            totalClues: Number(hunt.privateClueCount) || Number(hunt.legacyClueCount),
+            discoveredClues: Number(hunt.discoveredClues)
+          })) });
+        } catch (error) {
+          console.error("treasure_history_load_failed", player.id, error);
+          send(socket, { type: "treasure_hunt_history", hunts: [], code: "history_unavailable" });
+        }
+        return;
+      }
       if (msg && msg.type === "district_content_ready") {
         const pending = player.pendingDistrict;
         if (matchesDistrictTransition(pending, msg.districtId, msg.nonce)) {
