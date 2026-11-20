@@ -51,7 +51,7 @@ export function selectPersonalTreasureRoute(
     groups.set(candidate.sequence, group);
   }
   const result: PersonalTreasureAssignment[] = [];
-  const selected = new Set<string>();
+  const selectedInteractables = new Set<string>();
   for (let sequence = 0; sequence < clueCount; sequence++) {
     const group = groups.get(sequence) ?? [];
     if (!group.length) throw new Error("treasure_spawn_sequence_unavailable");
@@ -60,10 +60,11 @@ export function selectPersonalTreasureRoute(
     const offset = digest.readUInt32BE(0) % group.length;
     let candidate = group[offset]!;
     // Avoid assigning the same interactable twice in a single route when
-    // alternative authored candidates exist.
-    for (let step = 0; step < group.length && selected.has(candidate.id); step++)
+    // alternative authored candidates exist. Candidate IDs are not enough:
+    // distinct spawn-point rows can refer to the same in-world interactable.
+    for (let step = 0; step < group.length && selectedInteractables.has(candidate.interactableId); step++)
       candidate = group[(offset + step + 1) % group.length]!;
-    selected.add(candidate.id);
+    selectedInteractables.add(candidate.interactableId);
     result.push({ sequence, spawnPointId: candidate.id });
   }
   return result;
