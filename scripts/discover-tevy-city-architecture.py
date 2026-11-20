@@ -153,7 +153,10 @@ def allocate_city_candidates(candidate_pools, per_city=PER_CITY):
         # gets its first qualified asset before any city receives a second,
         # while city relevance score breaks ties within the same coverage tier.
         for slot in range(per_city):
-            add_edge(city_nodes[city], sink, 1, slot * 1000)
+            # A large first-slot bonus makes coverage a hard priority over
+            # relevance score: no city with eligible models is starved merely
+            # because another city's catalogue is broader or scores higher.
+            add_edge(city_nodes[city], sink, 1, -100000 + slot * 1000)
 
     # Successive shortest augmenting paths over the residual graph allow an
     # earlier broad-city assignment to be rerouted when that model fits another
