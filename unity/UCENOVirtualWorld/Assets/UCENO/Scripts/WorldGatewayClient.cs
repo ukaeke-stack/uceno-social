@@ -71,6 +71,7 @@ namespace UCENO.VirtualWorld
     }
 
     [Serializable] internal sealed class GatewaySimpleRequest { public string type; }
+    [Serializable] internal sealed class GatewayTreasureTeamRequest { public string type; public string huntId; public string teamId; public int maxMembers; }
 
     [Serializable] internal sealed class GatewayWardrobeRefreshRequest
     {
@@ -162,6 +163,8 @@ namespace UCENO.VirtualWorld
     [Serializable] internal sealed class GatewayActivityTransferRequest { public string sessionId; }
     [Serializable] internal sealed class GatewayActivityTransferResponse { public string ticket; public string endpoint; public string instanceId; public string sessionId; public string error; }
 
+    [Serializable] public sealed class GatewayTreasureTeamHunt { public string huntId; public string title; public int clueCount; public string endsAt; }
+
     [Serializable] public sealed class GatewayTreasureClue
     {
         public string title;
@@ -242,6 +245,12 @@ namespace UCENO.VirtualWorld
         public string endpoint;
         public string sessionId;
         public string huntId;
+        public string teamId;
+        public string status;
+        public int members;
+        public int maxMembers;
+        public bool ok;
+        public GatewayTreasureTeamHunt[] teamHunts;
         public string title;
         public int sequence;
         public GatewayTreasureClue clue;
@@ -343,6 +352,10 @@ namespace UCENO.VirtualWorld
         public event Action<GatewayActivitySessionState> ActivityStateChanged;
         public event Action<string> ActivityRejected;
         public event Action<string, string, int, GatewayTreasureClue> TreasureClueReceived;
+        public event Action<string, string, int, GatewayTreasureClue> TeamTreasureClueReceived;
+        public event Action<GatewayTreasureTeamHunt[]> TreasureTeamHuntsReceived;
+        public event Action<bool, string, string, int, int, string> TreasureTeamStateReceived;
+        public event Action<string, string, string> TreasureTeamRewardReceived;
         public event Action<string, string, bool, string, GatewayTreasureCollectible[]> TreasureDiscoveryReceived;
         public event Action<GatewayTreasureInventoryItem[]> TreasureInventoryReceived;
         public event Action<GatewayTreasureHistoryItem[]> TreasureHistoryReceived;
@@ -646,6 +659,24 @@ namespace UCENO.VirtualWorld
 
         public bool RequestTreasureInventory() => SendTreasureRequest("treasure_inventory_request");
         public bool RequestTreasureHistory() => SendTreasureRequest("treasure_history_request");
+        public bool RequestTreasureTeamHunts() => SendTreasureRequest("treasure_team_hunts_request");
+        public bool RequestCreateTreasureTeam(string huntId, int maxMembers = 5) =>
+            SendTreasureTeamRequest(new GatewayTreasureTeamRequest { type = "treasure_team_create", huntId = huntId, maxMembers = maxMembers });
+        public bool RequestJoinTreasureTeam(string teamId) =>
+            SendTreasureTeamRequest(new GatewayTreasureTeamRequest { type = "treasure_team_join", teamId = teamId });
+
+        private bool SendTreasureTeamRequest(GatewayTreasureTeamRequest request)
+        {
+            if (!connected || socket == null) return false;
+            _ = SendTreasureTeamRequestAsync(request);
+            return true;
+        }
+
+        private async Task SendTreasureTeamRequestAsync(GatewayTreasureTeamRequest request)
+        {
+            try { await socket.SendText(JsonUtility.ToJson(request)); }
+            catch (Exception error) { Debug.LogWarning("UCENO team treasure request failed: " + error.Message); }
+        }
 
         private bool SendTreasureRequest(string type)
         {
@@ -1009,6 +1040,34 @@ namespace UCENO.VirtualWorld
             {
                 TreasureClueReceived?.Invoke(packet.huntId ?? "", packet.title ?? "",
                     packet.sequence, packet.clue);
+                return;
+            }
+
+            if (packet.type == "team_treasure_hunt_catalog")
+            {
+                TreasureTeamHuntsReceived?.Invoke(packet.teamHunts ?? Array.Empty<GatewayTreasureTeamHunt>());
+                if (!string.IsNullOrEmpty(packet.code)) TreasureRejected?.Invoke(packet.code);
+                return;
+            }
+
+            if (packet.type == "team_treasure_hunt_clue")
+            {
+                TeamTreasureClueReceived?.Invoke(packet.teamId ?? "", packet.huntId ?? "", packet.sequence, packet.clue);
+                return;
+            }
+
+            if (packet.type == "treasure_team_created" || packet.type == "treasure_team_joined" ||
+                packet.type == "treasure_team_rejected")
+            {
+                TreasureTeamStateReceived?.Invoke(packet.ok, packet.teamId ?? "", packet.status ?? "",
+                    packet.members, packet.maxMembers, packet.code ?? "");
+                if (!string.IsNullOrEmpty(packet.code)) TreasureRejected?.Invoke(packet.code);
+                return;
+            }
+
+            if (packet.type == "team_treasure_reward")
+            {
+                TreasureTeamRewardReceived?.Invoke(packet.huntId ?? "", packet.teamId ?? "", packet.rewardEarnedCredits ?? "0");
                 return;
             }
 
