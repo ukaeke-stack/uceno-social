@@ -258,7 +258,7 @@ test("migration 037 applies cleanly and enforces mission, treasure and append-on
     assert.equal(hintsForOwner.length, 1);
     assert.equal(hintsForMember.length, 1);
     assert.equal(hintsForOwner[0].sequence, 0);
-    assert.equal(hintsForMember[0].createdTeamId, createdTeamId);
+    assert.equal(hintsForMember[0].teamId, createdTeamId);
     const teamAssignments = await db`SELECT assignment.sequence, point.id AS id,
         point.interactable_id AS "interactableId", point.position_x AS x,
         point.position_y AS y, point.position_z AS z, point.city_id AS "cityId",
