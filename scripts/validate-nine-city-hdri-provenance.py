@@ -86,7 +86,7 @@ def main() -> None:
         with hdri_path.open("rb") as stream:
             header = stream.read(512)
         require(header.startswith((b"#?RADIANCE", b"#?RGBE")), f"{city_id}: not a Radiance HDR file")
-        resolution = re.search(rb"(?m)^-Y\\s+(\\d+)\\s+\\+X\\s+(\\d+)\\s*$", header)
+        resolution = re.search(rb"(?m)^-Y\s+(\d+)\s+\+X\s+(\d+)\s*$", header)
         require(resolution is not None, f"{city_id}: Radiance resolution header missing")
         height, width = map(int, resolution.groups())
         require(width >= 1024 and height >= 512 and 1.8 <= width / height <= 2.2,
