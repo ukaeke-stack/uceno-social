@@ -156,3 +156,25 @@ test("join and cancellation respect the latest participant event timestamp", () 
   assert.equal(lobby.phase, "lobby");
   assert.equal(cancelActivity(lobby, true, 1_101).ok, true);
 });
+
+
+test("leave is idempotent for DNF participants and blocked after session cancellation", () => {
+  const active = race();
+  joinTwo(active);
+  assert.equal(startActivity(active, true, 1_200).ok, true);
+  assert.equal(leaveActivity(active, "user-a", 1_300).ok, true);
+  const dnfVersion = active.version;
+  assert.equal(leaveActivity(active, "user-a", 1_400).ok, true);
+  assert.equal(active.version, dnfVersion);
+  assert.equal(active.participants.get("user-a")?.lastActionAt, 1_300);
+
+  const cancelled = race();
+  joinTwo(cancelled);
+  assert.equal(cancelActivity(cancelled, true, 1_200).ok, true);
+  const cancelledVersion = cancelled.version;
+  assert.deepEqual(leaveActivity(cancelled, "user-a", 1_300), {
+    ok: false, code: "session_already_terminal"
+  });
+  assert.equal(cancelled.version, cancelledVersion);
+  assert.equal(cancelled.participants.get("user-a")?.status, "joined");
+});
