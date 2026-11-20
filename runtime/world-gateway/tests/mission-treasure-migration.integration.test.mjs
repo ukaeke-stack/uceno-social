@@ -280,11 +280,29 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       }
     }
     const privatePlayer = { id: userId, worldId, x: 0, y: 1.15, z: 0 };
-    const privateHints = await loadPrivateTreasureHints(db, privatePlayer, Date.now(),
-      'integration-test-secret-that-is-at-least-32-characters');
+    // Simultaneous reconnects from separate gateway pools must converge on
+    // one complete, immutable personal route without duplicate progress rows.
+    const privateHintResults = await Promise.all([
+      loadPrivateTreasureHints(db, privatePlayer, Date.now(),
+        'integration-test-secret-that-is-at-least-32-characters'),
+      loadPrivateTreasureHints(replayDb, privatePlayer, Date.now(),
+        'integration-test-secret-that-is-at-least-32-characters')
+    ]);
+    const privateHints = privateHintResults[0];
     assert.equal(privateHints.length, 1);
+    assert.deepEqual(privateHintResults[1], privateHints);
     assert.equal(privateHints[0].clue.title, 'Private clue');
     assert.equal('position_x' in privateHints[0].clue, false);
+    const concurrentPrivateAssignments = await db`SELECT sequence, spawn_point_id AS "spawnPointId"
+      FROM virtual_world_treasure_assignments
+      WHERE hunt_id = ${privateHuntId}::uuid AND user_id = ${userId}::uuid
+      ORDER BY sequence`;
+    assert.equal(concurrentPrivateAssignments.length, 2);
+    assert.deepEqual(concurrentPrivateAssignments.map(row => Number(row.sequence)), [0, 1]);
+    const concurrentPrivateProgress = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_treasure_progress
+      WHERE hunt_id = ${privateHuntId}::uuid AND user_id = ${userId}::uuid`;
+    assert.equal(concurrentPrivateProgress[0].total, 1);
     const assignments = await db`SELECT assignment.sequence, point.id AS "spawnPointId",
         point.city_id AS "cityId", point.district_id AS "districtId",
         point.interactable_id AS "interactableId", point.position_x AS x,
