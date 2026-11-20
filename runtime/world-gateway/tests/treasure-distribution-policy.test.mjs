@@ -37,3 +37,12 @@ test("global reward plans require a finite winner cap", () => {
   assert.equal(validateTreasureRewardPlan({mode:"global",rewardEarnedCredits:5n,maxGlobalWinners:100,maxRewardClaims:null}), true);
   assert.equal(validateTreasureRewardPlan({mode:"personal",rewardEarnedCredits:5n,maxGlobalWinners:null,maxRewardClaims:null}), true);
 });
+
+test("player-facing clue payload strips coordinates and internal spawn identifiers", async () => {
+  const { sanitizeTreasureCluePayload } = await import("../dist/treasure-distribution-policy.js");
+  assert.deepEqual(sanitizeTreasureCluePayload({
+    title: "Old fountain", hint: "Look near the water", difficulty: 2,
+    position_x: 100, position_y: 4, position_z: 20,
+    interactable_id: "secret-object", spawnPointId: "private-id"
+  }), { title: "Old fountain", hint: "Look near the water", difficulty: 2 });
+});
