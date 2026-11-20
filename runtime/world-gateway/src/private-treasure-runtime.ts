@@ -33,17 +33,19 @@ async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: str
       FROM virtual_world_treasure_spawn_points
       WHERE hunt_id = ANY($1::uuid[]) AND enabled = TRUE
     ) AS ranked
-    WHERE hunt_rank <= 10000
+    WHERE hunt_rank <= 10001
     ORDER BY "huntId", sequence, id`, [hunts.map((hunt: any) => hunt.id)]) : [];
   const pointsByHunt = new Map<string, any[]>();
   for (const point of candidateRows) {
     const group = pointsByHunt.get(point.huntId) ?? [];
-    if (group.length < 10000) group.push(point);
+    if (group.length < 10001) group.push(point);
     pointsByHunt.set(point.huntId, group);
   }
   for (const hunt of hunts) {
     const points = pointsByHunt.get(hunt.id) ?? [];
-    if (!points.length) continue;
+    // Do not silently accept a truncated candidate pool: doing so would make
+    // personal route selection depend on an arbitrary first 10,000 rows.
+    if (!points.length || points.length > 10000) continue;
     const clueCount = Math.max(...points.map((p: any) => Number(p.sequence))) + 1;
     if (clueCount < 2 || clueCount > 100) continue;
     const candidatesPerSequence = new Map<number, number>();
