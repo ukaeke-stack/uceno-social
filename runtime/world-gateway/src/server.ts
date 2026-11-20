@@ -548,7 +548,8 @@ async function isActiveTreasureInteractable(player: Player, target: RegisteredIn
       JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = clue.hunt_id
       WHERE clue.city_id = ${target.cityId} AND clue.district_id = ${target.districtId}
         AND clue.interactable_id = ${target.id}
-        AND hunt.enabled = TRUE AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
+        AND hunt.enabled = TRUE AND hunt.distribution_mode <> 'team'
+        AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
         AND hunt.starts_at <= to_timestamp(${now / 1000})
         AND hunt.ends_at > to_timestamp(${now / 1000})
     ) AS active`;
@@ -589,6 +590,7 @@ async function recordTreasureDiscovery(player: Player, target: RegisteredInterac
       JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = clue.hunt_id
       WHERE clue.city_id = ${target.cityId} AND clue.district_id = ${target.districtId}
         AND clue.interactable_id = ${target.id} AND hunt.enabled = TRUE
+        AND hunt.distribution_mode <> 'team'
         AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
         AND hunt.starts_at <= to_timestamp(${now / 1000})
         AND hunt.ends_at > to_timestamp(${now / 1000})
