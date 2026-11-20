@@ -110,7 +110,7 @@ class TevyCityArchitectureTests(unittest.TestCase):
         allocations = tevy.allocate_city_candidates(pools, 2)
         slugs = [item["slug"] for items in allocations.values() for item in items]
         self.assertEqual(len(slugs), len(set(slugs)))
-        self.assertEqual(sum(len(items) for items in allocations.values()), 3)
+        self.assertEqual(sum(len(items) for items in allocations.values()), 4)
 
     def test_glb_checksum_and_header_are_verified(self):
         import hashlib
