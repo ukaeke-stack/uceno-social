@@ -205,6 +205,8 @@ export async function recordTeamTreasureDiscovery(
       [match.teamId, completed, now / 1000]);
     if (!completed) return { handled: true, discovered: true, completed: false, rewardEarnedCredits: "0", teamId: match.teamId };
 
+    await tx.unsafe(`UPDATE virtual_world_treasure_teams SET status = 'completed'
+      WHERE id = $1::uuid AND status = 'active'`, [match.teamId]);
     const claims = await tx.unsafe(`SELECT COUNT(*)::integer AS total
       FROM virtual_world_treasure_global_claims WHERE hunt_id = $1::uuid`, [match.huntId]);
     const cap = match.maxRewardClaims === null ? null : Number(match.maxRewardClaims);
@@ -240,8 +242,6 @@ export async function recordTeamTreasureDiscovery(
         [share.userId, share.amount.toString(), "team-treasure:" + match.teamId + ":" + share.userId,
           match.huntId, JSON.stringify({ teamId: match.teamId, contributionPoints: share.contributionPoints })]);
     }
-    await tx.unsafe(`UPDATE virtual_world_treasure_teams SET status = 'completed'
-      WHERE id = $1::uuid AND status = 'active'`, [match.teamId]);
     const teamMembers = await tx.unsafe(`SELECT user_id AS "userId" FROM virtual_world_treasure_team_members
       WHERE team_id = $1::uuid ORDER BY user_id`, [match.teamId]);
     let collectibles: CollectibleReward[] = [];
