@@ -11,7 +11,7 @@ test("team reward shares are proportional and conserve the entire reward", () =>
     { userId: a, points: 5 }, { userId: b, points: 3 }, { userId: c, points: 2 }
   ]);
   assert.equal(shares.reduce((sum, item) => sum + item.amount, 0n), 101n);
-  assert.deepEqual(shares.map(item => item.amount), [50n, 30n, 21n]);
+  assert.deepEqual(shares.map(item => item.amount), [51n, 30n, 20n]);
 });
 
 test("team reward remainder assignment is deterministic", () => {
