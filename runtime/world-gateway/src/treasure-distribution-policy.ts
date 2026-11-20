@@ -85,3 +85,20 @@ export function validateTreasureRewardPlan(plan: TreasureRewardPlan): boolean {
   if (plan.mode === "global" && plan.maxGlobalWinners === null) return false;
   return true;
 }
+
+/** Return only player-facing clue fields. Never serialize spawn coordinates,
+ * interactable IDs, internal assignment IDs, or arbitrary authored JSON. */
+export function sanitizeTreasureCluePayload(value: unknown): Record<string, string | number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const source = value as Record<string, unknown>;
+  const output: Record<string, string | number> = {};
+  for (const key of ["title", "hint", "description", "mediaAssetId", "clueType"] as const) {
+    const item = source[key];
+    if (typeof item !== "string" || item.length === 0) continue;
+    const max = key === "description" ? 800 : key === "hint" ? 500 : 120;
+    if (item.length <= max && !/[\\u0000-\\u001f]/.test(item)) output[key] = item;
+  }
+  if (Number.isInteger(source.difficulty) && Number(source.difficulty) >= 1 &&
+      Number(source.difficulty) <= 5) output.difficulty = Number(source.difficulty);
+  return output;
+}
