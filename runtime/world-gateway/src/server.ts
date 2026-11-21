@@ -1533,14 +1533,14 @@ wss.on("connection", async (socket: WebSocket) => {
       if (msg && ["treasure_team_hunts_request", "treasure_team_create", "treasure_team_join"].includes(msg.type)) {
         if (!consumeTreasureRequestBudget(player.treasureRequestBudget, Date.now())) {
           if (msg.type === "treasure_team_hunts_request")
-            send(socket, { type: "team_treasure_hunt_catalog", hunts: [], code: "treasure_request_rate_limited" });
+            send(socket, { type: "team_treasure_hunt_catalog", teamHunts: [], code: "treasure_request_rate_limited" });
           else send(socket, { type: "treasure_team_rejected", code: "treasure_request_rate_limited" });
           return;
         }
       }
       if (msg && msg.type === "treasure_team_hunts_request") {
         if (TREASURE_ASSIGNMENT_SECRET.length < 32) {
-          send(socket, { type: "team_treasure_hunt_catalog", hunts: [], code: "treasure_assignment_secret_unavailable" });
+          send(socket, { type: "team_treasure_hunt_catalog", teamHunts: [], code: "treasure_assignment_secret_unavailable" });
           return;
         }
         try {
@@ -1558,7 +1558,7 @@ wss.on("connection", async (socket: WebSocket) => {
           send(socket, { type: "team_treasure_hunt_catalog", hunts });
         } catch (error) {
           console.error("team_treasure_hunt_catalog_failed", player.id, error);
-          send(socket, { type: "team_treasure_hunt_catalog", hunts: [], code: "team_hunts_unavailable" });
+          send(socket, { type: "team_treasure_hunt_catalog", teamHunts: [], code: "team_hunts_unavailable" });
         }
         return;
       }
