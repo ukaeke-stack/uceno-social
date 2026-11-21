@@ -528,8 +528,32 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     assert.equal(teamAllocations.length, 2);
     assert.equal(teamAllocations.reduce((sum, row) => sum + BigInt(row.amount), 0n), 101n);
     const teamLedger = await db`SELECT user_id AS "userId", amount::text AS amount
-      FROM virtual_world_earned_credit_ledger WHERE idempotency_key LIKE ${'team-treasure:' + createdTeamId + ':%'}`;
+      FROM virtual_world_earned_credit_ledger
+      WHERE idempotency_key LIKE ${'team-treasure:' + createdTeamId + ':%'}
+      ORDER BY user_id`;
     assert.equal(teamLedger.length, 2);
+    // Each member's immutable ledger entry must match that member's allocation,
+    // not merely produce the right aggregate reward total.
+    const allocationByUser = new Map(teamAllocations.map(row => [row.userId, BigInt(row.amount)]));
+    const ledgerByUser = new Map(teamLedger.map(row => [row.userId, BigInt(row.amount)]));
+    assert.deepEqual([...ledgerByUser.keys()].sort(), [...allocationByUser.keys()].sort());
+    for (const [memberId, allocatedAmount] of allocationByUser) {
+      assert.equal(ledgerByUser.get(memberId), allocatedAmount,
+        `Earned Credits ledger amount must match team allocation for ${memberId}`);
+    }
+    // Read the committed rows through a second pool to verify that the
+    // allocation/ledger pair is visible consistently outside the writer.
+    const [replayedAllocations, replayedLedger] = await Promise.all([
+      replayDb`SELECT user_id AS "userId", amount::text AS amount
+        FROM virtual_world_treasure_team_reward_allocations
+        WHERE team_id = ${createdTeamId}::uuid ORDER BY user_id`,
+      replayDb`SELECT user_id AS "userId", amount::text AS amount
+        FROM virtual_world_earned_credit_ledger
+        WHERE idempotency_key LIKE ${'team-treasure:' + createdTeamId + ':%'}
+        ORDER BY user_id`
+    ]);
+    assert.deepEqual(replayedAllocations, teamAllocations);
+    assert.deepEqual(replayedLedger, teamLedger);
     const teamInventory = await db`SELECT user_id AS "userId", quantity
       FROM virtual_world_user_collectibles
       WHERE collectible_id = ${teamCollectibleId}::uuid
