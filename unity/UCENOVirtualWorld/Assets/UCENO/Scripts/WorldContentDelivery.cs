@@ -116,9 +116,31 @@ namespace UCENO.VirtualWorld
             residencyLoads.Add(label);
             if (IsDistrictSceneLabel(label))
             {
-                // District scene entries use their content label as their Addressables address.
+                // Resolve the label specifically as a scene before loading it. A
+                // generic label lookup can also match prefabs or other assets;
+                // accepting those would make the gateway believe a district is
+                // resident when no additive scene was actually loaded.
+                AsyncOperationHandle<IList<IResourceLocation>> sceneLocations =
+                    Addressables.LoadResourceLocationsAsync(label, typeof(SceneInstance));
+                pendingLocationHandles[label] = sceneLocations;
+                yield return sceneLocations;
+                pendingLocationHandles.Remove(label);
+                bool hasSingleScene = sceneLocations.Status == AsyncOperationStatus.Succeeded &&
+                    sceneLocations.Result != null && sceneLocations.Result.Count == 1;
+                IResourceLocation sceneLocation = hasSingleScene ? sceneLocations.Result[0] : null;
+                if (sceneLocations.IsValid()) Addressables.Release(sceneLocations);
+                if (!hasSingleScene || sceneLocation == null)
+                {
+                    residencyLoads.Remove(label);
+                    completed?.Invoke(false, "District content label must resolve to exactly one Addressables scene.");
+                    ContentFailed?.Invoke(label);
+                    yield break;
+                }
+
+                // Load by the resolved scene location rather than assuming the
+                // gateway label is also the scene's address/key.
                 AsyncOperationHandle<SceneInstance> sceneLoad =
-                    Addressables.LoadSceneAsync(label, LoadSceneMode.Additive, true);
+                    Addressables.LoadSceneAsync(sceneLocation, LoadSceneMode.Additive, true);
                 pendingSceneHandles[label] = sceneLoad;
                 StatusChanged?.Invoke("Loading district scene " + label + "...");
                 while (!sceneLoad.IsDone)
