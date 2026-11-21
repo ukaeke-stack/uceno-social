@@ -62,7 +62,7 @@ const checks = [
 
   ["Remote Addressables catalogs are checked and updated before city labels resolve", /CheckForCatalogUpdates\(false\)/.test(delivery) && /UpdateCatalogs\(catalogCheck.Result, false\)/.test(delivery)],
   ["Download progress is exposed", /ProgressChanged\?\.Invoke\(label, download\.PercentComplete\)/.test(delivery)],
-  ["Failures are retried", /attempt < maxAttempts/.test(delivery) && /WaitForSecondsRealtime/.test(delivery)],
+  ["Failures are retried with bounded attempts and increasing realtime backoff", /int attempts = Mathf.Max\(1, maxAttempts\)/.test(delivery) && /attempt < attempts/.test(delivery) && /WaitForSecondsRealtime\(retryDelay \* attempt\)/.test(delivery)],
   ["Successful labels are cached in session", /readyLabels\.Add\(label\)/.test(delivery)],
   ["Developer preload list exists", /preloadLabels/.test(delivery) && /PreloadConfiguredContent/.test(delivery)],
   ["Remote catalog is configurable", /remoteCatalogUrl/.test(delivery)],
@@ -71,7 +71,7 @@ const checks = [
   ["Resident content uses reference-counted leases", /residencyReferences/.test(delivery) && /AcquireContent\(/.test(delivery)],
   ["Resident labels are released at zero references", /ReleaseContent\(/.test(delivery) && /Addressables.Release\(handle\)/.test(delivery)],
   ["Concurrent resident labels are capped", /maxConcurrentResidentLabels/.test(delivery)],
-  ["District labels load additive Addressables scenes", /IsDistrictSceneLabel/.test(delivery) && /LoadSceneAsync\(label, LoadSceneMode.Additive/.test(delivery)],
+  ["District labels resolve exactly one scene location and load it additively", /IsDistrictSceneLabel/.test(delivery) && /LoadResourceLocationsAsync\(label, typeof\(SceneInstance\)\)/.test(delivery) && /sceneLocations\.Result\.Count == 1/.test(delivery) && /LoadSceneAsync\(sceneLocation, LoadSceneMode.Additive/.test(delivery)],
   ["City root labels are not mistaken for additive district-scene addresses", /parts\.Length >= 4/.test(delivery) && cityCatalog.cities.every(city => city.contentLabel.split("-").length === 3 && city.districts.every(district => district.contentLabel.split("-").length >= 4))],
   ["Every city district uses the Addressables scene-label namespace consumed by the runtime classifier", cityCatalog.cities.every(city => city.districts.every(district => district.contentLabel.startsWith("world-city-district-") || district.contentLabel.startsWith("world-city-" + city.id + "-")))],
   ["District scene handles unload after final lease release", /UnloadSceneAsync\(handle, false\)/.test(delivery) && /residentSceneHandles/.test(delivery)],
