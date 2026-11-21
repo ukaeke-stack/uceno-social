@@ -371,6 +371,100 @@ def broaden_city_candidates(city, queries, raw_by_slug, globally_seen, query_dia
     return added_total
 
 
+
+def allocate_unique_city_candidates(candidate_pools, per_city=30):
+    """Allocate unique models globally while maximizing city coverage before extras."""
+    if not isinstance(per_city, int) or per_city < 1:
+        raise ValueError("per_city must be a positive integer")
+    cities = sorted(candidate_pools)
+    records_by_slug = {}
+    for city in cities:
+        for candidate in candidate_pools[city]:
+            slug = candidate.get("slug")
+            if isinstance(slug, str) and slug:
+                records_by_slug.setdefault(slug, candidate)
+    slugs = sorted(records_by_slug)
+    source = 0
+    asset_start = 1
+    city_start = asset_start + len(slugs)
+    sink = city_start + len(cities)
+    graph = [[] for _ in range(sink + 1)]
+
+    def add_edge(origin, destination, capacity, cost):
+        forward = {"to": destination, "capacity": capacity, "cost": cost,
+                   "reverse": len(graph[destination])}
+        backward = {"to": origin, "capacity": 0, "cost": -cost,
+                    "reverse": len(graph[origin])}
+        graph[origin].append(forward)
+        graph[destination].append(backward)
+        return forward
+
+    asset_nodes = {slug: asset_start + index for index, slug in enumerate(slugs)}
+    city_nodes = {city: city_start + index for index, city in enumerate(cities)}
+    for node in asset_nodes.values():
+        add_edge(source, node, 1, 0)
+
+    assignment_edges = {slug: [] for slug in slugs}
+    for city in cities:
+        for candidate in candidate_pools[city]:
+            slug = candidate.get("slug")
+            if slug not in asset_nodes:
+                continue
+            relevance = int(candidate.get("relevance_score") or 0)
+            mobile_cost = int(candidate.get("mobile_cost_score") or 0)
+            edge = add_edge(asset_nodes[slug], city_nodes[city], 1,
+                            -(relevance * 100 - mobile_cost))
+            assignment_edges[slug].append((city, edge))
+        for slot in range(per_city):
+            add_edge(city_nodes[city], sink, 1, -100000 + slot * 1000)
+
+    while True:
+        distances = [float("inf")] * len(graph)
+        previous_node = [-1] * len(graph)
+        previous_edge = [-1] * len(graph)
+        queued = [False] * len(graph)
+        from collections import deque
+        distances[source] = 0
+        queue = deque([source])
+        queued[source] = True
+        while queue:
+            node = queue.popleft()
+            queued[node] = False
+            for edge_index, edge in enumerate(graph[node]):
+                if edge["capacity"] <= 0:
+                    continue
+                distance = distances[node] + edge["cost"]
+                if distance >= distances[edge["to"]]:
+                    continue
+                distances[edge["to"]] = distance
+                previous_node[edge["to"]] = node
+                previous_edge[edge["to"]] = edge_index
+                if not queued[edge["to"]]:
+                    queue.append(edge["to"])
+                    queued[edge["to"]] = True
+        if previous_node[sink] < 0:
+            break
+        node = sink
+        while node != source:
+            parent = previous_node[node]
+            edge = graph[parent][previous_edge[node]]
+            edge["capacity"] -= 1
+            graph[node][edge["reverse"]]["capacity"] += 1
+            node = parent
+
+    allocations = {city: [] for city in cities}
+    for slug, choices in assignment_edges.items():
+        for city, edge in choices:
+            if edge["capacity"] == 0:
+                allocations[city].append(records_by_slug[slug])
+                break
+    for city in cities:
+        allocations[city].sort(key=lambda item: (
+            -int(item.get("relevance_score") or 0),
+            int(item.get("mobile_cost_score") or 0), item.get("slug", "")))
+    return allocations
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     report = {
@@ -379,7 +473,7 @@ def main():
         "selection_policy": "complete realistic exterior buildings only; reject modular parts, props, unrelated themes and undersized assets; Eclipse Central tower candidates must be at least 35m tall",
         "cities": {},
     }
-    globally_seen = set()
+    candidate_pools = {}
     for city, queries in QUERIES.items():
         raw_by_slug = {}
         query_diagnostics = []
@@ -426,12 +520,10 @@ def main():
                     raw_by_slug[slug] = item
 
         # Broaden underfilled searches without weakening strict qualification.
-        broaden_city_candidates(city, queries, raw_by_slug, globally_seen, query_diagnostics)
+        broaden_city_candidates(city, queries, raw_by_slug, set(), query_diagnostics)
 
         candidates, rejected = [], []
         for slug, item in raw_by_slug.items():
-            if slug in globally_seen:
-                continue
             reason = rejection_reason(item, city)
             if reason:
                 rejected.append({
@@ -476,8 +568,7 @@ def main():
             })
 
         candidates.sort(key=lambda c: (-c["relevance_score"], c["mobile_cost_score"], c["slug"]))
-        chosen = candidates[:30]
-        globally_seen.update(item["slug"] for item in chosen)
+        candidate_pools[city] = candidates
         report["cities"][city] = {
             "queries": queries,
             "query_diagnostics": query_diagnostics,
@@ -485,10 +576,17 @@ def main():
             "candidate_count": len(candidates),
             "rejected_count": len(rejected),
             "rejection_records": rejected,
-            "candidates": chosen,
+            "candidates": [],
         }
         rejection_summary = dict(Counter(item["reason"] for item in rejected).most_common(6))
         print(f"{city}: {len(raw_by_slug)} raw; {len(candidates)} complete-building candidates; rejected {len(rejected)}; top rejection reasons: {rejection_summary}")
+
+    # Resolve cross-city overlap globally; do not let the first city in the
+    # configuration consume a model that another city needs more.
+    allocations = allocate_unique_city_candidates(candidate_pools, per_city=30)
+    for city, chosen in allocations.items():
+        report["cities"][city]["candidates"] = chosen
+        report["cities"][city]["allocated_unique_count"] = len(chosen)
 
     (OUT / "nine-city-candidates.json").write_text(json.dumps(report, indent=2) + "\n")
     lines = [
