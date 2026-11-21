@@ -33,3 +33,14 @@ test("team reward remainder follows fractional share rather than simply highest 
   assert.deepEqual(shares.map(item => item.amount), [2n, 2n, 1n]);
   assert.equal(shares.reduce((sum, item) => sum + item.amount, 0n), 5n);
 });
+
+test("team reward shares are invariant to contribution input order", () => {
+  const forward = [
+    { userId: a, points: 7 }, { userId: b, points: 5 }, { userId: c, points: 3 }
+  ];
+  const reverse = [...forward].reverse();
+  const first = calculateTeamRewardShares(997n, forward);
+  const second = calculateTeamRewardShares(997n, reverse);
+  assert.deepEqual(second, first);
+  assert.equal(first.reduce((sum, item) => sum + item.amount, 0n), 997n);
+});
