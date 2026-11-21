@@ -421,6 +421,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     // progress marker, ledger entry, collectible inventory and minted count.
     // Removing the injected failure and replaying the same final clue must
     // complete exactly once rather than leaving a permanently claimed reward.
+    const recoverySecret = 'integration-test-secret-that-is-at-least-32-characters';
     const recoveryHuntId = randomUUID();
     const recoveryCollectibleId = randomUUID();
     await db`INSERT INTO virtual_world_treasure_hunts
@@ -447,7 +448,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
           'solsticebay', 'central', ${point.interactableId},
           ${point.x}, ${point.y}, ${point.z}, 2)`;
     }
-    await loadPrivateTreasureHints(db, privatePlayer, Date.now(), privateSecret);
+    await loadPrivateTreasureHints(db, privatePlayer, Date.now(), recoverySecret);
     const recoveryRoute = await db`SELECT assignment.sequence,
         point.id AS "spawnPointId", point.city_id AS "cityId",
         point.district_id AS "districtId", point.interactable_id AS "interactableId",
@@ -463,7 +464,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const firstRecoveryClue = recoveryRoute[0];
     const firstRecoveryResult = await recordPrivateTreasureDiscovery(db, recoveryPlayer,
       { id: firstRecoveryClue.interactableId, cityId: firstRecoveryClue.cityId,
-        districtId: firstRecoveryClue.districtId }, Date.now(), privateSecret,
+        districtId: firstRecoveryClue.districtId }, Date.now(), recoverySecret,
       instanceId, processId, 1);
     assert.equal(firstRecoveryResult.discovered, true);
     assert.equal(firstRecoveryResult.completed, false);
@@ -899,7 +900,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const finalRecoveryTarget = { id: finalRecoveryClue.interactableId,
       cityId: finalRecoveryClue.cityId, districtId: finalRecoveryClue.districtId };
     await assert.rejects(() => recordPrivateTreasureDiscovery(db, finalRecoveryInput,
-      finalRecoveryTarget, Date.now(), privateSecret, instanceId, processId, 1),
+      finalRecoveryTarget, Date.now(), recoverySecret, instanceId, processId, 1),
       /injected_treasure_inventory_failure/);
     const rolledBackRecovery = await db`SELECT progress.next_sequence AS sequence,
         progress.reward_issued_at AS "rewardIssuedAt",
@@ -923,7 +924,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     await db.unsafe("DROP TRIGGER fail_treasure_inventory_insert ON virtual_world_user_collectibles");
     await db.unsafe("DROP FUNCTION fail_treasure_inventory_insert()");
     const recoveredReward = await recordPrivateTreasureDiscovery(db, finalRecoveryInput,
-      finalRecoveryTarget, Date.now(), privateSecret, instanceId, processId, 1);
+      finalRecoveryTarget, Date.now(), recoverySecret, instanceId, processId, 1);
     assert.equal(recoveredReward.discovered, true);
     assert.equal(recoveredReward.completed, true);
     assert.equal(recoveredReward.rewardEarnedCredits, "31");
