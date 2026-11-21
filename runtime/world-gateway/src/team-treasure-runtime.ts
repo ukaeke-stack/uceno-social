@@ -260,6 +260,44 @@ export async function recordTeamTreasureDiscovery(
         [share.userId, share.amount.toString(), "team-treasure:" + match.teamId + ":" + share.userId,
           match.huntId, JSON.stringify({ teamId: match.teamId, contributionPoints: share.contributionPoints })]);
     }
+
+    // ON CONFLICT protects retries, but it must not silently bless a
+    // pre-existing row whose amount or ownership differs from this award.
+    // Verify the complete persisted allocation and ledger before granting
+    // collectibles or returning a successful completion receipt.
+    const [persistedAllocations, persistedLedger] = await Promise.all([
+      tx.unsafe(`SELECT user_id AS "userId", contribution_points AS points, amount::text AS amount
+        FROM virtual_world_treasure_team_reward_allocations
+        WHERE team_id = $1::uuid ORDER BY user_id`, [match.teamId]),
+      tx.unsafe(`SELECT user_id AS "userId", amount::text AS amount
+        FROM virtual_world_earned_credit_ledger
+        WHERE idempotency_key LIKE $1 ORDER BY user_id`, ["team-treasure:" + match.teamId + ":%"])
+    ]);
+    const expectedAllocations = new Map(shares.map(share => [share.userId, share]));
+    if (persistedAllocations.length !== shares.length)
+      throw new Error("team_treasure_allocation_integrity_mismatch");
+    let allocatedTotal = BigInt(0);
+    for (const row of persistedAllocations) {
+      const expected = expectedAllocations.get(row.userId);
+      if (!expected || BigInt(row.amount) !== expected.amount ||
+          Number(row.points) !== expected.contributionPoints)
+        throw new Error("team_treasure_allocation_integrity_mismatch");
+      allocatedTotal += BigInt(row.amount);
+    }
+    const expectedLedger = shares.filter(share => share.amount > BigInt(0));
+    if (persistedLedger.length !== expectedLedger.length)
+      throw new Error("team_treasure_ledger_integrity_mismatch");
+    const expectedLedgerByUser = new Map(expectedLedger.map(share => [share.userId, share.amount]));
+    let ledgerTotal = BigInt(0);
+    for (const row of persistedLedger) {
+      const expected = expectedLedgerByUser.get(row.userId);
+      if (expected === undefined || BigInt(row.amount) !== expected)
+        throw new Error("team_treasure_ledger_integrity_mismatch");
+      ledgerTotal += BigInt(row.amount);
+    }
+    if (allocatedTotal !== BigInt(rewardText) || ledgerTotal !== BigInt(rewardText))
+      throw new Error("team_treasure_reward_conservation_mismatch");
+
     const teamMembers = await tx.unsafe(`SELECT user_id AS "userId" FROM virtual_world_treasure_team_members
       WHERE team_id = $1::uuid ORDER BY user_id`, [match.teamId]);
     const collectibleRewards = await grantTreasureCollectiblesToUsers(
