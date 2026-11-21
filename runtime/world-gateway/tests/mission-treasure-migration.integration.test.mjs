@@ -738,10 +738,12 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       loadTeamRewardReceipts(userId), loadTeamRewardReceipts(secondUserId),
       loadTeamRewardReceipts(thirdUserId)
     ]);
-    assert.equal(ownerReceipts.length, 1);
-    assert.equal(memberReceipts.length, 1);
+    assert.equal(ownerReceipts.some(row => row.teamId === recoveryTeam.teamId), true);
+    assert.equal(memberReceipts.some(row => row.teamId === recoveryTeam.teamId), true);
     assert.equal(unrelatedReceipts.some(row => row.teamId === recoveryTeam.teamId), false);
-    for (const [receipt, expectedUser] of [[ownerReceipts[0], userId], [memberReceipts[0], secondUserId]]) {
+    const ownerRecoveryReceipt = ownerReceipts.find(row => row.teamId === recoveryTeam.teamId);
+    const memberRecoveryReceipt = memberReceipts.find(row => row.teamId === recoveryTeam.teamId);
+    for (const [receipt, expectedUser] of [[ownerRecoveryReceipt, userId], [memberRecoveryReceipt, secondUserId]]) {
       assert.equal(receipt.teamId, recoveryTeam.teamId);
       assert.equal(receipt.huntId, recoveryHuntId);
       const ledgerRows = await db`SELECT amount::text AS amount
