@@ -608,6 +608,86 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const completedHints = await loadTeamTreasureHints(db, privatePlayer, Date.now());
     assert.equal(completedHints.length, 0);
 
+    // Two independent teams may progress concurrently, but only one may
+    // consume the final hunt-wide reward slot. This exercises the shared hunt
+    // row lock plus the final-section advisory lock using separate DB pools.
+    const cappedTeamHuntId = randomUUID();
+    await db`INSERT INTO virtual_world_treasure_hunts
+      (id, code, title, world_id, starts_at, ends_at, enabled,
+       reward_earned_credits, max_reward_claims, distribution_mode)
+      VALUES (${cappedTeamHuntId}::uuid, ${'team-cap-' + cappedTeamHuntId.slice(0, 8)},
+        'Competing team reward claims', ${worldId}::uuid,
+        NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour',
+        TRUE, 59, 1, 'team')`;
+    for (let sequence = 0; sequence < 2; sequence++) {
+      for (let candidate = 0; candidate < 2; candidate++) {
+        const point = { id: randomUUID(), sequence,
+          interactableId: 'team-cap-' + sequence + '-' + candidate,
+          x: sequence * 10 + candidate, y: 1.15, z: candidate };
+        await db`INSERT INTO virtual_world_treasure_spawn_points
+          (id, hunt_id, sequence, city_id, district_id, interactable_id,
+           position_x, position_y, position_z, interaction_radius)
+          VALUES (${point.id}::uuid, ${cappedTeamHuntId}::uuid, ${sequence},
+            'solsticebay', 'central', ${point.interactableId},
+            ${point.x}, ${point.y}, ${point.z}, 2)`;
+      }
+    }
+    const cappedTeamA = await createTreasureTeam(
+      db, cappedTeamHuntId, userId, worldId, 2, Date.now(), teamSecret);
+    const cappedTeamB = await createTreasureTeam(
+      db, cappedTeamHuntId, thirdUserId, worldId, 2, Date.now(), teamSecret);
+    assert.equal(cappedTeamA.ok, true);
+    assert.equal(cappedTeamB.ok, true);
+    assert.equal((await joinTreasureTeam(
+      db, cappedTeamA.teamId, secondUserId, worldId, Date.now())).ok, true);
+    assert.equal((await joinTreasureTeam(
+      db, cappedTeamB.teamId, fourthUserId, worldId, Date.now())).ok, true);
+    const cappedTeamRoutes = await Promise.all([cappedTeamA.teamId, cappedTeamB.teamId].map(team => db`
+      SELECT assignment.sequence, point.interactable_id AS "interactableId",
+        point.city_id AS "cityId", point.district_id AS "districtId",
+        point.position_x AS x, point.position_y AS y, point.position_z AS z
+      FROM virtual_world_treasure_team_assignments AS assignment
+      JOIN virtual_world_treasure_spawn_points AS point
+        ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
+      WHERE assignment.team_id = ${team}::uuid ORDER BY assignment.sequence`));
+    assert.equal(cappedTeamRoutes.every(route => route.length === 2), true);
+    const cappedTeamPlayers = [
+      { teamId: cappedTeamA.teamId, owner: userId, finisher: secondUserId, route: cappedTeamRoutes[0] },
+      { teamId: cappedTeamB.teamId, owner: thirdUserId, finisher: fourthUserId, route: cappedTeamRoutes[1] }
+    ];
+    for (const contender of cappedTeamPlayers) {
+      const first = contender.route[0];
+      const firstResult = await recordTeamTreasureDiscovery(db,
+        { id: contender.owner, worldId, x: Number(first.x), y: Number(first.y), z: Number(first.z) },
+        { id: first.interactableId, cityId: first.cityId, districtId: first.districtId },
+        Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
+      assert.equal(firstResult.discovered, true);
+      assert.equal(firstResult.completed, false);
+    }
+    const concurrentTeamClaims = await Promise.all(cappedTeamPlayers.map((contender, index) => {
+      const final = contender.route[1];
+      return recordTeamTreasureDiscovery(index === 0 ? db : replayDb,
+        { id: contender.finisher, worldId, x: Number(final.x), y: Number(final.y), z: Number(final.z) },
+        { id: final.interactableId, cityId: final.cityId, districtId: final.districtId },
+        Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
+    }));
+    assert.equal(concurrentTeamClaims.every(result => result.discovered && result.completed), true);
+    assert.equal(concurrentTeamClaims.filter(result => result.rewardEarnedCredits === '59').length, 1);
+    assert.equal(concurrentTeamClaims.filter(result => result.code === 'team_treasure_claim_limit_reached').length, 1);
+    const [cappedTeamClaims, cappedTeamLedger, cappedTeamAllocations] = await Promise.all([
+      db`SELECT COUNT(*)::integer AS total FROM virtual_world_treasure_global_claims
+        WHERE hunt_id = ${cappedTeamHuntId}::uuid`,
+      replayDb`SELECT COUNT(*)::integer AS total, COALESCE(SUM(amount), 0)::text AS amount
+        FROM virtual_world_earned_credit_ledger
+        WHERE source_treasure_hunt_id = ${cappedTeamHuntId}::uuid`,
+      db`SELECT COUNT(*)::integer AS total FROM virtual_world_treasure_team_reward_allocations
+        WHERE team_id = ANY(${cappedTeamPlayers.map(item => item.teamId)}::uuid[])`
+    ]);
+    assert.equal(cappedTeamClaims[0].total, 1);
+    assert.equal(cappedTeamLedger[0].total, 2);
+    assert.equal(BigInt(cappedTeamLedger[0].amount), 59n);
+    assert.equal(cappedTeamAllocations[0].total, 2);
+
     // A failure after reward writes but before COMMIT must roll back the
     // completion, ledger, allocations, inventory and minted supply together.
     // Retrying the same final clue must then recover exactly one complete award.
