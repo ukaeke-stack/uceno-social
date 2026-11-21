@@ -73,7 +73,7 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
     FROM virtual_world_treasure_hunt_templates
     WHERE enabled = TRUE AND (active_from IS NULL OR active_from <= to_timestamp($1))
       AND (active_until IS NULL OR active_until > to_timestamp($1))
-    ORDER BY id LIMIT 200`, [now / 1000]);
+    ORDER BY id`, [now / 1000]);
   let created = 0;
   for (const template of templates) {
     // Cheap outer eligibility check; the locked row is revalidated below.
