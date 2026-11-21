@@ -681,6 +681,31 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       FROM virtual_world_treasure_team_progress WHERE team_id = ${recoveryTeam.teamId}::uuid`;
     assert.equal(Number(fencedProgress[0].nextSequence), 1);
 
+    // A stale allocation row must not be accepted merely because the
+    // idempotency key prevents a duplicate insert. Completion must fail closed
+    // and roll back the final clue until the conflicting row is repaired.
+    await db`INSERT INTO virtual_world_treasure_team_reward_allocations
+      (team_id, user_id, contribution_points, amount)
+      VALUES (${recoveryTeam.teamId}::uuid, ${secondUserId}::uuid, 0, 999)`;
+    await assert.rejects(() => recordTeamTreasureDiscovery(db,
+      { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
+      { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
+      Date.now(), teamSecret, instanceId, takeoverProcessId, 2),
+      /team_treasure_allocation_integrity_mismatch/);
+    const conflictRollback = await db`SELECT
+        (SELECT next_sequence FROM virtual_world_treasure_team_progress WHERE team_id = ${recoveryTeam.teamId}::uuid)::integer AS "nextSequence",
+        (SELECT status FROM virtual_world_treasure_teams WHERE id = ${recoveryTeam.teamId}::uuid) AS "teamStatus",
+        (SELECT COUNT(*) FROM virtual_world_earned_credit_ledger
+          WHERE idempotency_key LIKE ${'team-treasure:' + recoveryTeam.teamId + ':%'})::integer AS ledger,
+        (SELECT COUNT(*) FROM virtual_world_user_collectibles
+          WHERE source_treasure_hunt_id = ${recoveryHuntId}::uuid)::integer AS inventory`;
+    assert.equal(conflictRollback[0].nextSequence, 1);
+    assert.equal(conflictRollback[0].teamStatus, 'active');
+    assert.equal(conflictRollback[0].ledger, 0);
+    assert.equal(conflictRollback[0].inventory, 0);
+    await db`DELETE FROM virtual_world_treasure_team_reward_allocations
+      WHERE team_id = ${recoveryTeam.teamId}::uuid AND user_id = ${secondUserId}::uuid`;
+
     // Inject a failure after the Earned Credits ledger writes but before
     // collectible inventory is inserted. The whole completion transaction
     // must roll back, including progress, allocations and ledger rows.
