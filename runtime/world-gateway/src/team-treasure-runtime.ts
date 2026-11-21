@@ -304,6 +304,11 @@ export async function recordTeamTreasureDiscovery(
       tx, match.huntId, teamMembers.map((member: any) => member.userId)
     );
     const collectibles: CollectibleReward[] = collectibleRewards.get(player.id) ?? [];
+    const issued = await tx.unsafe(`UPDATE virtual_world_treasure_team_progress
+      SET reward_issued_at = NOW(), updated_at = NOW()
+      WHERE team_id = $1::uuid AND completed_at IS NOT NULL
+        AND reward_issued_at IS NULL RETURNING team_id`, [match.teamId]);
+    if (issued.length !== 1) throw new Error("team_treasure_reward_issue_marker_conflict");
     return { handled: true, discovered: true, completed: true, rewardEarnedCredits: playerShare.toString(), collectibles, huntId: match.huntId, teamId: match.teamId };
   });
 }
