@@ -672,7 +672,11 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
         Date.now(), teamSecret, instanceId, processId, 1);
     }));
     assert.equal(concurrentTeamClaims.every(result => result.discovered && result.completed), true);
-    assert.equal(concurrentTeamClaims.filter(result => result.rewardEarnedCredits === '59').length, 1);
+    // The discovery response reports the completing player's allocated share,
+    // not the full team pool. The ledger assertions below verify conservation
+    // across every member of the one winning team.
+    assert.equal(concurrentTeamClaims.filter(result =>
+      BigInt(result.rewardEarnedCredits) > 0n).length, 1);
     assert.equal(concurrentTeamClaims.filter(result => result.code === 'team_treasure_claim_limit_reached').length, 1);
     const [cappedTeamClaims, cappedTeamLedger, cappedTeamAllocations] = await Promise.all([
       db`SELECT COUNT(*)::integer AS total FROM virtual_world_treasure_global_claims
