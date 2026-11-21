@@ -44,3 +44,15 @@ test("team reward shares are invariant to contribution input order", () => {
   assert.deepEqual(second, first);
   assert.equal(first.reduce((sum, item) => sum + item.amount, 0n), 997n);
 });
+
+test("zero-contribution members receive no share and large rewards remain exact", () => {
+  const reward = 1_000_000_000_000_000_000_000_000_000_001n;
+  const shares = calculateTeamRewardShares(reward, [
+    { userId: a, points: 1 },
+    { userId: b, points: 2 },
+    { userId: c, points: 0 }
+  ]);
+  assert.deepEqual(shares.map(item => item.userId), [a, b]);
+  assert.equal(shares.reduce((sum, item) => sum + item.amount, 0n), reward);
+  assert.equal(shares.find(item => item.userId === c), undefined);
+});
