@@ -796,7 +796,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
         { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
         Date.now(), teamSecret, instanceId, processId, 1);
     }));
-    assert.equal(firstCapDiscoveries.every(result => result.discovered && !result.completed), true);
+    assert.equal(firstCapDiscoveries.every(result => result.discovered && !result.completed), true, JSON.stringify(firstCapDiscoveries));
     const finalCapDiscoveries = await Promise.all(capPlayers.map(({ member, route }) => {
       const point = route[1];
       return recordTeamTreasureDiscovery(db,
