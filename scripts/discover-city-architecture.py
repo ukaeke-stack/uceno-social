@@ -204,10 +204,29 @@ CITY_RELEVANCE = {
                       "power station", "laboratory", "assay"),
 }
 
-def get(url):
+def get(url, max_attempts=4, base_delay_seconds=1.5, max_delay_seconds=20):
+    """Fetch catalogue JSON with bounded retries for transient provider failures."""
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=45) as response:
-        return json.loads(response.read().decode("utf-8"))
+    retryable_statuses = {429, 500, 502, 503, 504}
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=45) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            if error.code not in retryable_statuses or attempt >= max_attempts:
+                raise
+            retry_after = error.headers.get("Retry-After") if error.headers else None
+            try:
+                delay = float(retry_after) if retry_after is not None else base_delay_seconds * (2 ** (attempt - 1))
+            except (TypeError, ValueError):
+                delay = base_delay_seconds * (2 ** (attempt - 1))
+            time.sleep(min(max(0.0, delay), max_delay_seconds))
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt >= max_attempts:
+                raise
+            delay = min(base_delay_seconds * (2 ** (attempt - 1)), max_delay_seconds)
+            time.sleep(delay)
+    raise RuntimeError("Catalogue request exhausted retry attempts")
 
 def unwrap(payload):
     if isinstance(payload, dict) and isinstance(payload.get("data"), list):
