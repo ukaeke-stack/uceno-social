@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createTreasureTeam, joinTreasureTeam } from "../dist/team-treasure-runtime.js";
+import { createTreasureTeam, joinTreasureTeam, recordTeamTreasureDiscovery } from "../dist/team-treasure-runtime.js";
 
 const huntId = "123e4567-e89b-42d3-a456-426614174010";
 const userId = "123e4567-e89b-42d3-a456-426614174011";
@@ -34,6 +34,33 @@ test("team create and join reject malformed UUIDs and non-finite time before dat
     assert.equal(result.code, "invalid_team_identity");
   }
   assert.equal(opened, false);
+});
+
+
+test("ordinary team discoveries share-lock the hunt and reserve exclusive claim locking for completion", async () => {
+  const calls = [];
+  const db = {
+    begin: async fn => fn({
+      unsafe: async (query, params = []) => {
+        calls.push({ query, params });
+        if (query.includes("FROM virtual_world_instances")) return [{ id: "instance" }];
+        if (query.includes("FROM virtual_world_treasure_team_members AS member")) return [];
+        return [];
+      }
+    })
+  };
+  const result = await recordTeamTreasureDiscovery(db,
+    { id: userId, worldId, x: 1, y: 1, z: 1 },
+    { id: "fountain-a", cityId: "solsticebay", districtId: "central" },
+    now, secret, "123e4567-e89b-42d3-a456-426614174014", userId, 1);
+  assert.equal(result.handled, false);
+  const discoveryLookup = calls.find(call =>
+    call.query.includes("FROM virtual_world_treasure_team_members AS member"));
+  assert.ok(discoveryLookup, "team discovery lookup must execute");
+  assert.match(discoveryLookup.query, /FOR UPDATE OF team, progress FOR SHARE OF hunt/);
+  assert.doesNotMatch(discoveryLookup.query, /FOR UPDATE OF[^]*hunt/);
+  assert.equal(calls.some(call => call.query.includes("pg_advisory_xact_lock")), false,
+    "non-final discovery must not acquire the per-hunt reward-claim lock");
 });
 
 test("team creation persists one shared assignment per authored clue step", async () => {
