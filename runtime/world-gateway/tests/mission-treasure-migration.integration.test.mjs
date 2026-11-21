@@ -753,6 +753,26 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     }
     const repeatedOwnerReceipts = await loadTeamRewardReceipts(userId);
     assert.deepEqual(repeatedOwnerReceipts, ownerReceipts);
+
+    // Offline reconnect inventory must expose the collectible granted by the
+    // completed team hunt to each member, without mutating minted supply.
+    const loadUserTreasureInventory = user => db`SELECT catalog.code,
+        catalog.display_name AS "displayName", catalog.category, catalog.rarity,
+        inventory.quantity, inventory.awarded_at AS "awardedAt"
+      FROM virtual_world_user_collectibles AS inventory
+      JOIN virtual_world_collectible_catalog AS catalog
+        ON catalog.id = inventory.collectible_id
+      WHERE inventory.user_id = ${user}::uuid
+      ORDER BY inventory.awarded_at DESC, inventory.id DESC LIMIT 100`;
+    const [ownerInventory, memberInventory] = await Promise.all([
+      loadUserTreasureInventory(userId), loadUserTreasureInventory(secondUserId)
+    ]);
+    for (const inventory of [ownerInventory, memberInventory]) {
+      assert.equal(inventory.some(item => item.code === 'recovery-team-badge' && Number(item.quantity) === 1), true);
+    }
+    const stableMintedSupply = await db`SELECT minted_count FROM virtual_world_collectible_catalog
+      WHERE id = ${recoveryCollectibleId}::uuid`;
+    assert.equal(Number(stableMintedSupply[0].minted_count), 2);
     const recoveredReplay = await recordTeamTreasureDiscovery(db,
       { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
       { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
