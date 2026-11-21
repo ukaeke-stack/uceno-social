@@ -56,3 +56,24 @@ test("zero-contribution members receive no share and large rewards remain exact"
   assert.equal(shares.reduce((sum, item) => sum + item.amount, 0n), reward);
   assert.equal(shares.find(item => item.userId === c), undefined);
 });
+
+test("team reward allocation is stable across all four-member input permutations", () => {
+  const members = [
+    { userId: a, points: 11 },
+    { userId: b, points: 7 },
+    { userId: c, points: 4 },
+    { userId: "123e4567-e89b-42d3-a456-426614174014", points: 0 }
+  ];
+  const permute = (items) => items.length <= 1
+    ? [items]
+    : items.flatMap((item, index) =>
+        permute(items.filter((_, other) => other !== index)).map(rest => [item, ...rest]));
+  for (const reward of [0n, 1n, 2n, 17n, 997n, 1_000_000_000_000_000_001n]) {
+    const expected = calculateTeamRewardShares(reward, members);
+    for (const ordering of permute(members)) {
+      const actual = calculateTeamRewardShares(reward, ordering);
+      assert.deepEqual(actual, expected);
+      assert.equal(actual.reduce((sum, share) => sum + share.amount, 0n), reward);
+    }
+  }
+});
