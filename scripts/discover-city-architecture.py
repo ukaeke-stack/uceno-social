@@ -309,6 +309,49 @@ def mobile_cost(candidate):
                     else 35 if size <= MAX_BYTES else 100)
     return triangle_penalty + size_penalty
 
+def broaden_city_candidates(city, queries, raw_by_slug, globally_seen, query_diagnostics,
+                            target_candidates=30, max_pages_per_query=3):
+    """Expand underfilled searches without weakening strict asset qualification."""
+    def qualifying_count():
+        return sum(
+            1 for slug, item in raw_by_slug.items()
+            if slug not in globally_seen and rejection_reason(item, city) is None
+        )
+
+    if qualifying_count() >= 12:
+        return 0
+
+    added_total = 0
+    for query in queries:
+        query_added = 0
+        page_diagnostics = []
+        for page in range(1, max_pages_per_query + 1):
+            params = urllib.parse.urlencode({
+                "q": query, "sort": "relevance", "limit": 100, "page": page
+            })
+            results = unwrap(get(f"{BASE}/assets?{params}"))
+            for item in results:
+                slug = item.get("slug") or item.get("id")
+                if slug and slug not in raw_by_slug:
+                    raw_by_slug[slug] = item
+                    query_added += 1
+            page_diagnostics.append({"page": page, "result_count": len(results)})
+            if len(results) < 100:
+                break
+        added_total += query_added
+        query_diagnostics.append({
+            "query": query,
+            "search_mode": "broad-underfill-retry",
+            "result_count": sum(item["result_count"] for item in page_diagnostics),
+            "new_records": query_added,
+            "pages_checked": page_diagnostics,
+            "fallback_without_category_or_style": True,
+        })
+        if qualifying_count() >= target_candidates:
+            break
+    return added_total
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     report = {
@@ -363,45 +406,8 @@ def main():
                 if slug:
                     raw_by_slug[slug] = item
 
-        # If the filtered catalogue search underfills a city, broaden discovery
-        # across the full city query set and inspect multiple relevance pages.
-        # The strict local validator remains authoritative; acquisition separately
-        # rechecks CC0, dimensions, HTTPS delivery and GLB integrity.
-        initial_qualifying = sum(
-            1 for slug, item in raw_by_slug.items()
-            if slug not in globally_seen and rejection_reason(item, city) is None
-        )
-        if initial_qualifying < 12:
-            for query in queries:
-                query_added = 0
-                page_diagnostics = []
-                for page in range(1, 4):
-                    params = urllib.parse.urlencode({
-                        "q": query, "sort": "relevance", "limit": 100, "page": page
-                    })
-                    broad_results = unwrap(get(f"{BASE}/assets?{params}"))
-                    for item in broad_results:
-                        slug = item.get("slug") or item.get("id")
-                        if slug and slug not in raw_by_slug:
-                            raw_by_slug[slug] = item
-                            query_added += 1
-                    page_diagnostics.append({"page": page, "result_count": len(broad_results)})
-                    if len(broad_results) < 100:
-                        break
-                query_diagnostics.append({
-                    "query": query,
-                    "search_mode": "broad-underfill-retry",
-                    "result_count": sum(item["result_count"] for item in page_diagnostics),
-                    "new_records": query_added,
-                    "pages_checked": page_diagnostics,
-                    "fallback_without_category_or_style": True,
-                })
-                qualifying_now = sum(
-                    1 for slug, candidate in raw_by_slug.items()
-                    if slug not in globally_seen and rejection_reason(candidate, city) is None
-                )
-                if qualifying_now >= 30:
-                    break
+        # Broaden underfilled searches without weakening strict qualification.
+        broaden_city_candidates(city, queries, raw_by_slug, globally_seen, query_diagnostics)
 
         candidates, rejected = [], []
         for slug, item in raw_by_slug.items():
