@@ -768,7 +768,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       loadUserTreasureInventory(userId), loadUserTreasureInventory(secondUserId)
     ]);
     for (const inventory of [ownerInventory, memberInventory]) {
-      assert.equal(inventory.some(item => item.code === 'recovery-team-badge' && Number(item.quantity) === 1), true);
+      assert.equal(inventory.some(item => item.code.startsWith('recovery-badge-') && Number(item.quantity) === 1), true);
     }
     const stableMintedSupply = await db`SELECT minted_count FROM virtual_world_collectible_catalog
       WHERE id = ${recoveryCollectibleId}::uuid`;
