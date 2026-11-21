@@ -206,6 +206,16 @@ namespace UCENO.VirtualWorld
         public int totalClues;
     }
 
+    [Serializable] public sealed class GatewayTreasureTeamRewardReceipt
+    {
+        public string teamId;
+        public string huntId;
+        public string title;
+        public string rewardEarnedCredits;
+        public int contributionPoints;
+        public string awardedAt;
+    }
+
     [Serializable] internal sealed class GatewayPacket
     {
         public string type;
@@ -259,6 +269,7 @@ namespace UCENO.VirtualWorld
         public GatewayTreasureCollectible[] collectibles;
         public GatewayTreasureInventoryItem[] items;
         public GatewayTreasureHistoryItem[] hunts;
+        public GatewayTreasureTeamRewardReceipt[] teamRewards;
     }
 
     /// <summary>
@@ -359,6 +370,7 @@ namespace UCENO.VirtualWorld
         public event Action<string, string, bool, string, GatewayTreasureCollectible[]> TreasureDiscoveryReceived;
         public event Action<GatewayTreasureInventoryItem[]> TreasureInventoryReceived;
         public event Action<GatewayTreasureHistoryItem[]> TreasureHistoryReceived;
+        public event Action<GatewayTreasureTeamRewardReceipt[]> TreasureTeamRewardHistoryReceived;
         public event Action<string> TreasureRejected;
         public event Action<string, string> ActivityRouteRequired;
         public event Action<string, bool> VoicePeerPresenceChanged;
@@ -1094,6 +1106,7 @@ namespace UCENO.VirtualWorld
             if (packet.type == "treasure_hunt_history")
             {
                 TreasureHistoryReceived?.Invoke(packet.hunts ?? Array.Empty<GatewayTreasureHistoryItem>());
+                TreasureTeamRewardHistoryReceived?.Invoke(packet.teamRewards ?? Array.Empty<GatewayTreasureTeamRewardReceipt>());
                 if (!string.IsNullOrEmpty(packet.code)) TreasureRejected?.Invoke(packet.code);
                 return;
             }
