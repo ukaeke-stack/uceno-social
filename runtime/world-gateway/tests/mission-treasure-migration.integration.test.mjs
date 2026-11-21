@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "../dist/private-treasure-runtime.js";
 import { createTreasureTeam, joinTreasureTeam, loadTeamTreasureHints, recordTeamTreasureDiscovery } from "../dist/team-treasure-runtime.js";
-import { grantTreasureCollectibles } from "../dist/treasure-collectible-runtime.js";
+import { grantTreasureCollectibles, grantTreasureCollectiblesToUsers } from "../dist/treasure-collectible-runtime.js";
 import { materializeScheduledTreasureHunts } from "../dist/treasure-schedule-runtime.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -264,8 +264,46 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       WHERE collectible_id = ${collectibleId}::uuid AND source_treasure_hunt_id = ${huntId}::uuid`;
     const finiteCatalog = await db`SELECT minted_count FROM virtual_world_collectible_catalog
       WHERE id = ${collectibleId}::uuid`;
+
     assert.equal(finiteInventory[0].total, 1);
     assert.equal(Number(finiteCatalog[0].minted_count), 1);
+
+    // Team completion grants from separate hunts must serialize on the shared
+    // catalog row. The combined team awards may consume the finite supply only
+    // once, even though both transactions try to grant to multiple members.
+    const sharedTeamCollectibleId = randomUUID();
+    const secondTeamHuntId = randomUUID();
+    await db`INSERT INTO virtual_world_collectible_catalog
+      (id, code, display_name, category, rarity, max_supply, enabled)
+      VALUES (${sharedTeamCollectibleId}::uuid,
+        ${'team-shared-' + sharedTeamCollectibleId.slice(0, 8)},
+        'Shared Team Supply Badge', 'badge', 'epic', 2, TRUE)`;
+    await db`INSERT INTO virtual_world_treasure_hunts
+      (id, code, title, starts_at, ends_at, enabled, reward_earned_credits)
+      VALUES (${secondTeamHuntId}::uuid,
+        ${'team-supply-' + secondTeamHuntId.slice(0, 8)},
+        'Second team supply hunt', NOW() - INTERVAL '1 hour',
+        NOW() + INTERVAL '1 hour', TRUE, 10)`;
+    await db`INSERT INTO virtual_world_treasure_reward_items
+      (hunt_id, collectible_id, quantity)
+      VALUES
+      (${huntId}::uuid, ${sharedTeamCollectibleId}::uuid, 1),
+      (${secondTeamHuntId}::uuid, ${sharedTeamCollectibleId}::uuid, 1)`;
+    const competingTeamGrants = await Promise.all([
+      db.begin(tx => grantTreasureCollectiblesToUsers(tx, huntId, [userId, secondUserId])),
+      replayDb.begin(tx => grantTreasureCollectiblesToUsers(tx, secondTeamHuntId, [thirdUserId, fourthUserId]))
+    ]);
+    assert.equal(competingTeamGrants.reduce((total, result) =>
+      total + [...result.values()].reduce((count, rewards) => count + rewards.length, 0), 0), 2);
+    const sharedTeamInventory = await db`SELECT COUNT(*)::integer AS total,
+        COALESCE(SUM(quantity), 0)::integer AS quantity
+      FROM virtual_world_user_collectibles
+      WHERE collectible_id = ${sharedTeamCollectibleId}::uuid`;
+    const sharedTeamCatalog = await db`SELECT minted_count FROM virtual_world_collectible_catalog
+      WHERE id = ${sharedTeamCollectibleId}::uuid`;
+    assert.equal(sharedTeamInventory[0].total, 2);
+    assert.equal(sharedTeamInventory[0].quantity, 2);
+    assert.equal(Number(sharedTeamCatalog[0].minted_count), 2);
 
     const spawnA = randomUUID();
     const spawnB = randomUUID();
