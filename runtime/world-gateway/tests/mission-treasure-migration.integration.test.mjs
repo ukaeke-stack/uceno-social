@@ -883,7 +883,8 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
       { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
       Date.now(), teamSecret, instanceId, takeoverProcessId, 2), /simulated_reward_commit_failure/);
-    const rolledBackProgress = await db`SELECT next_sequence AS "nextSequence", completed_at AS "completedAt"
+    const rolledBackProgress = await db`SELECT next_sequence AS "nextSequence", completed_at AS "completedAt",
+        reward_issued_at AS "rewardIssuedAt"
       FROM virtual_world_treasure_team_progress WHERE team_id = ${recoveryTeam.teamId}::uuid`;
     const rolledBackTeam = await db`SELECT status FROM virtual_world_treasure_teams
       WHERE id = ${recoveryTeam.teamId}::uuid`;
@@ -897,6 +898,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       WHERE id = ${recoveryCollectibleId}::uuid`;
     assert.equal(Number(rolledBackProgress[0].nextSequence), 1);
     assert.equal(rolledBackProgress[0].completedAt, null);
+    assert.equal(rolledBackProgress[0].rewardIssuedAt, null);
     assert.equal(rolledBackTeam[0].status, 'active');
     assert.equal(rolledBackLedger[0].total, 0);
     assert.equal(rolledBackInventory[0].total, 0);
@@ -907,6 +909,9 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
     assert.equal(recoveredCompletion.completed, true);
     assert.equal(BigInt(recoveredCompletion.rewardEarnedCredits) > 0n, true);
+    const recoveredIssueMarker = await db`SELECT reward_issued_at AS "rewardIssuedAt"
+      FROM virtual_world_treasure_team_progress WHERE team_id = ${recoveryTeam.teamId}::uuid`;
+    assert.equal(recoveredIssueMarker[0].rewardIssuedAt instanceof Date, true);
     const recoveredLedger = await db`SELECT COUNT(*)::integer AS total,
         COALESCE(SUM(amount), 0)::text AS amount
       FROM virtual_world_earned_credit_ledger
@@ -1076,6 +1081,13 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const cappedCatalog = await db`SELECT minted_count FROM virtual_world_collectible_catalog
       WHERE id = ${cappedCollectibleId}::uuid`;
     assert.equal(Number(cappedCatalog[0].minted_count), 2);
+    const cappedIssueMarkers = await db`SELECT
+        COUNT(*) FILTER (WHERE reward_issued_at IS NOT NULL)::integer AS issued,
+        COUNT(*) FILTER (WHERE reward_issued_at IS NULL)::integer AS unissued
+      FROM virtual_world_treasure_team_progress
+      WHERE team_id IN (${capTeamA.teamId}::uuid, ${capTeamB.teamId}::uuid)`;
+    assert.equal(cappedIssueMarkers[0].issued, 1);
+    assert.equal(cappedIssueMarkers[0].unissued, 1);
     const losingTeamId = finalCapDiscoveries[0].rewardEarnedCredits === "0"
       ? capTeamA.teamId : capTeamB.teamId;
     const losingMembers = await db`SELECT user_id AS "userId"
