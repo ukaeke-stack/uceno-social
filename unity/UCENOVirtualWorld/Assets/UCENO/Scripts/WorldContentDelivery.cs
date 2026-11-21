@@ -334,7 +334,12 @@ namespace UCENO.VirtualWorld
                 AsyncOperationHandle<IResourceLocator> catalog =
                     Addressables.LoadContentCatalogAsync(catalogUrl, true);
                 yield return catalog;
-                if (catalog.Status != AsyncOperationStatus.Succeeded)
+                bool catalogLoaded = catalog.Status == AsyncOperationStatus.Succeeded;
+                // The locator remains registered with Addressables after the
+                // operation handle is released; retaining this handle leaks one
+                // reference on every initialization/retry cycle.
+                if (catalog.IsValid()) Addressables.Release(catalog);
+                if (!catalogLoaded)
                 {
                     initializing = false;
                     StatusChanged?.Invoke("World content catalog could not be reached.");
@@ -452,7 +457,9 @@ namespace UCENO.VirtualWorld
             }
 
             string lastError = "Download did not complete.";
-            for (int attempt = 1; attempt <= Mathf.Max(1, maxAttempts); attempt++)
+            int attempts = Mathf.Max(1, maxAttempts);
+            float retryDelay = Mathf.Max(0.25f, retryDelaySeconds);
+            for (int attempt = 1; attempt <= attempts; attempt++)
             {
                 StatusChanged?.Invoke("Preparing " + label + " (attempt " + attempt + ")...");
                 AsyncOperationHandle<long> sizeHandle = Addressables.GetDownloadSizeAsync(label);
@@ -463,7 +470,7 @@ namespace UCENO.VirtualWorld
                 {
                     lastError = "Could not calculate the content download size.";
                     Addressables.Release(sizeHandle);
-                    if (attempt < maxAttempts) yield return new WaitForSecondsRealtime(retryDelaySeconds);
+                    if (attempt < attempts) yield return new WaitForSecondsRealtime(retryDelay);
                     continue;
                 }
 
@@ -500,8 +507,8 @@ namespace UCENO.VirtualWorld
 
                 lastError = "Download failed. Check the connection and retry.";
                 Addressables.Release(download);
-                if (attempt < maxAttempts)
-                    yield return new WaitForSecondsRealtime(retryDelaySeconds * attempt);
+                if (attempt < attempts)
+                    yield return new WaitForSecondsRealtime(retryDelay * attempt);
             }
 
             StatusChanged?.Invoke(lastError);
