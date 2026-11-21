@@ -157,3 +157,39 @@ test("materializer uses the locked current template after an operator edits its 
   assert.equal(db.state.insertParams[3], worldId);
   assert.match(db.state.insertParams[11], /^weekly:/);
 });
+
+
+test("scheduled materialization defers cleanly when another worker owns the advisory lock", async () => {
+  const db = fakeDb();
+  const begin = db.begin.bind(db);
+  db.begin = async fn => begin(tx => fn({
+    unsafe: async (query, params) => {
+      if (query.includes("pg_try_advisory_xact_lock")) return [{ locked: false }];
+      return tx.unsafe(query, params);
+    }
+  }));
+  assert.equal(await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z")), 0);
+  assert.equal(db.state.created, false);
+  assert.equal(db.state.copied, 0);
+});
+
+test("scheduled materialization recovers on the next run after a transient transaction failure", async () => {
+  const db = fakeDb();
+  const begin = db.begin.bind(db);
+  let failed = false;
+  db.begin = async fn => {
+    if (!failed) {
+      failed = true;
+      throw new Error("temporary_database_disconnect");
+    }
+    return begin(fn);
+  };
+  const now = Date.parse("2026-11-20T12:00:00Z");
+  await assert.rejects(() => materializeScheduledTreasureHunts(db, now), /temporary_database_disconnect/);
+  assert.equal(db.state.created, false);
+  assert.equal(await materializeScheduledTreasureHunts(db, now), 1);
+  assert.equal(db.state.copied, 4);
+  assert.equal(db.state.spawnInsertBatches, 1);
+  assert.equal(await materializeScheduledTreasureHunts(db, now), 0);
+  assert.equal(db.state.copied, 4);
+});
