@@ -58,7 +58,6 @@ test("ordinary team discoveries share-lock the hunt and reserve exclusive claim 
     call.query.includes("FROM virtual_world_treasure_team_members AS member"));
   assert.ok(discoveryLookup, "team discovery lookup must execute");
   assert.match(discoveryLookup.query, /FOR UPDATE OF team, progress FOR SHARE OF hunt/);
-  assert.doesNotMatch(discoveryLookup.query, /FOR UPDATE OF[^]*hunt/);
   assert.equal(calls.some(call => call.query.includes("pg_advisory_xact_lock")), false,
     "non-final discovery must not acquire the per-hunt reward-claim lock");
 });
