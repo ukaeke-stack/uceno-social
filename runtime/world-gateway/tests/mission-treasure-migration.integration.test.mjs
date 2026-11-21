@@ -32,6 +32,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
   const fourthUserId = randomUUID();
   const teamId = randomUUID();
   const competingHuntId = randomUUID();
+  const capacityHuntId = randomUUID();
   const worldId = randomUUID();
   const activityId = randomUUID();
   const resultSessionId = randomUUID();
