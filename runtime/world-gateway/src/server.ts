@@ -1634,14 +1634,23 @@ wss.on("connection", async (socket: WebSocket) => {
               ON ledger.user_id = progress.user_id AND ledger.source_treasure_hunt_id = hunt.id
             WHERE progress.user_id = ${player.id}::uuid
             ORDER BY progress.completed_at DESC NULLS LAST, progress.updated_at DESC LIMIT 100`;
+          const teamRewards = await sql`SELECT allocation.team_id AS "teamId",
+              hunt.id AS "huntId", hunt.title, allocation.amount::text AS "rewardEarnedCredits",
+              allocation.contribution_points AS "contributionPoints",
+              allocation.created_at AS "awardedAt"
+            FROM virtual_world_treasure_team_reward_allocations AS allocation
+            JOIN virtual_world_treasure_teams AS team ON team.id = allocation.team_id
+            JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = team.hunt_id
+            WHERE allocation.user_id = ${player.id}::uuid AND team.status = 'completed'
+            ORDER BY allocation.created_at DESC, allocation.team_id LIMIT 100`;
           send(socket, { type: "treasure_hunt_history", hunts: history.map((hunt: any) => ({
             ...hunt,
             totalClues: Number(hunt.privateClueCount) || Number(hunt.legacyClueCount),
             discoveredClues: Number(hunt.discoveredClues)
-          })) });
+          })), teamRewards });
         } catch (error) {
           console.error("treasure_history_load_failed", player.id, error);
-          send(socket, { type: "treasure_hunt_history", hunts: [], code: "history_unavailable" });
+          send(socket, { type: "treasure_hunt_history", hunts: [], teamRewards: [], code: "history_unavailable" });
         }
         return;
       }
