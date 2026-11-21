@@ -18,3 +18,11 @@ test("Unity catalog packet deserializes and publishes teamHunts", () => {
   assert.match(client, /GatewayTreasureTeamHunt\[\] teamHunts;/);
   assert.match(client, /TreasureTeamHuntsReceived\?\.Invoke\(packet\.teamHunts \?\? Array\.Empty<GatewayTreasureTeamHunt>\(\)\)/);
 });
+
+test("team reward receipts are recoverable from history after reconnect", () => {
+  assert.match(server, /FROM virtual_world_treasure_team_reward_allocations AS allocation/);
+  assert.match(server, /WHERE allocation\.user_id = \$\{player\.id\}::uuid AND team\.status = 'completed'/);
+  assert.match(server, /teamRewards/);
+  assert.match(client, /GatewayTreasureTeamRewardReceipt\[\] teamRewards;/);
+  assert.match(client, /TreasureTeamRewardHistoryReceived\?\.Invoke\(packet\.teamRewards \?\? Array\.Empty<GatewayTreasureTeamRewardReceipt>\(\)\)/);
+});
