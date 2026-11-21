@@ -1555,7 +1555,7 @@ wss.on("connection", async (socket: WebSocket) => {
             HAVING MIN(point.sequence) = 0 AND MAX(point.sequence) + 1 = COUNT(DISTINCT point.sequence)
               AND COUNT(DISTINCT point.sequence) BETWEEN 2 AND 100
             ORDER BY hunt.ends_at ASC, hunt.id LIMIT 20`;
-          send(socket, { type: "team_treasure_hunt_catalog", hunts });
+          send(socket, { type: "team_treasure_hunt_catalog", teamHunts: hunts });
         } catch (error) {
           console.error("team_treasure_hunt_catalog_failed", player.id, error);
           send(socket, { type: "team_treasure_hunt_catalog", teamHunts: [], code: "team_hunts_unavailable" });
