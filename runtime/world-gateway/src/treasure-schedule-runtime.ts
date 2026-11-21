@@ -148,7 +148,7 @@ export async function materializeScheduledTreasureHunts(db: Db, now: number): Pr
             input.clue_payload::jsonb, TRUE
           FROM unnest($2::uuid[], $3::integer[], $4::text[], $5::text[], $6::text[],
             $7::double precision[], $8::double precision[], $9::double precision[],
-            $10::double precision[], $11::jsonb[])
+            $10::double precision[], $11::text[])
           AS input(id, sequence, city_id, district_id, interactable_id,
             x, y, z, radius, clue_payload)
           ON CONFLICT (hunt_id, sequence, interactable_id) DO NOTHING`,
