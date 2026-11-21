@@ -1,0 +1,206 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { materializeScheduledTreasureHunts } from "../dist/treasure-schedule-runtime.js";
+
+const templateId = "123e4567-e89b-42d3-a456-426614174011";
+const huntId = "123e4567-e89b-42d3-a456-426614174012";
+const points = [
+  { sequence: 0, cityId: "solsticebay", districtId: "central", interactableId: "a",
+    x: 1, y: 1.15, z: 1, radius: 2, clue: { hint: "First" } },
+  { sequence: 0, cityId: "solsticebay", districtId: "central", interactableId: "b",
+    x: 2, y: 1.15, z: 2, radius: 2, clue: { hint: "Alternate" } },
+  { sequence: 1, cityId: "solsticebay", districtId: "central", interactableId: "c",
+    x: 3, y: 1.15, z: 3, radius: 2, clue: { hint: "Second" } },
+  { sequence: 1, cityId: "solsticebay", districtId: "central", interactableId: "d",
+    x: 4, y: 1.15, z: 4, radius: 2, clue: { hint: "Alternate second" } }
+];
+
+function fakeDb(spawnPoints = points, distributionMode = "personal", currentOverrides = {}) {
+  const state = { created: false, copied: 0, sourcePoints: spawnPoints };
+  const template = { id: templateId, code: "daily-arch", title: "Arch Hunt",
+    worldId: null, cadence: "daily", timeZone: "Africa/Lagos",
+    activeFrom: null, activeUntil: null };
+  const currentTemplate = { ...template, reward: "20", distributionMode,
+    maxGlobalWinners: null, maxRewardClaims: null, ...currentOverrides };
+  const db = {
+    state,
+    async unsafe(query) {
+      if (query.includes("FROM virtual_world_treasure_hunt_templates")) {
+        state.templateScanQuery = query;
+        return [template];
+      }
+      throw new Error("unexpected top-level query: " + query);
+    },
+    async begin(fn) {
+      return fn({
+        async unsafe(query, params = []) {
+          if (query.includes("pg_try_advisory_xact_lock")) return [{ locked: true }];
+          if (query.includes("FROM virtual_world_treasure_hunt_templates")) return [currentTemplate];
+          if (query.includes("FROM virtual_world_treasure_template_spawn_points")) return state.sourcePoints;
+          if (query.includes("FROM virtual_world_treasure_hunts")) return state.created ? [{ id: huntId }] : [];
+          if (query.includes("INSERT INTO virtual_world_treasure_hunts")) {
+            if (state.created) return [];
+            state.created = true;
+            state.insertParams = params;
+            return [{ id: huntId }];
+          }
+          if (query.includes("INSERT INTO virtual_world_treasure_spawn_points")) {
+            state.copied += params[1]?.length ?? 0;
+            state.spawnInsertBatches = (state.spawnInsertBatches ?? 0) + 1;
+            return [];
+          }
+          throw new Error("unexpected transaction query: " + query);
+        }
+      });
+    }
+  };
+  return db;
+}
+
+test("daily treasure templates materialize once and copy authored route candidates", async () => {
+  const db = fakeDb();
+  const now = Date.parse("2026-11-20T12:00:00Z");
+  assert.equal(await materializeScheduledTreasureHunts(db, now), 1);
+  assert.equal(db.state.copied, 4);
+  assert.equal(db.state.spawnInsertBatches, 1);
+  db.state.sourcePoints = [...points, { ...points[0], sequence: 0, interactableId: "new-template-location" }];
+  assert.equal(await materializeScheduledTreasureHunts(db, now), 0);
+  assert.equal(db.state.copied, 4, "an existing hunt must keep its original authored-location snapshot after template edits");
+});
+
+test("team templates materialize when every clue step has one authored location", async () => {
+  const onePerStep = points.filter(point => point.interactableId === "a" || point.interactableId === "c");
+  const db = fakeDb(onePerStep, "team");
+  assert.equal(await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z")), 1);
+  assert.equal(db.state.copied, 2);
+  assert.equal(db.state.spawnInsertBatches, 1);
+});
+test("personal templates without alternate authored locations fail closed", async () => {
+  const db = fakeDb(points.filter(point => point.sequence !== 1 || point.interactableId === "c"));
+  assert.equal(await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z")), 0);
+  assert.equal(db.state.created, false);
+});
+
+test("scheduled hunts fail closed on malformed authored spawn points", async () => {
+  const malformed = [
+    { sequence: -1 },
+    { sequence: 100 },
+    { sequence: 0.5 },
+    { cityId: "../outside-city" },
+    { districtId: "" },
+    { interactableId: "x".repeat(129) },
+    { x: Number.NaN },
+    { y: 10001 },
+    { z: Infinity },
+    { radius: 0.49 },
+    { radius: 8.01 },
+    { clue: [] },
+    { clue: null },
+    { clue: { hint: "x".repeat(17000) } }
+  ];
+  for (const override of malformed) {
+    const candidatePoints = points.map(point => ({ ...point }));
+    candidatePoints[0] = { ...candidatePoints[0], ...override };
+    const db = fakeDb(candidatePoints);
+    assert.equal(await materializeScheduledTreasureHunts(
+      db, Date.parse("2026-11-20T12:00:00Z")), 0,
+      "must reject malformed spawn point: " + JSON.stringify(override, (_key, value) =>
+        typeof value === "number" && !Number.isFinite(value) ? String(value) : value));
+    assert.equal(db.state.created, false);
+  }
+});
+
+test("scheduled hunts reject a repeated interactable even when its district metadata differs", async () => {
+  const duplicate = points.map(point => ({ ...point }));
+  duplicate[1].interactableId = duplicate[0].interactableId;
+  duplicate[1].cityId = "nexusdelta";
+  duplicate[1].districtId = "another-district";
+  const db = fakeDb(duplicate, "personal");
+  assert.equal(await materializeScheduledTreasureHunts(
+    db, Date.parse("2026-11-20T12:00:00Z")), 0);
+  assert.equal(db.state.created, false);
+});
+
+test("scheduled hunts reject duplicate in-world interactables across clue rows", async () => {
+  const duplicate = points.map(point => ({ ...point }));
+  duplicate[1].interactableId = duplicate[0].interactableId;
+  const db = fakeDb(duplicate, "personal");
+  assert.equal(await materializeScheduledTreasureHunts(
+    db, Date.parse("2026-11-20T12:00:00Z")), 0);
+  assert.equal(db.state.created, false);
+});
+
+test("scheduled hunts reject more than 10000 authored spawn points instead of truncating", async () => {
+  const oversized = Array.from({ length: 10001 }, (_, index) => ({
+    ...points[index % points.length],
+    sequence: Math.floor(index / 101),
+    interactableId: "point-" + index
+  }));
+  const db = fakeDb(oversized, "team");
+  assert.equal(await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z")), 0);
+  assert.equal(db.state.created, false);
+});
+
+test("invalid schedule instants are rejected", async () => {
+  await assert.rejects(() => materializeScheduledTreasureHunts(fakeDb(), Number.NaN),
+    /invalid_treasure_schedule_instant/);
+});
+
+test("materializer uses the locked current template after an operator edits its schedule", async () => {
+  const worldId = "223e4567-e89b-42d3-a456-426614174055";
+  const db = fakeDb(points, "team", {
+    title: "Revised Weekly Hunt",
+    worldId,
+    cadence: "weekly",
+    timeZone: "UTC"
+  });
+  assert.equal(await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z")), 1);
+  assert.match(db.state.insertParams[1], /-weekly-/);
+  assert.equal(db.state.insertParams[2], "Revised Weekly Hunt");
+  assert.equal(db.state.insertParams[3], worldId);
+  assert.match(db.state.insertParams[11], /^weekly:/);
+});
+
+
+test("scheduled materialization defers cleanly when another worker owns the advisory lock", async () => {
+  const db = fakeDb();
+  const begin = db.begin.bind(db);
+  db.begin = async fn => begin(tx => fn({
+    unsafe: async (query, params) => {
+      if (query.includes("pg_try_advisory_xact_lock")) return [{ locked: false }];
+      return tx.unsafe(query, params);
+    }
+  }));
+  assert.equal(await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z")), 0);
+  assert.equal(db.state.created, false);
+  assert.equal(db.state.copied, 0);
+});
+
+test("scheduled materialization recovers on the next run after a transient transaction failure", async () => {
+  const db = fakeDb();
+  const begin = db.begin.bind(db);
+  let failed = false;
+  db.begin = async fn => {
+    if (!failed) {
+      failed = true;
+      throw new Error("temporary_database_disconnect");
+    }
+    return begin(fn);
+  };
+  const now = Date.parse("2026-11-20T12:00:00Z");
+  await assert.rejects(() => materializeScheduledTreasureHunts(db, now), /temporary_database_disconnect/);
+  assert.equal(db.state.created, false);
+  assert.equal(await materializeScheduledTreasureHunts(db, now), 1);
+  assert.equal(db.state.copied, 4);
+  assert.equal(db.state.spawnInsertBatches, 1);
+  assert.equal(await materializeScheduledTreasureHunts(db, now), 0);
+  assert.equal(db.state.copied, 4);
+});
+
+
+test("template discovery does not impose a fixed first-page limit that can starve later templates", async () => {
+  const db = fakeDb();
+  await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z"));
+  assert.match(db.state.templateScanQuery, /ORDER BY id\s*$/);
+  assert.doesNotMatch(db.state.templateScanQuery, /LIMIT\s+200/i);
+});

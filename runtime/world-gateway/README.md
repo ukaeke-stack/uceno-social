@@ -26,6 +26,8 @@ Standalone WebSocket runtime for an already-provisioned UCENO world instance.
 - `WORLD_INSTANCE_ID` (UUID registered in `virtual_world_instances`)
 - `DATABASE_URL` (server-only PostgreSQL connection string)
 - `WORLD_TOKEN_SECRET` (same server-only secret used to sign world JWTs)
+- `TREASURE_ASSIGNMENT_SECRET` (required server-only random secret of at least 32 characters before private personal/global or team treasure routes can be assigned)
+- `TREASURE_SCHEDULE_MATERIALIZER_ENABLED` (optional; set to `true` only after migrations 042 and earlier treasure migrations are applied and authored templates are ready)
 - `WORLD_INSTANCE_CAPACITY` (optional, default 64; keep consistent with DB capacity)
 - `WORLD_BOUNDS` (optional, default 10000 world units)
 - `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` (optional until spatial voice is provisioned; server-only credentials for pair-scoped audio rooms)
@@ -191,7 +193,8 @@ cannot become ready while the first owns the lease. It requires
 
 ## Provisioning and deployment sequence
 
-1. Apply database migrations 015–036 in numeric order, after reviewing the full sequence against the target database. This includes the later district persistence, player-session fencing, durable activity/transfer, relay-consumer offset and exclusive gateway-process ownership migrations. Do not apply only the latest migration or skip earlier dependencies.
+1. Apply database migrations 015–036 in numeric order for the baseline world gateway, after reviewing the full sequence against the target database. This includes district persistence, player-session fencing, durable activity/transfer, relay-consumer offsets and exclusive gateway-process ownership. Do not apply only the latest migration or skip earlier dependencies.
+2. Treat migrations 037–042 as the optional missions/treasure feature sequence. Review and apply them in numeric order before enabling treasure routes, team hunts, collectible rewards or schedule materialization. Do not enable the scheduler until all six migrations, the server-only assignment secret and authored hunt content have been verified.
 2. Create a runtime instance record with the target world, region, reachable
    WebSocket URL in `endpoint`, capacity and status `provisioning`.
 3. Deploy this service with the matching `WORLD_INSTANCE_ID` and secrets.
@@ -300,3 +303,17 @@ objects, furniture or vehicles. Assign the actual door pivot where applicable,
 keep object IDs stable, and export every city's saved generated district
 scenes. The exporter preserves other city entries, but the aggregate manifest
 is not complete until all ten cities have been exported.
+
+
+## Private treasure hunts and reward distribution
+
+Migration 038 adds authored spawn-point pools, per-user route assignments, clue payloads, and capped global claims. Migration 039 records private route discoveries. These migrations are additive and are not applied automatically by the gateway.
+
+The gateway can issue private personal/global hunt clues after authentication when TREASURE_ASSIGNMENT_SECRET is configured. It derives stable routes from authored spawn-point pools, persists each player's assignment once, validates discovery against the current assigned interactable and server position, and sends only allow-listed clue fields. Candidate pools are skipped after a route is committed, reducing repeat database reads. Spawn coordinates, interactable IDs and assignment IDs are not included in clue packets. A missing/weak assignment secret fails closed for private and team route assignment; legacy authored clue chains remain a separate compatibility path.
+
+Global hunts require a configured winner cap. Final claims are serialized on the hunt row and apply the stricter of max_global_winners and max_reward_claims. Rewards are recorded only as Earned Credits in the append-only ledger.
+
+Team hunts now support authenticated `treasure_team_hunts_request`, `treasure_team_create` and `treasure_team_join` WebSocket requests. Teams receive one shared HMAC-derived route. Discoveries are serialized against team progress, duplicate step claims are rejected, and each member's contribution points determine their deterministic share of the Earned Credits reward. Team reward allocations, ledger entries and collectible grants are committed transactionally. The Unity treasure HUD can list eligible authored team hunts, create a team, join by team ID, display shared clues and receive individual reward receipts. This is source implementation; PostgreSQL integration, deployed load and device-level Unity behavior must pass before release. Spawn locations and clue text must come from reviewed city exports and authored live-ops content, never synthetic placeholders.
+
+
+Migration 041 adds an operator-authored collectible catalog, finite mint limits, per-hunt reward mappings and idempotent player inventory. Private and legacy treasure completions grant configured collectibles inside the same PostgreSQL transaction as the reward claim; exhausted limited supplies are not over-minted. Migration 042 adds daily, weekly and seasonal templates. The gateway's opt-in materializer creates each schedule window once, uses the template time zone for calendar boundaries, and refuses to create a hunt unless every clue step has enough real authored spawn alternatives. It runs only when TREASURE_SCHEDULE_MATERIALIZER_ENABLED=true. The materializer supports personal/global templates with at least two authored alternatives per clue step and team templates with at least one authored location per step. Team-mode hunts are then consumed by the shared team-route runtime. The materializer remains opt-in and must stay disabled until migrations 037–042, the server-only assignment secret and reviewed Unity/live-ops content are verified. The template tables are intentionally empty until that content is supplied.
