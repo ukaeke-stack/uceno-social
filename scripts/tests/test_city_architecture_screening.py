@@ -296,6 +296,47 @@ class CityArchitectureScreeningTests(unittest.TestCase):
 
 
 class CityArchitectureDiscoveryExpansionTests(unittest.TestCase):
+    def test_catalogue_get_retries_rate_limit_and_honours_retry_after(self):
+        from email.message import Message
+        from unittest.mock import patch
+        import urllib.error
+        import io
+
+        headers = Message()
+        headers["Retry-After"] = "3"
+        throttled = urllib.error.HTTPError(
+            "https://3dassets.dev/api/v1/assets", 429, "rate limited", headers, io.BytesIO()
+        )
+        class Response:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                return b'{"data": []}'
+
+        with patch.object(discovery.urllib.request, "urlopen",
+                          side_effect=[throttled, Response()]) as request, \\
+             patch.object(discovery.time, "sleep") as sleep:
+            self.assertEqual(discovery.get("https://3dassets.dev/api/v1/assets"), {"data": []})
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(3.0)
+
+    def test_catalogue_get_does_not_retry_permanent_client_errors(self):
+        from unittest.mock import patch
+        import urllib.error
+        import io
+
+        failure = urllib.error.HTTPError(
+            "https://3dassets.dev/api/v1/assets", 404, "not found", {}, io.BytesIO()
+        )
+        with patch.object(discovery.urllib.request, "urlopen", side_effect=failure) as request, \\
+             patch.object(discovery.time, "sleep") as sleep:
+            with self.assertRaises(urllib.error.HTTPError):
+                discovery.get("https://3dassets.dev/api/v1/assets")
+        request.assert_called_once()
+        sleep.assert_not_called()
+
     def test_broad_search_visits_multiple_queries_and_stops_at_candidate_target(self):
         from unittest.mock import patch
         from urllib.parse import parse_qs, urlparse
