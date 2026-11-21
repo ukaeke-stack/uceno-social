@@ -128,3 +128,30 @@ test("team collectible batches never split an item quantity when finite supply i
   assert.ok(mint);
   assert.deepEqual(mint.params[1], [2]);
 });
+
+
+test("team collectible grant increments supply only for rows actually inserted after a concurrent conflict", async () => {
+  const otherUser = "123e4567-e89b-42d3-a456-426614174014";
+  const calls = [];
+  const tx = {
+    async unsafe(query, params) {
+      calls.push({ query, params });
+      if (query.includes("FROM virtual_world_treasure_reward_items")) return [{
+        id, code: "rare-badge", displayName: "Rare Badge", category: "badge",
+        rarity: "rare", maxSupply: "5", mintedCount: "0", quantity: 1
+      }];
+      if (query.includes("FROM virtual_world_user_collectibles")) return [];
+      if (query.includes("INSERT INTO virtual_world_user_collectibles")) {
+        // A concurrent transaction won the unique-key race for the first user.
+        return [{ userId: otherUser, collectibleId: id, quantity: 1 }];
+      }
+      return [];
+    }
+  };
+  const rewards = await grantTreasureCollectiblesToUsers(tx, hunt, [user, otherUser]);
+  assert.deepEqual(rewards.get(user), []);
+  assert.equal(rewards.get(otherUser)?.length, 1);
+  const mint = calls.find(call => call.query.includes("UPDATE virtual_world_collectible_catalog"));
+  assert.ok(mint);
+  assert.deepEqual(mint.params[1], [1]);
+});
