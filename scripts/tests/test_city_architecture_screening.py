@@ -295,5 +295,73 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         )
 
 
+class CityArchitectureDiscoveryExpansionTests(unittest.TestCase):
+    def test_broad_search_visits_multiple_queries_and_stops_at_candidate_target(self):
+        from unittest.mock import patch
+        from urllib.parse import parse_qs, urlparse
+
+        def building(slug):
+            return {
+                "slug": slug,
+                "title": "Glass Office Tower",
+                "summary": "Modern urban glass commercial building exterior",
+                "category": "buildings",
+                "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+                "stats": {"sizeMeters": [24, 62, 20], "fileSize": 250000},
+            }
+
+        requested = []
+        def fake_get(url):
+            params = parse_qs(urlparse(url).query)
+            query = params["q"][0]
+            requested.append(query)
+            offset = 0 if query == "first" else 15
+            return {"data": [building(f"{query}-{i}") for i in range(offset, offset + 15)]}
+
+        candidates, diagnostics = {}, []
+        with patch.object(discovery, "get", side_effect=fake_get):
+            added = discovery.broaden_city_candidates(
+                "NexusDelta", ["first", "second", "third"], candidates, set(),
+                diagnostics, target_candidates=30, max_pages_per_query=3
+            )
+
+        self.assertEqual(added, 30)
+        self.assertEqual(requested, ["first", "second"])
+        self.assertEqual(len(candidates), 30)
+        self.assertEqual(len(diagnostics), 2)
+        self.assertTrue(all(item["search_mode"] == "broad-underfill-retry"
+                            for item in diagnostics))
+
+    def test_broad_search_checks_next_page_when_provider_returns_full_page(self):
+        from unittest.mock import patch
+        from urllib.parse import parse_qs, urlparse
+
+        requested_pages = []
+        def fake_get(url):
+            page = int(parse_qs(urlparse(url).query)["page"][0])
+            requested_pages.append(page)
+            # Nonqualifying records force the helper to inspect subsequent pages.
+            return {"data": [
+                {"slug": f"prop-{page}-{i}", "title": "Garden Bench",
+                 "category": "props", "tags": [], "stats": {}}
+                for i in range(100 if page < 3 else 5)
+            ]}
+
+        candidates, diagnostics = {}, []
+        with patch.object(discovery, "get", side_effect=fake_get):
+            discovery.broaden_city_candidates(
+                "NexusDelta", ["one"], candidates, set(), diagnostics,
+                target_candidates=30, max_pages_per_query=3
+            )
+
+        self.assertEqual(requested_pages, [1, 2, 3])
+        self.assertEqual(len(candidates), 205)
+        self.assertEqual(diagnostics[0]["pages_checked"], [
+            {"page": 1, "result_count": 100},
+            {"page": 2, "result_count": 100},
+            {"page": 3, "result_count": 5},
+        ])
+
+
 if __name__ == "__main__":
     unittest.main()
