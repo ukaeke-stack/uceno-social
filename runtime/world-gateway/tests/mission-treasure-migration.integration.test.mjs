@@ -1603,6 +1603,11 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const cappedCatalog = await db`SELECT minted_count FROM virtual_world_collectible_catalog
       WHERE id = ${cappedCollectibleId}::uuid`;
     assert.equal(Number(cappedCatalog[0].minted_count), 2);
+    const cappedRewardMarkers = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_treasure_team_progress
+      WHERE team_id = ANY(${[capTeamA.teamId, capTeamB.teamId]}::uuid[])
+        AND reward_issued_at IS NOT NULL`;
+    assert.equal(Number(cappedRewardMarkers[0].total), 1);
     const losingTeamId = finalCapDiscoveries[0].rewardEarnedCredits === "0"
       ? capTeamA.teamId : capTeamB.teamId;
     const losingMembers = await db`SELECT user_id AS "userId"
@@ -1683,6 +1688,10 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     }));
     assert.equal(sharedFinalResults.every(result => result.completed), true);
     assert.equal(sharedFinalResults.every(result => BigInt(result.rewardEarnedCredits) > 0n), true);
+    const sharedRewardMarkers = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_treasure_team_progress
+      WHERE team_id = ANY(${sharedSupplyTeams}::uuid[]) AND reward_issued_at IS NOT NULL`;
+    assert.equal(Number(sharedRewardMarkers[0].total), 2);
     const sharedSupplyInventory = await db`SELECT user_id AS "userId", quantity
       FROM virtual_world_user_collectibles
       WHERE collectible_id = ${sharedSupplyCollectibleId}::uuid
