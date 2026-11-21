@@ -407,7 +407,9 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     for (const playerId of cappedPrivatePlayers) {
       const hints = await loadPrivateTreasureHints(db,
         { id: playerId, worldId, x: 0, y: 1.15, z: 0 }, Date.now(), privateSecret);
-      assert.equal(hints.length, 1);
+      // Earlier fixtures leave another active personal hunt for these users;
+      // assert the route belonging to this capped hunt, not the global hint list.
+      assert.equal(hints.filter(hint => hint.huntId === cappedPrivateHuntId).length, 1);
     }
     const cappedPrivateRoutes = await Promise.all(cappedPrivatePlayers.map(async playerId => db`
       SELECT assignment.sequence, point.interactable_id AS "interactableId",
