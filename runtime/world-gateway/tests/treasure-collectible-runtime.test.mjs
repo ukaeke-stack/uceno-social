@@ -99,3 +99,32 @@ test("team collectible grant skips existing awards and does not issue empty writ
   assert.equal(calls.filter(call => call.query.includes("INSERT INTO virtual_world_user_collectibles")).length, 1);
   assert.equal(calls.filter(call => call.query.includes("UPDATE virtual_world_collectible_catalog")).length, 1);
 });
+
+test("team collectible batches never split an item quantity when finite supply is insufficient", async () => {
+  const firstUser = "123e4567-e89b-42d3-a456-426614174014";
+  const secondUser = "123e4567-e89b-42d3-a456-426614174015";
+  const calls = [];
+  const tx = {
+    async unsafe(query, params) {
+      calls.push({ query, params });
+      if (query.includes("FROM virtual_world_treasure_reward_items")) return [{
+        id, code: "rare-badge", displayName: "Rare Badge", category: "badge",
+        rarity: "rare", maxSupply: "3", mintedCount: "0", quantity: 2
+      }];
+      if (query.includes("FROM virtual_world_user_collectibles")) return [];
+      if (query.includes("INSERT INTO virtual_world_user_collectibles")) {
+        assert.deepEqual(params[1], [firstUser]);
+        assert.deepEqual(params[3], [2]);
+        return [{ userId: firstUser, collectibleId: id, quantity: 2 }];
+      }
+      return [];
+    }
+  };
+
+  const rewards = await grantTreasureCollectiblesToUsers(tx, hunt, [secondUser, firstUser]);
+  assert.equal(rewards.get(firstUser)?.[0]?.quantity, 2);
+  assert.deepEqual(rewards.get(secondUser), []);
+  const mint = calls.find(call => call.query.includes("UPDATE virtual_world_collectible_catalog"));
+  assert.ok(mint);
+  assert.deepEqual(mint.params[1], [2]);
+});
