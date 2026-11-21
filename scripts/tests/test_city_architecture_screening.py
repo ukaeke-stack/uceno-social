@@ -404,5 +404,68 @@ class CityArchitectureDiscoveryExpansionTests(unittest.TestCase):
         ])
 
 
+    def test_global_allocator_preserves_coverage_when_cities_share_candidates(self):
+        shared = {
+            "slug": "shared-waterfront-office",
+            "relevance_score": 20,
+            "mobile_cost_score": 5,
+        }
+        solstice_only = {
+            "slug": "solstice-coastal-hotel",
+            "relevance_score": 15,
+            "mobile_cost_score": 8,
+        }
+        allocations = discovery.allocate_unique_city_candidates({
+            "SolsticeBay": [shared, solstice_only],
+            "MonsoonHarbour": [shared],
+        }, per_city=1)
+        self.assertEqual(
+            {city: [item["slug"] for item in items]
+             for city, items in allocations.items()},
+            {
+                "MonsoonHarbour": ["shared-waterfront-office"],
+                "SolsticeBay": ["solstice-coastal-hotel"],
+            }
+        )
+
+    def test_global_allocator_enforces_unique_assets_and_city_capacity(self):
+        pools = {}
+        for index, city in enumerate(discovery.CITY_RELEVANCE):
+            pools[city] = [{
+                "slug": f"building-{index}",
+                "relevance_score": 10 + index,
+                "mobile_cost_score": index,
+            }]
+        pools["SolsticeBay"].append(pools["NexusDelta"][0])
+        pools["VerdantReach"].append(pools["NexusDelta"][0])
+        allocations = discovery.allocate_unique_city_candidates(pools, per_city=1)
+        assigned = [
+            item["slug"] for items in allocations.values() for item in items
+        ]
+        self.assertEqual(len(assigned), len(set(assigned)))
+        self.assertTrue(all(len(items) <= 1 for items in allocations.values()))
+        self.assertEqual(len(assigned), len(discovery.CITY_RELEVANCE))
+
+    def test_global_allocator_is_deterministic_for_identical_inputs(self):
+        pools = {
+            "SolsticeBay": [
+                {"slug": "coastal-hotel", "relevance_score": 12, "mobile_cost_score": 2},
+                {"slug": "shared-tower", "relevance_score": 8, "mobile_cost_score": 4},
+            ],
+            "MonsoonHarbour": [
+                {"slug": "shared-tower", "relevance_score": 11, "mobile_cost_score": 3},
+                {"slug": "port-terminal", "relevance_score": 10, "mobile_cost_score": 4},
+            ],
+        }
+        def signature(result):
+            return {city: [item["slug"] for item in items]
+                    for city, items in result.items()}
+        self.assertEqual(
+            signature(discovery.allocate_unique_city_candidates(pools, 2)),
+            signature(discovery.allocate_unique_city_candidates(pools, 2))
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main()
