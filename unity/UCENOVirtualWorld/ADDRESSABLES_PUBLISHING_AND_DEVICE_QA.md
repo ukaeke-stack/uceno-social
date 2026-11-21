@@ -15,8 +15,8 @@ This is the release procedure for remote world-area content. It does not authori
 
 1. Open `unity/UCENOVirtualWorld` in the project's pinned Unity 6000.3 Editor and allow Package Manager to resolve the checked-in manifest and lock file.
 2. Confirm Addressables is installed and the intended Addressables Settings asset is present. Do not create a second settings asset or silently change the active profile.
-3. Keep the bootstrap scene and essential fallback assets in the local build. Mark downloadable district scenes as Addressable and give each scene the exact stable label/address expected by the gateway's authored city/district export.
-4. Keep labels deterministic and unique. Do not derive labels from display names. A published label is an API contract between the reviewed world export, gateway admission response, and Unity content catalogue.
+3. Keep the bootstrap scene and essential fallback assets in the local build. Mark downloadable district scenes as Addressable and assign each district the exact stable content label expected by the gateway's authored city/district export. The scene address may differ from that label.
+4. Keep labels deterministic and unique. Do not derive labels from display names. Every district label must resolve to exactly one Addressables scene location; labels that resolve to zero or multiple scenes are rejected by the client. A published label is an API contract between the reviewed world export, gateway admission response, and Unity content catalogue.
 5. Configure the active build profile with an HTTPS remote build/load path. Use a versioned release prefix for each published content set; never overwrite bundles already referenced by a live catalog.
 6. Build Addressables for Android using the same Unity version, scripting backend, target architecture, and compression settings intended for the Android player.
 7. Upload the generated catalog, catalog hash, and bundles together to the configured remote content origin. Preserve the generated relative paths. Verify the catalog and every referenced bundle return successful HTTPS responses before publishing the player.
