@@ -1194,6 +1194,37 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       WHERE hunt_id = ${competingHuntId}::uuid AND user_id = ${thirdUserId}::uuid`;
     assert.equal(thirdUserMemberships.length, 1);
 
+    // Two concurrent joins competing for the final team seat must serialize
+    // on the team row. One member is admitted; the other receives team_full.
+    await db`INSERT INTO virtual_world_treasure_hunts
+      (id, code, title, world_id, starts_at, ends_at, enabled, reward_earned_credits, distribution_mode)
+      VALUES (${capacityHuntId}::uuid, ${'team-capacity-' + capacityHuntId.slice(0, 8)},
+        'Concurrent final-seat team join race', ${worldId}::uuid,
+        NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour', TRUE, 10, 'team')`;
+    for (let sequence = 0; sequence < 2; sequence++) {
+      await db`INSERT INTO virtual_world_treasure_spawn_points
+        (id, hunt_id, sequence, city_id, district_id, interactable_id,
+         position_x, position_y, position_z, interaction_radius)
+        VALUES (${randomUUID()}::uuid, ${capacityHuntId}::uuid, ${sequence},
+          'solsticebay', 'central', ${'capacity-' + sequence}, ${sequence * 10}, 1.15, 0, 2)`;
+    }
+    const capacityTeam = await createTreasureTeam(
+      db, capacityHuntId, fourthUserId, worldId, 2, Date.now(), teamSecret
+    );
+    assert.equal(capacityTeam.ok, true);
+    const finalSeatAttempts = await Promise.all([
+      joinTreasureTeam(db, capacityTeam.teamId, userId, worldId, Date.now()),
+      joinTreasureTeam(replayDb, capacityTeam.teamId, secondUserId, worldId, Date.now())
+    ]);
+    assert.equal(finalSeatAttempts.filter(result => result.ok).length, 1);
+    assert.equal(finalSeatAttempts.filter(result => result.code === 'team_full').length, 1);
+    const capacityMembers = await db`SELECT user_id FROM virtual_world_treasure_team_members
+      WHERE team_id = ${capacityTeam.teamId}::uuid`;
+    assert.equal(capacityMembers.length, 2);
+    const capacityStatus = await db`SELECT status FROM virtual_world_treasure_teams
+      WHERE id = ${capacityTeam.teamId}::uuid`;
+    assert.equal(capacityStatus[0].status, 'active');
+
     await db.unsafe(`INSERT INTO virtual_world_treasure_progress
       (hunt_id, user_id, next_sequence) VALUES ($1, $2, 1)`, [huntId, userId]);
     await db.unsafe(`INSERT INTO virtual_world_treasure_discoveries
