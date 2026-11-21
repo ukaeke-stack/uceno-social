@@ -316,7 +316,7 @@ class CityArchitectureDiscoveryExpansionTests(unittest.TestCase):
                 return b'{"data": []}'
 
         with patch.object(discovery.urllib.request, "urlopen",
-                          side_effect=[throttled, Response()]) as request, \\
+                          side_effect=[throttled, Response()]) as request, \
              patch.object(discovery.time, "sleep") as sleep:
             self.assertEqual(discovery.get("https://3dassets.dev/api/v1/assets"), {"data": []})
         self.assertEqual(request.call_count, 2)
@@ -330,7 +330,7 @@ class CityArchitectureDiscoveryExpansionTests(unittest.TestCase):
         failure = urllib.error.HTTPError(
             "https://3dassets.dev/api/v1/assets", 404, "not found", {}, io.BytesIO()
         )
-        with patch.object(discovery.urllib.request, "urlopen", side_effect=failure) as request, \\
+        with patch.object(discovery.urllib.request, "urlopen", side_effect=failure) as request, \
              patch.object(discovery.time, "sleep") as sleep:
             with self.assertRaises(urllib.error.HTTPError):
                 discovery.get("https://3dassets.dev/api/v1/assets")
