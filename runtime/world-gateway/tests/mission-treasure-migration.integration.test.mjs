@@ -686,7 +686,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     // and roll back the final clue until the conflicting row is repaired.
     await db`INSERT INTO virtual_world_treasure_team_reward_allocations
       (team_id, user_id, contribution_points, amount)
-      VALUES (${recoveryTeam.teamId}::uuid, ${secondUserId}::uuid, 0, 999)`;
+      VALUES (${recoveryTeam.teamId}::uuid, ${secondUserId}::uuid, 2, 999)`;
     await assert.rejects(() => recordTeamTreasureDiscovery(db,
       { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
       { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
