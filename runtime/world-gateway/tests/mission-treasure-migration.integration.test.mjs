@@ -183,9 +183,196 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
           ${sequence}, 1.15, 0, 2)`;
     }
     await db.unsafe(`CREATE FUNCTION fail_treasure_spawn_snapshot() RETURNS trigger
-      LANGUAGE plpgsql AS $ BEGIN
+      LANGUAGE plpgsql AS $function$ BEGIN
         RAISE EXCEPTION 'simulated_spawn_snapshot_failure';
-      END $`);
+      END $functionimport test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import postgres from "postgres";
+import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "../dist/private-treasure-runtime.js";
+import { createTreasureTeam, joinTreasureTeam, loadTeamTreasureHints, recordTeamTreasureDiscovery } from "../dist/team-treasure-runtime.js";
+import { grantTreasureCollectibles } from "../dist/treasure-collectible-runtime.js";
+import { materializeScheduledTreasureHunts } from "../dist/treasure-schedule-runtime.js";
+
+const databaseUrl = process.env.TEST_DATABASE_URL;
+
+test("migrations 037-042 apply cleanly and enforce mission, treasure, team, collectible and schedule invariants", {
+  skip: !databaseUrl,
+  timeout: 60000
+}, async () => {
+  const schema = "uceno_rewards_" + randomUUID().replace(/-/g, "");
+  const admin = postgres(databaseUrl, { max: 2, idle_timeout: 5 });
+  const scoped = new URL(databaseUrl);
+  scoped.searchParams.set("options", `-csearch_path=${schema},public`);
+  const db = postgres(scoped.toString(), { max: 2, idle_timeout: 5 });
+  const replayDb = postgres(scoped.toString(), { max: 2, idle_timeout: 5 });
+  const migration = readFileSync(new URL("../../../db/migrations/037_daily_missions_treasure_rewards.sql", import.meta.url), "utf8");
+  const distributionMigration = readFileSync(new URL("../../../db/migrations/038_treasure_distribution_and_private_routes.sql", import.meta.url), "utf8");
+  const routeDiscoveryMigration = readFileSync(new URL("../../../db/migrations/039_private_treasure_route_discoveries.sql", import.meta.url), "utf8");
+  const teamMigration = readFileSync(new URL("../../../db/migrations/040_treasure_team_rewards.sql", import.meta.url), "utf8");
+  const collectibleMigration = readFileSync(new URL("../../../db/migrations/041_treasure_collectible_inventory.sql", import.meta.url), "utf8");
+  const scheduleMigration = readFileSync(new URL("../../../db/migrations/042_treasure_schedule_templates.sql", import.meta.url), "utf8");
+  const userId = randomUUID();
+  const secondUserId = randomUUID();
+  const thirdUserId = randomUUID();
+  const fourthUserId = randomUUID();
+  const teamId = randomUUID();
+  const competingHuntId = randomUUID();
+  const worldId = randomUUID();
+  const activityId = randomUUID();
+  const resultSessionId = randomUUID();
+  const missionTemplateId = randomUUID();
+  const missionInstanceId = randomUUID();
+  const huntId = randomUUID();
+  const privateHuntId = randomUUID();
+  const instanceId = randomUUID();
+  const processId = randomUUID();
+  const clueId = randomUUID();
+  const collectibleId = randomUUID();
+
+  try {
+    await admin.unsafe(`CREATE SCHEMA "${schema}"`);
+    await db.unsafe("CREATE TABLE users (id UUID PRIMARY KEY)");
+    await db.unsafe("CREATE TABLE virtual_worlds (id UUID PRIMARY KEY)");
+    await db.unsafe("CREATE TABLE virtual_world_activity_sessions (id UUID PRIMARY KEY)");
+    await db.unsafe("CREATE TABLE virtual_world_instances (id UUID PRIMARY KEY, owner_process_id UUID NOT NULL, owner_generation INTEGER NOT NULL, owner_lease_expires_at TIMESTAMPTZ NOT NULL)");
+    await db.unsafe(`CREATE TABLE virtual_world_activity_results (
+      id BIGSERIAL PRIMARY KEY,
+      session_id UUID NOT NULL REFERENCES virtual_world_activity_sessions(id),
+      world_id UUID NOT NULL REFERENCES virtual_worlds(id),
+      user_id UUID NOT NULL,
+      placement INTEGER,
+      status TEXT NOT NULL,
+      checkpoint_index INTEGER NOT NULL DEFAULT 0,
+      finish_time BIGINT,
+      recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (session_id, user_id)
+    )`);
+    const migrations = [
+      ["037_daily_missions_treasure_rewards.sql", migration],
+      ["038_treasure_distribution_and_private_routes.sql", distributionMigration],
+      ["039_private_treasure_route_discoveries.sql", routeDiscoveryMigration],
+      ["040_treasure_team_rewards.sql", teamMigration],
+      ["041_treasure_collectible_inventory.sql", collectibleMigration],
+      ["042_treasure_schedule_templates.sql", scheduleMigration]
+    ];
+    let activeMigrationName = "unknown";
+    let activeMigrationSql = "";
+    try {
+      for (const [name, sql] of migrations) {
+        activeMigrationName = name;
+        activeMigrationSql = sql;
+        await db.unsafe(sql);
+      }
+    } catch (error) {
+      const position = Number(error?.position);
+      const context = Number.isInteger(position) && position > 0
+        ? activeMigrationSql.slice(Math.max(0, position - 100), position + 100)
+        : "migration position unavailable";
+      throw new Error(`Migration ${activeMigrationName} failed: ${error instanceof Error ? error.message : String(error)}; SQL context: ${context}`);
+    }
+    const distributionIndexes = [
+      "virtual_world_treasure_spawn_candidates_idx",
+      "virtual_world_treasure_spawn_location_idx",
+      "virtual_world_treasure_assignments_user_idx",
+      "virtual_world_treasure_global_claims_recent_idx",
+      "virtual_world_treasure_route_discoveries_user_idx",
+      "virtual_world_treasure_teams_hunt_idx",
+      "virtual_world_treasure_team_members_rank_idx",
+      "virtual_world_treasure_team_members_user_idx",
+      "virtual_world_treasure_team_assignments_spawn_idx",
+      "virtual_world_treasure_team_discoveries_member_idx",
+      "virtual_world_collectible_catalog_live_idx",
+      "virtual_world_user_collectibles_inventory_idx",
+      "virtual_world_treasure_templates_live_idx",
+      "virtual_world_treasure_template_spawn_idx"
+    ];
+    const installedDistributionIndexes = await db`SELECT indexname FROM pg_indexes
+      WHERE schemaname = current_schema() AND indexname = ANY(${distributionIndexes})`;
+    assert.deepEqual(installedDistributionIndexes.map(row => row.indexname).sort(), distributionIndexes.sort());
+    const expectedIndexes = [
+      "virtual_world_daily_mission_active_lookup_idx",
+      "virtual_world_daily_mission_template_event_idx",
+      "virtual_world_treasure_hunt_active_lookup_idx",
+      "virtual_world_treasure_clue_location_lookup_idx",
+      "virtual_world_treasure_progress_user_active_idx"
+    ];
+    const installedIndexes = await db`SELECT indexname FROM pg_indexes
+      WHERE schemaname = current_schema() AND indexname = ANY(${expectedIndexes})`;
+    assert.deepEqual(installedIndexes.map(row => row.indexname).sort(), expectedIndexes.sort());
+
+    await db.unsafe("INSERT INTO users(id) VALUES ($1), ($2), ($3), ($4)", [userId, secondUserId, thirdUserId, fourthUserId]);
+    await db.unsafe("INSERT INTO virtual_worlds(id) VALUES ($1)", [worldId]);
+
+    // Scheduled-hunt creation must be idempotent across concurrent workers:
+    // only one generated hunt may claim a template's cadence key.
+    const scheduleTemplateId = randomUUID();
+    const scheduleTemplateCode = 'schedule-' + scheduleTemplateId.slice(0, 8);
+    await db`INSERT INTO virtual_world_treasure_hunt_templates
+      (id, code, title, world_id, cadence, time_zone, distribution_mode,
+       max_global_winners, enabled)
+      VALUES (${scheduleTemplateId}::uuid, ${scheduleTemplateCode},
+        'Concurrent scheduled hunt', ${worldId}::uuid, 'daily',
+        'Africa/Lagos', 'global', 25, TRUE)`;
+    const scheduleKey = 'daily:2026-11-20';
+    const scheduledInsertions = await Promise.allSettled([0, 1].map(index =>
+      db`INSERT INTO virtual_world_treasure_hunts
+        (id, code, title, world_id, starts_at, ends_at, enabled,
+         reward_earned_credits, distribution_mode, template_id, schedule_key)
+        VALUES (${randomUUID()}::uuid,
+          ${'scheduled-' + index + '-' + scheduleTemplateId.slice(0, 8)},
+          'Generated scheduled hunt', ${worldId}::uuid,
+          NOW(), NOW() + INTERVAL '1 day', TRUE, 10, 'global',
+          ${scheduleTemplateId}::uuid, ${scheduleKey})`
+    ));
+    assert.equal(scheduledInsertions.filter(result => result.status === 'fulfilled').length, 1);
+    assert.equal(scheduledInsertions.filter(result => result.status === 'rejected').length, 1);
+    const generatedScheduleRows = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_treasure_hunts
+      WHERE template_id = ${scheduleTemplateId}::uuid AND schedule_key = ${scheduleKey}`;
+    assert.equal(generatedScheduleRows[0].total, 1);
+
+    const scheduleSpawnId = randomUUID();
+    await db`INSERT INTO virtual_world_treasure_template_spawn_points
+      (id, template_id, sequence, city_id, district_id, interactable_id,
+       position_x, position_y, position_z, interaction_radius)
+      VALUES (${scheduleSpawnId}::uuid, ${scheduleTemplateId}::uuid, 0,
+        'solsticebay', 'central', 'scheduled-gate', 1, 1.15, 1, 2)`;
+    await assert.rejects(() => db`INSERT INTO virtual_world_treasure_template_spawn_points
+      (id, template_id, sequence, city_id, district_id, interactable_id,
+       position_x, position_y, position_z, interaction_radius)
+      VALUES (${randomUUID()}::uuid, ${scheduleTemplateId}::uuid, 1,
+        'solsticebay', 'central', 'invalid-radius', 1, 1.15, 1, 50)`);
+    await assert.rejects(() => db`INSERT INTO virtual_world_treasure_hunt_templates
+      (id, code, title, cadence, time_zone, active_from, active_until,
+       distribution_mode, max_global_winners)
+      VALUES (${randomUUID()}::uuid, ${'bad-season-' + scheduleTemplateId.slice(0, 8)},
+        'Invalid seasonal template', 'seasonal', 'Africa/Lagos',
+        NOW(), NULL, 'global', 10)`);
+
+    // A failure while copying authored spawn points must roll back the
+    // generated hunt too. A retry after the transient failure should create
+    // exactly one complete snapshot rather than a hunt with no playable route.
+    const recoveryTemplateId = randomUUID();
+    const recoveryTemplateCode = 'recover-' + recoveryTemplateId.slice(0, 8);
+    await db`INSERT INTO virtual_world_treasure_hunt_templates
+      (id, code, title, world_id, cadence, time_zone, distribution_mode, enabled)
+      VALUES (${recoveryTemplateId}::uuid, ${recoveryTemplateCode},
+        'Schedule recovery test', ${worldId}::uuid, 'daily',
+        'Africa/Lagos', 'team', TRUE)`;
+    for (let sequence = 0; sequence < 2; sequence++) {
+      await db`INSERT INTO virtual_world_treasure_template_spawn_points
+        (id, template_id, sequence, city_id, district_id, interactable_id,
+         position_x, position_y, position_z, interaction_radius)
+        VALUES (${randomUUID()}::uuid, ${recoveryTemplateId}::uuid, ${sequence},
+          'solsticebay', 'central', ${'recovery-' + sequence},
+          ${sequence}, 1.15, 0, 2)`;
+    }
+    await db.unsafe(`CREATE FUNCTION fail_treasure_spawn_snapshot() RETURNS trigger
+      LANGUAGE plpgsql AS $function$ BEGIN
+        RAISE EXCEPTION 'simulated_spawn_snapshot_failure';
+);
     await db.unsafe(`CREATE TRIGGER fail_treasure_spawn_snapshot
       BEFORE INSERT ON virtual_world_treasure_spawn_points
       FOR EACH ROW EXECUTE FUNCTION fail_treasure_spawn_snapshot()`);
