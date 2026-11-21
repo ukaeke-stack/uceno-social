@@ -660,7 +660,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       const firstResult = await recordTeamTreasureDiscovery(db,
         { id: contender.owner, worldId, x: Number(first.x), y: Number(first.y), z: Number(first.z) },
         { id: first.interactableId, cityId: first.cityId, districtId: first.districtId },
-        Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
+        Date.now(), teamSecret, instanceId, processId, 1);
       assert.equal(firstResult.discovered, true);
       assert.equal(firstResult.completed, false);
     }
@@ -669,7 +669,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       return recordTeamTreasureDiscovery(index === 0 ? db : replayDb,
         { id: contender.finisher, worldId, x: Number(final.x), y: Number(final.y), z: Number(final.z) },
         { id: final.interactableId, cityId: final.cityId, districtId: final.districtId },
-        Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
+        Date.now(), teamSecret, instanceId, processId, 1);
     }));
     assert.equal(concurrentTeamClaims.every(result => result.discovered && result.completed), true);
     assert.equal(concurrentTeamClaims.filter(result => result.rewardEarnedCredits === '59').length, 1);
