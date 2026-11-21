@@ -372,6 +372,77 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     assert.equal(privateReward.length, 1);
     assert.equal(String(privateReward[0].amount), '25');
 
+    // Two personal players racing for a single reward slot must not both
+    // receive Earned Credits. Use independent PostgreSQL pools to exercise
+    // the transaction-level claim lock under real contention.
+    const cappedPrivateHuntId = randomUUID();
+    await db`INSERT INTO virtual_world_treasure_hunts
+      (id, code, title, world_id, starts_at, ends_at, enabled,
+       reward_earned_credits, max_reward_claims, distribution_mode)
+      VALUES (${cappedPrivateHuntId}::uuid, ${'private-cap-' + cappedPrivateHuntId.slice(0, 8)},
+        'Competing personal reward claims', ${worldId}::uuid,
+        NOW() - INTERVAL '1 minute', NOW() + INTERVAL '1 hour',
+        TRUE, 73, 1, 'personal')`;
+    for (let sequence = 0; sequence < 2; sequence++) {
+      for (let candidate = 0; candidate < 2; candidate++) {
+        const point = { id: randomUUID(), sequence,
+          interactableId: 'private-cap-' + sequence + '-' + candidate,
+          x: sequence * 10 + candidate * 0.1, y: 1.15, z: candidate * 0.1 };
+        await db`INSERT INTO virtual_world_treasure_spawn_points
+          (id, hunt_id, sequence, city_id, district_id, interactable_id,
+           position_x, position_y, position_z, interaction_radius)
+          VALUES (${point.id}::uuid, ${cappedPrivateHuntId}::uuid, ${sequence},
+            'solsticebay', 'central', ${point.interactableId},
+            ${point.x}, ${point.y}, ${point.z}, 2)`;
+      }
+    }
+    const cappedPrivatePlayers = [userId, secondUserId];
+    const privateSecret = 'integration-test-secret-that-is-at-least-32-characters';
+    for (const playerId of cappedPrivatePlayers) {
+      const hints = await loadPrivateTreasureHints(db,
+        { id: playerId, worldId, x: 0, y: 1.15, z: 0 }, Date.now(), privateSecret);
+      assert.equal(hints.length, 1);
+    }
+    const cappedPrivateRoutes = await Promise.all(cappedPrivatePlayers.map(async playerId => db`
+      SELECT assignment.sequence, point.interactable_id AS "interactableId",
+        point.city_id AS "cityId", point.district_id AS "districtId",
+        point.position_x AS x, point.position_y AS y, point.position_z AS z
+      FROM virtual_world_treasure_assignments AS assignment
+      JOIN virtual_world_treasure_spawn_points AS point
+        ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
+      WHERE assignment.hunt_id = ${cappedPrivateHuntId}::uuid
+        AND assignment.user_id = ${playerId}::uuid ORDER BY assignment.sequence`));
+    assert.equal(cappedPrivateRoutes.every(route => route.length === 2), true);
+    for (let index = 0; index < cappedPrivatePlayers.length; index++) {
+      const playerId = cappedPrivatePlayers[index];
+      const first = cappedPrivateRoutes[index][0];
+      const result = await recordPrivateTreasureDiscovery(db,
+        { id: playerId, worldId, x: Number(first.x), y: Number(first.y), z: Number(first.z) },
+        { id: first.interactableId, cityId: first.cityId, districtId: first.districtId },
+        Date.now(), privateSecret, instanceId, processId, 1);
+      assert.equal(result.discovered, true);
+      assert.equal(result.completed, false);
+    }
+    const competingPrivateClaims = await Promise.all(cappedPrivatePlayers.map(async (playerId, index) => {
+      const final = cappedPrivateRoutes[index][1];
+      return recordPrivateTreasureDiscovery(index === 0 ? db : replayDb,
+        { id: playerId, worldId, x: Number(final.x), y: Number(final.y), z: Number(final.z) },
+        { id: final.interactableId, cityId: final.cityId, districtId: final.districtId },
+        Date.now(), privateSecret, instanceId, processId, 1);
+    }));
+    assert.equal(competingPrivateClaims.filter(result => result.rewardEarnedCredits === '73').length, 1);
+    assert.equal(competingPrivateClaims.filter(result =>
+      result.code === 'treasure_reward_claim_limit_reached').length, 1);
+    const privateCapClaims = await db`SELECT COUNT(*)::integer AS total
+      FROM virtual_world_treasure_global_claims WHERE hunt_id = ${cappedPrivateHuntId}::uuid`;
+    assert.equal(privateCapClaims[0].total, 1);
+    const privateCapLedger = await db`SELECT COUNT(*)::integer AS total,
+        COALESCE(SUM(amount), 0)::text AS amount
+      FROM virtual_world_earned_credit_ledger
+      WHERE source_treasure_hunt_id = ${cappedPrivateHuntId}::uuid`;
+    assert.equal(privateCapLedger[0].total, 1);
+    assert.equal(BigInt(privateCapLedger[0].amount), 73n);
+
     const teamHuntId = randomUUID();
     const teamCollectibleId = randomUUID();
     await db`INSERT INTO virtual_world_collectible_catalog
