@@ -180,7 +180,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
          position_x, position_y, position_z, interaction_radius, clue_payload)
         VALUES (${randomUUID()}::uuid, ${recoveryTemplateId}::uuid, ${sequence},
           'solsticebay', 'central', ${'recovery-' + sequence},
-          ${sequence}, 1.15, 0, 2, ${JSON.stringify({ title: 'Recovery clue ' + sequence })}::jsonb)`;
+          ${sequence}, 1.15, 0, 2, ${{ title: 'Recovery clue ' + sequence }}::jsonb)`;
     }
     await db.unsafe(`CREATE FUNCTION fail_treasure_spawn_snapshot() RETURNS trigger
       LANGUAGE plpgsql AS $function$ BEGIN
