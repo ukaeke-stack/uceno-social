@@ -177,6 +177,10 @@ export async function recordPrivateTreasureDiscovery(
         return { handled: true, discovered: true, completed: true, rewardEarnedCredits: "0", code: "treasure_reward_claim_cap_invalid", huntId: match.huntId };
       const caps = [winnerCap, rewardClaimCap].filter((value): value is number => value !== null);
       const cap = Math.min(...caps);
+      // Serialize every capped reward claim for this hunt. Without this
+      // transaction-scoped lock, two different players can both observe a
+      // claim count below the cap and over-issue the final reward slot.
+      await tx.unsafe(`SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))`, [match.huntId]);
       const claims = await tx.unsafe(`SELECT COUNT(*)::integer AS total
         FROM virtual_world_treasure_global_claims WHERE hunt_id = $1::uuid`, [match.huntId]);
       if (Number(claims[0]?.total ?? 0) >= cap)
