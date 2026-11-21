@@ -622,7 +622,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const staleOwnerAttempt = await recordTeamTreasureDiscovery(db,
       { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
       { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
-      Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
+      Date.now(), teamSecret, instanceId, processId, 1);
     assert.equal(staleOwnerAttempt.handled, true);
     assert.equal(staleOwnerAttempt.discovered, false);
     assert.equal(staleOwnerAttempt.completed, false);
