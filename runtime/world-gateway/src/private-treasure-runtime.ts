@@ -143,7 +143,9 @@ export async function recordPrivateTreasureDiscovery(
           power($7 - point.position_z, 2)) <= point.interaction_radius
         AND hunt.enabled = TRUE AND hunt.starts_at <= to_timestamp($8)
         AND hunt.ends_at > to_timestamp($8)
-      ORDER BY hunt.id LIMIT 2 FOR UPDATE OF hunt, progress`,
+      ORDER BY hunt.id LIMIT 2
+      FOR SHARE OF hunt
+      FOR UPDATE OF progress`,
       [player.id, target.cityId, target.districtId, target.id, player.x, player.y, player.z, now / 1000]);
     if (!matches.length) return { handled: false, discovered: false, completed: false, rewardEarnedCredits: "0" };
     if (matches.length > 1) return { handled: true, discovered: false, completed: false, rewardEarnedCredits: "0", code: "ambiguous_treasure_assignment" };
