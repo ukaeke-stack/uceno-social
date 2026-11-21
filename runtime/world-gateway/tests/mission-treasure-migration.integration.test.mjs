@@ -579,6 +579,32 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       WHERE id = ${teamCollectibleId}::uuid`;
     assert.equal(replayInventory[0].total, 2);
     assert.equal(Number(replaySupply[0].minted_count), 2);
+    // A retry routed to another gateway DB pool must also be a no-op after
+    // the committed completion, with no second credit or collectible grant.
+    const independentReplay = await recordTeamTreasureDiscovery(replayDb,
+      { id: finalUserId, worldId, x: Number(secondStep.x), y: Number(secondStep.y), z: Number(secondStep.z) },
+      { id: secondStep.interactableId, cityId: secondStep.cityId, districtId: secondStep.districtId },
+      Date.now(), teamSecret, instanceId, processId, 1);
+    assert.equal(independentReplay.discovered, false);
+    assert.equal(independentReplay.completed, false);
+    assert.equal(independentReplay.rewardEarnedCredits, "0");
+    const [postReplayLedger, postReplayAllocations, postReplayInventory, postReplaySupply] = await Promise.all([
+      replayDb`SELECT user_id AS "userId", amount::text AS amount
+        FROM virtual_world_earned_credit_ledger
+        WHERE idempotency_key LIKE ${'team-treasure:' + createdTeamId + ':%'} ORDER BY user_id`,
+      replayDb`SELECT user_id AS "userId", amount::text AS amount
+        FROM virtual_world_treasure_team_reward_allocations
+        WHERE team_id = ${createdTeamId}::uuid ORDER BY user_id`,
+      replayDb`SELECT COUNT(*)::integer AS total FROM virtual_world_user_collectibles
+        WHERE collectible_id = ${teamCollectibleId}::uuid
+          AND source_treasure_hunt_id = ${teamHuntId}::uuid`,
+      replayDb`SELECT minted_count FROM virtual_world_collectible_catalog
+        WHERE id = ${teamCollectibleId}::uuid`
+    ]);
+    assert.deepEqual(postReplayLedger, teamLedger);
+    assert.deepEqual(postReplayAllocations, teamAllocations);
+    assert.equal(postReplayInventory[0].total, 2);
+    assert.equal(Number(postReplaySupply[0].minted_count), 2);
     const completedHints = await loadTeamTreasureHints(db, privatePlayer, Date.now());
     assert.equal(completedHints.length, 0);
 
