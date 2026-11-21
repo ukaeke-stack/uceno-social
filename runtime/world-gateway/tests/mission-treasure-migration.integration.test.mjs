@@ -177,10 +177,10 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     for (let sequence = 0; sequence < 2; sequence++) {
       await db`INSERT INTO virtual_world_treasure_template_spawn_points
         (id, template_id, sequence, city_id, district_id, interactable_id,
-         position_x, position_y, position_z, interaction_radius)
+         position_x, position_y, position_z, interaction_radius, clue_payload)
         VALUES (${randomUUID()}::uuid, ${recoveryTemplateId}::uuid, ${sequence},
           'solsticebay', 'central', ${'recovery-' + sequence},
-          ${sequence}, 1.15, 0, 2)`;
+          ${sequence}, 1.15, 0, 2, ${JSON.stringify({ title: 'Recovery clue ' + sequence })}::jsonb)`;
     }
     await db.unsafe(`CREATE FUNCTION fail_treasure_spawn_snapshot() RETURNS trigger
       LANGUAGE plpgsql AS $function$ BEGIN
@@ -205,6 +205,12 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const recoveredSpawnPoints = await db`SELECT COUNT(*)::integer AS total
       FROM virtual_world_treasure_spawn_points WHERE hunt_id = ${recoveredSchedule[0].id}::uuid`;
     assert.equal(recoveredSpawnPoints[0].total, 2);
+    const recoveredCluePayloads = await db`SELECT clue_payload
+      FROM virtual_world_treasure_spawn_points
+      WHERE hunt_id = ${recoveredSchedule[0].id}::uuid
+      ORDER BY sequence`;
+    assert.deepEqual(recoveredCluePayloads.map(row => row.clue_payload),
+      [{ title: "Recovery clue 0" }, { title: "Recovery clue 1" }]);
 
     await db.unsafe("INSERT INTO virtual_world_activity_sessions(id) VALUES ($1)", [resultSessionId]);
     const result = await db.unsafe(`INSERT INTO virtual_world_activity_results
