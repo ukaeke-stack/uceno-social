@@ -288,5 +288,54 @@ class TevyCityArchitectureTests(unittest.TestCase):
             tevy.verify_glb(data, "0" * 64)
 
 
+    def test_allocator_respects_capacity_and_global_uniqueness_across_all_nine_cities(self):
+        cities = list(tevy.CITIES)
+        pools = {}
+        for index, city in enumerate(cities):
+            shared = record(
+                name=f"{city} office building",
+                tags=list(tevy.CITIES[city][:2]) + ["office"],
+                description=f"{city} city office building"
+            )
+            shared["slug"] = f"shared-{index}"
+            pools[city] = [shared]
+        # Add cross-city overlap to force the global allocator to resolve conflicts.
+        pools["SolsticeBay"].append(pools["SaffronDunes"][0])
+        pools["NexusDelta"].append(pools["EclipseCentral"][0])
+
+        allocations = tevy.allocate_city_candidates(pools, per_city=2)
+        assigned = [
+            item["slug"]
+            for city_records in allocations.values()
+            for item in city_records
+        ]
+        self.assertEqual(len(assigned), len(set(assigned)))
+        self.assertTrue(all(len(items) <= 2 for items in allocations.values()))
+        self.assertEqual(set(allocations), set(cities))
+        self.assertEqual(len(assigned), len(cities))
+
+    def test_allocator_is_deterministic_for_identical_candidate_pools(self):
+        first = record(name="Coastal Waterfront Hotel",
+                       tags=["coastal", "waterfront", "hotel"])
+        first["slug"] = "coastal-hotel"
+        second = record(name="Desert Adobe Hotel",
+                        tags=["desert", "adobe", "hotel"])
+        second["slug"] = "desert-hotel"
+        pools = {
+            "SolsticeBay": [first, second],
+            "SaffronDunes": [second, first],
+        }
+        def signature(result):
+            return {
+                city: [item["slug"] for item in items]
+                for city, items in result.items()
+            }
+        self.assertEqual(
+            signature(tevy.allocate_city_candidates(pools, 1)),
+            signature(tevy.allocate_city_candidates(pools, 1))
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main()
