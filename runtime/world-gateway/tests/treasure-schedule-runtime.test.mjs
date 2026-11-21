@@ -25,7 +25,10 @@ function fakeDb(spawnPoints = points, distributionMode = "personal", currentOver
   const db = {
     state,
     async unsafe(query) {
-      if (query.includes("FROM virtual_world_treasure_hunt_templates")) return [template];
+      if (query.includes("FROM virtual_world_treasure_hunt_templates")) {
+        state.templateScanQuery = query;
+        return [template];
+      }
       throw new Error("unexpected top-level query: " + query);
     },
     async begin(fn) {
@@ -192,4 +195,12 @@ test("scheduled materialization recovers on the next run after a transient trans
   assert.equal(db.state.spawnInsertBatches, 1);
   assert.equal(await materializeScheduledTreasureHunts(db, now), 0);
   assert.equal(db.state.copied, 4);
+});
+
+
+test("template discovery does not impose a fixed first-page limit that can starve later templates", async () => {
+  const db = fakeDb();
+  await materializeScheduledTreasureHunts(db, Date.parse("2026-11-20T12:00:00Z"));
+  assert.match(db.state.templateScanQuery, /ORDER BY id\s*$/);
+  assert.doesNotMatch(db.state.templateScanQuery, /LIMIT\s+200/i);
 });
