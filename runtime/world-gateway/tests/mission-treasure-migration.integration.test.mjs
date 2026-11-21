@@ -622,7 +622,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     const staleOwnerAttempt = await recordTeamTreasureDiscovery(db,
       { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
       { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
-      Date.now(), teamSecret, instanceId, processId, 1);
+      Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
     assert.equal(staleOwnerAttempt.handled, true);
     assert.equal(staleOwnerAttempt.discovered, false);
     assert.equal(staleOwnerAttempt.completed, false);
@@ -794,7 +794,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       return recordTeamTreasureDiscovery(db,
         { id: owner, worldId, x: Number(point.x), y: Number(point.y), z: Number(point.z) },
         { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
-        Date.now(), teamSecret, instanceId, processId, 1);
+        Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
     }));
     assert.equal(firstCapDiscoveries.every(result => result.discovered && !result.completed), true, JSON.stringify(firstCapDiscoveries));
     const finalCapDiscoveries = await Promise.all(capPlayers.map(({ member, route }) => {
@@ -802,7 +802,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
       return recordTeamTreasureDiscovery(db,
         { id: member, worldId, x: Number(point.x), y: Number(point.y), z: Number(point.z) },
         { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
-        Date.now(), teamSecret, instanceId, processId, 1);
+        Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
     }));
     assert.equal(finalCapDiscoveries.every(result => result.completed), true);
     assert.equal(finalCapDiscoveries.filter(result => result.code === 'team_treasure_claim_limit_reached').length, 1);
@@ -892,7 +892,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
         { id: sharedSupplyPlayers[index].owner, worldId,
           x: Number(point.x), y: Number(point.y), z: Number(point.z) },
         { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
-        Date.now(), teamSecret, instanceId, processId, 1);
+        Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
     }));
     assert.equal(sharedFirstResults.every(result => result.discovered && !result.completed), true);
     const sharedFinalResults = await Promise.all(sharedSupplyRoutes.map((route, index) => {
@@ -901,7 +901,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
         { id: sharedSupplyPlayers[index].member, worldId,
           x: Number(point.x), y: Number(point.y), z: Number(point.z) },
         { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
-        Date.now(), teamSecret, instanceId, processId, 1);
+        Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
     }));
     assert.equal(sharedFinalResults.every(result => result.completed), true);
     assert.equal(sharedFinalResults.every(result => BigInt(result.rewardEarnedCredits) > 0n), true);
@@ -936,7 +936,7 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
         { id: sharedSupplyPlayers[index].member, worldId,
           x: Number(point.x), y: Number(point.y), z: Number(point.z) },
         { id: point.interactableId, cityId: point.cityId, districtId: point.districtId },
-        Date.now(), teamSecret, instanceId, processId, 1);
+        Date.now(), teamSecret, instanceId, takeoverProcessId, 2);
     }));
     assert.equal(sharedCompletionReplays.every(result =>
       !result.discovered && !result.completed && result.rewardEarnedCredits === "0"), true);
