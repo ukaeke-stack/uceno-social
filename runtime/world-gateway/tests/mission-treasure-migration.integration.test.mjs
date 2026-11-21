@@ -722,6 +722,37 @@ test("migrations 037-042 apply cleanly and enforce mission, treasure, team, coll
     assert.equal(BigInt(recoveredLedger[0].amount), 37n);
     assert.equal(recoveredInventory[0].total, 2);
     assert.equal(Number(recoveredCatalog[0].minted_count), 2);
+
+    // Reconnect history must return only the requesting member's completed
+    // team allocation, and the receipt amount must match that member's ledger.
+    const loadTeamRewardReceipts = user => db`SELECT allocation.team_id AS "teamId",
+        hunt.id AS "huntId", hunt.title, allocation.amount::text AS "rewardEarnedCredits",
+        allocation.contribution_points AS "contributionPoints",
+        allocation.created_at AS "awardedAt"
+      FROM virtual_world_treasure_team_reward_allocations AS allocation
+      JOIN virtual_world_treasure_teams AS team ON team.id = allocation.team_id
+      JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = team.hunt_id
+      WHERE allocation.user_id = ${user}::uuid AND team.status = 'completed'
+      ORDER BY allocation.created_at DESC, allocation.team_id LIMIT 100`;
+    const [ownerReceipts, memberReceipts, unrelatedReceipts] = await Promise.all([
+      loadTeamRewardReceipts(userId), loadTeamRewardReceipts(secondUserId),
+      loadTeamRewardReceipts(thirdUserId)
+    ]);
+    assert.equal(ownerReceipts.length, 1);
+    assert.equal(memberReceipts.length, 1);
+    assert.equal(unrelatedReceipts.some(row => row.teamId === recoveryTeam.teamId), false);
+    for (const [receipt, expectedUser] of [[ownerReceipts[0], userId], [memberReceipts[0], secondUserId]]) {
+      assert.equal(receipt.teamId, recoveryTeam.teamId);
+      assert.equal(receipt.huntId, recoveryHuntId);
+      const ledgerRows = await db`SELECT amount::text AS amount
+        FROM virtual_world_earned_credit_ledger
+        WHERE user_id = ${expectedUser}::uuid
+          AND idempotency_key = ${'team-treasure:' + recoveryTeam.teamId + ':' + expectedUser}`;
+      assert.equal(ledgerRows.length, 1);
+      assert.equal(receipt.rewardEarnedCredits, ledgerRows[0].amount);
+    }
+    const repeatedOwnerReceipts = await loadTeamRewardReceipts(userId);
+    assert.deepEqual(repeatedOwnerReceipts, ownerReceipts);
     const recoveredReplay = await recordTeamTreasureDiscovery(db,
       { id: secondUserId, worldId, x: Number(recoveryFinal.x), y: Number(recoveryFinal.y), z: Number(recoveryFinal.z) },
       { id: recoveryFinal.interactableId, cityId: recoveryFinal.cityId, districtId: recoveryFinal.districtId },
