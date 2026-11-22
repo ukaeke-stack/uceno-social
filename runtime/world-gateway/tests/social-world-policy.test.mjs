@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canUseSocialWorldCapability } from "../src/social-world-policy.js";
+import { canUseSocialWorldCapability } from "../dist/social-world-policy.js";
 
 const relationship = {
   viewerId: "viewer",
