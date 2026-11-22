@@ -70,6 +70,39 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "non-empty relative string"):
                         audit.safe_artifact_path(root, invalid)
 
+
+    def test_rejects_malformed_asset_metadata_and_collection_shapes(self):
+        malformed_documents = (
+            {"asset": None},
+            {"asset": []},
+            {"asset": {"version": "1.0"}},
+            {"asset": {"version": "2.0"}, "images": {}},
+            {"asset": {"version": "2.0"}, "meshes": {}},
+            {"asset": {"version": "2.0"}, "materials": "not-an-array"},
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, document in enumerate(malformed_documents):
+                with self.subTest(document=document):
+                    path = pathlib.Path(directory) / f"malformed-{index}.glb"
+                    path.write_bytes(glb(document))
+                    with self.assertRaises(ValueError):
+                        audit.inspect_glb(path)
+
+    def test_rejects_malformed_image_entries_and_buffer_views(self):
+        malformed_images = (
+            [None],
+            [{"bufferView": -1}],
+            [{"bufferView": True}],
+            [{"uri": 17}],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, images in enumerate(malformed_images):
+                with self.subTest(images=images):
+                    path = pathlib.Path(directory) / f"image-{index}.glb"
+                    path.write_bytes(glb({"asset": {"version": "2.0"}, "images": images}))
+                    with self.assertRaises(ValueError):
+                        audit.inspect_glb(path)
+
     def test_rejects_non_json_first_chunk(self):
         data = b"glTF" + struct.pack("<II", 2, 24) + struct.pack("<II", 4, 0) + bytes(4)
         with tempfile.TemporaryDirectory() as directory:
