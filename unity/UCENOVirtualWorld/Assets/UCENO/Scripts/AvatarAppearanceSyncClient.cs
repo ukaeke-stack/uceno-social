@@ -38,6 +38,8 @@ namespace UCENO.VirtualWorld
         private float nextLoadAttempt;
         private float nextSaveAttempt;
         private string loadedUserId;
+        private string loadedWorldId;
+        private int sessionGeneration;
 
         public void Initialize(WorldSessionClient worldSession, AvatarAppearanceProfile appearanceProfile)
         {
@@ -47,8 +49,10 @@ namespace UCENO.VirtualWorld
 
         private void Update()
         {
-            if (session != null && loadedUserId != session.UserId)
+            if (session != null &&
+                (loadedUserId != session.UserId || loadedWorldId != session.WorldId))
             {
+                sessionGeneration++;
                 StopAllCoroutines();
                 loading = false;
                 saving = false;
@@ -56,6 +60,7 @@ namespace UCENO.VirtualWorld
                 pendingSave = false;
                 nextSaveAttempt = 0f;
                 loadedUserId = session.UserId;
+                loadedWorldId = session.WorldId;
                 if (profile != null) profile.Apply(AvatarAppearanceProfile.Palette.Default);
                 AvatarCustomizationHud hud = GetComponent<AvatarCustomizationHud>();
                 if (hud == null) hud = GetComponentInChildren<AvatarCustomizationHud>();
@@ -80,6 +85,8 @@ namespace UCENO.VirtualWorld
         {
             loading = true;
             string requestedUserId = session != null ? session.UserId : null;
+            string requestedWorldId = session != null ? session.WorldId : null;
+            int requestedGeneration = sessionGeneration;
             if (session == null || profile == null || !session.IsAuthenticated ||
                 string.IsNullOrEmpty(session.WorldId) || string.IsNullOrEmpty(session.UserId)) { loading = false; yield break; }
             string url = session.ApiBaseUrl.TrimEnd('/') + "/api/worlds/" + UnityWebRequest.EscapeURL(session.WorldId) + "/appearance";
@@ -89,7 +96,9 @@ namespace UCENO.VirtualWorld
                 request.SetRequestHeader("Accept", "application/json");
                 request.timeout = 15;
                 yield return request.SendWebRequest();
-                if (session == null || session.UserId != requestedUserId) { loading = false; yield break; }
+                if (session == null || session.UserId != requestedUserId ||
+                    session.WorldId != requestedWorldId || sessionGeneration != requestedGeneration)
+                { loading = false; yield break; }
                 if (request.result == UnityWebRequest.Result.Success)
                 {
                     AvatarAppearanceResponse response = JsonUtility.FromJson<AvatarAppearanceResponse>(request.downloadHandler.text);
@@ -120,7 +129,10 @@ namespace UCENO.VirtualWorld
             saving = true;
             AvatarAppearanceProfile.Palette palette = initial;
             string requestedUserId = session != null ? session.UserId : null;
-            while (pendingSave && session != null && session.UserId == requestedUserId)
+            string requestedWorldId = session != null ? session.WorldId : null;
+            int requestedGeneration = sessionGeneration;
+            while (pendingSave && session != null && session.UserId == requestedUserId &&
+                session.WorldId == requestedWorldId && sessionGeneration == requestedGeneration)
             {
                 pendingSave = false;
                 AvatarAppearancePayload payload = new AvatarAppearancePayload {
@@ -138,7 +150,9 @@ namespace UCENO.VirtualWorld
                     request.SetRequestHeader("Content-Type", "application/json");
                     request.timeout = 15;
                     yield return request.SendWebRequest();
-                    if (session == null || session.UserId != requestedUserId) { saving = false; yield break; }
+                    if (session == null || session.UserId != requestedUserId ||
+                        session.WorldId != requestedWorldId || sessionGeneration != requestedGeneration)
+                    { saving = false; yield break; }
                     if (request.result != UnityWebRequest.Result.Success)
                     {
                         long status = request.responseCode;
