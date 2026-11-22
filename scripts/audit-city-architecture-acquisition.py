@@ -66,19 +66,31 @@ def inspect_glb(path, expected_sha=None):
 
     if offset != len(data) or not isinstance(document, dict):
         raise ValueError(f"{path}: malformed GLB chunks or missing JSON")
-    if document.get("asset", {}).get("version") != "2.0":
-        raise ValueError(f"{path}: embedded glTF version is not 2.0")
+    asset = document.get("asset")
+    if not isinstance(asset, dict) or asset.get("version") != "2.0":
+        raise ValueError(f"{path}: embedded glTF asset metadata/version is invalid")
+    for collection in ("meshes", "materials", "images"):
+        value = document.get(collection, [])
+        if not isinstance(value, list):
+            raise ValueError(f"{path}: glTF {collection} must be an array")
     digest = hashlib.sha256(data).hexdigest()
     if expected_sha and digest.lower() != str(expected_sha).lower():
         raise ValueError(f"{path}: SHA-256 mismatch")
-    images = document.get("images") or []
-    embedded = sum(
-        1 for item in images
-        if isinstance(item, dict) and (
-            isinstance(item.get("bufferView"), int)
-            or str(item.get("uri", "")).startswith("data:")
-        )
-    )
+    images = document.get("images", [])
+    embedded = 0
+    for index, item in enumerate(images):
+        if not isinstance(item, dict):
+            raise ValueError(f"{path}: glTF image {index} must be an object")
+        buffer_view = item.get("bufferView")
+        uri = item.get("uri")
+        if buffer_view is not None and (
+            not isinstance(buffer_view, int) or isinstance(buffer_view, bool) or buffer_view < 0
+        ):
+            raise ValueError(f"{path}: glTF image {index} has an invalid bufferView")
+        if uri is not None and not isinstance(uri, str):
+            raise ValueError(f"{path}: glTF image {index} has an invalid URI")
+        if buffer_view is not None or (isinstance(uri, str) and uri.startswith("data:")):
+            embedded += 1
     return {
         "bytes": len(data),
         "sha256": digest,
