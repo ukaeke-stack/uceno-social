@@ -176,10 +176,19 @@ async function main() {
       // Persist the budget reservation before starting expensive model work so
       // a crash/restart cannot reset or bypass the daily cycle limit.
       await saveState(state);
+      let cycleFailed = false;
       try { await runCycle(state); state.failed = 0; }
-      catch (error) { state.failed++; await log("Cycle failed: " + (error?.stack || error)); }
+      catch (error) {
+        cycleFailed = true;
+        state.failed++;
+        await log("Cycle failed: " + (error?.stack || error));
+      }
       await saveState(state);
-      await sleep(cfg.idleMs);
+      const waitMs = cycleFailed
+        ? failureBackoffMs(state.failed, cfg.idleMs, 60 * 60 * 1000)
+        : cfg.idleMs;
+      if (cycleFailed) await log("Retry backoff: " + waitMs + "ms after consecutive failure(s).");
+      await sleep(waitMs);
     }
   } finally { await rm(lock, { force: true }); }
 }
