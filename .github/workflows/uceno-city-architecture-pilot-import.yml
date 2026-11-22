@@ -64,7 +64,7 @@ jobs:
           expected = str(lod0["sha256"]).lower()
           if len(expected) != 64:
               raise SystemExit("Manifest LOD0 SHA-256 is malformed.")
-          relative_file = pathlib.PurePosixPath(str(lod0["file"]).replace("\\\\", "/"))
+          relative_file = pathlib.PurePosixPath(str(lod0["file"]).replace(chr(92), "/"))
           if relative_file.is_absolute() or ".." in relative_file.parts:
               raise SystemExit("Manifest LOD0 path must be a safe relative path.")
           matches = [p for p in acquisition_root.rglob(relative_file.name)
