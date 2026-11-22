@@ -134,7 +134,14 @@ namespace UCENO.VirtualWorld
                                 continue;
                             WardrobeInventoryItem owned = Array.Find(inventory,
                                 candidate => candidate != null && candidate.itemId == item.itemId);
-                            if (owned == null) continue;
+                            if (owned == null ||
+                                !Enum.TryParse(owned.slot, true, out AvatarWardrobeSlot ownedSlot) ||
+                                ownedSlot != slot)
+                            {
+                                Debug.LogWarning("UCENO ignored a saved wardrobe selection with an invalid inventory slot (" +
+                                    item.itemId + ").");
+                                continue;
+                            }
                             if (owned.assetVersion > 0 && !string.IsNullOrWhiteSpace(owned.prefabKey))
                             {
                                 controller.EquipAddressable(owned.itemId, owned.prefabKey, owned.assetVersion,
@@ -144,8 +151,7 @@ namespace UCENO.VirtualWorld
                                             owned.itemId + "): " + loadError);
                                     }, () => session != null && session.UserId == requestedUserId);
                             }
-                            else if (Enum.TryParse(owned.slot, true, out AvatarWardrobeSlot ownedSlot) &&
-                                !controller.TryEquip(owned.itemId, owned.prefabKey, out string equipError))
+                            else if (!controller.TryEquip(owned.itemId, owned.prefabKey, out string equipError))
                             {
                                 Debug.LogWarning("UCENO legacy wardrobe item could not load (" +
                                     owned.itemId + "): " + equipError);
