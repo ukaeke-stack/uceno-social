@@ -30,6 +30,9 @@ test("appearance state and pending saves are reset on account changes", () => {
 
 test("wardrobe inventory, queued equipment and rendered garments are cleared on account changes", () => {
   assert.match(wardrobe, /loadedUserId != session\.UserId/);
+  assert.match(wardrobe, /loadedWorldId != session\.WorldId/);
+  assert.match(wardrobe, /session\.WorldId == requestedWorldId/);
+  assert.match(wardrobe, /session\.WorldId != requestedWorldId/);
   assert.match(wardrobe, /inventory = Array\.Empty<WardrobeInventoryItem>\(\)/);
   assert.match(wardrobe, /pendingEquipment\.Clear\(\)/);
   assert.match(wardrobe, /controller\.ApplyEquipped\(Array\.Empty<KeyValuePair<AvatarWardrobeSlot, string>>\(\)\)/);
