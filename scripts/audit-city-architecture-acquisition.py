@@ -69,6 +69,22 @@ def inspect_glb(path, expected_sha=None):
     }
 
 
+def safe_artifact_path(base, relative):
+    """Resolve a manifest path without allowing absolute or escaping paths."""
+    if not isinstance(relative, str) or not relative.strip():
+        raise ValueError("Manifest asset path must be a non-empty relative string")
+    candidate = pathlib.Path(relative)
+    if candidate.is_absolute():
+        raise ValueError(f"Absolute manifest asset path rejected: {relative}")
+    root = pathlib.Path(base).resolve()
+    resolved = (root / candidate).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"Manifest asset path escapes its acquisition root: {relative}") from exc
+    return resolved
+
+
 def load_manifest(path):
     if not path.exists():
         return None
@@ -100,7 +116,7 @@ def audit_tevy(manifest, report):
             lod_results = {}
             for level in (0, 1, 2):
                 item = lods[level]
-                path = ROOT / "tevy-city-architecture" / item["file"]
+                path = safe_artifact_path(ROOT / "tevy-city-architecture", item.get("file"))
                 result = inspect_glb(path, item.get("sha256"))
                 if result["bytes"] != item.get("bytes"):
                     raise ValueError(f"Tevy {city}/{slug} LOD{level}: byte count mismatch")
@@ -121,7 +137,7 @@ def audit_3dassets(manifest, report):
         city_result = report["cities"][city]
         city_result["3dassets_model_count"] = len(entries)
         for model in entries:
-            path = ROOT / "city-architecture-models" / model["file"]
+            path = safe_artifact_path(ROOT / "city-architecture-models", model.get("file"))
             result = inspect_glb(path, model.get("sha256"))
             if result["bytes"] != model.get("bytes"):
                 raise ValueError(f"3DAssets {city}/{model.get('slug')}: byte count mismatch")
