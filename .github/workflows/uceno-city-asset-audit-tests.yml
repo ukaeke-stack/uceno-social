@@ -1,0 +1,28 @@
+name: UCENO City Asset Audit Regression
+on:
+  pull_request:
+    paths:
+      - "scripts/audit-city-architecture-acquisition.py"
+      - "scripts/tests/test_city_architecture_acquisition_audit.py"
+      - ".github/workflows/uceno-city-asset-audit-tests.yml"
+  push:
+    branches:
+      - "feature/uceno-unity-foundation"
+    paths:
+      - "scripts/audit-city-architecture-acquisition.py"
+      - "scripts/tests/test_city_architecture_acquisition_audit.py"
+      - ".github/workflows/uceno-city-asset-audit-tests.yml"
+permissions:
+  contents: read
+jobs:
+  audit-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile audit and regression tests
+        run: python -m py_compile scripts/audit-city-architecture-acquisition.py scripts/tests/test_city_architecture_acquisition_audit.py
+      - name: Run city asset audit regression tests
+        run: python scripts/tests/test_city_architecture_acquisition_audit.py -v
