@@ -14,8 +14,10 @@ namespace UCENO.VirtualWorld
         public string itemId;
         public string displayName;
         public AvatarWardrobeSlot slot;
-        [Tooltip("Resources-relative path to a prefab containing skinned mesh renderers.")]
+        [Tooltip("Legacy Resources-relative path; retained only for local development fallback.")]
         public string prefabResourcePath;
+        [Tooltip("Stable versioned Addressables key shared with the server wardrobe inventory.")]
+        public string addressableKey;
     }
 
     [CreateAssetMenu(menuName = "UCENO/Avatar Wardrobe Catalog", fileName = "AvatarWardrobeCatalog")]
