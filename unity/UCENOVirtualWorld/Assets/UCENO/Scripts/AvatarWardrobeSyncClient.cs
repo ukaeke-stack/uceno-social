@@ -70,7 +70,7 @@ namespace UCENO.VirtualWorld
             }
             // The server catalogue key is checked against the local versioned
             // Addressables key before the remote wardrobe prefab is accepted.
-            controller.EquipAddressable(itemId, owned.prefabKey, (loadedAsset, loadError) =>
+            controller.EquipAddressable(itemId, owned.prefabKey, owned.assetVersion, (loadedAsset, loadError) =>
             {
                 if (loadedAsset)
                 {
