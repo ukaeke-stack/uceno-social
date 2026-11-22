@@ -9,6 +9,7 @@ on:
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Animations/Imported/**'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported/**'
       - 'scripts/validate_uceno_humanoid_animation_contract.py'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarAppearanceProfile.cs'
       - '.github/workflows/uceno-humanoid-animation-contract.yml'
   pull_request:
     paths:
@@ -16,6 +17,7 @@ on:
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Animations/Imported/**'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported/**'
       - 'scripts/validate_uceno_humanoid_animation_contract.py'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarAppearanceProfile.cs'
       - '.github/workflows/uceno-humanoid-animation-contract.yml'
 
 permissions:
