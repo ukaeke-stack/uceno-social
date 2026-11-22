@@ -28,7 +28,11 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
     def test_reports_embedded_images_and_mesh_material_counts(self):
         data = glb({
             "asset": {"version": "2.0"},
-            "meshes": [{}, {}],
+            "accessors": [{"componentType": 5126, "count": 3, "type": "VEC3"}],
+            "meshes": [
+                {"primitives": [{"attributes": {"POSITION": 0}, "material": 0}]},
+                {"primitives": [{"attributes": {"POSITION": 0}}]},
+            ],
             "materials": [{}],
             "images": [{"bufferView": 0}, {"uri": "https://example.invalid/a.png"}],
         })
@@ -41,6 +45,58 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
         self.assertEqual(result["image_count"], 2)
         self.assertEqual(result["embedded_image_count"], 1)
         self.assertEqual(result["external_image_count"], 1)
+
+
+    def test_reports_primitive_and_referenced_material_counts(self):
+        data = glb({
+            "asset": {"version": "2.0"},
+            "accessors": [{"componentType": 5126, "count": 3, "type": "VEC3"}],
+            "meshes": [{"primitives": [
+                {"attributes": {"POSITION": 0}, "material": 0},
+                {"attributes": {"POSITION": 0}},
+            ]}],
+            "materials": [{}],
+        })
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "building.glb"
+            path.write_bytes(data)
+            result = audit.inspect_glb(path)
+        self.assertEqual(result["primitive_count"], 2)
+        self.assertEqual(result["referenced_material_count"], 1)
+
+    def test_rejects_meshes_without_renderable_primitives(self):
+        documents = (
+            {"asset": {"version": "2.0"}, "meshes": [{"primitives": []}]},
+            {"asset": {"version": "2.0"}, "meshes": [{"primitives": [{"attributes": {}}]}]},
+            {"asset": {"version": "2.0"}, "meshes": [{"primitives": [{"attributes": {"POSITION": 2}}]}]},
+            {"asset": {"version": "2.0"}, "accessors": [{}],
+             "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "material": 3}]}]},
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, document in enumerate(documents):
+                with self.subTest(document=document):
+                    path = pathlib.Path(directory) / f"invalid-mesh-{index}.glb"
+                    path.write_bytes(glb(document))
+                    with self.assertRaises(ValueError):
+                        audit.inspect_glb(path)
+
+    def test_rejects_invalid_scene_graph_and_buffer_references(self):
+        documents = (
+            {"asset": {"version": "2.0"}, "nodes": [{"mesh": 0}]},
+            {"asset": {"version": "2.0"}, "nodes": [{"children": [2]}]},
+            {"asset": {"version": "2.0"}, "scenes": [{"nodes": [1]}]},
+            {"asset": {"version": "2.0"}, "buffers": [{}],
+             "bufferViews": [{"buffer": 1, "byteLength": 4}]},
+            {"asset": {"version": "2.0"}, "images": [{}],
+             "textures": [{"source": 1}]},
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, document in enumerate(documents):
+                with self.subTest(document=document):
+                    path = pathlib.Path(directory) / f"invalid-scene-{index}.glb"
+                    path.write_bytes(glb(document))
+                    with self.assertRaises(ValueError):
+                        audit.inspect_glb(path)
 
     def test_manifest_asset_paths_cannot_escape_acquisition_root(self):
         with tempfile.TemporaryDirectory() as directory:
