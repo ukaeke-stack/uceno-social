@@ -80,6 +80,11 @@ namespace UCENO.VirtualWorld
                 completed?.Invoke(false, "Wardrobe item has no versioned Addressables address.");
                 yield break;
             }
+            if (string.IsNullOrWhiteSpace(item.deliveryLabel))
+            {
+                completed?.Invoke(false, "Wardrobe item has no configured WorldContentDelivery label.");
+                yield break;
+            }
             if (!string.IsNullOrWhiteSpace(expectedAddressableKey) &&
                 !string.Equals(item.addressableKey, expectedAddressableKey, StringComparison.Ordinal))
             {
@@ -100,6 +105,28 @@ namespace UCENO.VirtualWorld
                 !avatarAnimator.avatar.isHuman)
             {
                 completed?.Invoke(false, "A valid Humanoid avatar rig is required.");
+                yield break;
+            }
+
+            WorldContentDelivery delivery = FindObjectOfType<WorldContentDelivery>();
+            if (delivery == null)
+            {
+                completed?.Invoke(false, "World content delivery service is unavailable.");
+                yield break;
+            }
+
+            bool contentReady = false;
+            string deliveryError = null;
+            delivery.EnsureContent(item.deliveryLabel, (ok, message) =>
+            {
+                contentReady = ok;
+                deliveryError = message;
+            });
+            while (!contentReady && deliveryError == null) yield return null;
+            if (!contentReady)
+            {
+                completed?.Invoke(false, "Wardrobe content delivery failed: " +
+                    (string.IsNullOrEmpty(deliveryError) ? "unknown delivery error." : deliveryError));
                 yield break;
             }
 
