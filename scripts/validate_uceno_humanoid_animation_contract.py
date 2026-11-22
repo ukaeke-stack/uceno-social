@@ -89,6 +89,12 @@ for token in (
     "animator.runtimeAnimatorController == null",
     "Procedural locomotion is disabled",
     "private bool RequireParameter(string parameterName, AnimatorControllerParameterType type)",
+    "private bool voiceEventSubscribed",
+    "BindVoiceEvents();",
+    "UnbindVoiceEvents();",
+    "WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking;",
+    "WorldSpatialVoiceClient.LocalTransmitChanged -= SetTalking;",
+    "if (voiceEventSubscribed || motor == null) return;",
 ):
     require(token in locomotion, "runtime locomotion/gesture driver is missing: " + token)
 
