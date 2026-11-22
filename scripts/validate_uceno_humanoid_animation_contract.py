@@ -108,6 +108,7 @@ for token in (
     "Apply gaze as a damped additive offset",
     "blinkStartWeight", "RestoreBlinkChannels()",
     "channel.renderer.GetBlendShapeWeight(channel.index)",
+    "if (blinking) RestoreBlinkChannels()",
 ):
     require(token in expressions, "social expression driver is missing: " + token)
 require("headBaseRotation" not in expressions,
