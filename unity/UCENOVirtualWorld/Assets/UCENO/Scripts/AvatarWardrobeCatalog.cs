@@ -18,6 +18,8 @@ namespace UCENO.VirtualWorld
         public string prefabResourcePath;
         [Tooltip("Versioned Addressables address for remotely delivered wardrobe content.")]
         public string addressableKey;
+        [Tooltip("Configured WorldContentDelivery label containing this wardrobe asset and its dependencies.")]
+        public string deliveryLabel;
         [Min(1)] public int assetVersion = 1;
     }
 
