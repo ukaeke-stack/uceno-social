@@ -22,7 +22,6 @@ namespace UCENO.VirtualWorld
         [SerializeField] private float idleHeadPitch = 1.1f;
 
         private Transform head;
-        private Quaternion headBaseRotation;
         private Transform lookTarget;
         private readonly List<BlendShapeChannel> blinkChannels = new List<BlendShapeChannel>();
         private float nextBlinkAt;
@@ -57,7 +56,6 @@ namespace UCENO.VirtualWorld
             if (animator != null && animator.avatar != null && animator.avatar.isHuman)
                 head = animator.GetBoneTransform(HumanBodyBones.Head);
 
-            if (head != null) headBaseRotation = head.localRotation;
             CacheBlinkChannels();
             ScheduleNextBlink();
         }
@@ -93,9 +91,13 @@ namespace UCENO.VirtualWorld
                 }
             }
 
-            Quaternion targetRotation = headBaseRotation * Quaternion.Euler(pitch, yaw, 0f);
+            // Animator has already evaluated this frame's imported facial/head pose.
+            // Apply gaze as a damped additive offset so LateUpdate does not reset
+            // authored animation back to the Awake-time bind pose.
+            Quaternion animatedLocalRotation = head.localRotation;
+            Quaternion targetRotation = animatedLocalRotation * Quaternion.Euler(pitch, yaw, 0f);
             head.localRotation = Quaternion.Slerp(
-                head.localRotation, targetRotation, 1f - Mathf.Exp(-headTurnSpeed * Time.deltaTime));
+                animatedLocalRotation, targetRotation, 1f - Mathf.Exp(-headTurnSpeed * Time.deltaTime));
         }
 
         private void CacheBlinkChannels()
