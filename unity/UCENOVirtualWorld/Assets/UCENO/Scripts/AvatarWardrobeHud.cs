@@ -12,6 +12,9 @@ namespace UCENO.VirtualWorld
         private AvatarWardrobeSyncClient sync;
         private WorldSessionClient session;
         private readonly Dictionary<string, int> selected = new Dictionary<string, int>();
+        private readonly Dictionary<string, List<WardrobeInventoryItem>> inventoryBySlot =
+            new Dictionary<string, List<WardrobeInventoryItem>>();
+        private static readonly List<WardrobeInventoryItem> EmptyItems = new List<WardrobeInventoryItem>(0);
         private bool visible;
         private string status = "Sign in to load your wardrobe.";
         private Vector2 scroll;
@@ -22,6 +25,7 @@ namespace UCENO.VirtualWorld
 
         private void Awake()
         {
+            foreach (string slot in Slots) inventoryBySlot[slot] = new List<WardrobeInventoryItem>();
             AvatarAppearanceProfile profile = GetComponentInChildren<AvatarAppearanceProfile>();
             if (profile == null) profile = GetComponent<AvatarAppearanceProfile>();
             if (profile == null) return;
@@ -43,9 +47,12 @@ namespace UCENO.VirtualWorld
                 status = "Loading account wardrobe...";
             }
             if (sync != null && sync.IsLoaded && status == "Loading account wardrobe...")
+            {
+                RebuildInventoryIndex();
                 status = sync.Inventory.Count == 0
                     ? "No wardrobe items are assigned to this account yet."
                     : "Select an owned item and equip it.";
+            }
         }
 
         private void OnGUI()
@@ -116,13 +123,20 @@ namespace UCENO.VirtualWorld
             }
         }
 
+        private void RebuildInventoryIndex()
+        {
+            foreach (List<WardrobeInventoryItem> items in inventoryBySlot.Values)
+                items.Clear();
+            if (sync == null || !sync.IsLoaded) return;
+            foreach (WardrobeInventoryItem item in sync.Inventory)
+                if (item != null && inventoryBySlot.TryGetValue(item.slot, out List<WardrobeInventoryItem> items))
+                    items.Add(item);
+        }
+
         private List<WardrobeInventoryItem> GetItems(string slot)
         {
-            List<WardrobeInventoryItem> result = new List<WardrobeInventoryItem>();
-            if (sync == null || !sync.IsLoaded) return result;
-            foreach (WardrobeInventoryItem item in sync.Inventory)
-                if (item != null && item.slot == slot) result.Add(item);
-            return result;
+            return inventoryBySlot.TryGetValue(slot, out List<WardrobeInventoryItem> items)
+                ? items : EmptyItems;
         }
 
         private void EnsureStyles()
