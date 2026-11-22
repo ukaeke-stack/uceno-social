@@ -21,6 +21,9 @@ test("wardrobe controller resolves immutable key-plus-version addresses and reje
   assert.match(controller, /TryEquipInternal/);
   assert.match(controller, /ReleasePreviousAddressableHandle/);
   assert.match(controller, /pendingAddressableReleases/);
+  assert.match(controller, /inFlightAddressableHandles\.Add\(handle\)/);
+  assert.match(controller, /inFlightAddressableHandles\.Remove\(handle\)/);
+  assert.match(controller, /foreach \(AsyncOperationHandle<GameObject> handle in inFlightAddressableHandles\)/);
   assert.match(controller, /foreach \(AsyncOperationHandle<GameObject> handle in pendingAddressableReleases\)/);
   assert.match(controller, /string\.Equals\(item\.addressableKey, expectedAddressableKey/);
   assert.match(controller, /AsyncOperationStatus\.Succeeded/);
