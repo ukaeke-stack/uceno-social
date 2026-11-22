@@ -51,8 +51,7 @@ async function saveState(state) { await writeFile(stateFile, JSON.stringify(stat
 async function processStartTicks(pid) {
   try {
     const stat = await readProcFile("/proc/" + pid + "/stat", "utf8");
-    const fields = stat.slice(stat.lastIndexOf(")") + 2).trim().split(/\s+/);
-    return fields[19] || null; // Linux stat field 22: process start time.
+    return parseLinuxProcessStartTicks(stat); // Linux stat field 22: process start time.
   } catch { return null; }
 }
 async function git(args, timeout = 120000) {
