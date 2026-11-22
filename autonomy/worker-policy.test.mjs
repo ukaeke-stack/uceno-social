@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   assertWorkBranch, buildPushRefspec, codexEnvironment, failureBackoffMs,
-  gitAuthEnvironment, parseLinuxProcessStartTicks, reserveDailyCycle
+  gitAuthEnvironment, isLiveWorkerLockOwner, parseLinuxProcessStartTicks, reserveDailyCycle
 } from "./worker-policy.mjs";
 
 test("process start-time parser handles spaces and parentheses in Linux process names", () => {
@@ -11,6 +11,24 @@ test("process start-time parser handles spaces and parentheses in Linux process 
   assert.equal(parseLinuxProcessStartTicks("123 (worker (codex) child) " + fields.join(" ")), "987654");
   assert.equal(parseLinuxProcessStartTicks("not-a-proc-stat"), null);
   assert.equal(parseLinuxProcessStartTicks(null), null);
+});
+
+test("worker lock treats matching process start ticks as a live owner", () => {
+  assert.equal(isLiveWorkerLockOwner({ pid: 41, startTicks: "900" }, "900", () => false), true);
+});
+
+test("worker lock detects PID reuse from a different process start time", () => {
+  assert.equal(isLiveWorkerLockOwner({ pid: 41, startTicks: "900" }, "901", () => true), false);
+});
+
+test("worker lock preserves a live process when proc start-time metadata is unavailable", () => {
+  assert.equal(isLiveWorkerLockOwner({ pid: 41, startTicks: "900" }, null, () => true), true);
+  assert.equal(isLiveWorkerLockOwner({ pid: 41 }, null, () => true), true);
+});
+
+test("worker lock is stale when its process no longer exists", () => {
+  assert.equal(isLiveWorkerLockOwner({ pid: 41, startTicks: "900" }, null, () => false), false);
+  assert.equal(isLiveWorkerLockOwner({ pid: 0, startTicks: "900" }, "900", () => true), false);
 });
 
 test("daily reservation rolls over by UTC date and resets only the daily counter", () => {
