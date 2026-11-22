@@ -21,6 +21,7 @@ namespace UCENO.VirtualWorld
         private readonly Dictionary<AvatarWardrobeSlot, string> equippedIds =
             new Dictionary<AvatarWardrobeSlot, string>();
         private Dictionary<string, Transform> avatarBones;
+        private readonly HashSet<string> ambiguousAvatarBones = new HashSet<string>(StringComparer.Ordinal);
 
         public event Action<AvatarWardrobeSlot, string> EquippedChanged;
 
@@ -97,10 +98,12 @@ namespace UCENO.VirtualWorld
             if (avatarBones == null || avatarBones.Count == 0) RebuildBoneMap();
             foreach (SkinnedMeshRenderer renderer in renderers)
             {
-                if (renderer.sharedMesh == null || renderer.bones == null || renderer.bones.Length == 0)
+                if (renderer.sharedMesh == null || renderer.bones == null || renderer.bones.Length == 0 ||
+                    renderer.sharedMesh.bindposes == null || renderer.sharedMesh.bindposes.Length != renderer.bones.Length ||
+                    renderer.rootBone == null)
                 {
                     Destroy(instance);
-                    error = "Wardrobe mesh is missing its mesh or bone weights.";
+                    error = "Wardrobe mesh must have matching bind poses, bones and a root bone.";
                     return false;
                 }
 
@@ -108,17 +111,18 @@ namespace UCENO.VirtualWorld
                 for (int i = 0; i < renderer.bones.Length; i++)
                 {
                     Transform sourceBone = renderer.bones[i];
-                    if (sourceBone == null || !avatarBones.TryGetValue(sourceBone.name, out mappedBones[i]))
+                    if (sourceBone == null || ambiguousAvatarBones.Contains(sourceBone.name) ||
+                        !avatarBones.TryGetValue(sourceBone.name, out mappedBones[i]))
                     {
                         Destroy(instance);
-                        error = "Avatar rig is missing garment bone: " +
+                        error = "Avatar rig has a missing or ambiguous garment bone: " +
                             (sourceBone == null ? "(null)" : sourceBone.name);
                         return false;
                     }
                 }
 
                 Transform mappedRoot = null;
-                if (renderer.rootBone != null)
+                if (renderer.rootBone != null && !ambiguousAvatarBones.Contains(renderer.rootBone.name))
                     avatarBones.TryGetValue(renderer.rootBone.name, out mappedRoot);
                 if (renderer.rootBone != null && mappedRoot == null)
                 {
@@ -174,9 +178,18 @@ namespace UCENO.VirtualWorld
         private void RebuildBoneMap()
         {
             avatarBones = new Dictionary<string, Transform>(StringComparer.Ordinal);
+            ambiguousAvatarBones.Clear();
             Transform root = avatarAnimator != null ? avatarAnimator.transform : transform;
             foreach (Transform bone in root.GetComponentsInChildren<Transform>(true))
-                if (!avatarBones.ContainsKey(bone.name)) avatarBones.Add(bone.name, bone);
+            {
+                if (string.IsNullOrEmpty(bone.name) || ambiguousAvatarBones.Contains(bone.name)) continue;
+                if (avatarBones.ContainsKey(bone.name))
+                {
+                    avatarBones.Remove(bone.name);
+                    ambiguousAvatarBones.Add(bone.name);
+                }
+                else avatarBones.Add(bone.name, bone);
+            }
         }
     }
 }
