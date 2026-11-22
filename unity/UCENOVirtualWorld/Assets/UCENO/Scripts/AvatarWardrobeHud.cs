@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -22,6 +23,7 @@ namespace UCENO.VirtualWorld
         private GUIStyle buttonStyle;
         private GUIStyle panelStyle;
         private bool initialized;
+        private string pendingEquipItemId;
 
         private void Awake()
         {
@@ -43,6 +45,7 @@ namespace UCENO.VirtualWorld
                 sync = GetComponent<AvatarWardrobeSyncClient>();
                 if (sync == null) sync = gameObject.AddComponent<AvatarWardrobeSyncClient>();
                 sync.Initialize(session, controller);
+                sync.EquipCompleted += OnEquipCompleted;
                 initialized = true;
                 status = "Loading account wardrobe...";
             }
@@ -112,7 +115,10 @@ namespace UCENO.VirtualWorld
                 if (items.Count == 0 || sync == null || !sync.IsLoaded)
                     status = "No owned item is available for this slot.";
                 else if (sync.Equip(items[index].itemId, out string error))
-                    status = items[index].displayName + " equipped.";
+                {
+                    pendingEquipItemId = items[index].itemId;
+                    status = "Loading " + items[index].displayName + "...";
+                }
                 else status = error;
             }
             if (GUI.Button(new Rect(x + 100f * scale, y + 30f * scale, 94f * scale, 27f * scale),
@@ -121,6 +127,23 @@ namespace UCENO.VirtualWorld
                 if (sync == null || !sync.IsLoaded) status = "Wardrobe is not connected.";
                 else { sync.Unequip(slot); status = slot + " removed."; }
             }
+        }
+
+        private void OnEquipCompleted(string itemId, bool success, string error)
+        {
+            if (itemId != pendingEquipItemId) return;
+            pendingEquipItemId = null;
+            if (success)
+            {
+                WardrobeInventoryItem item = Array.Find(sync.Inventory.ToArray(), x => x != null && x.itemId == itemId);
+                status = item == null ? "Wardrobe item equipped." : item.displayName + " equipped.";
+            }
+            else status = "Equip failed: " + (string.IsNullOrEmpty(error) ? "asset unavailable." : error);
+        }
+
+        private void OnDestroy()
+        {
+            if (sync != null) sync.EquipCompleted -= OnEquipCompleted;
         }
 
         private void RebuildInventoryIndex()
