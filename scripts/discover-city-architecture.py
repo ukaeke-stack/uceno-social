@@ -146,6 +146,9 @@ QUERIES = {
 }
 UA = "UCENO-city-architecture-discovery/2.0"
 MAX_BYTES = 25 * 1024 * 1024
+INITIAL_MAX_PAGES = 2
+BROADEN_MAX_PAGES = 1
+TARGET_CITY_CANDIDATES = 30
 MIN_HEIGHT_M = 5.0
 MIN_FOOTPRINT_M = 4.0
 MIN_HORIZONTAL_SPAN_M = 4.0
@@ -355,7 +358,7 @@ def broaden_city_candidates(city, queries, raw_by_slug, globally_seen, query_dia
             if slug not in globally_seen and rejection_reason(item, city) is None
         )
 
-    if qualifying_count() >= 12:
+    if qualifying_count() >= target_candidates:
         return 0
 
     added_total = 0
@@ -501,7 +504,7 @@ def main():
             page_diagnostics = []
             # The catalogue caps each response at 100 records. Read multiple
             # pages so relevance-ranked page one cannot hide qualifying assets.
-            for page in range(1, 9):
+            for page in range(1, INITIAL_MAX_PAGES + 1):
                 params = urllib.parse.urlencode({
                     "q": query, "category": "buildings", "style": "realistic",
                     "tag": "exterior", "sort": "relevance", "limit": 100, "page": page
@@ -536,9 +539,22 @@ def main():
                 slug = item.get("slug") or item.get("id")
                 if slug:
                     raw_by_slug[slug] = item
+            # Stop searching once this city has enough qualified options for
+            # global allocation; additional pages cannot increase its quota.
+            qualifying_count = sum(
+                1 for candidate in raw_by_slug.values()
+                if rejection_reason(candidate, city) is None
+            )
+            if qualifying_count >= TARGET_CITY_CANDIDATES:
+                break
 
-        # Broaden underfilled searches without weakening strict qualification.
-        broaden_city_candidates(city, queries, raw_by_slug, set(), query_diagnostics)
+        # Broaden only underfilled cities, one page per query, and stop at the
+        # allocation target. This avoids hundreds of redundant catalogue calls.
+        broaden_city_candidates(
+            city, queries, raw_by_slug, set(), query_diagnostics,
+            target_candidates=TARGET_CITY_CANDIDATES,
+            max_pages_per_query=BROADEN_MAX_PAGES,
+        )
 
         candidates, rejected = [], []
         for slug, item in raw_by_slug.items():
