@@ -29,6 +29,20 @@ const huntProgress = (overrides = {}) => ({ huntId: d, userId: a, nextSequence: 
 const discovery = (clueId, sequence) => ({ source: "authoritative_gateway",
   huntId: d, userId: a, clueId, sequence, discoveredAt: 2000 });
 
+test("treasure discovery rejects null, primitive and array progress without throwing", () => {
+  for (const malformed of [null, undefined, "progress", 7, []]) {
+    assert.deepEqual(applyTreasureDiscovery(clues, malformed, discovery(a, 0)),
+      { ok: false, code: "invalid_treasure_progress" });
+  }
+});
+
+test("treasure discovery rejects non-object discovery payloads without throwing", () => {
+  for (const malformed of [null, undefined, "discovery", 7, []]) {
+    assert.deepEqual(applyTreasureDiscovery(clues, huntProgress(), malformed),
+      { ok: false, code: "unverified_treasure_discovery" });
+  }
+});
+
 test("treasure chain rejects duplicate clue identities", () => {
   const duplicateIds = [{ id: a, sequence: 0 }, { id: a, sequence: 1 }];
   assert.equal(applyTreasureDiscovery(duplicateIds, huntProgress(), discovery(a, 0)).ok, false);
