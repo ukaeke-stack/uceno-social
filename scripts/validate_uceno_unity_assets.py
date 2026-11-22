@@ -445,7 +445,7 @@ def main():
             fail("World object interaction input/target dispatch is missing: " + required)
 
     authoring = read_text(ASSETS / "Editor/WorldInteractableAuthoring.cs")
-    if "GlobalObjectId.GetGlobalObjectIdSlow" not in authoring or "SHA256" not in authoring or '"scene:"' not in authoring:
+    if "GlobalObjectId.GetGlobalObjectIdSlow" not in authoring or "SHA256" not in authoring or '"uceno:"' not in authoring:
         fail("Interactable authoring must assign stable, hashed GlobalObjectId values.")
     marker = read_text(ASSETS / "Scripts/WorldInteractable.cs")
     if "gameObject.name.ToLowerInvariant()" in marker or "HasDoorPivot" not in marker:
