@@ -48,6 +48,13 @@ test("treasure chain rejects duplicate clue identities", () => {
   assert.equal(applyTreasureDiscovery(duplicateIds, huntProgress(), discovery(a, 0)).ok, false);
 });
 
+test("treasure progress rejects malformed completion timestamps", () => {
+  for (const completedAt of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, "completed"]) {
+    assert.deepEqual(applyTreasureDiscovery(clues, huntProgress({ completedAt }), discovery(a, 0)),
+      { ok: false, code: "invalid_treasure_progress" });
+  }
+});
+
 test("treasure progress must be the exact ordered prefix of the configured clue chain", () => {
   assert.deepEqual(applyTreasureDiscovery(clues, huntProgress({
     nextSequence: 1, discoveredClueIds: [b]
