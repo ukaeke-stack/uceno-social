@@ -40,5 +40,7 @@ test("wardrobe sync uses server-owned item version metadata for equip and saved 
   assert.match(sync, /controller\.EquipAddressable\(owned\.itemId, owned\.prefabKey, owned\.assetVersion/);
   assert.match(sync, /candidate\.itemId == item\.itemId/);
   assert.match(sync, /session\.UserId == requestedUserId && loaded/);
+  assert.match(sync, /ownedSlot != slot/);
+  assert.match(sync, /ignored a saved wardrobe selection with an invalid inventory slot/);
   assert.match(sync, /\(\) => session != null && session\.UserId == requestedUserId/);
 });
