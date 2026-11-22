@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace UCENO.VirtualWorld
 {
@@ -39,6 +40,7 @@ namespace UCENO.VirtualWorld
             BuildBathroom(root.transform, tile, wall, glass, metal, stone);
             BuildLighting(root.transform, metal, warmGlow);
             BuildArchitecturalDetails(root.transform, trim, metal, accent);
+            CombineDecorativeGeometry(root.transform);
 
             return root;
         }
@@ -217,6 +219,53 @@ namespace UCENO.VirtualWorld
                 new Vector3(.32f, .08f, 2.8f), trim, false);
             AddBox(root, "Entry wall metal reveal", new Vector3(-5.84f, 1.8f, -3.1f),
                 new Vector3(.05f, 2.2f, .06f), metal, false);
+        }
+
+        private static void CombineDecorativeGeometry(Transform root)
+        {
+            // Merge collider-free architectural details by shared material. This
+            // retains the authored appearance while avoiding hundreds of tiny
+            // renderers and draw calls for every streamed residential interior.
+            var batches = new Dictionary<Material, List<CombineInstance>>();
+            var sourceObjects = new List<GameObject>();
+            foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
+            {
+                MeshRenderer renderer = filter.GetComponent<MeshRenderer>();
+                if (filter.sharedMesh == null || renderer == null ||
+                    filter.GetComponent<Collider>() != null || renderer.sharedMaterial == null)
+                    continue;
+
+                Material material = renderer.sharedMaterial;
+                if (!batches.TryGetValue(material, out List<CombineInstance> instances))
+                {
+                    instances = new List<CombineInstance>();
+                    batches.Add(material, instances);
+                }
+                instances.Add(new CombineInstance
+                {
+                    mesh = filter.sharedMesh,
+                    transform = root.worldToLocalMatrix * filter.transform.localToWorldMatrix
+                });
+                sourceObjects.Add(filter.gameObject);
+            }
+
+            foreach (KeyValuePair<Material, List<CombineInstance>> batch in batches)
+            {
+                var combined = new Mesh { name = "UCENO Interior " + batch.Key.name + " Batch" };
+                int vertexCount = 0;
+                foreach (CombineInstance instance in batch.Value)
+                    vertexCount += instance.mesh.vertexCount;
+                if (vertexCount > 65535) combined.indexFormat = IndexFormat.UInt32;
+                combined.CombineMeshes(batch.Value.ToArray(), true, true, false);
+
+                GameObject batchObject = new GameObject("Interior Batch - " + batch.Key.name);
+                batchObject.transform.SetParent(root, false);
+                batchObject.AddComponent<MeshFilter>().sharedMesh = combined;
+                batchObject.AddComponent<MeshRenderer>().sharedMaterial = batch.Key;
+            }
+
+            foreach (GameObject source in sourceObjects)
+                if (source != null) Object.Destroy(source);
         }
 
         private static void CreatePointLight(Transform parent, string name, Vector3 position,
