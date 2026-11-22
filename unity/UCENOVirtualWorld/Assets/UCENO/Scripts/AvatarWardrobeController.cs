@@ -33,6 +33,8 @@ namespace UCENO.VirtualWorld
             new HashSet<AsyncOperationHandle<GameObject>>();
         private readonly HashSet<AsyncOperationHandle<GameObject>> inFlightAddressableHandles =
             new HashSet<AsyncOperationHandle<GameObject>>();
+        private readonly Dictionary<AvatarWardrobeSlot, int> equipRequestGenerations =
+            new Dictionary<AvatarWardrobeSlot, int>();
         private Dictionary<string, Transform> avatarBones;
         private readonly HashSet<string> ambiguousAvatarBones = new HashSet<string>(StringComparer.Ordinal);
 
@@ -53,8 +55,28 @@ namespace UCENO.VirtualWorld
         public bool TryEquip(string itemId, out string error) =>
             TryEquip(itemId, null, out error);
 
-        public bool TryEquip(string itemId, string expectedPrefabKey, out string error) =>
-            TryEquipInternal(itemId, expectedPrefabKey, out error, false);
+        public bool TryEquip(string itemId, string expectedPrefabKey, out string error)
+        {
+            InvalidatePendingEquipForItem(itemId);
+            return TryEquipInternal(itemId, expectedPrefabKey, out error, false);
+        }
+
+        private int NextEquipRequestGeneration(AvatarWardrobeSlot slot)
+        {
+            int next = equipRequestGenerations.TryGetValue(slot, out int current) ? current + 1 : 1;
+            equipRequestGenerations[slot] = next;
+            return next;
+        }
+
+        private bool IsCurrentEquipRequest(AvatarWardrobeSlot slot, int generation) =>
+            equipRequestGenerations.TryGetValue(slot, out int current) && current == generation;
+
+        private void InvalidatePendingEquipForItem(string itemId)
+        {
+            if (catalog != null && catalog.TryGet(itemId, out AvatarWardrobeItemDefinition item) &&
+                Enum.IsDefined(typeof(AvatarWardrobeSlot), item.slot))
+                NextEquipRequestGeneration(item.slot);
+        }
 
         private bool TryEquipInternal(string itemId, string expectedPrefabKey, out string error, bool forceRebuild)
         {
@@ -194,11 +216,21 @@ namespace UCENO.VirtualWorld
         public void EquipAddressable(string itemId, string expectedAddressableKey, int assetVersion,
             Action<bool, string> completed, Func<bool> applyGuard = null)
         {
-            StartCoroutine(EquipAddressableRoutine(itemId, expectedAddressableKey, assetVersion, completed, applyGuard));
+            int requestGeneration = 0;
+            AvatarWardrobeSlot requestedSlot = default;
+            if (catalog != null && catalog.TryGet(itemId, out AvatarWardrobeItemDefinition requestedItem) &&
+                Enum.IsDefined(typeof(AvatarWardrobeSlot), requestedItem.slot))
+            {
+                requestedSlot = requestedItem.slot;
+                requestGeneration = NextEquipRequestGeneration(requestedSlot);
+            }
+            StartCoroutine(EquipAddressableRoutine(itemId, expectedAddressableKey, assetVersion,
+                completed, applyGuard, requestedSlot, requestGeneration));
         }
 
         private IEnumerator EquipAddressableRoutine(string itemId, string expectedAddressableKey,
-            int assetVersion, Action<bool, string> completed, Func<bool> applyGuard)
+            int assetVersion, Action<bool, string> completed, Func<bool> applyGuard,
+            AvatarWardrobeSlot requestedSlot, int requestGeneration)
         {
             if (catalog == null || !catalog.TryGet(itemId, out AvatarWardrobeItemDefinition item) ||
                 !Enum.IsDefined(typeof(AvatarWardrobeSlot), item.slot))
@@ -212,9 +244,10 @@ namespace UCENO.VirtualWorld
                 completed?.Invoke(false, "Wardrobe Addressables key or asset version is invalid.");
                 yield break;
             }
-            if (applyGuard != null && !applyGuard())
+            if ((requestGeneration > 0 && !IsCurrentEquipRequest(requestedSlot, requestGeneration)) ||
+                (applyGuard != null && !applyGuard()))
             {
-                completed?.Invoke(false, "Wardrobe equip was cancelled because the active account changed.");
+                completed?.Invoke(false, "Wardrobe equip was cancelled because a newer selection or account change superseded it.");
                 yield break;
             }
             if (addressablePrefabs.TryGetValue(item.itemId, out GameObject cached) && cached != null &&
@@ -233,10 +266,11 @@ namespace UCENO.VirtualWorld
             inFlightAddressableHandles.Add(handle);
             yield return handle;
             inFlightAddressableHandles.Remove(handle);
-            if (applyGuard != null && !applyGuard())
+            if ((requestGeneration > 0 && !IsCurrentEquipRequest(requestedSlot, requestGeneration)) ||
+                (applyGuard != null && !applyGuard()))
             {
                 if (handle.IsValid()) Addressables.Release(handle);
-                completed?.Invoke(false, "Wardrobe equip was cancelled because the active account changed.");
+                completed?.Invoke(false, "Wardrobe equip was cancelled because a newer selection or account change superseded it.");
                 yield break;
             }
             if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
@@ -303,6 +337,7 @@ namespace UCENO.VirtualWorld
 
         public void Unequip(AvatarWardrobeSlot slot)
         {
+            NextEquipRequestGeneration(slot);
             string previousItemId = equippedIds.TryGetValue(slot, out string previousId)
                 ? previousId : null;
             if (equippedObjects.TryGetValue(slot, out GameObject previous) && previous != null)
