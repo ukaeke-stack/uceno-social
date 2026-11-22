@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decideCitizenAction } from "../src/ai-citizen-policy.js";
+import { decideCitizenAction } from "../dist/ai-citizen-policy.js";
 
 const base = {
   disclosedAsAi: true,
