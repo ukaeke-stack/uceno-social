@@ -115,22 +115,25 @@ namespace UCENO.VirtualWorld
                 yield break;
             }
 
+            pendingAddressableSlots.Add(item.slot);
+            bool deliveryFinished = false;
             bool contentReady = false;
             string deliveryError = null;
             delivery.EnsureContent(item.deliveryLabel, (ok, message) =>
             {
                 contentReady = ok;
                 deliveryError = message;
+                deliveryFinished = true;
             });
-            while (!contentReady && deliveryError == null) yield return null;
+            while (!deliveryFinished) yield return null;
             if (!contentReady)
             {
+                pendingAddressableSlots.Remove(item.slot);
                 completed?.Invoke(false, "Wardrobe content delivery failed: " +
                     (string.IsNullOrEmpty(deliveryError) ? "unknown delivery error." : deliveryError));
                 yield break;
             }
 
-            pendingAddressableSlots.Add(item.slot);
             AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(item.addressableKey);
             pendingAddressableHandles[item.slot] = handle;
             yield return handle;
