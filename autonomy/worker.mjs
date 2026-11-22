@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile, appendFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { assertWorkBranch, buildPushRefspec, codexEnvironment, failureBackoffMs, gitAuthEnvironment, parseLinuxProcessStartTicks, reserveDailyCycle } from "./worker-policy.mjs";
+import { assertWorkBranch, buildPushRefspec, codexEnvironment, failureBackoffMs, gitAuthEnvironment, isLiveWorkerLockOwner, parseLinuxProcessStartTicks, reserveDailyCycle } from "./worker-policy.mjs";
 import { readFile as readProcFile } from "node:fs/promises";
 
 const cfg = {
@@ -149,15 +149,16 @@ async function main() {
   if (existsSync(lock)) {
     let owner = null;
     try { owner = JSON.parse(await readFile(lock, "utf8")); } catch {}
-    if (owner?.pid && owner?.startTicks) {
-      const currentStartTicks = await processStartTicks(owner.pid);
-      if (currentStartTicks && currentStartTicks === owner.startTicks) {
-        throw new Error("another worker process appears active (pid " + owner.pid + ")");
-      }
+    const currentStartTicks = owner?.pid ? await processStartTicks(owner.pid) : null;
+    const processExists = pid => {
+      try { process.kill(pid, 0); return true; }
+      catch (error) { return error?.code === "EPERM"; }
+    };
+    if (isLiveWorkerLockOwner(owner, currentStartTicks, processExists)) {
+      throw new Error("another worker process appears active (pid " + owner.pid + ")");
     }
-    // A PID can be reused after a container restart. Only a matching Linux
-    // process start-time token proves that the recorded owner is still alive.
-    await rm(lock, { force: true });
+    // A dead PID or a reused PID with a different start-time token is stale.
+    // If /proc is temporarily unavailable, a live PID is preserved conservatively.
   }
   const startTicks = await processStartTicks(process.pid);
   await writeFile(lock, JSON.stringify({ pid: process.pid, startTicks, startedAt: new Date().toISOString() }), { flag: "wx" });
