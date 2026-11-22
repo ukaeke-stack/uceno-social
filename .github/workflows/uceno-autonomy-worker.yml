@@ -32,4 +32,4 @@ jobs:
       - name: Build worker image
         run: docker build -f autonomy/Dockerfile -t uceno-autonomous-worker:ci .
       - name: Smoke-test worker image dependency resolution
-        run: docker run --rm --entrypoint node uceno-autonomous-worker:ci --input-type=module -e "await import('/opt/uceno-worker/worker-policy.mjs')"
+        run: docker run --rm --entrypoint node uceno-autonomous-worker:ci --input-type=module -e "await Promise.all([import('/opt/uceno-worker/worker-policy.mjs'), import('/opt/uceno-worker/process-runner.mjs')])"
