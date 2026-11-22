@@ -9,7 +9,6 @@ import hashlib
 import json
 import pathlib
 import struct
-from collections import defaultdict
 
 ROOT = pathlib.Path("artifacts")
 TEVY = ROOT / "tevy-city-architecture" / "tevy-acquisition-manifest.json"
@@ -160,12 +159,12 @@ def main():
         "3dassets_textured_models": sum(x["3dassets_textured_count"] for x in report["cities"].values()),
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(report, indent=2) + "\\n")
+    OUT.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report["totals"], sort_keys=True))
     for city, value in report["cities"].items():
         print(
             f"{city}: Tevy {value['tevy_model_count']} models/"
-            f"{value['tevy_textured_lod0']} textured LOD0; "
+            f"{value['tevy_textured_lod0_count']} textured LOD0; "
             f"3DAssets {value['3dassets_model_count']} models/"
             f"{value['3dassets_textured_count']} textured"
         )
