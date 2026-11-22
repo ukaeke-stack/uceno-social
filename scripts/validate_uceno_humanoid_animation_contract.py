@@ -139,9 +139,13 @@ for token in (
     "renderer.bones = mappedBones",
     "expectedAssetVersion",
     "item.assetVersion != expectedAssetVersion",
+    "item.deliveryLabel",
+    "delivery.EnsureContent(item.deliveryLabel",
+    "while (!deliveryFinished) yield return null;",
+    "World content delivery service is unavailable.",
 ):
     require(token in wardrobe_controller, "wardrobe Addressables loader is missing: " + token)
-for token in ("addressableKey", "assetVersion"):
+for token in ("addressableKey", "deliveryLabel", "assetVersion"):
     require(token in wardrobe_catalog, "wardrobe catalogue is missing versioned field: " + token)
 require("owned.assetVersion" in wardrobe_sync and
         "controller.EquipAddressable(itemId, owned.prefabKey" in wardrobe_sync and
