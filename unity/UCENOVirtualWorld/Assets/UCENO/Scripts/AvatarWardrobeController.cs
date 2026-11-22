@@ -25,6 +25,8 @@ namespace UCENO.VirtualWorld
             new Dictionary<AvatarWardrobeSlot, string>();
         private readonly Dictionary<string, GameObject> addressablePrefabs =
             new Dictionary<string, GameObject>(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> addressableVersions =
+            new Dictionary<string, int>(StringComparer.Ordinal);
         private readonly Dictionary<string, AsyncOperationHandle<GameObject>> addressableHandles =
             new Dictionary<string, AsyncOperationHandle<GameObject>>(StringComparer.Ordinal);
         private Dictionary<string, Transform> avatarBones;
@@ -47,7 +49,10 @@ namespace UCENO.VirtualWorld
         public bool TryEquip(string itemId, out string error) =>
             TryEquip(itemId, null, out error);
 
-        public bool TryEquip(string itemId, string expectedPrefabKey, out string error)
+        public bool TryEquip(string itemId, string expectedPrefabKey, out string error) =>
+            TryEquipInternal(itemId, expectedPrefabKey, out error, false);
+
+        private bool TryEquipInternal(string itemId, string expectedPrefabKey, out string error, bool forceRebuild)
         {
             error = null;
             if (catalog == null)
@@ -68,7 +73,8 @@ namespace UCENO.VirtualWorld
                 error = "The local wardrobe asset key does not match the server catalogue.";
                 return false;
             }
-            if (equippedIds.TryGetValue(item.slot, out string alreadyEquipped) &&
+            if (!forceRebuild &&
+                equippedIds.TryGetValue(item.slot, out string alreadyEquipped) &&
                 alreadyEquipped == item.itemId &&
                 equippedObjects.TryGetValue(item.slot, out GameObject existingObject) && existingObject != null)
                 return true;
@@ -202,7 +208,8 @@ namespace UCENO.VirtualWorld
                 completed?.Invoke(false, "Wardrobe Addressables key or asset version is invalid.");
                 yield break;
             }
-            if (addressablePrefabs.TryGetValue(item.itemId, out GameObject cached) && cached != null)
+            if (addressablePrefabs.TryGetValue(item.itemId, out GameObject cached) && cached != null &&
+                addressableVersions.TryGetValue(item.itemId, out int cachedVersion) && cachedVersion == assetVersion)
             {
                 bool equipped = TryEquip(itemId, expectedAddressableKey, out string cachedError);
                 completed?.Invoke(equipped, cachedError);
@@ -220,17 +227,39 @@ namespace UCENO.VirtualWorld
                 yield break;
             }
 
+            bool hadPrevious = addressableHandles.TryGetValue(item.itemId,
+                out AsyncOperationHandle<GameObject> previousHandle);
             addressablePrefabs[item.itemId] = handle.Result;
+            addressableVersions[item.itemId] = assetVersion;
             addressableHandles[item.itemId] = handle;
-            if (!TryEquip(itemId, expectedAddressableKey, out string error))
+            if (!TryEquipInternal(itemId, expectedAddressableKey, out string error, true))
             {
-                addressablePrefabs.Remove(item.itemId);
-                addressableHandles.Remove(item.itemId);
+                if (hadPrevious)
+                {
+                    addressablePrefabs[item.itemId] = cached;
+                    addressableHandles[item.itemId] = previousHandle;
+                    addressableVersions.TryGetValue(item.itemId, out int oldVersion);
+                    if (oldVersion == assetVersion) addressableVersions.Remove(item.itemId);
+                }
+                else
+                {
+                    addressablePrefabs.Remove(item.itemId);
+                    addressableVersions.Remove(item.itemId);
+                    addressableHandles.Remove(item.itemId);
+                }
                 if (handle.IsValid()) Addressables.Release(handle);
                 completed?.Invoke(false, error);
                 yield break;
             }
+            if (hadPrevious && previousHandle.IsValid())
+                StartCoroutine(ReleasePreviousAddressableHandle(previousHandle));
             completed?.Invoke(true, null);
+        }
+
+        private IEnumerator ReleasePreviousAddressableHandle(AsyncOperationHandle<GameObject> handle)
+        {
+            yield return null;
+            if (handle.IsValid()) Addressables.Release(handle);
         }
 
         private void OnDestroy()
@@ -238,6 +267,7 @@ namespace UCENO.VirtualWorld
             foreach (AsyncOperationHandle<GameObject> handle in addressableHandles.Values)
                 if (handle.IsValid()) Addressables.Release(handle);
             addressableHandles.Clear();
+            addressableVersions.Clear();
             addressablePrefabs.Clear();
         }
 
@@ -261,6 +291,7 @@ namespace UCENO.VirtualWorld
             yield return null;
             if (equippedIds.ContainsValue(itemId)) yield break;
             addressablePrefabs.Remove(itemId);
+            addressableVersions.Remove(itemId);
             if (addressableHandles.TryGetValue(itemId, out AsyncOperationHandle<GameObject> handle))
             {
                 addressableHandles.Remove(itemId);
