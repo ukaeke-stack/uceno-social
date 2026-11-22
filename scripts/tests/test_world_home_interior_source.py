@@ -56,7 +56,7 @@ class HomeInteriorSourceContractTests(unittest.TestCase):
     def test_decorative_geometry_is_batched_for_mobile_rendering(self):
         self.assertIn("CombineDecorativeGeometry(root.transform)", CODE)
         batch = method_body("CombineDecorativeGeometry")
-        self.assertIn("Mesh.CombineMeshes", batch)
+        self.assertIn("combined.CombineMeshes", batch)
         self.assertIn("filter.GetComponent<Collider>().enabled", batch)
 
     def test_no_per_home_material_allocation_when_cached(self):
