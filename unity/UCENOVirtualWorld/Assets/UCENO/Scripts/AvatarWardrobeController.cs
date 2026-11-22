@@ -30,6 +30,7 @@ namespace UCENO.VirtualWorld
         private readonly HashSet<AvatarWardrobeSlot> pendingAddressableSlots =
             new HashSet<AvatarWardrobeSlot>();
         private Dictionary<string, Transform> avatarBones;
+        private HashSet<string> ambiguousAvatarBoneNames;
 
         public event Action<AvatarWardrobeSlot, string> EquippedChanged;
 
@@ -190,14 +191,48 @@ namespace UCENO.VirtualWorld
                     error = "Wardrobe mesh is missing its mesh or bone weights.";
                     return false;
                 }
+                Matrix4x4[] bindposes = renderer.sharedMesh.bindposes;
+                if (bindposes == null || bindposes.Length != renderer.bones.Length)
+                {
+                    error = "Wardrobe mesh bind-pose count does not match its bone array.";
+                    return false;
+                }
+                for (int bindposeIndex = 0; bindposeIndex < bindposes.Length; bindposeIndex++)
+                {
+                    Matrix4x4 bindpose = bindposes[bindposeIndex];
+                    for (int element = 0; element < 16; element++)
+                    {
+                        float value = bindpose[element];
+                        if (float.IsNaN(value) || float.IsInfinity(value))
+                        {
+                            error = "Wardrobe mesh contains a non-finite bind-pose matrix.";
+                            return false;
+                        }
+                    }
+                    if (Mathf.Abs(bindpose.determinant) < 0.0000001f)
+                    {
+                        error = "Wardrobe mesh contains a singular bind-pose matrix.";
+                        return false;
+                    }
+                }
                 Transform[] mappedBones = new Transform[renderer.bones.Length];
                 for (int i = 0; i < renderer.bones.Length; i++)
                 {
                     Transform sourceBone = renderer.bones[i];
-                    if (sourceBone == null || !avatarBones.TryGetValue(sourceBone.name, out mappedBones[i]))
+                    if (sourceBone == null)
                     {
-                        error = "Avatar rig is missing garment bone: " +
-                            (sourceBone == null ? "(null)" : sourceBone.name);
+                        error = "Wardrobe mesh contains a null bone reference.";
+                        return false;
+                    }
+                    if (ambiguousAvatarBoneNames != null && ambiguousAvatarBoneNames.Contains(sourceBone.name))
+                    {
+                        error = "Avatar rig contains duplicate bone names; refusing ambiguous garment binding: " +
+                            sourceBone.name;
+                        return false;
+                    }
+                    if (!avatarBones.TryGetValue(sourceBone.name, out mappedBones[i]))
+                    {
+                        error = "Avatar rig is missing garment bone: " + sourceBone.name;
                         return false;
                     }
                 }
@@ -382,9 +417,19 @@ namespace UCENO.VirtualWorld
         private void RebuildBoneMap()
         {
             avatarBones = new Dictionary<string, Transform>(StringComparer.Ordinal);
+            ambiguousAvatarBoneNames = new HashSet<string>(StringComparer.Ordinal);
             Transform root = avatarAnimator != null ? avatarAnimator.transform : transform;
             foreach (Transform bone in root.GetComponentsInChildren<Transform>(true))
-                if (!avatarBones.ContainsKey(bone.name)) avatarBones.Add(bone.name, bone);
+            {
+                if (ambiguousAvatarBoneNames.Contains(bone.name)) continue;
+                if (avatarBones.ContainsKey(bone.name))
+                {
+                    avatarBones.Remove(bone.name);
+                    ambiguousAvatarBoneNames.Add(bone.name);
+                    continue;
+                }
+                avatarBones.Add(bone.name, bone);
+            }
         }
     }
 }
