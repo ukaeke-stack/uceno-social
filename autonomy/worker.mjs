@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile, appendFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { readFile as readProcFile } from "node:fs/promises";
 
 const cfg = {
   repo: process.env.REPO_URL || "https://github.com/ukaeke-stack/uceno-social.git",
@@ -46,6 +47,13 @@ async function loadState() {
   catch { return { day: new Date().toISOString().slice(0, 10), cycles: 0, completed: 0, failed: 0, lastCommit: null }; }
 }
 async function saveState(state) { await writeFile(stateFile, JSON.stringify(state, null, 2)); }
+async function processStartTicks(pid) {
+  try {
+    const stat = await readProcFile("/proc/" + pid + "/stat", "utf8");
+    const fields = stat.slice(stat.lastIndexOf(")") + 2).trim().split(/\s+/);
+    return fields[19] || null; // Linux stat field 22: process start time.
+  } catch { return null; }
+}
 async function git(args, timeout = 120000) {
   const auth = cfg.repoToken ? ["-c", "http.extraheader=AUTHORIZATION: basic " + Buffer.from("x-access-token:" + cfg.repoToken).toString("base64")] : [];
   return run("git", [...auth, ...args], { cwd: cfg.workdir, timeout });
@@ -112,13 +120,18 @@ async function main() {
   if (existsSync(lock)) {
     let owner = null;
     try { owner = JSON.parse(await readFile(lock, "utf8")); } catch {}
-    if (owner?.pid) {
-      try { process.kill(owner.pid, 0); throw new Error("another worker process appears active (pid " + owner.pid + ")"); }
-      catch (error) { if (error.message.startsWith("another worker")) throw error; }
+    if (owner?.pid && owner?.startTicks) {
+      const currentStartTicks = await processStartTicks(owner.pid);
+      if (currentStartTicks && currentStartTicks === owner.startTicks) {
+        throw new Error("another worker process appears active (pid " + owner.pid + ")");
+      }
     }
+    // A PID can be reused after a container restart. Only a matching Linux
+    // process start-time token proves that the recorded owner is still alive.
     await rm(lock, { force: true });
   }
-  await writeFile(lock, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }), { flag: "wx" });
+  const startTicks = await processStartTicks(process.pid);
+  await writeFile(lock, JSON.stringify({ pid: process.pid, startTicks, startedAt: new Date().toISOString() }), { flag: "wx" });
   process.on("SIGTERM", async () => { await log("Received SIGTERM; exiting."); process.exit(0); });
   process.on("SIGINT", async () => { await log("Received SIGINT; exiting."); process.exit(0); });
   await log("UCENO autonomous worker started; sequential agent, no production privileges.");
@@ -133,6 +146,9 @@ async function main() {
         continue;
       }
       state.cycles++;
+      // Persist the budget reservation before starting expensive model work so
+      // a crash/restart cannot reset or bypass the daily cycle limit.
+      await saveState(state);
       try { await runCycle(state); state.failed = 0; }
       catch (error) { state.failed++; await log("Cycle failed: " + (error?.stack || error)); }
       await saveState(state);
