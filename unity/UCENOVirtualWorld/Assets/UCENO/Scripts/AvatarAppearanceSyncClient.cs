@@ -49,6 +49,9 @@ namespace UCENO.VirtualWorld
         {
             if (session != null && loadedUserId != session.UserId)
             {
+                StopAllCoroutines();
+                loading = false;
+                saving = false;
                 loaded = false;
                 pendingSave = false;
                 nextSaveAttempt = 0f;
@@ -76,6 +79,7 @@ namespace UCENO.VirtualWorld
         private IEnumerator LoadRoutine()
         {
             loading = true;
+            string requestedUserId = session != null ? session.UserId : null;
             if (session == null || profile == null || !session.IsAuthenticated ||
                 string.IsNullOrEmpty(session.WorldId) || string.IsNullOrEmpty(session.UserId)) { loading = false; yield break; }
             string url = session.ApiBaseUrl.TrimEnd('/') + "/api/worlds/" + UnityWebRequest.EscapeURL(session.WorldId) + "/appearance";
@@ -85,6 +89,7 @@ namespace UCENO.VirtualWorld
                 request.SetRequestHeader("Accept", "application/json");
                 request.timeout = 15;
                 yield return request.SendWebRequest();
+                if (session == null || session.UserId != requestedUserId) { loading = false; yield break; }
                 if (request.result == UnityWebRequest.Result.Success)
                 {
                     AvatarAppearanceResponse response = JsonUtility.FromJson<AvatarAppearanceResponse>(request.downloadHandler.text);
@@ -114,7 +119,8 @@ namespace UCENO.VirtualWorld
         {
             saving = true;
             AvatarAppearanceProfile.Palette palette = initial;
-            while (pendingSave)
+            string requestedUserId = session != null ? session.UserId : null;
+            while (pendingSave && session != null && session.UserId == requestedUserId)
             {
                 pendingSave = false;
                 AvatarAppearancePayload payload = new AvatarAppearancePayload {
@@ -132,6 +138,7 @@ namespace UCENO.VirtualWorld
                     request.SetRequestHeader("Content-Type", "application/json");
                     request.timeout = 15;
                     yield return request.SendWebRequest();
+                    if (session == null || session.UserId != requestedUserId) { saving = false; yield break; }
                     if (request.result != UnityWebRequest.Result.Success)
                     {
                         long status = request.responseCode;
