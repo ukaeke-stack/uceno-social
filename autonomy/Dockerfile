@@ -5,4 +5,6 @@ WORKDIR /opt/uceno-worker
 COPY autonomy/worker.mjs ./worker.mjs
 ENV WORKDIR=/workspace/uceno-social
 ENV STATE_DIR=/state
+ENV HOME=/tmp/home
+ENV XDG_CONFIG_HOME=/tmp/xdg
 CMD ["node", "/opt/uceno-worker/worker.mjs"]
