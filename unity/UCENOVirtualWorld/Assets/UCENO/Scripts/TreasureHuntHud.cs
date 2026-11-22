@@ -233,7 +233,6 @@ namespace UCENO.VirtualWorld
                 GUILayout.Space(8f);
                 GUILayout.Label("ACTIVE CLUES");
                 if (clues.Count == 0) GUILayout.Label("No active personal or team clues.");
-                if (clues.Count == 0) GUILayout.Label("No active personal clues. New hunts appear when schedules are enabled.");
                 foreach (ClueEntry entry in clues)
                 {
                     if (entry == null || entry.clue == null) continue;
