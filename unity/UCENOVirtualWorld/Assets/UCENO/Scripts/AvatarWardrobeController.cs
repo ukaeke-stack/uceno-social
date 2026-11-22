@@ -108,14 +108,31 @@ namespace UCENO.VirtualWorld
                 }
 
                 Transform[] mappedBones = new Transform[renderer.bones.Length];
+                HashSet<string> garmentBoneNames = new HashSet<string>(StringComparer.Ordinal);
+                Matrix4x4[] bindposes = renderer.sharedMesh.bindposes;
+                for (int poseIndex = 0; poseIndex < bindposes.Length; poseIndex++)
+                {
+                    Matrix4x4 pose = bindposes[poseIndex];
+                    for (int element = 0; element < 16; element++)
+                    {
+                        float value = pose[element];
+                        if (float.IsNaN(value) || float.IsInfinity(value))
+                        {
+                            Destroy(instance);
+                            error = "Wardrobe mesh contains a non-finite bind pose.";
+                            return false;
+                        }
+                    }
+                }
                 for (int i = 0; i < renderer.bones.Length; i++)
                 {
                     Transform sourceBone = renderer.bones[i];
-                    if (sourceBone == null || ambiguousAvatarBones.Contains(sourceBone.name) ||
+                    if (sourceBone == null || !garmentBoneNames.Add(sourceBone.name) ||
+                        ambiguousAvatarBones.Contains(sourceBone.name) ||
                         !avatarBones.TryGetValue(sourceBone.name, out mappedBones[i]))
                     {
                         Destroy(instance);
-                        error = "Avatar rig has a missing or ambiguous garment bone: " +
+                        error = "Garment or avatar rig has a duplicate, missing or ambiguous bone: " +
                             (sourceBone == null ? "(null)" : sourceBone.name);
                         return false;
                     }
