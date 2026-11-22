@@ -6,6 +6,17 @@ export function parseLinuxProcessStartTicks(stat) {
   return fields[19] || null;
 }
 
+export function isLiveWorkerLockOwner(owner, currentStartTicks, processExists) {
+  if (!owner || !Number.isSafeInteger(owner.pid) || owner.pid <= 0) return false;
+  if (typeof currentStartTicks === "string" && currentStartTicks.length > 0 &&
+      typeof owner.startTicks === "string" && owner.startTicks.length > 0) {
+    return currentStartTicks === owner.startTicks;
+  }
+  // /proc can be temporarily unreadable or the lock may predate start-time
+  // fencing. Prefer a conservative false-positive over starting a second worker.
+  return typeof processExists === "function" && processExists(owner.pid) === true;
+}
+
 export function reserveDailyCycle(state, now = new Date(), maxCycles = 24) {
   const day = now.toISOString().slice(0, 10);
   const current = state && typeof state === "object" ? { ...state } : {};
