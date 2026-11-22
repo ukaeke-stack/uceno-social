@@ -115,8 +115,15 @@ jobs:
           report="$RUNNER_TEMP/uceno-solsticebay-glb-import-report.json"
           test -s "$report"
           python - "$report" <<'PY'
-          import json, sys
+          import hashlib, json, pathlib, sys
           data = json.load(open(sys.argv[1], encoding="utf-8"))
+          manifests = list(pathlib.Path(sys.argv[1]).parent.joinpath("uceno-city-architecture-source-acquisition").rglob("tevy-acquisition-manifest.json"))
+          if len(manifests) != 1:
+              raise SystemExit(f"Expected exactly one retained acquisition manifest; found {len(manifests)}")
+          manifest_bytes = manifests[0].read_bytes()
+          manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
+          assert data.get("sourceManifestSha256") == manifest_sha, data
+          assert data.get("sourceManifestBytes") == len(manifest_bytes), data
           assert data.get("status") == "technical-import-pass-visual-review-pending", data
           assert data.get("meshCount", 0) > 0, data
           assert data.get("rendererCount", 0) > 0, data
