@@ -15,13 +15,28 @@ function validAssignmentSecret(secret: unknown): secret is string {
 async function ensureRoutes(tx: any, player: PlayerRef, now: number, secret: string): Promise<Hint[]> {
   // Existing assignments are immutable and inserted transactionally. Skip their
   // candidate pools on reconnects and repeat discoveries.
-  const hunts = await tx.unsafe(`SELECT id, title FROM virtual_world_treasure_hunts
+  let hunts = await tx.unsafe(`SELECT id, title FROM virtual_world_treasure_hunts
     WHERE enabled = TRUE AND distribution_mode IN ('personal', 'global')
       AND (world_id IS NULL OR world_id = $1::uuid)
       AND starts_at <= to_timestamp($2) AND ends_at > to_timestamp($2)
       AND NOT EXISTS (SELECT 1 FROM virtual_world_treasure_assignments AS existing
         WHERE existing.hunt_id = virtual_world_treasure_hunts.id AND existing.user_id = $3::uuid)
     ORDER BY starts_at, id LIMIT 20`, [player.worldId, now / 1000, player.id]);
+  // Serialize route creation per (hunt, player), across gateway processes.
+  // The first read above finds candidates cheaply; after acquiring the
+  // transaction-scoped locks, recheck assignments because another process may
+  // have committed while this transaction waited.
+  if (hunts.length) {
+    await tx.unsafe(`SELECT pg_advisory_xact_lock(
+        hashtextextended(hunt_id::text || ':' || $2::text, 0))
+      FROM unnest($1::uuid[]) AS selected(hunt_id)
+      ORDER BY hunt_id`, [hunts.map((hunt: any) => hunt.id), player.id]);
+    hunts = await tx.unsafe(`SELECT id, title FROM virtual_world_treasure_hunts
+      WHERE id = ANY($1::uuid[])
+        AND NOT EXISTS (SELECT 1 FROM virtual_world_treasure_assignments AS existing
+          WHERE existing.hunt_id = virtual_world_treasure_hunts.id AND existing.user_id = $2::uuid)
+      ORDER BY starts_at, id`, [hunts.map((hunt: any) => hunt.id), player.id]);
+  }
   const assignmentHunts: string[] = [];
   const assignmentUsers: string[] = [];
   const assignmentSequences: number[] = [];
