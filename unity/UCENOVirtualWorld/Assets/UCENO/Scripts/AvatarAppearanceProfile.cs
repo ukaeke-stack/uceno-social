@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace UCENO.VirtualWorld
@@ -31,6 +32,8 @@ namespace UCENO.VirtualWorld
         }
 
         private readonly MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+        private readonly List<Renderer> rendererBuffer = new List<Renderer>(16);
+        private readonly List<Material> materialSlots = new List<Material>(8);
 
         [SerializeField] private Palette palette = new Palette
         {
@@ -51,13 +54,17 @@ namespace UCENO.VirtualWorld
         public void Apply(Palette next)
         {
             palette = next;
-            Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
-            foreach (Renderer renderer in renderers)
+            // Reuse hierarchy/material buffers so changing appearance does not
+            // allocate renderer arrays, material arrays or property blocks.
+            rendererBuffer.Clear();
+            GetComponentsInChildren(true, rendererBuffer);
+            foreach (Renderer renderer in rendererBuffer)
             {
-                Material[] materials = renderer.sharedMaterials;
-                for (int slot = 0; slot < materials.Length; slot++)
+                materialSlots.Clear();
+                renderer.GetSharedMaterials(materialSlots);
+                for (int slot = 0; slot < materialSlots.Count; slot++)
                 {
-                    Material material = materials[slot];
+                    Material material = materialSlots[slot];
                     if (material == null) continue;
                     if (!TryResolveColor(material.name, palette, out Color tint)) continue;
 
