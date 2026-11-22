@@ -24,9 +24,9 @@ def sha256_file(path: Path) -> str:
 
 
 def evidence_file(project_root: Path, city_id: str, relative: str, kind: str) -> Path:
-    prefix = f"Assets/UCENO/Cities/{city_id}/Source/"
+    prefix = f"Assets/UCENO/Cities/{city_id}/Source/Editor/"
     if not isinstance(relative, str) or not relative.startswith(prefix):
-        raise ProvenanceError(f"{city_id}: {kind} must be retained under {prefix}")
+        raise ProvenanceError(f"{city_id}: {kind} must be retained under the editor-only folder {prefix}")
     unity_root = (project_root / "unity/UCENOVirtualWorld").resolve()
     candidate = (unity_root / relative).resolve()
     evidence_root = (unity_root / prefix).resolve()
