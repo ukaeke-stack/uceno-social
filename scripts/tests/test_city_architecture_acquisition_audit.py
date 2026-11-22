@@ -42,6 +42,18 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
         self.assertEqual(result["embedded_image_count"], 1)
         self.assertEqual(result["external_image_count"], 1)
 
+    def test_manifest_asset_paths_cannot_escape_acquisition_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory) / "assets"
+            root.mkdir()
+            outside = pathlib.Path(directory) / "outside.glb"
+            outside.write_bytes(b"not an asset")
+            with self.assertRaisesRegex(ValueError, "escapes its acquisition root"):
+                audit.safe_artifact_path(root, "../outside.glb")
+            with self.assertRaisesRegex(ValueError, "Absolute manifest asset path"):
+                audit.safe_artifact_path(root, str(outside))
+            self.assertEqual(audit.safe_artifact_path(root, "city/model.glb"), root / "city" / "model.glb")
+
     def test_rejects_checksum_mismatch(self):
         data = glb({"asset": {"version": "2.0"}})
         with tempfile.TemporaryDirectory() as directory:
