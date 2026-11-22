@@ -9,6 +9,7 @@ README = ASSETS / "Animations/Imported/README.md"
 LOCOMOTION = ASSETS / "Scripts/AvatarLocomotionDriver.cs"
 CROWD_LOD = ASSETS / "Scripts/AvatarCrowdLod.cs"
 APPEARANCE = ASSETS / "Scripts/AvatarAppearanceProfile.cs"
+WARDROBE_HUD = ASSETS / "Scripts/AvatarWardrobeHud.cs"
 EXPRESSIONS = ASSETS / "Scripts/AvatarSocialExpressionDriver.cs"
 ANIMATION_ROOT = ASSETS / "Animations/Imported"
 BASE_AVATAR = ASSETS / "Characters/Imported/UCENO_Default_Avatar.fbx"
@@ -18,7 +19,7 @@ def require(condition: bool, message: str) -> None:
     if not condition:
         raise SystemExit("UCENO humanoid animation source contract failed: " + message)
 
-if not all(path.is_file() for path in (VALIDATOR, README, LOCOMOTION, CROWD_LOD, EXPRESSIONS, APPEARANCE)):
+if not all(path.is_file() for path in (VALIDATOR, README, LOCOMOTION, CROWD_LOD, EXPRESSIONS, APPEARANCE, WARDROBE_HUD)):
     raise SystemExit("UCENO humanoid animation validator, runtime drivers or import instructions are missing.")
 
 source = VALIDATOR.read_text(encoding="utf-8")
@@ -27,6 +28,7 @@ locomotion = LOCOMOTION.read_text(encoding="utf-8")
 crowd_lod = CROWD_LOD.read_text(encoding="utf-8")
 expressions = EXPRESSIONS.read_text(encoding="utf-8")
 appearance = APPEARANCE.read_text(encoding="utf-8")
+wardrobe_hud = WARDROBE_HUD.read_text(encoding="utf-8")
 for token in (
     "AnimationType.Human",
     "AvatarSetup.CopyFromOther",
@@ -115,6 +117,17 @@ require("new MaterialPropertyBlock()" not in apply_body and
         "GetComponentsInChildren<Renderer>" not in apply_body and
         "renderer.sharedMaterials" not in apply_body,
         "avatar appearance Apply must reuse its property block rather than allocate per material slot")
+
+for token in (
+    "inventoryBySlot",
+    "RebuildInventoryIndex()",
+    "items.Clear()",
+    "inventoryBySlot.TryGetValue(item.slot",
+):
+    require(token in wardrobe_hud, "wardrobe inventory is missing cached slot indexing: " + token)
+get_items_body = wardrobe_hud.split("private List<WardrobeInventoryItem> GetItems", 1)[1].split("private void EnsureStyles", 1)[0]
+require("new List<WardrobeInventoryItem>" not in get_items_body,
+        "wardrobe HUD must not allocate a new inventory list on every GUI frame")
 
 fbxs = sorted(p for p in ANIMATION_ROOT.rglob("*.fbx") if p.is_file())
 base_exists = BASE_AVATAR.is_file()
