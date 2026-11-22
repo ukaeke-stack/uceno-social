@@ -30,6 +30,8 @@ namespace UCENO.VirtualWorld
             };
         }
 
+        private readonly MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+
         [SerializeField] private Palette palette = new Palette
         {
             skin = new Color(0.58f, 0.34f, 0.21f, 1f),
@@ -59,20 +61,20 @@ namespace UCENO.VirtualWorld
                     if (material == null) continue;
                     if (!TryResolveColor(material.name, palette, out Color tint)) continue;
 
-                    MaterialPropertyBlock block = new MaterialPropertyBlock();
-                    renderer.GetPropertyBlock(block, slot);
+                    // Reuse one block across all slots; GetPropertyBlock overwrites it.
+                    renderer.GetPropertyBlock(propertyBlock, slot);
                     bool wroteColor = false;
                     if (material.HasProperty("_BaseColor"))
                     {
-                        block.SetColor("_BaseColor", tint);
+                        propertyBlock.SetColor("_BaseColor", tint);
                         wroteColor = true;
                     }
                     if (material.HasProperty("_Color"))
                     {
-                        block.SetColor("_Color", tint);
+                        propertyBlock.SetColor("_Color", tint);
                         wroteColor = true;
                     }
-                    if (wroteColor) renderer.SetPropertyBlock(block, slot);
+                    if (wroteColor) renderer.SetPropertyBlock(propertyBlock, slot);
                 }
             }
         }
