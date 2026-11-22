@@ -106,7 +106,8 @@ export function applyTreasureDiscovery(clues: readonly TreasureClue[], progress:
   if (!Number.isInteger(progress.nextSequence) || progress.nextSequence < 0 ||
       progress.nextSequence > clues.length || !Array.isArray(progress.discoveredClueIds) ||
       progress.discoveredClueIds.length !== progress.nextSequence ||
-      progress.discoveredClueIds.some((id, index) => id !== clues[index]?.id))
+      progress.discoveredClueIds.some((id, index) => id !== clues[index]?.id) ||
+      (progress.completedAt !== null && (!Number.isFinite(progress.completedAt) || progress.completedAt <= 0)))
     return { ok: false, code: "invalid_treasure_progress" };
   if (progress.completedAt !== null) return { ok: false, code: "treasure_hunt_completed" };
   if (!Number.isFinite(discovery.discoveredAt) || discovery.discoveredAt <= 0)
