@@ -93,9 +93,14 @@ namespace UCENO.VirtualWorld
                 }
             }
 
-            Quaternion targetRotation = headBaseRotation * Quaternion.Euler(pitch, yaw, 0f);
+            // Animator has already evaluated the imported Humanoid clip before LateUpdate.
+            // Apply gaze as an additive offset to that frame's animated head pose instead
+            // of resetting the head to its bind pose, which would erase authored talk,
+            // turn and gesture motion whenever social gaze is enabled.
+            Quaternion animatedHeadRotation = head.localRotation;
+            Quaternion targetRotation = animatedHeadRotation * Quaternion.Euler(pitch, yaw, 0f);
             head.localRotation = Quaternion.Slerp(
-                head.localRotation, targetRotation, 1f - Mathf.Exp(-headTurnSpeed * Time.deltaTime));
+                animatedHeadRotation, targetRotation, 1f - Mathf.Exp(-headTurnSpeed * Time.deltaTime));
         }
 
         private void CacheBlinkChannels()
