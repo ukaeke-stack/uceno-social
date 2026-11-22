@@ -10,7 +10,7 @@ const controller = readFileSync(resolve(root, "unity/UCENOVirtualWorld/Assets/UC
 test("wardrobe garments require valid meshes, matching bind poses, bones and root bones", () => {
   assert.match(controller, /renderer\.sharedMesh\.bindposes\.Length != renderer\.bones\.Length/);
   assert.match(controller, /renderer\.rootBone == null/);
-  assert.match(controller, /matching bind poses, bones and a root bone/);
+  assert.match(controller, /matching bind poses, bones and a root bone/);\n  assert.match(controller, /float\\.IsNaN\\(value\\) \\|\\| float\\.IsInfinity\\(value\\)/);
 });
 
 test("ambiguous duplicate avatar bone names fail closed instead of binding to an arbitrary transform", () => {
