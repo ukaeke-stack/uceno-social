@@ -246,8 +246,8 @@ namespace UCENO.VirtualWorld.Editor
             string cityId, string prefabPath, string evidenceKind)
         {
             Require(!string.IsNullOrWhiteSpace(relativePath) &&
-                relativePath.StartsWith(evidenceRoot, StringComparison.Ordinal),
-                cityId + " " + evidenceKind + " must be retained under " + evidenceRoot + " for " + prefabPath);
+                relativePath.StartsWith(evidenceRoot + "Editor/", StringComparison.Ordinal),
+                cityId + " " + evidenceKind + " must be retained under the editor-only " + evidenceRoot + "Editor/ folder for " + prefabPath);
             string absolutePath = AssetAbsolutePath(relativePath);
             string absoluteRoot = AssetAbsolutePath(evidenceRoot).TrimEnd(Path.DirectorySeparatorChar) +
                 Path.DirectorySeparatorChar;
