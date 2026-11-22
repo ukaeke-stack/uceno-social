@@ -54,6 +54,44 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                 audit.safe_artifact_path(root, str(outside))
             self.assertEqual(audit.safe_artifact_path(root, "city/model.glb"), root / "city" / "model.glb")
 
+    def test_rejects_non_json_first_chunk(self):
+        data = b"glTF" + struct.pack("<II", 2, 20) + struct.pack("<II", 0, 0)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "wrong-first-chunk.glb"
+            path.write_bytes(data)
+            with self.assertRaisesRegex(ValueError, "first GLB chunk must be JSON"):
+                audit.inspect_glb(path)
+
+    def test_rejects_unaligned_chunk_length(self):
+        payload = b'{"asset":{"version":"2.0"}}'
+        data = b"glTF" + struct.pack("<II", 2, 20 + 8 + len(payload))
+        data += struct.pack("<II", len(payload), 0x4E4F534A) + payload
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "unaligned.glb"
+            path.write_bytes(data)
+            with self.assertRaisesRegex(ValueError, "4-byte aligned"):
+                audit.inspect_glb(path)
+
+    def test_rejects_more_than_two_chunks(self):
+        data = glb({"asset": {"version": "2.0"}})
+        extra = struct.pack("<II", 4, 0x004E4942) + b"\\x00" * 4
+        third = struct.pack("<II", 4, 0x004E4942) + b"\\x00" * 4
+        data = data[:-0] + extra + third
+        data = data[:8] + struct.pack("<I", len(data)) + data[12:]
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "extra-chunks.glb"
+            path.write_bytes(data)
+            with self.assertRaisesRegex(ValueError, "more than two chunks"):
+                audit.inspect_glb(path)
+
+    def test_rejects_oversized_file_before_reading_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "oversized.glb"
+            with path.open("wb") as stream:
+                stream.truncate(audit.MAX_BYTES + 1)
+            with self.assertRaisesRegex(ValueError, "invalid GLB header or size"):
+                audit.inspect_glb(path)
+
     def test_rejects_checksum_mismatch(self):
         data = glb({"asset": {"version": "2.0"}})
         with tempfile.TemporaryDirectory() as directory:
