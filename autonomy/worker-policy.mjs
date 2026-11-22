@@ -17,17 +17,33 @@ export function isLiveWorkerLockOwner(owner, currentStartTicks, processExists) {
   return typeof processExists === "function" && processExists(owner.pid) === true;
 }
 
+export function validateWorkerState(state) {
+  if (!state || typeof state !== "object" || Array.isArray(state)) {
+    throw new Error("worker state must be a JSON object");
+  }
+  if (typeof state.day !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(state.day) ||
+      new Date(state.day + "T00:00:00.000Z").toISOString().slice(0, 10) !== state.day) {
+    throw new Error("worker state day is invalid");
+  }
+  for (const field of ["cycles", "completed", "failed"]) {
+    if (!Number.isSafeInteger(state[field]) || state[field] < 0) {
+      throw new Error("worker state " + field + " counter is invalid");
+    }
+  }
+  if (state.lastCommit !== undefined && state.lastCommit !== null &&
+      typeof state.lastCommit !== "string") {
+    throw new Error("worker state lastCommit is invalid");
+  }
+  return { ...state, lastCommit: state.lastCommit ?? null };
+}
+
 export function reserveDailyCycle(state, now = new Date(), maxCycles = 24) {
   const day = now.toISOString().slice(0, 10);
-  const current = state && typeof state === "object" ? { ...state } : {};
+  const current = validateWorkerState(state);
   if (current.day !== day) {
     current.day = day;
     current.cycles = 0;
   }
-  current.cycles = Number.isInteger(current.cycles) && current.cycles >= 0 ? current.cycles : 0;
-  current.completed = Number.isInteger(current.completed) ? current.completed : 0;
-  current.failed = Number.isInteger(current.failed) ? current.failed : 0;
-  current.lastCommit = current.lastCommit ?? null;
   if (current.cycles >= maxCycles) return { allowed: false, state: current };
   current.cycles += 1;
   return { allowed: true, state: current };
