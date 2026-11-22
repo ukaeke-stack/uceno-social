@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   assertWorkBranch, buildPushRefspec, codexEnvironment, failureBackoffMs,
-  gitAuthEnvironment, isLiveWorkerLockOwner, parseLinuxProcessStartTicks, reserveDailyCycle
+  gitAuthEnvironment, isLiveWorkerLockOwner, parseLinuxProcessStartTicks, reserveDailyCycle, validateWorkerState
 } from "./worker-policy.mjs";
 
 test("process start-time parser handles spaces and parentheses in Linux process names", () => {
@@ -45,6 +45,26 @@ test("daily reservation refuses work at the configured limit without incrementin
   const result = reserveDailyCycle({ day: "2026-11-22", cycles: 2, completed: 1, failed: 0 }, new Date("2026-11-22T12:00:00Z"), 2);
   assert.equal(result.allowed, false);
   assert.equal(result.state.cycles, 2);
+});
+
+test("worker state validation rejects corrupted quota counters instead of resetting them", () => {
+  assert.throws(() => validateWorkerState({
+    day: "2026-11-22", cycles: -1, completed: 0, failed: 0
+  }), /cycles counter is invalid/);
+  assert.throws(() => validateWorkerState({
+    day: "2026-11-22", cycles: 24, completed: 0, failed: "broken"
+  }), /failed counter is invalid/);
+  assert.throws(() => validateWorkerState({
+    day: "2026-99-99", cycles: 24, completed: 0, failed: 0
+  }));
+});
+
+test("valid worker state preserves its daily reservation and commit marker", () => {
+  const state = validateWorkerState({
+    day: "2026-11-22", cycles: 24, completed: 3, failed: 1, lastCommit: "abc123"
+  });
+  assert.equal(state.cycles, 24);
+  assert.equal(state.lastCommit, "abc123");
 });
 
 test("Codex receives an explicit environment allowlist, not inherited process secrets", () => {
