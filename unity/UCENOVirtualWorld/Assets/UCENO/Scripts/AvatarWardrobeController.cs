@@ -25,6 +25,8 @@ namespace UCENO.VirtualWorld
             new Dictionary<AvatarWardrobeSlot, string>();
         private readonly Dictionary<AvatarWardrobeSlot, AsyncOperationHandle<GameObject>> addressableHandles =
             new Dictionary<AvatarWardrobeSlot, AsyncOperationHandle<GameObject>>();
+        private readonly Dictionary<AvatarWardrobeSlot, AsyncOperationHandle<GameObject>> pendingAddressableHandles =
+            new Dictionary<AvatarWardrobeSlot, AsyncOperationHandle<GameObject>>();
         private readonly HashSet<AvatarWardrobeSlot> pendingAddressableSlots =
             new HashSet<AvatarWardrobeSlot>();
         private Dictionary<string, Transform> avatarBones;
@@ -103,7 +105,9 @@ namespace UCENO.VirtualWorld
 
             pendingAddressableSlots.Add(item.slot);
             AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(item.addressableKey);
+            pendingAddressableHandles[item.slot] = handle;
             yield return handle;
+            pendingAddressableHandles.Remove(item.slot);
             if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
             {
                 if (handle.IsValid()) Addressables.Release(handle);
@@ -194,7 +198,10 @@ namespace UCENO.VirtualWorld
         {
             foreach (AsyncOperationHandle<GameObject> handle in addressableHandles.Values)
                 if (handle.IsValid()) Addressables.Release(handle);
+            foreach (AsyncOperationHandle<GameObject> handle in pendingAddressableHandles.Values)
+                if (handle.IsValid()) Addressables.Release(handle);
             addressableHandles.Clear();
+            pendingAddressableHandles.Clear();
         }
 
         public bool TryEquip(string itemId, out string error) =>
