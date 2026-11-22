@@ -268,6 +268,7 @@ def main():
         "source.licenseFileSha256",
         "ResolveEvidencePath(source.sourceArchive, evidenceRoot",
         "ResolveEvidencePath(source.licenseFile, evidenceRoot",
+        'relativePath.StartsWith(evidenceRoot + "Editor/", StringComparison.Ordinal)',
         "ComputeSha256(archivePath)",
         "ComputeSha256(licensePath)",
         "licenseText.IndexOf(license, StringComparison.OrdinalIgnoreCase)",
