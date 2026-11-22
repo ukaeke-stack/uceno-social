@@ -7,11 +7,11 @@ Repository: `ukaeke-stack/uceno-social`
 This ledger distinguishes source implementation from CI, deployment, and device verification. A source file or passing unit test is not evidence of production readiness.
 
 ## Latest verified repository state
-- PR #46 is open, draft, and unmerged. Its head before the current HUD-only follow-up was `d4b693385a9cbba3d944bf8e28a9a589a91d25ca`.
-- That head passed all three PR workflows: World Gateway Activity Tests (run 44995628661), UCENO World Gateway Tests (44995628698), and UCENO World Gateway and Unity Client (44995628706).
-- Verified jobs: activity TypeScript compile/tests; gateway policy/session tests; gateway TypeScript build; PostgreSQL fencing and real-process failover tests; Unity source validation; and root web build. All completed successfully.
-- A follow-up Unity HUD source change removes a duplicated empty-clue message. It is committed after the verified head and awaits its own latest-head CI result.
+- PR #46 is open, draft, and unmerged. Latest verified head: `91f901d0964ebb600953868ee17dc3f502b28080`.
+- All three PR workflows passed on that exact head (2026-11-22): World Gateway Tests run `45036981801`, World Gateway and Unity Client run `45036981812`, and World Gateway Activity Tests run `45036981781`.
+- Verified coverage includes gateway builds/policy/session tests, PostgreSQL fencing and real-process failover tests, activity TypeScript compile/tests, Unity source validation and root web build. The immediately preceding treasure concurrency implementation exposed two stale unit-test mocks; those mocks were updated in `91f901d`, and the three workflows now pass.
 - The latest verified CI does not establish Unity Editor compilation, imported asset quality, scene correctness, Addressables publication, CDN delivery, or Android device behavior.
+- Repository inventory inspection on 2026-11-22 confirmed nine city-specific HDRI `.hdr` files and provenance JSON files under `Assets/UCENO/Cities/<city>/Textures/Skybox/`. The nine city folders currently expose only their `Textures` directory; no city `Prefabs` directory or imported city scene assets were present in those folders. HDRI presence is verified; the 108-prefab imported-art requirement remains unmet.
 
 ## Release constraints
 - Keep PR #46 draft, open, and unmerged until its full review and release gates pass.
