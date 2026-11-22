@@ -144,8 +144,15 @@ for token in (
 for token in ("addressableKey", "assetVersion"):
     require(token in wardrobe_catalog, "wardrobe catalogue is missing versioned field: " + token)
 require("owned.assetVersion" in wardrobe_sync and
-        "controller.EquipAddressable(itemId, owned.prefabKey" in wardrobe_sync,
-        "account wardrobe sync must validate the server prefab key and asset version")
+        "controller.EquipAddressable(itemId, owned.prefabKey" in wardrobe_sync and
+        "EquipCompleted?.Invoke(itemId, true, null)" in wardrobe_sync and
+        "EquipCompleted?.Invoke(itemId, false, message)" in wardrobe_sync and
+        "Never substitute a Resources prefab" in wardrobe_sync,
+        "account wardrobe sync must validate versioned assets and report definitive asynchronous results")
+require("sync.EquipCompleted += OnEquipCompleted" in wardrobe_hud and
+        'status = "Loading " + items[index].displayName + "...";' in wardrobe_hud and
+        "Equip failed:" in wardrobe_hud,
+        "wardrobe HUD must distinguish pending, successful and failed asynchronous equips")
 get_items_body = wardrobe_hud.split("private List<WardrobeInventoryItem> GetItems", 1)[1].split("private void EnsureStyles", 1)[0]
 require("new List<WardrobeInventoryItem>" not in get_items_body,
         "wardrobe HUD must not allocate a new inventory list on every GUI frame")
