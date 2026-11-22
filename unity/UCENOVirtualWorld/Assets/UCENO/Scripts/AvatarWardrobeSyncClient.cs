@@ -83,11 +83,14 @@ namespace UCENO.VirtualWorld
             }
             if (owned.assetVersion > 0 && !string.IsNullOrWhiteSpace(owned.prefabKey))
             {
+                string requestedUserId = session.UserId;
                 controller.EquipAddressable(itemId, owned.prefabKey, owned.assetVersion, (success, loadError) =>
                 {
-                    if (success) QueueSaveSlot(owned.slot, itemId);
-                    else Debug.LogWarning("UCENO versioned wardrobe equip failed (" + itemId + "): " + loadError);
-                });
+                    if (success && session != null && session.UserId == requestedUserId && loaded)
+                        QueueSaveSlot(owned.slot, itemId);
+                    else if (!success)
+                        Debug.LogWarning("UCENO versioned wardrobe equip failed (" + itemId + "): " + loadError);
+                }, () => session != null && session.UserId == requestedUserId && loaded);
                 return true;
             }
             if (!controller.TryEquip(itemId, owned.prefabKey, out error)) return false;
@@ -139,7 +142,7 @@ namespace UCENO.VirtualWorld
                                     {
                                         if (!success) Debug.LogWarning("UCENO saved wardrobe item could not load (" +
                                             owned.itemId + "): " + loadError);
-                                    });
+                                    }, () => session != null && session.UserId == requestedUserId);
                             }
                             else if (Enum.TryParse(owned.slot, true, out AvatarWardrobeSlot ownedSlot) &&
                                 !controller.TryEquip(owned.itemId, owned.prefabKey, out string equipError))
