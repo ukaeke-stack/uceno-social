@@ -62,6 +62,7 @@ namespace UCENO.VirtualWorld
 
         private void OnDisable()
         {
+            if (blinking) RestoreBlinkChannels();
             blinking = false;
             lookTarget = null;
         }
@@ -139,8 +140,6 @@ namespace UCENO.VirtualWorld
                 foreach (BlendShapeChannel channel in blinkChannels)
                     if (channel.renderer != null)
                         channel.blinkStartWeight = channel.renderer.GetBlendShapeWeight(channel.index);
-                foreach (BlendShapeChannel channel in blinkChannels)
-                    if (channel.renderer != null)
             }
 
             if (!blinking) return;
