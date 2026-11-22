@@ -28,6 +28,11 @@ test("wardrobe controller resolves immutable key-plus-version addresses and reje
   assert.match(controller, /string\.Equals\(item\.addressableKey, expectedAddressableKey/);
   assert.match(controller, /AsyncOperationStatus\.Succeeded/);
   assert.match(controller, /Func<bool> applyGuard/);
+  assert.match(controller, /equipRequestGenerations/);
+  assert.match(controller, /NextEquipRequestGeneration\(requestedSlot\)/);
+  assert.match(controller, /IsCurrentEquipRequest\(requestedSlot, requestGeneration\)/);
+  assert.match(controller, /newer selection or account change superseded it/);
+  assert.match(controller, /NextEquipRequestGeneration\(slot\)/);
   assert.match(controller, /applyGuard != null && !applyGuard\(\)/);
   assert.match(controller, /Addressables\.Release\(handle\)/);
   assert.match(controller, /ReleaseAddressableWhenUnused/);
