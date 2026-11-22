@@ -105,7 +105,16 @@ async function main() {
   if (!cfg.apiKey || !cfg.repoToken) throw new Error("OPENAI_API_KEY and GITHUB_TOKEN are required as runtime secrets.");
   await mkdir(cfg.stateDir, { recursive: true });
   const lock = path.join(cfg.stateDir, "worker.lock");
-  await writeFile(lock, String(process.pid), { flag: "wx" });
+  if (existsSync(lock)) {
+    let owner = null;
+    try { owner = JSON.parse(await readFile(lock, "utf8")); } catch {}
+    if (owner?.pid) {
+      try { process.kill(owner.pid, 0); throw new Error("another worker process appears active (pid " + owner.pid + ")"); }
+      catch (error) { if (error.message.startsWith("another worker")) throw error; }
+    }
+    await rm(lock, { force: true });
+  }
+  await writeFile(lock, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }), { flag: "wx" });
   process.on("SIGTERM", async () => { await log("Received SIGTERM; exiting."); process.exit(0); });
   process.on("SIGINT", async () => { await log("Received SIGINT; exiting."); process.exit(0); });
   await log("UCENO autonomous worker started; sequential agent, no production privileges.");
