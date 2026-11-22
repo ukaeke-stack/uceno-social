@@ -22,6 +22,8 @@ jobs:
           node-version: 22
       - name: Check worker syntax
         run: node --check autonomy/worker.mjs
+      - name: Test worker safety policies
+        run: node --test autonomy/worker-policy.test.mjs
       - name: Validate Compose configuration
         run: docker compose -f autonomy/docker-compose.yml config --quiet
       - name: Build worker image
