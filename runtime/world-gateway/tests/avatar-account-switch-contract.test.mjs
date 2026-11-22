@@ -21,6 +21,9 @@ test("world entry binds the Unity session to the authenticated Social account", 
 
 test("appearance state and pending saves are reset on account changes", () => {
   assert.match(appearance, /loadedUserId != session\.UserId/);
+  assert.match(appearance, /loadedWorldId != session\.WorldId/);
+  assert.match(appearance, /sessionGeneration\+\+/);
+  assert.match(appearance, /sessionGeneration != requestedGeneration/);
   assert.match(appearance, /pendingSave = false/);
   assert.match(appearance, /profile\.Apply\(AvatarAppearanceProfile\.Palette\.Default\)/);
 });
