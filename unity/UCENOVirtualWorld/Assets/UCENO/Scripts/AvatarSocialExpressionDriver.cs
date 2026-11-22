@@ -32,7 +32,7 @@ namespace UCENO.VirtualWorld
         {
             public SkinnedMeshRenderer renderer;
             public int index;
-            public float originalWeight;
+            public float blinkStartWeight;
         }
 
         public void SetLookTarget(Transform target)
@@ -58,6 +58,13 @@ namespace UCENO.VirtualWorld
 
             CacheBlinkChannels();
             ScheduleNextBlink();
+        }
+
+        private void OnDisable()
+        {
+            RestoreBlinkChannels();
+            blinking = false;
+            lookTarget = null;
         }
 
         private void LateUpdate()
@@ -116,7 +123,7 @@ namespace UCENO.VirtualWorld
                     {
                         renderer = skin,
                         index = i,
-                        originalWeight = skin.GetBlendShapeWeight(i)
+                        blinkStartWeight = 0f
                     });
                 }
             }
@@ -130,6 +137,9 @@ namespace UCENO.VirtualWorld
             {
                 blinking = true;
                 blinkStartedAt = Time.time;
+                foreach (BlendShapeChannel channel in blinkChannels)
+                    if (channel.renderer != null)
+                        channel.blinkStartWeight = channel.renderer.GetBlendShapeWeight(channel.index);
             }
 
             if (!blinking) return;
@@ -140,18 +150,23 @@ namespace UCENO.VirtualWorld
             {
                 if (channel.renderer != null)
                     channel.renderer.SetBlendShapeWeight(channel.index,
-                        Mathf.Lerp(channel.originalWeight, 100f, weight / 100f));
+                        Mathf.Lerp(channel.blinkStartWeight, 100f, weight / 100f));
             }
 
             if (progress >= 1f)
             {
-                foreach (BlendShapeChannel channel in blinkChannels)
-                {
-                    if (channel.renderer != null)
-                        channel.renderer.SetBlendShapeWeight(channel.index, channel.originalWeight);
-                }
+                RestoreBlinkChannels();
                 blinking = false;
                 ScheduleNextBlink();
+            }
+        }
+
+        private void RestoreBlinkChannels()
+        {
+            foreach (BlendShapeChannel channel in blinkChannels)
+            {
+                if (channel.renderer != null)
+                    channel.renderer.SetBlendShapeWeight(channel.index, channel.blinkStartWeight);
             }
         }
 
