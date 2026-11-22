@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from scripts.validate_city_asset_provenance import (
-    CATEGORY_COUNTS, ProvenanceError, validate_manifest_records, validate_record,
+    CATEGORY_COUNTS, ProvenanceError, validate_city, validate_manifest_records, validate_record,
 )
 
 
@@ -35,6 +35,13 @@ class CityAssetProvenanceTests(unittest.TestCase):
 
     def test_accepts_retained_archive_and_matching_license_document(self):
         validate_record(self.root, "atlas", self.record)
+
+    def test_rejects_non_object_manifest_root_with_domain_error(self):
+        manifest = self.root / "unity/UCENOVirtualWorld/Assets/UCENO/Cities/atlas/source-manifest.json"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text("[]", encoding="utf-8")
+        with self.assertRaisesRegex(ProvenanceError, "root must be a JSON object"):
+            validate_city(self.root, "atlas")
 
     def test_rejects_archive_hash_mismatch(self):
         self.record["sourceArchiveSha256"] = "0" * 64
