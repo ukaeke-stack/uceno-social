@@ -229,6 +229,7 @@ namespace UCENO.VirtualWorld
 
             bool hadPrevious = addressableHandles.TryGetValue(item.itemId,
                 out AsyncOperationHandle<GameObject> previousHandle);
+            bool hadPreviousVersion = addressableVersions.TryGetValue(item.itemId, out int previousVersion);
             addressablePrefabs[item.itemId] = handle.Result;
             addressableVersions[item.itemId] = assetVersion;
             addressableHandles[item.itemId] = handle;
@@ -238,8 +239,8 @@ namespace UCENO.VirtualWorld
                 {
                     addressablePrefabs[item.itemId] = cached;
                     addressableHandles[item.itemId] = previousHandle;
-                    addressableVersions.TryGetValue(item.itemId, out int oldVersion);
-                    if (oldVersion == assetVersion) addressableVersions.Remove(item.itemId);
+                    if (hadPreviousVersion) addressableVersions[item.itemId] = previousVersion;
+                    else addressableVersions.Remove(item.itemId);
                 }
                 else
                 {
