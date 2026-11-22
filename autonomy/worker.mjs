@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { runProcess } from "./process-runner.mjs";
 import { mkdir, readFile, writeFile, appendFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -18,42 +18,7 @@ const cfg = {
 };
 const stateFile = path.join(cfg.stateDir, "worker-state.json");
 const logFile = path.join(cfg.stateDir, "worker.log");
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-function run(command, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.cleanEnv ? options.env : { ...process.env, ...(options.env || {}) },
-      stdio: ["ignore", "pipe", "pipe"],
-      detached: Boolean(options.timeout)
-    });
-    let stdout = "", stderr = "";
-    child.stdout.on("data", d => stdout += d.toString());
-    child.stderr.on("data", d => stderr += d.toString());
-    let timedOut = false;
-    let killTimer = null;
-    const signalGroup = signal => {
-      if (!child.pid) return;
-      try { process.kill(-child.pid, signal); }
-      catch { try { child.kill(signal); } catch {} }
-    };
-    const timer = options.timeout ? setTimeout(() => {
-      timedOut = true;
-      signalGroup("SIGTERM");
-      killTimer = setTimeout(() => signalGroup("SIGKILL"), options.killGraceMs || 10000);
-    }, options.timeout) : null;
-    child.on("error", error => {
-      if (timer) clearTimeout(timer);
-      if (killTimer) clearTimeout(killTimer);
-      reject(error);
-    });
-    child.on("close", code => {
-      if (timer) clearTimeout(timer);
-      if (killTimer) clearTimeout(killTimer);
-      resolve({ code: timedOut ? 124 : (code ?? 1), stdout, stderr, timedOut });
-    });
-  });
+const sleep = ms => new Promise(resolve => setTimeout(resolve, const run = runProcess;  });
 }
 async function log(message) {
   const line = "[" + new Date().toISOString() + "] " + message + "\n";
