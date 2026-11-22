@@ -47,7 +47,7 @@ namespace UCENO.VirtualWorld
 
         private static void BuildFloor(Transform root, Material timber, Material seam)
         {
-            AddBox(root, "Structural floor slab", new Vector3(0f, -.12f, 0f),
+            AddBox(root, "Timber Floor - Structural Slab", new Vector3(0f, -.12f, 0f),
                 new Vector3(12f, .24f, 10f), timber);
             // Fine plank joints add scale and material breakup without a texture dependency.
             for (int row = 0; row < 20; row++)
@@ -70,11 +70,11 @@ namespace UCENO.VirtualWorld
         private static void BuildShell(Transform root, Material wall, Material accent,
             Material trim, Material glass, Material ceiling, Material metal)
         {
-            AddBox(root, "Back plaster wall", new Vector3(0f, 1.65f, 5f),
+            AddBox(root, "Back Wall - Warm Plaster", new Vector3(0f, 1.65f, 5f),
                 new Vector3(12f, 3.3f, .20f), wall);
-            AddBox(root, "Left plaster wall", new Vector3(-6f, 1.65f, 0f),
+            AddBox(root, "Left Wall - Warm Plaster", new Vector3(-6f, 1.65f, 0f),
                 new Vector3(.20f, 3.3f, 10f), wall);
-            AddBox(root, "Right feature wall", new Vector3(6f, 1.65f, 0f),
+            AddBox(root, "Right Wall - Feature Finish", new Vector3(6f, 1.65f, 0f),
                 new Vector3(.20f, 3.3f, 10f), accent);
             AddBox(root, "Front wall left pier", new Vector3(-4.5f, 1.65f, -5f),
                 new Vector3(3f, 3.3f, .20f), wall);
@@ -85,11 +85,11 @@ namespace UCENO.VirtualWorld
             AddBox(root, "Ceiling", new Vector3(0f, 3.35f, 0f),
                 new Vector3(12f, .18f, 10f), ceiling);
 
-            AddBox(root, "Entry door leaf", new Vector3(0f, 1.05f, -4.94f),
+            AddBox(root, "Entry Door leaf", new Vector3(0f, 1.05f, -4.94f),
                 new Vector3(1.12f, 2.10f, .10f), trim, false);
-            AddBox(root, "Entry door inset panel", new Vector3(0f, 1.10f, -4.875f),
+            AddBox(root, "Entry Door inset panel", new Vector3(0f, 1.10f, -4.875f),
                 new Vector3(.78f, 1.48f, .025f), accent, false);
-            AddBox(root, "Entry door handle", new Vector3(.40f, 1.05f, -4.84f),
+            AddBox(root, "Entry Door handle", new Vector3(.40f, 1.05f, -4.84f),
                 new Vector3(.055f, .12f, .055f), metal, false);
             AddBox(root, "Entry threshold", new Vector3(0f, .025f, -4.82f),
                 new Vector3(1.3f, .05f, .34f), metal, false);
@@ -112,7 +112,7 @@ namespace UCENO.VirtualWorld
         private static void BuildWindow(Transform root, string side, Vector3 center,
             Material glass, Material frame, Material metal)
         {
-            AddBox(root, side + " panoramic glazing", center, new Vector3(.055f, 1.55f, 2.5f), glass, false);
+            AddBox(root, side + " Window panoramic glazing", center, new Vector3(.055f, 1.55f, 2.5f), glass, false);
             AddBox(root, side + " window top frame", center + new Vector3(0f, .82f, 0f),
                 new Vector3(.16f, .12f, 2.7f), frame, false);
             AddBox(root, side + " window bottom frame", center + new Vector3(0f, -.82f, 0f),
@@ -204,7 +204,7 @@ namespace UCENO.VirtualWorld
                 AddBox(root, "Recessed downlight diffuser " + x + " " + z,
                     position + new Vector3(0f, -.028f, 0f), new Vector3(.24f, .018f, .24f), diffuser, false);
             }
-            CreatePointLight(root, "Warm living-zone light", new Vector3(-1.6f, 2.95f, .5f), 1.5f, 10f);
+            CreatePointLight(root, "Warm Ceiling Light - Living Zone", new Vector3(-1.6f, 2.95f, .5f), 1.5f, 10f);
             CreatePointLight(root, "Kitchen task light", new Vector3(3.4f, 2.85f, 3.2f), 1.1f, 7f);
             CreatePointLight(root, "Bathroom light", new Vector3(-4.1f, 2.8f, -3.6f), .55f, 4f);
         }
