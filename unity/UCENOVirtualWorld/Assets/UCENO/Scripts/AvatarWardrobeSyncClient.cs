@@ -37,6 +37,7 @@ namespace UCENO.VirtualWorld
         private bool loaded;
         private float retryAt;
         private bool saving;
+        private string loadedUserId;
         private readonly Dictionary<string, string> pendingEquipment = new Dictionary<string, string>();
 
         public IReadOnlyList<WardrobeInventoryItem> Inventory => inventory;
@@ -51,8 +52,17 @@ namespace UCENO.VirtualWorld
 
         private void Update()
         {
+            if (session != null && loadedUserId != session.UserId)
+            {
+                loaded = false;
+                inventory = Array.Empty<WardrobeInventoryItem>();
+                pendingEquipment.Clear();
+                loadedUserId = session.UserId;
+                if (controller != null)
+                    controller.ApplyEquipped(Array.Empty<KeyValuePair<AvatarWardrobeSlot, string>>());
+            }
             if (!loaded && !loading && session != null && session.IsAuthenticated &&
-                !string.IsNullOrEmpty(session.WorldId) && Time.unscaledTime >= retryAt)
+                !string.IsNullOrEmpty(session.WorldId) && !string.IsNullOrEmpty(session.UserId) && Time.unscaledTime >= retryAt)
                 StartCoroutine(LoadRoutine());
             if (loaded && !saving && pendingEquipment.Count > 0 &&
                 session != null && session.IsAuthenticated && Time.unscaledTime >= retryAt)
@@ -106,6 +116,7 @@ namespace UCENO.VirtualWorld
                     }
                     controller.ApplyEquipped(selections);
                     loaded = true;
+                    loadedUserId = session.UserId;
                 }
                 else
                 {
