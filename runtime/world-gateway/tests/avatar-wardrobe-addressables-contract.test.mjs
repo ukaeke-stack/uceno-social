@@ -17,6 +17,9 @@ test("wardrobe catalog exposes a stable Addressables key separately from the leg
 test("wardrobe controller resolves immutable key-plus-version addresses and rejects mismatched catalog keys", () => {
   assert.match(controller, /Addressables\.LoadAssetAsync<GameObject>\(versionedKey\)/);
   assert.match(controller, /expectedAddressableKey \+ "@v"/);
+  assert.match(controller, /cachedVersion == assetVersion/);
+  assert.match(controller, /TryEquipInternal/);
+  assert.match(controller, /ReleasePreviousAddressableHandle/);
   assert.match(controller, /string\.Equals\(item\.addressableKey, expectedAddressableKey/);
   assert.match(controller, /AsyncOperationStatus\.Succeeded/);
   assert.match(controller, /Addressables\.Release\(handle\)/);
