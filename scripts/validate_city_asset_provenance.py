@@ -94,6 +94,8 @@ def validate_city(project_root: Path, city_id: str) -> int:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise ProvenanceError(f"{city_id}: cannot read source manifest: {error}") from error
+    if not isinstance(manifest, dict):
+        raise ProvenanceError(f"{city_id}: source manifest root must be a JSON object")
     return validate_manifest_records(project_root, city_id, manifest.get("assets"))
 
 
