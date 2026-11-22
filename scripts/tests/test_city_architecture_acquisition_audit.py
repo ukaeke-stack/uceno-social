@@ -54,6 +54,22 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                 audit.safe_artifact_path(root, str(outside))
             self.assertEqual(audit.safe_artifact_path(root, "city/model.glb"), root / "city" / "model.glb")
 
+
+    def test_rejects_symlink_escape_and_blank_manifest_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory) / "assets"
+            root.mkdir()
+            outside = pathlib.Path(directory) / "outside.glb"
+            outside.write_bytes(b"not an asset")
+            link = root / "linked-model.glb"
+            link.symlink_to(outside)
+            with self.assertRaisesRegex(ValueError, "escapes its acquisition root"):
+                audit.safe_artifact_path(root, "linked-model.glb")
+            for invalid in ("", "   ", None, 42):
+                with self.subTest(invalid=invalid):
+                    with self.assertRaisesRegex(ValueError, "non-empty relative string"):
+                        audit.safe_artifact_path(root, invalid)
+
     def test_rejects_non_json_first_chunk(self):
         data = b"glTF" + struct.pack("<II", 2, 24) + struct.pack("<II", 4, 0) + bytes(4)
         with tempfile.TemporaryDirectory() as directory:
