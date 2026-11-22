@@ -1,0 +1,28 @@
+name: UCENO Autonomous Worker Validation
+on:
+  pull_request:
+    paths:
+      - "autonomy/**"
+      - ".github/workflows/uceno-autonomy-worker.yml"
+  push:
+    branches:
+      - "infra/uceno-autonomous-development-agent"
+    paths:
+      - "autonomy/**"
+      - ".github/workflows/uceno-autonomy-worker.yml"
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check worker syntax
+        run: node --check autonomy/worker.mjs
+      - name: Validate Compose configuration
+        run: docker compose -f autonomy/docker-compose.yml config --quiet
+      - name: Build worker image
+        run: docker build -f autonomy/Dockerfile -t uceno-autonomous-worker:ci .
