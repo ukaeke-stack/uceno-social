@@ -12,7 +12,7 @@ class CityAssetProvenanceTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        self.source = self.root / "unity/UCENOVirtualWorld/Assets/UCENO/Cities/atlas/Source"
+        self.source = self.root / "unity/UCENOVirtualWorld/Assets/UCENO/Cities/atlas/Source/Editor"
         self.source.mkdir(parents=True)
         self.archive = self.source / "tower-source.zip"
         self.archive.write_bytes(b"authentic source archive fixture")
@@ -24,9 +24,9 @@ class CityAssetProvenanceTests(unittest.TestCase):
             "sourceUrl": "https://example.org/assets/tower",
             "license": "CC-BY 4.0",
             "attribution": "Example artist",
-            "sourceArchive": "Assets/UCENO/Cities/atlas/Source/tower-source.zip",
+            "sourceArchive": "Assets/UCENO/Cities/atlas/Source/Editor/tower-source.zip",
             "sourceArchiveSha256": hashlib.sha256(self.archive.read_bytes()).hexdigest(),
-            "licenseFile": "Assets/UCENO/Cities/atlas/Source/LICENSE.txt",
+            "licenseFile": "Assets/UCENO/Cities/atlas/Source/Editor/LICENSE.txt",
             "licenseFileSha256": hashlib.sha256(self.license.read_bytes()).hexdigest(),
         }
 
@@ -48,7 +48,7 @@ class CityAssetProvenanceTests(unittest.TestCase):
             validate_record(self.root, "atlas", self.record)
 
     def test_rejects_path_traversal_outside_city_source_folder(self):
-        self.record["sourceArchive"] = "Assets/UCENO/Cities/atlas/Source/../../../../../../outside.zip"
+        self.record["sourceArchive"] = "Assets/UCENO/Cities/atlas/Source/Editor/../../../../../../outside.zip"
         with self.assertRaisesRegex(ProvenanceError, "missing or unsafe"):
             validate_record(self.root, "atlas", self.record)
 
