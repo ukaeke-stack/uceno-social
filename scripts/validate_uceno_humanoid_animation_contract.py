@@ -106,10 +106,14 @@ for token in (
     "CacheBlinkChannels()", "UpdateHeadLook()", "UpdateBlink()",
     "animatedLocalRotation", "Quaternion.Euler(pitch, yaw, 0f)",
     "Apply gaze as a damped additive offset",
+    "blinkStartWeight", "RestoreBlinkChannels()",
+    "channel.renderer.GetBlendShapeWeight(channel.index)",
 ):
     require(token in expressions, "social expression driver is missing: " + token)
 require("headBaseRotation" not in expressions,
         "social gaze must not reset imported head animation to the Awake-time bind pose")
+require("originalWeight" not in expressions,
+        "blink restoration must not overwrite animation-authored blendshape weights with Awake-time values")
 
 for token in (
     "MaterialPropertyBlock",
