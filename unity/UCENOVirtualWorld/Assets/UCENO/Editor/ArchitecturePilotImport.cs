@@ -25,6 +25,9 @@ namespace UCENO.VirtualWorld.Editor
             public string unityVersion;
             public string importerType;
             public string sourceSha256;
+            public string sourceManifestSha256;
+            public string sourceManifestFile;
+            public long sourceManifestBytes;
             public long sourceBytes;
             public bool importedGameObject;
             public int meshCount;
@@ -47,6 +50,13 @@ namespace UCENO.VirtualWorld.Editor
             if (string.IsNullOrWhiteSpace(source) || !File.Exists(source))
                 throw new FileNotFoundException("UCENO_PILOT_GLB must point to the acquired SolsticeBay LOD0 GLB.", source);
             string expectedSha = Environment.GetEnvironmentVariable("UCENO_PILOT_EXPECTED_SHA256");
+            string sourceManifest = Environment.GetEnvironmentVariable("UCENO_PILOT_SOURCE_MANIFEST");
+            if (string.IsNullOrWhiteSpace(sourceManifest) || !File.Exists(sourceManifest))
+                throw new FileNotFoundException("UCENO_PILOT_SOURCE_MANIFEST must point to the original acquisition manifest.", sourceManifest);
+            string manifestSha;
+            using (var sha = SHA256.Create())
+            using (var stream = File.OpenRead(sourceManifest))
+                manifestSha = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
             string actualSha;
             using (var sha = SHA256.Create())
             using (var stream = File.OpenRead(source))
@@ -68,6 +78,9 @@ namespace UCENO.VirtualWorld.Editor
                 importedAssetPath = destination,
                 unityVersion = Application.unityVersion,
                 sourceSha256 = actualSha,
+                sourceManifestSha256 = manifestSha,
+                sourceManifestFile = Path.GetFileName(sourceManifest),
+                sourceManifestBytes = new FileInfo(sourceManifest).Length,
                 sourceBytes = new FileInfo(source).Length,
                 meshNames = Array.Empty<string>(),
                 materialNames = Array.Empty<string>(),
