@@ -73,6 +73,92 @@ def inspect_glb(path, expected_sha=None):
         value = document.get(collection, [])
         if not isinstance(value, list):
             raise ValueError(f"{path}: glTF {collection} must be an array")
+
+    # Validate the actual scene graph and geometry references. A valid GLB
+    # header alone is not evidence that Unity can render a building.
+    arrays = ("buffers", "bufferViews", "accessors", "textures", "nodes", "scenes")
+    for collection in arrays:
+        if not isinstance(document.get(collection, []), list):
+            raise ValueError(f"{path}: glTF {collection} must be an array")
+
+    buffers = document.get("buffers", [])
+    buffer_views = document.get("bufferViews", [])
+    accessors = document.get("accessors", [])
+    meshes = document.get("meshes", [])
+    materials = document.get("materials", [])
+    textures = document.get("textures", [])
+    nodes = document.get("nodes", [])
+    scenes = document.get("scenes", [])
+
+    for index, view in enumerate(buffer_views):
+        if not isinstance(view, dict):
+            raise ValueError(f"{path}: bufferView {index} must be an object")
+        buffer_index = view.get("buffer")
+        if not isinstance(buffer_index, int) or isinstance(buffer_index, bool) or not 0 <= buffer_index < len(buffers):
+            raise ValueError(f"{path}: bufferView {index} references an invalid buffer")
+        if not isinstance(view.get("byteLength"), int) or view["byteLength"] <= 0:
+            raise ValueError(f"{path}: bufferView {index} has invalid byteLength")
+
+    for index, accessor in enumerate(accessors):
+        if not isinstance(accessor, dict):
+            raise ValueError(f"{path}: accessor {index} must be an object")
+        view_index = accessor.get("bufferView")
+        if view_index is not None and (
+            not isinstance(view_index, int) or isinstance(view_index, bool) or not 0 <= view_index < len(buffer_views)
+        ):
+            raise ValueError(f"{path}: accessor {index} references an invalid bufferView")
+
+    primitive_count = 0
+    material_references = set()
+    for mesh_index, mesh in enumerate(meshes):
+        if not isinstance(mesh, dict) or not isinstance(mesh.get("primitives"), list) or not mesh["primitives"]:
+            raise ValueError(f"{path}: mesh {mesh_index} must contain primitives")
+        for primitive_index, primitive in enumerate(mesh["primitives"]):
+            if not isinstance(primitive, dict) or not isinstance(primitive.get("attributes"), dict) or not primitive["attributes"]:
+                raise ValueError(f"{path}: mesh {mesh_index} primitive {primitive_index} has no attributes")
+            for semantic, accessor_index in primitive["attributes"].items():
+                if not isinstance(accessor_index, int) or isinstance(accessor_index, bool) or not 0 <= accessor_index < len(accessors):
+                    raise ValueError(f"{path}: mesh {mesh_index} primitive {primitive_index} has invalid {semantic} accessor")
+            indices = primitive.get("indices")
+            if indices is not None and (
+                not isinstance(indices, int) or isinstance(indices, bool) or not 0 <= indices < len(accessors)
+            ):
+                raise ValueError(f"{path}: mesh {mesh_index} primitive {primitive_index} has invalid indices accessor")
+            material_index = primitive.get("material")
+            if material_index is not None:
+                if not isinstance(material_index, int) or isinstance(material_index, bool) or not 0 <= material_index < len(materials):
+                    raise ValueError(f"{path}: mesh {mesh_index} primitive {primitive_index} has invalid material")
+                material_references.add(material_index)
+            primitive_count += 1
+
+    for index, node in enumerate(nodes):
+        if not isinstance(node, dict):
+            raise ValueError(f"{path}: node {index} must be an object")
+        mesh_index = node.get("mesh")
+        if mesh_index is not None and (
+            not isinstance(mesh_index, int) or isinstance(mesh_index, bool) or not 0 <= mesh_index < len(meshes)
+        ):
+            raise ValueError(f"{path}: node {index} references an invalid mesh")
+        for child in node.get("children", []):
+            if not isinstance(child, int) or isinstance(child, bool) or not 0 <= child < len(nodes):
+                raise ValueError(f"{path}: node {index} references an invalid child")
+
+    for index, scene in enumerate(scenes):
+        if not isinstance(scene, dict):
+            raise ValueError(f"{path}: scene {index} must be an object")
+        for node_index in scene.get("nodes", []):
+            if not isinstance(node_index, int) or isinstance(node_index, bool) or not 0 <= node_index < len(nodes):
+                raise ValueError(f"{path}: scene {index} references an invalid node")
+
+    for index, texture in enumerate(textures):
+        if not isinstance(texture, dict):
+            raise ValueError(f"{path}: texture {index} must be an object")
+        source = texture.get("source")
+        if source is not None and (
+            not isinstance(source, int) or isinstance(source, bool) or not 0 <= source < len(document.get("images", []))
+        ):
+            raise ValueError(f"{path}: texture {index} references an invalid image")
+
     digest = hashlib.sha256(data).hexdigest()
     if expected_sha and digest.lower() != str(expected_sha).lower():
         raise ValueError(f"{path}: SHA-256 mismatch")
@@ -94,8 +180,10 @@ def inspect_glb(path, expected_sha=None):
     return {
         "bytes": len(data),
         "sha256": digest,
-        "mesh_count": len(document.get("meshes") or []),
-        "material_count": len(document.get("materials") or []),
+        "mesh_count": len(meshes),
+        "primitive_count": primitive_count,
+        "material_count": len(materials),
+        "referenced_material_count": len(material_references),
         "image_count": len(images),
         "embedded_image_count": embedded,
         "external_image_count": len(images) - embedded,
