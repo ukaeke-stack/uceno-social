@@ -68,8 +68,24 @@ namespace UCENO.VirtualWorld
                 error = "This account does not own that wardrobe item.";
                 return false;
             }
-            if (!controller.TryEquip(itemId, owned.prefabKey, out error)) return false;
-            QueueSaveSlot(owned.slot, itemId);
+            // The server catalogue key is checked against the local versioned
+            // Addressables key before the remote wardrobe prefab is accepted.
+            controller.EquipAddressable(itemId, owned.prefabKey, (loadedAsset, loadError) =>
+            {
+                if (loadedAsset)
+                {
+                    QueueSaveSlot(owned.slot, itemId);
+                    return;
+                }
+
+                // Older locally bundled wardrobe entries remain supported during
+                // migration; remote entries never silently fall back to another key.
+                if (controller.TryEquip(itemId, owned.prefabKey, out string fallbackError))
+                    QueueSaveSlot(owned.slot, itemId);
+                else
+                    Debug.LogWarning("UCENO wardrobe equip failed: " +
+                        (string.IsNullOrEmpty(loadError) ? fallbackError : loadError + " " + fallbackError));
+            });
             return true;
         }
 
