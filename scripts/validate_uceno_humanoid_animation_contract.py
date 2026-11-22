@@ -10,6 +10,9 @@ LOCOMOTION = ASSETS / "Scripts/AvatarLocomotionDriver.cs"
 CROWD_LOD = ASSETS / "Scripts/AvatarCrowdLod.cs"
 APPEARANCE = ASSETS / "Scripts/AvatarAppearanceProfile.cs"
 WARDROBE_HUD = ASSETS / "Scripts/AvatarWardrobeHud.cs"
+WARDROBE_CONTROLLER = ASSETS / "Scripts/AvatarWardrobeController.cs"
+WARDROBE_CATALOG = ASSETS / "Scripts/AvatarWardrobeCatalog.cs"
+WARDROBE_SYNC = ASSETS / "Scripts/AvatarWardrobeSyncClient.cs"
 EXPRESSIONS = ASSETS / "Scripts/AvatarSocialExpressionDriver.cs"
 ANIMATION_ROOT = ASSETS / "Animations/Imported"
 BASE_AVATAR = ASSETS / "Characters/Imported/UCENO_Default_Avatar.fbx"
@@ -19,7 +22,7 @@ def require(condition: bool, message: str) -> None:
     if not condition:
         raise SystemExit("UCENO humanoid animation source contract failed: " + message)
 
-if not all(path.is_file() for path in (VALIDATOR, README, LOCOMOTION, CROWD_LOD, EXPRESSIONS, APPEARANCE, WARDROBE_HUD)):
+if not all(path.is_file() for path in (VALIDATOR, README, LOCOMOTION, CROWD_LOD, EXPRESSIONS, APPEARANCE, WARDROBE_HUD, WARDROBE_CONTROLLER, WARDROBE_CATALOG, WARDROBE_SYNC)):
     raise SystemExit("UCENO humanoid animation validator, runtime drivers or import instructions are missing.")
 
 source = VALIDATOR.read_text(encoding="utf-8")
@@ -29,6 +32,9 @@ crowd_lod = CROWD_LOD.read_text(encoding="utf-8")
 expressions = EXPRESSIONS.read_text(encoding="utf-8")
 appearance = APPEARANCE.read_text(encoding="utf-8")
 wardrobe_hud = WARDROBE_HUD.read_text(encoding="utf-8")
+wardrobe_controller = WARDROBE_CONTROLLER.read_text(encoding="utf-8")
+wardrobe_catalog = WARDROBE_CATALOG.read_text(encoding="utf-8")
+wardrobe_sync = WARDROBE_SYNC.read_text(encoding="utf-8")
 for token in (
     "AnimationType.Human",
     "AvatarSetup.CopyFromOther",
@@ -125,6 +131,21 @@ for token in (
     "inventoryBySlot.TryGetValue(item.slot",
 ):
     require(token in wardrobe_hud, "wardrobe inventory is missing cached slot indexing: " + token)
+for token in (
+    "Addressables.LoadAssetAsync<GameObject>(item.addressableKey)",
+    "Addressables.Release(handle)",
+    "addressableHandles",
+    "TryBindWardrobeInstance",
+    "renderer.bones = mappedBones",
+    "expectedAssetVersion",
+    "item.assetVersion != expectedAssetVersion",
+):
+    require(token in wardrobe_controller, "wardrobe Addressables loader is missing: " + token)
+for token in ("addressableKey", "assetVersion"):
+    require(token in wardrobe_catalog, "wardrobe catalogue is missing versioned field: " + token)
+require("owned.assetVersion" in wardrobe_sync and
+        "controller.EquipAddressable(itemId, owned.prefabKey" in wardrobe_sync,
+        "account wardrobe sync must validate the server prefab key and asset version")
 get_items_body = wardrobe_hud.split("private List<WardrobeInventoryItem> GetItems", 1)[1].split("private void EnsureStyles", 1)[0]
 require("new List<WardrobeInventoryItem>" not in get_items_body,
         "wardrobe HUD must not allocate a new inventory list on every GUI frame")
