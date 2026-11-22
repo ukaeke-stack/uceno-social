@@ -20,6 +20,8 @@ test("wardrobe controller resolves immutable key-plus-version addresses and reje
   assert.match(controller, /string\.Equals\(item\.addressableKey, expectedAddressableKey/);
   assert.match(controller, /AsyncOperationStatus\.Succeeded/);
   assert.match(controller, /Addressables\.Release\(handle\)/);
+  assert.match(controller, /ReleaseAddressableWhenUnused/);
+  assert.match(controller, /equippedIds\.ContainsValue\(itemId\)/);
 });
 
 test("wardrobe sync uses server-owned item version metadata for equip and saved selections", () => {
