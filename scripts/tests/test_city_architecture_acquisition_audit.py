@@ -55,7 +55,7 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
             self.assertEqual(audit.safe_artifact_path(root, "city/model.glb"), root / "city" / "model.glb")
 
     def test_rejects_non_json_first_chunk(self):
-        data = b"glTF" + struct.pack("<II", 2, 20) + struct.pack("<II", 0, 0)
+        data = b"glTF" + struct.pack("<II", 2, 24) + struct.pack("<II", 4, 0) + bytes(4)
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "wrong-first-chunk.glb"
             path.write_bytes(data)
@@ -64,7 +64,7 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
 
     def test_rejects_unaligned_chunk_length(self):
         payload = b'{"asset":{"version":"2.0"}}'
-        data = b"glTF" + struct.pack("<II", 2, 20 + 8 + len(payload))
+        data = b"glTF" + struct.pack("<II", 2, 20 + len(payload))
         data += struct.pack("<II", len(payload), 0x4E4F534A) + payload
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "unaligned.glb"
@@ -112,7 +112,7 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "empty.glb"
             path.write_bytes(data)
-            with self.assertRaisesRegex(ValueError, "missing JSON"):
+            with self.assertRaisesRegex(ValueError, "positive and 4-byte aligned"):
                 audit.inspect_glb(path)
 
 
