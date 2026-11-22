@@ -37,6 +37,14 @@ test("collectible grant does not exceed a finite catalog supply", async () => {
   assert.equal(tx.calls.some(call => call.query.includes("INSERT INTO virtual_world_user_collectibles")), false);
 });
 
+test("single-player collectible grant fails closed on malformed or over-minted supply counters", async () => {
+  for (const [minted, maxSupply] of [["not-a-number", "10"], ["-1", "10"], ["11", "10"], ["1", "invalid"]]) {
+    const tx = fakeTx({ minted, maxSupply });
+    assert.deepEqual(await grantTreasureCollectibles(tx, hunt, user), []);
+    assert.equal(tx.calls.some(call => call.query.includes("INSERT INTO virtual_world_user_collectibles")), false);
+  }
+});
+
 test("collectible grant is idempotent for an existing user/hunt/item award", async () => {
   const tx = fakeTx({ existing: true });
   assert.deepEqual(await grantTreasureCollectibles(tx, hunt, user), []);
@@ -72,6 +80,23 @@ test("team collectible grant batches inventory writes and respects finite supply
   const minted = calls.find(call => call.query.includes("UPDATE virtual_world_collectible_catalog"));
   assert.ok(minted);
   assert.deepEqual(minted.params[1], [1]);
+});
+
+test("team collectible grant skips malformed or over-minted catalog supply", async () => {
+  for (const [mintedCount, maxSupply] of [["bad", "10"], ["-1", "10"], ["11", "10"], ["1", "bad"]]) {
+    const calls = [];
+    const tx = { async unsafe(query, params) {
+      calls.push({ query, params });
+      if (query.includes("FROM virtual_world_treasure_reward_items")) return [{
+        id, code: "rare-badge", displayName: "Rare Badge", category: "badge",
+        rarity: "rare", maxSupply, mintedCount, quantity: 1
+      }];
+      return [];
+    }};
+    const rewards = await grantTreasureCollectiblesToUsers(tx, hunt, [user]);
+    assert.deepEqual(rewards.get(user), []);
+    assert.equal(calls.some(call => call.query.includes("INSERT INTO virtual_world_user_collectibles")), false);
+  }
 });
 
 test("team collectible grant skips existing awards and does not issue empty writes", async () => {
