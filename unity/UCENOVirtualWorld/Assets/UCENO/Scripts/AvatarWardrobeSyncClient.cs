@@ -42,6 +42,7 @@ namespace UCENO.VirtualWorld
         public IReadOnlyList<WardrobeInventoryItem> Inventory => inventory;
         private WardrobeInventoryItem[] inventory = Array.Empty<WardrobeInventoryItem>();
         public bool IsLoaded => loaded;
+        public event Action<string, bool, string> EquipCompleted;
 
         public void Initialize(WorldSessionClient worldSession, AvatarWardrobeController wardrobe)
         {
@@ -75,16 +76,15 @@ namespace UCENO.VirtualWorld
                 if (loadedAsset)
                 {
                     QueueSaveSlot(owned.slot, itemId);
+                    EquipCompleted?.Invoke(itemId, true, null);
                     return;
                 }
 
-                // Older locally bundled wardrobe entries remain supported during
-                // migration; remote entries never silently fall back to another key.
-                if (controller.TryEquip(itemId, owned.prefabKey, out string fallbackError))
-                    QueueSaveSlot(owned.slot, itemId);
-                else
-                    Debug.LogWarning("UCENO wardrobe equip failed: " +
-                        (string.IsNullOrEmpty(loadError) ? fallbackError : loadError + " " + fallbackError));
+                // Never substitute a Resources prefab after a remote key/version
+                // mismatch or download failure: that could equip stale content.
+                string message = string.IsNullOrEmpty(loadError) ? "Wardrobe asset could not be loaded." : loadError;
+                Debug.LogWarning("UCENO wardrobe equip failed: " + message);
+                EquipCompleted?.Invoke(itemId, false, message);
             });
             return true;
         }
