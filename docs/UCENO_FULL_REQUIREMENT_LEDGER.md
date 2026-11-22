@@ -123,3 +123,11 @@ This ledger distinguishes source implementation from CI, deployment, and device 
 - Changes are in commits `ba4779a3fe28869ba344f0107e3f33719aca2069`, `a8f28f5436abdb2736d698abbb43d08cf196a75c`, `c51cc0976fb420374d1b042e5e6da463cce04d94` and `8273613c3bbcc5ffc6d8f82c614de37e4646cc06`. No exact-head CI runs were visible when this checkpoint was recorded; treat these changes as unverified until CI completes.
 - Previous exact checkpoint `5362e1ab4277302c78b3ded496c5f66ceeb30268` passed content-delivery source checks, World Gateway Tests, Activity Tests and World Gateway/Unity Client; the nine-city art gate failed due to missing imported city assets/manifests. Those results do not verify these later policy changes.
 - No production migrations, deployment, Addressables publication, Unity Editor compilation or APK/device test occurred.
+
+
+## Latest engineering checkpoint — 2026-11-22 (collectible supply integrity)
+- Hardened both single-player and team collectible grant paths against malformed catalog counters. Minted count and finite max supply are parsed as canonical non-negative integer values; invalid, negative, out-of-range or already-over-minted catalog state is skipped safely rather than throwing or minting additional items.
+- Team reward allocation continues to reserve finite supply deterministically under catalog row locks and increments minted_count only for inventory rows actually returned by the insert. Added regression coverage for corrupt counters in both grant paths.
+- Commits: `e791303a6654941fa0dbb64a213c2edefb3aa365` and `7eef92ba48eee96d2bbe3231d8b6df29199fa176`. These new commits do not yet have exact-head CI results.
+- CI for the immediately preceding policy checkpoint `d16b5ff7b5d80df162ac843210e84d6c0324a42e`: Activity Tests passed; World Gateway Tests passed; content-delivery source checks passed; Unity source validation passed; gateway build and real-process PostgreSQL fencing/failover tests passed. Web-app build was still running when checked. The nine-city art release gate failed because actual imported city prefabs and provenance manifests remain absent.
+- Current PR head is `7eef92ba48eee96d2bbe3231d8b6df29199fa176`, PR #46 remains open/draft and mergeable. No production migration, deployment, Addressables publication, Unity Editor compilation, Android device test or APK build occurred.
