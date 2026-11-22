@@ -31,6 +31,8 @@ namespace UCENO.VirtualWorld
             new Dictionary<string, AsyncOperationHandle<GameObject>>(StringComparer.Ordinal);
         private readonly HashSet<AsyncOperationHandle<GameObject>> pendingAddressableReleases =
             new HashSet<AsyncOperationHandle<GameObject>>();
+        private readonly HashSet<AsyncOperationHandle<GameObject>> inFlightAddressableHandles =
+            new HashSet<AsyncOperationHandle<GameObject>>();
         private Dictionary<string, Transform> avatarBones;
         private readonly HashSet<string> ambiguousAvatarBones = new HashSet<string>(StringComparer.Ordinal);
 
@@ -221,7 +223,11 @@ namespace UCENO.VirtualWorld
             string versionedKey = expectedAddressableKey + "@v" +
                 assetVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
             AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(versionedKey);
+            // A scene/avatar can be destroyed while the remote download is pending.
+            // Track the handle before yielding so OnDestroy can release it.
+            inFlightAddressableHandles.Add(handle);
             yield return handle;
+            inFlightAddressableHandles.Remove(handle);
             if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
             {
                 if (handle.IsValid()) Addressables.Release(handle);
@@ -276,6 +282,9 @@ namespace UCENO.VirtualWorld
             foreach (AsyncOperationHandle<GameObject> handle in pendingAddressableReleases)
                 if (handle.IsValid()) Addressables.Release(handle);
             pendingAddressableReleases.Clear();
+            foreach (AsyncOperationHandle<GameObject> handle in inFlightAddressableHandles)
+                if (handle.IsValid()) Addressables.Release(handle);
+            inFlightAddressableHandles.Clear();
             addressableHandles.Clear();
             addressableVersions.Clear();
             addressablePrefabs.Clear();
