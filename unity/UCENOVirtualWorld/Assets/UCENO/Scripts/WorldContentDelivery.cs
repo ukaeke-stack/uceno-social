@@ -177,8 +177,7 @@ namespace UCENO.VirtualWorld
             {
                 residentHandles.Remove(label);
                 Addressables.Release(handle);
-                StatusChanged?.Invoke(label + " released from memory.");
-                StartCoroutine(UnloadUnusedAssetsRoutine());
+                StatusChanged?.Invoke(label + " released from memory.");                StartCoroutine(UnloadUnusedAssetsRoutine());
             }
         }
 
@@ -304,11 +303,11 @@ namespace UCENO.VirtualWorld
             {
                 string catalogUrl = remoteCatalogUrl.Trim();
                 if (!Uri.TryCreate(catalogUrl, UriKind.Absolute, out Uri parsedCatalogUrl) ||
-                    (parsedCatalogUrl.Scheme != Uri.UriSchemeHttps && parsedCatalogUrl.Scheme != Uri.UriSchemeHttp))
+                    parsedCatalogUrl.Scheme != Uri.UriSchemeHttps)
                 {
                     initializing = false;
-                    StatusChanged?.Invoke("Remote world catalog URL is invalid.");
-                    completed?.Invoke(false, "Remote catalog URL must be an absolute HTTP or HTTPS URL.");
+                    StatusChanged?.Invoke("Remote world catalog URL is invalid or insecure.");
+                    completed?.Invoke(false, "Remote catalog URL must be an absolute HTTPS URL.");
                     yield break;
                 }
 
@@ -317,11 +316,16 @@ namespace UCENO.VirtualWorld
                 yield return catalog;
                 if (catalog.Status != AsyncOperationStatus.Succeeded)
                 {
+                    if (catalog.IsValid()) Addressables.Release(catalog);
                     initializing = false;
                     StatusChanged?.Invoke("World content catalog could not be reached.");
                     completed?.Invoke(false, "Remote catalog load failed.");
                     yield break;
                 }
+                // The locator remains registered with Addressables; release this
+                // completed operation handle so repeated lifecycle initialization
+                // does not retain an unnecessary handle reference.
+                Addressables.Release(catalog);
             }
 
             // Refresh the loaded remote catalog before resolving any city/district
@@ -357,8 +361,7 @@ namespace UCENO.VirtualWorld
             initialized = true;
             initializing = false;
             StatusChanged?.Invoke("Content service ready.");
-            completed?.Invoke(true, null);
-        }
+            completed?.Invoke(true, null);        }
 
         private IEnumerator EnsureContentRoutine(string label, Action<bool, string> completed)
         {
