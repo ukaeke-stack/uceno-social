@@ -11,6 +11,9 @@ on:
       - 'scripts/validate_uceno_humanoid_animation_contract.py'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarAppearanceProfile.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeHud.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeCatalog.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeController.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeSyncClient.cs'
       - '.github/workflows/uceno-humanoid-animation-contract.yml'
   pull_request:
     paths:
@@ -20,6 +23,9 @@ on:
       - 'scripts/validate_uceno_humanoid_animation_contract.py'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarAppearanceProfile.cs'
       - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeHud.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeCatalog.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeController.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeSyncClient.cs'
       - '.github/workflows/uceno-humanoid-animation-contract.yml'
 
 permissions:
