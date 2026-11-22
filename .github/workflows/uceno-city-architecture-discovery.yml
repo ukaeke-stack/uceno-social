@@ -39,18 +39,22 @@ jobs:
           python-version: "3.12"
       - name: Test strict city-building discovery and acquisition filters
         run: python -m unittest discover -s scripts/tests -p "test_*city_architecture*.py"
-      - name: Discover, pin and checksum-verify CC0 Tevy building GLBs
+      - id: tevy
+        name: Discover, pin and checksum-verify CC0 Tevy building GLBs
         continue-on-error: true
         run: python scripts/discover-tevy-city-architecture.py
-      - name: Discover independent 3DAssets.dev city candidates
+      - id: discover
+        name: Discover independent 3DAssets.dev city candidates
         if: always()
         continue-on-error: true
         run: python scripts/discover-city-architecture.py
-      - name: Acquire and verify 3DAssets.dev full-building GLBs
+      - id: acquire
+        name: Acquire and verify 3DAssets.dev full-building GLBs
         if: always() && hashFiles('artifacts/city-architecture-candidates/nine-city-candidates.json') != ''
         continue-on-error: true
         run: python scripts/acquire-city-architecture.py
-      - name: Audit acquired GLB integrity, LODs and embedded texture evidence
+      - id: audit
+        name: Audit acquired GLB integrity, LODs and embedded texture evidence
         if: always()
         continue-on-error: true
         run: python scripts/audit-city-architecture-acquisition.py
@@ -66,4 +70,22 @@ jobs:
             artifacts/city-architecture-quality-audit.json
           if-no-files-found: warn
           retention-days: 30
-# Trigger acquisition again after tightening amusement-ride exclusions.
+      - name: Fail workflow when acquisition is incomplete
+        if: always()
+        env:
+          TEVY_OUTCOME: ${{ steps.tevy.outcome }}
+          DISCOVERY_OUTCOME: ${{ steps.discover.outcome }}
+          ACQUISITION_OUTCOME: ${{ steps.acquire.outcome }}
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+        run: |
+          failed=0
+          for result in "$TEVY_OUTCOME" "$DISCOVERY_OUTCOME" "$ACQUISITION_OUTCOME" "$AUDIT_OUTCOME"; do
+            if [ "$result" != "success" ]; then
+              echo "::error::City asset pipeline stage did not complete successfully: $result"
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "Partial acquisition evidence was uploaded, but the pipeline is not release-ready."
+            exit 1
+          fi
