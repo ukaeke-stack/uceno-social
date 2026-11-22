@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace UCENO.VirtualWorld
 {
@@ -20,6 +22,10 @@ namespace UCENO.VirtualWorld
             new Dictionary<AvatarWardrobeSlot, GameObject>();
         private readonly Dictionary<AvatarWardrobeSlot, string> equippedIds =
             new Dictionary<AvatarWardrobeSlot, string>();
+        private readonly Dictionary<string, GameObject> addressablePrefabs =
+            new Dictionary<string, GameObject>(StringComparer.Ordinal);
+        private readonly Dictionary<string, AsyncOperationHandle<GameObject>> addressableHandles =
+            new Dictionary<string, AsyncOperationHandle<GameObject>>(StringComparer.Ordinal);
         private Dictionary<string, Transform> avatarBones;
         private readonly HashSet<string> ambiguousAvatarBones = new HashSet<string>(StringComparer.Ordinal);
 
@@ -55,21 +61,26 @@ namespace UCENO.VirtualWorld
                 return false;
             }
             if (!string.IsNullOrEmpty(expectedPrefabKey) &&
+                !string.Equals(item.addressableKey, expectedPrefabKey, StringComparison.Ordinal) &&
                 !string.Equals(item.prefabResourcePath, expectedPrefabKey, StringComparison.Ordinal))
             {
-                error = "The local wardrobe prefab does not match the server catalogue."; 
+                error = "The local wardrobe asset key does not match the server catalogue.";
                 return false;
             }
             if (equippedIds.TryGetValue(item.slot, out string alreadyEquipped) &&
                 alreadyEquipped == item.itemId &&
                 equippedObjects.TryGetValue(item.slot, out GameObject existingObject) && existingObject != null)
                 return true;
-            if (string.IsNullOrWhiteSpace(item.prefabResourcePath))
+            GameObject prefab = null;
+            if (!addressablePrefabs.TryGetValue(item.itemId, out prefab))
             {
-                error = "Wardrobe item has no prefab resource path.";
-                return false;
+                if (string.IsNullOrWhiteSpace(item.prefabResourcePath))
+                {
+                    error = "Wardrobe item has no loaded Addressables asset or legacy resource path.";
+                    return false;
+                }
+                prefab = Resources.Load<GameObject>(item.prefabResourcePath);
             }
-            GameObject prefab = Resources.Load<GameObject>(item.prefabResourcePath);
             if (prefab == null)
             {
                 error = "Wardrobe prefab is missing: " + item.prefabResourcePath;
@@ -158,6 +169,71 @@ namespace UCENO.VirtualWorld
             equippedIds[item.slot] = item.itemId;
             EquippedChanged?.Invoke(item.slot, item.itemId);
             return true;
+        }
+
+        /// <summary>
+        /// Loads a wardrobe prefab from the remote catalog using an immutable versioned key.
+        /// The completed asset handle is retained for this controller's lifetime so equipped
+        /// meshes cannot lose their source dependencies while instances remain active.
+        /// </summary>
+        public void EquipAddressable(string itemId, string expectedAddressableKey, int assetVersion,
+            Action<bool, string> completed)
+        {
+            StartCoroutine(EquipAddressableRoutine(itemId, expectedAddressableKey, assetVersion, completed));
+        }
+
+        private IEnumerator EquipAddressableRoutine(string itemId, string expectedAddressableKey,
+            int assetVersion, Action<bool, string> completed)
+        {
+            if (catalog == null || !catalog.TryGet(itemId, out AvatarWardrobeItemDefinition item) ||
+                !Enum.IsDefined(typeof(AvatarWardrobeSlot), item.slot))
+            {
+                completed?.Invoke(false, "Wardrobe item is not in the local catalog.");
+                yield break;
+            }
+            if (assetVersion < 1 || string.IsNullOrWhiteSpace(item.addressableKey) ||
+                !string.Equals(item.addressableKey, expectedAddressableKey, StringComparison.Ordinal))
+            {
+                completed?.Invoke(false, "Wardrobe Addressables key or asset version is invalid.");
+                yield break;
+            }
+            if (addressablePrefabs.TryGetValue(item.itemId, out GameObject cached) && cached != null)
+            {
+                bool equipped = TryEquip(itemId, expectedAddressableKey, out string cachedError);
+                completed?.Invoke(equipped, cachedError);
+                yield break;
+            }
+
+            string versionedKey = expectedAddressableKey + "@v" +
+                assetVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(versionedKey);
+            yield return handle;
+            if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
+            {
+                if (handle.IsValid()) Addressables.Release(handle);
+                completed?.Invoke(false, "Versioned wardrobe asset could not be loaded: " + versionedKey);
+                yield break;
+            }
+
+            addressablePrefabs[item.itemId] = handle.Result;
+            addressableHandles[item.itemId] = handle;
+            if (!TryEquip(itemId, expectedAddressableKey, out string error))
+            {
+                addressablePrefabs.Remove(item.itemId);
+                addressableHandles.Remove(item.itemId);
+                if (handle.IsValid()) Addressables.Release(handle);
+                completed?.Invoke(false, error);
+                yield break;
+            }
+            completed?.Invoke(true, null);
+        }
+
+        private void OnDestroy()
+        {
+            foreach (AsyncOperationHandle<GameObject> handle in addressableHandles.Values)
+                if (handle.IsValid()) Addressables.Release(handle);
+            addressableHandles.Clear();
+            addressablePrefabs.Clear();
         }
 
         public void Unequip(AvatarWardrobeSlot slot)
