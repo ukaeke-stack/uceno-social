@@ -50,10 +50,15 @@ namespace UCENO.VirtualWorld
         /// </summary>
         public void EquipAddressable(string itemId, Action<bool, string> completed = null)
         {
-            StartCoroutine(EquipAddressableRoutine(itemId, completed));
+            EquipAddressable(itemId, null, completed);
         }
 
-        private IEnumerator EquipAddressableRoutine(string itemId, Action<bool, string> completed)
+        public void EquipAddressable(string itemId, string expectedAddressableKey, Action<bool, string> completed)
+        {
+            StartCoroutine(EquipAddressableRoutine(itemId, expectedAddressableKey, completed));
+        }
+
+        private IEnumerator EquipAddressableRoutine(string itemId, string expectedAddressableKey, Action<bool, string> completed)
         {
             if (catalog == null || !catalog.TryGet(itemId, out AvatarWardrobeItemDefinition item) ||
                 !Enum.IsDefined(typeof(AvatarWardrobeSlot), item.slot))
@@ -64,6 +69,12 @@ namespace UCENO.VirtualWorld
             if (string.IsNullOrWhiteSpace(item.addressableKey))
             {
                 completed?.Invoke(false, "Wardrobe item has no versioned Addressables address.");
+                yield break;
+            }
+            if (!string.IsNullOrWhiteSpace(expectedAddressableKey) &&
+                !string.Equals(item.addressableKey, expectedAddressableKey, StringComparison.Ordinal))
+            {
+                completed?.Invoke(false, "The local Addressables key does not match the server wardrobe catalogue.");
                 yield break;
             }
             if (pendingAddressableSlots.Contains(item.slot))
@@ -306,7 +317,15 @@ namespace UCENO.VirtualWorld
                 if (equippedIds.TryGetValue(slot, out string currentId) && currentId == itemId &&
                     equippedObjects.TryGetValue(slot, out GameObject current) && current != null)
                     continue;
-                if (!TryEquip(itemId, out string error))
+                if (catalog != null && catalog.TryGet(itemId, out AvatarWardrobeItemDefinition definition) &&
+                    !string.IsNullOrWhiteSpace(definition.addressableKey))
+                {
+                    EquipAddressable(itemId, (ok, error) =>
+                    {
+                        if (!ok) Debug.LogWarning("UCENO wardrobe item could not be applied (" + itemId + "): " + error);
+                    });
+                }
+                else if (!TryEquip(itemId, out string error))
                     Debug.LogWarning("UCENO wardrobe item could not be applied (" + itemId + "): " + error);
             }
         }
