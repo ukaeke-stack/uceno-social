@@ -46,6 +46,10 @@ jobs:
         if: always() && hashFiles('artifacts/city-architecture-candidates/nine-city-candidates.json') != ''
         continue-on-error: true
         run: python scripts/acquire-city-architecture.py
+      - name: Audit acquired GLB integrity, LODs and embedded texture evidence
+        if: always()
+        continue-on-error: true
+        run: python scripts/audit-city-architecture-acquisition.py
       - name: Preserve discovery and partial acquisition evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,6 +59,7 @@ jobs:
             artifacts/tevy-city-architecture/
             artifacts/city-architecture-candidates/
             artifacts/city-architecture-models/
+            artifacts/city-architecture-quality-audit.json
           if-no-files-found: warn
           retention-days: 30
 # Trigger acquisition again after tightening amusement-ride exclusions.
