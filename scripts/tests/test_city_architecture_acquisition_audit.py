@@ -76,7 +76,7 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
         data = glb({"asset": {"version": "2.0"}})
         extra = struct.pack("<II", 4, 0x004E4942) + b"\\x00" * 4
         third = struct.pack("<II", 4, 0x004E4942) + b"\\x00" * 4
-        data = data[:-0] + extra + third
+        data = data + extra + third
         data = data[:8] + struct.pack("<I", len(data)) + data[12:]
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "extra-chunks.glb"
