@@ -192,13 +192,13 @@ namespace UCENO.VirtualWorld
         /// released one frame after its last instance is removed.
         /// </summary>
         public void EquipAddressable(string itemId, string expectedAddressableKey, int assetVersion,
-            Action<bool, string> completed)
+            Action<bool, string> completed, Func<bool> applyGuard = null)
         {
-            StartCoroutine(EquipAddressableRoutine(itemId, expectedAddressableKey, assetVersion, completed));
+            StartCoroutine(EquipAddressableRoutine(itemId, expectedAddressableKey, assetVersion, completed, applyGuard));
         }
 
         private IEnumerator EquipAddressableRoutine(string itemId, string expectedAddressableKey,
-            int assetVersion, Action<bool, string> completed)
+            int assetVersion, Action<bool, string> completed, Func<bool> applyGuard)
         {
             if (catalog == null || !catalog.TryGet(itemId, out AvatarWardrobeItemDefinition item) ||
                 !Enum.IsDefined(typeof(AvatarWardrobeSlot), item.slot))
@@ -210,6 +210,11 @@ namespace UCENO.VirtualWorld
                 !string.Equals(item.addressableKey, expectedAddressableKey, StringComparison.Ordinal))
             {
                 completed?.Invoke(false, "Wardrobe Addressables key or asset version is invalid.");
+                yield break;
+            }
+            if (applyGuard != null && !applyGuard())
+            {
+                completed?.Invoke(false, "Wardrobe equip was cancelled because the active account changed.");
                 yield break;
             }
             if (addressablePrefabs.TryGetValue(item.itemId, out GameObject cached) && cached != null &&
@@ -228,6 +233,12 @@ namespace UCENO.VirtualWorld
             inFlightAddressableHandles.Add(handle);
             yield return handle;
             inFlightAddressableHandles.Remove(handle);
+            if (applyGuard != null && !applyGuard())
+            {
+                if (handle.IsValid()) Addressables.Release(handle);
+                completed?.Invoke(false, "Wardrobe equip was cancelled because the active account changed.");
+                yield break;
+            }
             if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
             {
                 if (handle.IsValid()) Addressables.Release(handle);
