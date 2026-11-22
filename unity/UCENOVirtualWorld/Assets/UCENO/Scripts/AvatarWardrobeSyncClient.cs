@@ -54,6 +54,9 @@ namespace UCENO.VirtualWorld
         {
             if (session != null && loadedUserId != session.UserId)
             {
+                StopAllCoroutines();
+                loading = false;
+                saving = false;
                 loaded = false;
                 inventory = Array.Empty<WardrobeInventoryItem>();
                 pendingEquipment.Clear();
@@ -94,6 +97,7 @@ namespace UCENO.VirtualWorld
         private IEnumerator LoadRoutine()
         {
             loading = true;
+            string requestedUserId = session.UserId;
             string url = BuildUrl();
             using (UnityWebRequest request = UnityWebRequest.Get(url))
             {
@@ -101,6 +105,7 @@ namespace UCENO.VirtualWorld
                 request.SetRequestHeader("Accept", "application/json");
                 request.timeout = 15;
                 yield return request.SendWebRequest();
+                if (session == null || session.UserId != requestedUserId) { loading = false; yield break; }
                 if (request.result == UnityWebRequest.Result.Success)
                 {
                     WardrobeLoadResponse response = JsonUtility.FromJson<WardrobeLoadResponse>(request.downloadHandler.text);
@@ -136,7 +141,8 @@ namespace UCENO.VirtualWorld
         private IEnumerator SavePendingRoutine()
         {
             saving = true;
-            while (pendingEquipment.Count > 0)
+            string requestedUserId = session != null ? session.UserId : null;
+            while (pendingEquipment.Count > 0 && session != null && session.UserId == requestedUserId)
             {
                 Dictionary<string, string> batch = new Dictionary<string, string>(pendingEquipment);
                 pendingEquipment.Clear();
@@ -162,6 +168,7 @@ namespace UCENO.VirtualWorld
                     request.SetRequestHeader("Content-Type", "application/json");
                     request.timeout = 15;
                     yield return request.SendWebRequest();
+                    if (session == null || session.UserId != requestedUserId) { saving = false; yield break; }
                     saved = request.result == UnityWebRequest.Result.Success;
                     responseCode = request.responseCode;
                     if (!saved) Debug.LogWarning("UCENO wardrobe save failed: " + responseCode);
