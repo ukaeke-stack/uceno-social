@@ -36,3 +36,15 @@ test("operator shutdown and world bounds fail closed", () => {
   assert.equal(decideCitizenAction({ ...base, operatorDisabled: true, action: "speak" }).allowed, false);
   assert.equal(decideCitizenAction({ ...base, withinWorldBounds: false, action: "speak" }).allowed, false);
 });
+
+test("runtime input validation rejects unknown actions and malformed contexts", () => {
+  assert.deepEqual(decideCitizenAction({ ...base, action: "execute_prompt" }), {
+    allowed: false, reason: "unknown_action"
+  });
+  assert.deepEqual(decideCitizenAction({ ...base, action: "navigate", operatorDisabled: "false" }), {
+    allowed: false, reason: "invalid_context_flags"
+  });
+  assert.deepEqual(decideCitizenAction(null), {
+    allowed: false, reason: "invalid_context"
+  });
+});
