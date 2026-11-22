@@ -104,8 +104,12 @@ for token in (
 for token in (
     "HumanBodyBones.Head", "SetLookTarget(Transform target)",
     "CacheBlinkChannels()", "UpdateHeadLook()", "UpdateBlink()",
+    "animatedLocalRotation", "Quaternion.Euler(pitch, yaw, 0f)",
+    "Apply gaze as a damped additive offset",
 ):
     require(token in expressions, "social expression driver is missing: " + token)
+require("headBaseRotation" not in expressions,
+        "social gaze must not reset imported head animation to the Awake-time bind pose")
 
 for token in (
     "MaterialPropertyBlock",
