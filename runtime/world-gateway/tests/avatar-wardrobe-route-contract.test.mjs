@@ -21,3 +21,13 @@ test("wardrobe writes remain restricted to enabled items owned in the requested 
   assert.match(route, /i\.item_id = r\.item_id AND c\.slot = r\.slot AND c\.enabled = TRUE/);
   assert.match(route, /if \(result\[0\]\?\.invalidCount > 0\)/);
 });
+
+
+test("wardrobe asset version and Addressables key are server-owned inventory metadata", () => {
+  assert.match(route, /c\.prefab_key AS "prefabKey"/);
+  assert.match(route, /c\.asset_version AS "assetVersion"/);
+  assert.match(route, /Cache-Control: "no-store, private"/);
+  const put = route.slice(route.indexOf("export async function PUT"));
+  assert.match(put, /requested = \(body as \{ equipped:/);
+  assert.doesNotMatch(put, /prefabKey|assetVersion|sourceUrl/);
+});
