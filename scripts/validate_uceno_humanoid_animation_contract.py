@@ -106,15 +106,14 @@ for token in (
     "CacheBlinkChannels()", "UpdateHeadLook()", "UpdateBlink()",
     "animatedLocalRotation", "Quaternion.Euler(pitch, yaw, 0f)",
     "Apply gaze as a damped additive offset",
+    "blinkStartWeight", "RestoreBlinkChannels()",
     "channel.renderer.GetBlendShapeWeight(channel.index)",
-    "Mathf.Lerp(channel.renderer.GetBlendShapeWeight(channel.index), 100f, weight / 100f)",
-    "The zeroed blink curve leaves the Animator's current facial pose intact",
 ):
     require(token in expressions, "social expression driver is missing: " + token)
 require("headBaseRotation" not in expressions,
         "social gaze must not reset imported head animation to the Awake-time bind pose")
-require("blinkStartWeight" not in expressions and "RestoreBlinkChannels" not in expressions,
-        "blink overlay must not restore a stale cached facial pose over Animator output")
+require("originalWeight" not in expressions,
+        "blink restoration must not overwrite animation-authored blendshape weights with Awake-time values")
 
 for token in (
     "MaterialPropertyBlock",
