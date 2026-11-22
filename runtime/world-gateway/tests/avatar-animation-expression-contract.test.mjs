@@ -12,7 +12,10 @@ const validator = readFileSync(resolve(root, "unity/UCENOVirtualWorld/Assets/UCE
 test("social gaze layers over the evaluated Humanoid head pose instead of resetting authored clip motion", () => {
   assert.match(expression, /Quaternion animatedHeadRotation = head\.localRotation/);
   assert.match(expression, /animatedHeadRotation \* Quaternion\.Euler\(pitch, yaw, 0f\)/);
-  assert.match(expression, /head\.localRotation = Quaternion\.Slerp\(\s*animatedHeadRotation/);
+  assert.match(expression, /head\.localRotation = animatedHeadRotation \* appliedOffset/);
+  assert.match(expression, /lastAppliedHeadRotation/);
+  assert.match(expression, /Quaternion\.Inverse\(lastAppliedHeadOffset\)/);
+  assert.match(expression, /Quaternion\.Angle\(animatedHeadRotation, lastAppliedHeadRotation\)/);
   assert.doesNotMatch(expression, /headBaseRotation/);
 });
 
