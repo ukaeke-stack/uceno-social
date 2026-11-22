@@ -90,8 +90,11 @@ export interface TreasureProgress {
 }
 export function applyTreasureDiscovery(clues: readonly TreasureClue[], progress: TreasureProgress,
   discovery: TreasureDiscovery): { ok: true; progress: TreasureProgress; completed: boolean } | { ok: false; code: string } {
-  if (!discovery || discovery.source !== "authoritative_gateway")
+  if (!discovery || typeof discovery !== "object" || Array.isArray(discovery) ||
+      discovery.source !== "authoritative_gateway")
     return { ok: false, code: "unverified_treasure_discovery" };
+  if (!progress || typeof progress !== "object" || Array.isArray(progress))
+    return { ok: false, code: "invalid_treasure_progress" };
   if (![progress.huntId, progress.userId, discovery.huntId, discovery.userId, discovery.clueId]
       .every(value => typeof value === "string" && UUID.test(value)) ||
       progress.huntId !== discovery.huntId || progress.userId !== discovery.userId)
