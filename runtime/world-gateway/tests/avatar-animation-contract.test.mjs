@@ -21,6 +21,7 @@ test("avatar builder requires every imported and retargeted animation clip", () 
   for (const clip of ["idle", "walk", "run", "talk", "turn", "wave", "cheer", "dance", "interact", "sit"])
     assert.ok(builder.includes('FindClip(clips, "' + clip + '")'), "missing required clip " + clip);
   assert.ok(builder.includes("HumanoidAnimationLibraryValidator.Validate()"));
+  assert.ok(builder.includes("AssetDatabase.LoadAllAssetsAtPath(AvatarPath)"));
   assert.ok(builder.includes("CreateHumanoidController"));
   assert.ok(builder.includes("AddGestureState"));
 });
