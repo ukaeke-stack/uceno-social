@@ -38,7 +38,7 @@ class HomeInteriorSourceContractTests(unittest.TestCase):
 
     def test_entry_door_does_not_block_home_spawn_or_exit(self):
         shell = method_body("BuildShell")
-        self.assertIn('"Entry door leaf"', shell)
+        self.assertIn('"Entry Door leaf"', shell)
         self.assertIn("new Vector3(1.12f, 2.10f, .10f), trim, false);", shell)
 
     def test_bathroom_has_an_opening_not_a_full_width_blocking_wall(self):
