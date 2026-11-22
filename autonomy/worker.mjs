@@ -18,8 +18,8 @@ const cfg = {
 };
 const stateFile = path.join(cfg.stateDir, "worker-state.json");
 const logFile = path.join(cfg.stateDir, "worker.log");
-const sleep = ms => new Promise(resolve => setTimeout(resolve, const run = runProcess;  });
-}
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const run = runProcess;
 async function log(message) {
   const line = "[" + new Date().toISOString() + "] " + message + "\n";
   process.stdout.write(line);
