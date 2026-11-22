@@ -1,6 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace UCENO.VirtualWorld
 {
@@ -20,6 +23,10 @@ namespace UCENO.VirtualWorld
             new Dictionary<AvatarWardrobeSlot, GameObject>();
         private readonly Dictionary<AvatarWardrobeSlot, string> equippedIds =
             new Dictionary<AvatarWardrobeSlot, string>();
+        private readonly Dictionary<AvatarWardrobeSlot, AsyncOperationHandle<GameObject>> addressableHandles =
+            new Dictionary<AvatarWardrobeSlot, AsyncOperationHandle<GameObject>>();
+        private readonly HashSet<AvatarWardrobeSlot> pendingAddressableSlots =
+            new HashSet<AvatarWardrobeSlot>();
         private Dictionary<string, Transform> avatarBones;
 
         public event Action<AvatarWardrobeSlot, string> EquippedChanged;
@@ -35,6 +42,137 @@ namespace UCENO.VirtualWorld
 
         public string GetEquippedId(AvatarWardrobeSlot slot) =>
             equippedIds.TryGetValue(slot, out string id) ? id : null;
+
+        /// <summary>
+        /// Loads a wardrobe prefab by its versioned Addressables address. The
+        /// catalog entry must be downloaded through WorldContentDelivery first;
+        /// the retained handle keeps remote bundle dependencies alive while worn.
+        /// </summary>
+        public void EquipAddressable(string itemId, Action<bool, string> completed = null)
+        {
+            StartCoroutine(EquipAddressableRoutine(itemId, completed));
+        }
+
+        private IEnumerator EquipAddressableRoutine(string itemId, Action<bool, string> completed)
+        {
+            if (catalog == null || !catalog.TryGet(itemId, out AvatarWardrobeItemDefinition item) ||
+                !Enum.IsDefined(typeof(AvatarWardrobeSlot), item.slot))
+            {
+                completed?.Invoke(false, "Wardrobe item is not in the local catalogue.");
+                yield break;
+            }
+            if (string.IsNullOrWhiteSpace(item.addressableKey))
+            {
+                completed?.Invoke(false, "Wardrobe item has no versioned Addressables address.");
+                yield break;
+            }
+            if (pendingAddressableSlots.Contains(item.slot))
+            {
+                completed?.Invoke(false, "A wardrobe load is already running for this slot.");
+                yield break;
+            }
+            if (avatarAnimator == null || avatarAnimator.avatar == null || !avatarAnimator.avatar.isValid ||
+                !avatarAnimator.avatar.isHuman)
+            {
+                completed?.Invoke(false, "A valid Humanoid avatar rig is required.");
+                yield break;
+            }
+
+            pendingAddressableSlots.Add(item.slot);
+            AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(item.addressableKey);
+            yield return handle;
+            if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
+            {
+                if (handle.IsValid()) Addressables.Release(handle);
+                pendingAddressableSlots.Remove(item.slot);
+                completed?.Invoke(false, "Addressables could not load wardrobe asset: " + item.addressableKey);
+                yield break;
+            }
+
+            GameObject instance = Instantiate(handle.Result, garmentRoot, false);
+            instance.name = "Equipped_" + item.itemId;
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+
+            string bindError;
+            if (!TryBindWardrobeInstance(instance, out bindError))
+            {
+                Destroy(instance);
+                Addressables.Release(handle);
+                pendingAddressableSlots.Remove(item.slot);
+                completed?.Invoke(false, bindError);
+                yield break;
+            }
+
+            if (equippedObjects.TryGetValue(item.slot, out GameObject previous) && previous != null)
+                Destroy(previous);
+            ReleaseAddressableHandle(item.slot);
+            equippedObjects[item.slot] = instance;
+            equippedIds[item.slot] = item.itemId;
+            addressableHandles[item.slot] = handle;
+            pendingAddressableSlots.Remove(item.slot);
+            EquippedChanged?.Invoke(item.slot, item.itemId);
+            completed?.Invoke(true, null);
+        }
+
+        private bool TryBindWardrobeInstance(GameObject instance, out string error)
+        {
+            error = null;
+            SkinnedMeshRenderer[] renderers = instance.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            if (renderers.Length == 0)
+            {
+                error = "Wardrobe prefab must contain at least one SkinnedMeshRenderer.";
+                return false;
+            }
+            if (avatarBones == null || avatarBones.Count == 0) RebuildBoneMap();
+            foreach (SkinnedMeshRenderer renderer in renderers)
+            {
+                if (renderer.sharedMesh == null || renderer.bones == null || renderer.bones.Length == 0)
+                {
+                    error = "Wardrobe mesh is missing its mesh or bone weights.";
+                    return false;
+                }
+                Transform[] mappedBones = new Transform[renderer.bones.Length];
+                for (int i = 0; i < renderer.bones.Length; i++)
+                {
+                    Transform sourceBone = renderer.bones[i];
+                    if (sourceBone == null || !avatarBones.TryGetValue(sourceBone.name, out mappedBones[i]))
+                    {
+                        error = "Avatar rig is missing garment bone: " +
+                            (sourceBone == null ? "(null)" : sourceBone.name);
+                        return false;
+                    }
+                }
+                Transform mappedRoot = null;
+                if (renderer.rootBone != null)
+                    avatarBones.TryGetValue(renderer.rootBone.name, out mappedRoot);
+                if (renderer.rootBone != null && mappedRoot == null)
+                {
+                    error = "Avatar rig is missing the garment root bone.";
+                    return false;
+                }
+                renderer.bones = mappedBones;
+                renderer.rootBone = mappedRoot;
+                renderer.updateWhenOffscreen = false;
+            }
+            return true;
+        }
+
+        private void ReleaseAddressableHandle(AvatarWardrobeSlot slot)
+        {
+            if (!addressableHandles.TryGetValue(slot, out AsyncOperationHandle<GameObject> handle))
+                return;
+            addressableHandles.Remove(slot);
+            if (handle.IsValid()) Addressables.Release(handle);
+        }
+
+        private void OnDestroy()
+        {
+            foreach (AsyncOperationHandle<GameObject> handle in addressableHandles.Values)
+                if (handle.IsValid()) Addressables.Release(handle);
+            addressableHandles.Clear();
+        }
 
         public bool TryEquip(string itemId, out string error) =>
             TryEquip(itemId, null, out error);
@@ -133,6 +271,7 @@ namespace UCENO.VirtualWorld
 
             if (equippedObjects.TryGetValue(item.slot, out GameObject previous) && previous != null)
                 Destroy(previous);
+            ReleaseAddressableHandle(item.slot);
             equippedObjects[item.slot] = instance;
             equippedIds[item.slot] = item.itemId;
             EquippedChanged?.Invoke(item.slot, item.itemId);
@@ -145,6 +284,7 @@ namespace UCENO.VirtualWorld
                 Destroy(previous);
             equippedObjects.Remove(slot);
             equippedIds.Remove(slot);
+            ReleaseAddressableHandle(slot);
             EquippedChanged?.Invoke(slot, null);
         }
 
