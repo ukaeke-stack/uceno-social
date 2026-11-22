@@ -45,7 +45,10 @@ test("scene export creates the exact file and schema loaded by the authoritative
   assert.match(exporter, /GetComponentsInChildren<Collider>\(true\)/);
   assert.match(exporter, /collider\.enabled && collider\.gameObject\.activeInHierarchy && !collider\.isTrigger/);
   assert.match(exporter, /marker\.Kind == "door" && !marker\.HasDoorPivot/);
-  assert.match(exporter, /Guid\.NewGuid\(\)\.ToString\("N"\)/);
+  assert.match(exporter, /GlobalObjectId\\.GetGlobalObjectIdSlow\\(marker\\)/);
+  assert.match(exporter, /SHA256\\.Create\\(\\)/);
+  assert.match(exporter, /Encoding\\.UTF8\\.GetBytes\\(globalId\\)/);
+  assert.doesNotMatch(exporter, /Guid\\.NewGuid\\(\\)/);
   assert.match(exporter, /id\.StartsWith\("uceno:"/);
   assert.match(authoring, /objectId\.stringValue = StableObjectId\(marker\)/);
   assert.match(authoring, /string\.IsNullOrWhiteSpace\(objectId\.stringValue\)/);
