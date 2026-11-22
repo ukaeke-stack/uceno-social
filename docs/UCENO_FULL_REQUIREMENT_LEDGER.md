@@ -6,6 +6,13 @@ Repository: `ukaeke-stack/uceno-social`
 
 This ledger distinguishes source implementation from CI, deployment, and device verification. A source file or passing unit test is not evidence of production readiness.
 
+## Latest verified repository state
+- PR #46 is open, draft, and unmerged. Its head before the current HUD-only follow-up was `d4b693385a9cbba3d944bf8e28a9a589a91d25ca`.
+- That head passed all three PR workflows: World Gateway Activity Tests (run 44995628661), UCENO World Gateway Tests (44995628698), and UCENO World Gateway and Unity Client (44995628706).
+- Verified jobs: activity TypeScript compile/tests; gateway policy/session tests; gateway TypeScript build; PostgreSQL fencing and real-process failover tests; Unity source validation; and root web build. All completed successfully.
+- A follow-up Unity HUD source change removes a duplicated empty-clue message. It is committed after the verified head and awaits its own latest-head CI result.
+- The latest verified CI does not establish Unity Editor compilation, imported asset quality, scene correctness, Addressables publication, CDN delivery, or Android device behavior.
+
 ## Release constraints
 - Keep PR #46 draft, open, and unmerged until its full review and release gates pass.
 - Do not apply migrations 037–043 to production without separate review and approval.
@@ -20,9 +27,9 @@ This ledger distinguishes source implementation from CI, deployment, and device 
 |---|---|---|
 | Separate Earned and Purchased Credits | Source foundation exists in earlier world migrations and reward ledger | Reconcile every write path and verify DB constraints/integration |
 | Append-only Earned Credits ledger | Source foundation and activity reward allocation exist | Dedicated accounting invariants, reversals/adjustments policy, audit review |
-| Mission and treasure reward issuance | Source implemented in PR #46 | Latest-head CI for current head; production schema not applied |
-| Team contribution allocation and reward caps | Source and PostgreSQL integration coverage described in PR #46 | Reconfirm latest head and extend adversarial tests |
-| Collectible inventory and finite supply | Source and concurrency tests described in PR #46 | Production migration and real runtime verification |
+| Mission and treasure reward issuance | Source implemented in PR #46 | Production schema not applied; maintain latest-head CI |
+| Team contribution allocation and reward caps | Source and PostgreSQL integration coverage in PR #46 | Production migration and real runtime verification |
+| Collectible inventory and finite supply | Source and concurrency tests in PR #46 | Production migration and real runtime verification |
 | Marketplace listings and Purchased Credit pricing | Earlier source foundation | Seller fulfilment, settlement, refunds, dispute resolution and full UI remain incomplete |
 | Escrow purchase state machine | Earlier SQL foundation | Keep disabled; verify full fulfilment/dispute lifecycle before activation |
 | Paystack multi-currency top-ups | Provider metadata/issuance foundation only | Initialization, signature verification, webhook replay handling, reconciliation, refunds, secrets and end-to-end tests |
@@ -48,13 +55,13 @@ This ledger distinguishes source implementation from CI, deployment, and device 
 - The current gateway configuration describes a ten-city catalogue; reconcile this against the approved product requirement and city list before treating city coverage as complete.
 - HDRI provenance checks and partial architecture acquisition are source/artifact evidence only.
 - The city art gate still requires complete imported prefabs, reviewed manifests, LODs, textured materials, collision, scene generation and visual acceptance for every city.
-- Addressables remote profiles/catalogues/bundles, CDN publication, district collision exports, interactable exports and gateway configuration must match exactly.
+- Addressables package 2.7.6 is pinned for the Unity 6000.0-compatible project line. Remote profiles/catalogues/bundles, CDN publication, district collision exports, interactable exports and gateway configuration must match exactly. Addressables source configuration is not proof of published content.
 - AI citizens, homes, commerce, activities, spatial voice, avatars, creator tools and governance must be tested in actual scenes, not only source contracts.
 
 ## Multiplayer and activities
-- PR #46 describes PostgreSQL-backed fencing, takeover, stale-generation rejection, treasure concurrency, reward conservation and finite-supply tests.
-- The latest commit reported by repository search is `01a40f3484db4e5fa55bde37cad9809790be7760`; no PR workflow runs or combined status entries were returned for that SHA at the time of reconciliation.
-- Do not carry forward historical CI success as current-head evidence.
+- PR #46 includes PostgreSQL-backed fencing, takeover, stale-generation rejection, treasure concurrency, reward conservation and finite-supply tests.
+- Latest verified head `d4b693385a9cbba3d944bf8e28a9a589a91d25ca` passed all three PR workflows on 2026-11-22. This verification supersedes earlier historical CI notes.
+- Failover tests exercise local gateway OS processes against PostgreSQL; this is CI integration coverage, not production multi-host validation.
 - Still required: deployed multi-host runtime validation, live voice, real city registry, Unity Editor compilation, Addressables publication, Android two-device testing and recovery tests against deployed infrastructure.
 
 ## Release and operational verification
