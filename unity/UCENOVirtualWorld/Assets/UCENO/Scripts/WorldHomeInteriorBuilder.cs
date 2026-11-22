@@ -94,8 +94,8 @@ namespace UCENO.VirtualWorld
             AddBox(root, "Entry threshold", new Vector3(0f, .025f, -4.82f),
                 new Vector3(1.3f, .05f, .34f), metal, false);
 
-            BuildWindow(root, "Left", new Vector3(-5.87f, 2f, 1.7f), glass, trim, metal);
-            BuildWindow(root, "Right", new Vector3(5.87f, 2f, 1.7f), glass, trim, metal);
+            BuildWindow(root, "Left Window", new Vector3(-5.87f, 2f, 1.7f), glass, trim, metal);
+            BuildWindow(root, "Right Window", new Vector3(5.87f, 2f, 1.7f), glass, trim, metal);
 
             // Skirting, ceiling coves and slim ceiling beams make wall/ceiling transitions intentional.
             AddBox(root, "Back skirting", new Vector3(0f, .08f, 4.86f), new Vector3(11.8f, .16f, .08f), trim, false);
@@ -112,7 +112,7 @@ namespace UCENO.VirtualWorld
         private static void BuildWindow(Transform root, string side, Vector3 center,
             Material glass, Material frame, Material metal)
         {
-            AddBox(root, side + " Window panoramic glazing", center, new Vector3(.055f, 1.55f, 2.5f), glass, false);
+            AddBox(root, side + " panoramic glazing", center, new Vector3(.055f, 1.55f, 2.5f), glass, false);
             AddBox(root, side + " window top frame", center + new Vector3(0f, .82f, 0f),
                 new Vector3(.16f, .12f, 2.7f), frame, false);
             AddBox(root, side + " window bottom frame", center + new Vector3(0f, -.82f, 0f),
