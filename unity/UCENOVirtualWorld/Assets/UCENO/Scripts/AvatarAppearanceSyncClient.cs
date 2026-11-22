@@ -37,6 +37,7 @@ namespace UCENO.VirtualWorld
         private bool loading;
         private float nextLoadAttempt;
         private float nextSaveAttempt;
+        private string loadedUserId;
 
         public void Initialize(WorldSessionClient worldSession, AvatarAppearanceProfile appearanceProfile)
         {
@@ -46,6 +47,17 @@ namespace UCENO.VirtualWorld
 
         private void Update()
         {
+            if (session != null && loadedUserId != session.UserId)
+            {
+                loaded = false;
+                pendingSave = false;
+                nextSaveAttempt = 0f;
+                loadedUserId = session.UserId;
+                if (profile != null) profile.Apply(AvatarAppearanceProfile.Palette.Default);
+                AvatarCustomizationHud hud = GetComponent<AvatarCustomizationHud>();
+                if (hud == null) hud = GetComponentInChildren<AvatarCustomizationHud>();
+                if (hud != null) hud.ApplyAccountPalette(AvatarAppearanceProfile.Palette.Default);
+            }
             if (!loaded && !loading && session != null && session.IsAuthenticated &&
                 Time.unscaledTime >= nextLoadAttempt)
                 StartCoroutine(LoadRoutine());
@@ -65,7 +77,7 @@ namespace UCENO.VirtualWorld
         {
             loading = true;
             if (session == null || profile == null || !session.IsAuthenticated ||
-                string.IsNullOrEmpty(session.WorldId)) { loading = false; yield break; }
+                string.IsNullOrEmpty(session.WorldId) || string.IsNullOrEmpty(session.UserId)) { loading = false; yield break; }
             string url = session.ApiBaseUrl.TrimEnd('/') + "/api/worlds/" + UnityWebRequest.EscapeURL(session.WorldId) + "/appearance";
             using (UnityWebRequest request = UnityWebRequest.Get(url))
             {
@@ -90,6 +102,7 @@ namespace UCENO.VirtualWorld
                         if (hud != null) hud.ApplyAccountPalette(palette);
                     }
                     loaded = true;
+                    loadedUserId = session.UserId;
                 }
                 else Debug.LogWarning("UCENO account appearance load failed: " + request.responseCode);
             }
