@@ -38,6 +38,7 @@ namespace UCENO.VirtualWorld
         private float retryAt;
         private bool saving;
         private string loadedUserId;
+        private int accountGeneration;
         private readonly Dictionary<string, string> pendingEquipment = new Dictionary<string, string>();
 
         public IReadOnlyList<WardrobeInventoryItem> Inventory => inventory;
@@ -54,6 +55,7 @@ namespace UCENO.VirtualWorld
         {
             if (session != null && loadedUserId != session.UserId)
             {
+                accountGeneration++;
                 StopAllCoroutines();
                 loading = false;
                 saving = false;
@@ -84,13 +86,16 @@ namespace UCENO.VirtualWorld
             if (owned.assetVersion > 0 && !string.IsNullOrWhiteSpace(owned.prefabKey))
             {
                 string requestedUserId = session.UserId;
+                int requestedGeneration = accountGeneration;
                 controller.EquipAddressable(itemId, owned.prefabKey, owned.assetVersion, (success, loadError) =>
                 {
-                    if (success && session != null && session.UserId == requestedUserId && loaded)
+                    if (success && session != null && session.UserId == requestedUserId &&
+                        accountGeneration == requestedGeneration && loaded)
                         QueueSaveSlot(owned.slot, itemId);
                     else if (!success)
                         Debug.LogWarning("UCENO versioned wardrobe equip failed (" + itemId + "): " + loadError);
-                }, () => session != null && session.UserId == requestedUserId && loaded);
+                }, () => session != null && session.UserId == requestedUserId &&
+                    accountGeneration == requestedGeneration && loaded);
                 return true;
             }
             if (!controller.TryEquip(itemId, owned.prefabKey, out error)) return false;
@@ -110,6 +115,7 @@ namespace UCENO.VirtualWorld
         {
             loading = true;
             string requestedUserId = session.UserId;
+            int requestedGeneration = accountGeneration;
             string url = BuildUrl();
             using (UnityWebRequest request = UnityWebRequest.Get(url))
             {
@@ -117,7 +123,8 @@ namespace UCENO.VirtualWorld
                 request.SetRequestHeader("Accept", "application/json");
                 request.timeout = 15;
                 yield return request.SendWebRequest();
-                if (session == null || session.UserId != requestedUserId) { loading = false; yield break; }
+                if (session == null || session.UserId != requestedUserId ||
+                    accountGeneration != requestedGeneration) { loading = false; yield break; }
                 if (request.result == UnityWebRequest.Result.Success)
                 {
                     WardrobeLoadResponse response = JsonUtility.FromJson<WardrobeLoadResponse>(request.downloadHandler.text);
@@ -149,7 +156,8 @@ namespace UCENO.VirtualWorld
                                     {
                                         if (!success) Debug.LogWarning("UCENO saved wardrobe item could not load (" +
                                             owned.itemId + "): " + loadError);
-                                    }, () => session != null && session.UserId == requestedUserId);
+                                    }, () => session != null && session.UserId == requestedUserId &&
+                                        accountGeneration == requestedGeneration);
                             }
                             else if (!controller.TryEquip(owned.itemId, owned.prefabKey, out string equipError))
                             {
@@ -180,7 +188,9 @@ namespace UCENO.VirtualWorld
         {
             saving = true;
             string requestedUserId = session != null ? session.UserId : null;
-            while (pendingEquipment.Count > 0 && session != null && session.UserId == requestedUserId)
+            int requestedGeneration = accountGeneration;
+            while (pendingEquipment.Count > 0 && session != null &&
+                session.UserId == requestedUserId && accountGeneration == requestedGeneration)
             {
                 Dictionary<string, string> batch = new Dictionary<string, string>(pendingEquipment);
                 pendingEquipment.Clear();
@@ -206,7 +216,8 @@ namespace UCENO.VirtualWorld
                     request.SetRequestHeader("Content-Type", "application/json");
                     request.timeout = 15;
                     yield return request.SendWebRequest();
-                    if (session == null || session.UserId != requestedUserId) { saving = false; yield break; }
+                    if (session == null || session.UserId != requestedUserId ||
+                        accountGeneration != requestedGeneration) { saving = false; yield break; }
                     saved = request.result == UnityWebRequest.Result.Success;
                     responseCode = request.responseCode;
                     if (!saved) Debug.LogWarning("UCENO wardrobe save failed: " + responseCode);
