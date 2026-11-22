@@ -25,7 +25,8 @@ function run(command, args, options = {}) {
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.cleanEnv ? options.env : { ...process.env, ...(options.env || {}) },
-      stdio: ["ignore", "pipe", "pipe"],\n      detached: Boolean(options.timeout)\n
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: Boolean(options.timeout)
     });
     let stdout = "", stderr = "";
     child.stdout.on("data", d => stdout += d.toString());
@@ -40,8 +41,6 @@ function run(command, args, options = {}) {
     const timer = options.timeout ? setTimeout(() => {
       timedOut = true;
       signalGroup("SIGTERM");
-      // Codex may spawn subprocesses; escalate the whole process group if it
-      // does not stop cleanly rather than leaving orphaned work behind.
       killTimer = setTimeout(() => signalGroup("SIGKILL"), options.killGraceMs || 10000);
     }, options.timeout) : null;
     child.on("error", error => {
@@ -83,6 +82,7 @@ async function git(args, timeout = 120000) {
   });
 }
 async function ensureCheckout() {
+  assertWorkBranch(cfg.branch, "infra/uceno-autonomous-development-agent");
   await mkdir(path.dirname(cfg.workdir), { recursive: true });
   if (!existsSync(path.join(cfg.workdir, ".git"))) {
     const result = await run("git", ["-c", "core.hooksPath=/dev/null", "clone", "--branch", cfg.branch, cfg.repo, cfg.workdir], {
