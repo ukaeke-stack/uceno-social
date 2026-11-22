@@ -41,8 +41,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          manifest="$(find "$RUNNER_TEMP/uceno-city-architecture-source-acquisition" -type f -name tevy-acquisition-manifest.json -print -quit)"
-          test -n "$manifest"
+          mapfile -t manifests < <(find "$RUNNER_TEMP/uceno-city-architecture-source-acquisition" -type f -name tevy-acquisition-manifest.json -print | sort)
+          if [ "${#manifests[@]}" -ne 1 ]; then
+            echo "Expected exactly one acquisition manifest; found ${#manifests[@]}." >&2
+            exit 1
+          fi
+          manifest="${manifests[0]}"
           python - "$manifest" "$RUNNER_TEMP/uceno-city-architecture-source-acquisition" "$GITHUB_OUTPUT" <<'PY'
           import hashlib, json, os, pathlib, shutil, sys
           manifest_path, acquisition_root, output_path = map(pathlib.Path, sys.argv[1:])
@@ -55,11 +59,16 @@ jobs:
           lod0 = next((x for x in candidate.get("lods", []) if x.get("lod") == 0), None)
           if not lod0 or not lod0.get("file") or not lod0.get("sha256"):
               raise SystemExit("Selected SolsticeBay candidate has no manifest-pinned LOD0 file/checksum.")
+          if len([x for x in candidate.get("lods", []) if x.get("lod") == 0]) != 1:
+              raise SystemExit("Selected candidate must contain exactly one LOD0 record.")
           expected = str(lod0["sha256"]).lower()
           if len(expected) != 64:
               raise SystemExit("Manifest LOD0 SHA-256 is malformed.")
-          matches = list(acquisition_root.rglob(pathlib.Path(lod0["file"]).name))
-          matches = [p for p in matches if p.as_posix().endswith("/" + lod0["file"].replace("\\\\", "/"))]
+          relative_file = pathlib.PurePosixPath(str(lod0["file"]).replace("\\\\", "/"))
+          if relative_file.is_absolute() or ".." in relative_file.parts:
+              raise SystemExit("Manifest LOD0 path must be a safe relative path.")
+          matches = [p for p in acquisition_root.rglob(relative_file.name)
+                     if p.relative_to(acquisition_root).as_posix().endswith(relative_file.as_posix())]
           if len(matches) != 1:
               raise SystemExit(f"Expected exactly one file for {lod0['file']}; found {len(matches)}.")
           source = matches[0]
