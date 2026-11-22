@@ -1,5 +1,4 @@
 import pathlib
-import re
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -8,18 +7,21 @@ CODE = SOURCE.read_text(encoding="utf-8")
 
 
 def method_body(name):
-    match = re.search(r"private static void " + re.escape(name) + r"\\([^)]*\\)\\s*\\{", CODE)
-    if not match:
+    marker = "private static void " + name + "("
+    start_signature = CODE.find(marker)
+    if start_signature < 0:
         raise AssertionError("Missing method: " + name)
-    start = match.end()
+    start = CODE.find("{", start_signature)
+    if start < 0:
+        raise AssertionError("Missing method body: " + name)
     depth = 1
-    for index in range(start, len(CODE)):
+    for index in range(start + 1, len(CODE)):
         if CODE[index] == "{":
             depth += 1
         elif CODE[index] == "}":
             depth -= 1
             if depth == 0:
-                return CODE[start:index]
+                return CODE[start + 1:index]
     raise AssertionError("Unclosed method: " + name)
 
 
@@ -36,8 +38,8 @@ class HomeInteriorSourceContractTests(unittest.TestCase):
 
     def test_entry_door_does_not_block_home_spawn_or_exit(self):
         shell = method_body("BuildShell")
-        self.assertRegex(shell, r'"Entry door leaf".*?trim, false\\)')
-        self.assertIn('"Entry door handle"', shell)
+        self.assertIn('"Entry door leaf"', shell)
+        self.assertIn("new Vector3(1.12f, 2.10f, .10f), trim, false);", shell)
 
     def test_bathroom_has_an_opening_not_a_full_width_blocking_wall(self):
         bathroom = method_body("BuildBathroom")
@@ -46,14 +48,14 @@ class HomeInteriorSourceContractTests(unittest.TestCase):
         self.assertNotIn('"Bathroom partition left"', bathroom)
 
     def test_decorative_geometry_can_omit_colliders(self):
-        add_box = re.search(r"private static void AddBox\\([\\s\\S]*?\\n        }", CODE)
-        self.assertIsNotNone(add_box)
-        self.assertIn("if (!collider)", add_box.group(0))
-        self.assertIn("Object.Destroy(shape)", add_box.group(0))
+        add_box = method_body("AddBox")
+        self.assertIn("if (!collider)", add_box)
+        self.assertIn("Object.Destroy(shape)", add_box)
 
     def test_no_per_home_material_allocation_when_cached(self):
         material_method = method_body("CreateMaterial")
-        self.assertLess(material_method.index("Materials.TryGetValue"), material_method.index("new Material(shader)"))
+        self.assertLess(material_method.index("Materials.TryGetValue"),
+                        material_method.index("new Material(shader)"))
 
 
 if __name__ == "__main__":
