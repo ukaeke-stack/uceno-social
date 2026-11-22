@@ -264,6 +264,13 @@ def main():
         '"CC0 1.0", "CC-BY 4.0", "CC-BY 3.0"',
         '"CC-BY-SA 4.0", "CC-BY-SA 3.0"',
         'city.skyboxTexture.StartsWith("Assets/UCENO/Cities/" + city.cityId',
+        "source.sourceArchiveSha256",
+        "source.licenseFileSha256",
+        "ResolveEvidencePath(source.sourceArchive, evidenceRoot",
+        "ResolveEvidencePath(source.licenseFile, evidenceRoot",
+        "ComputeSha256(archivePath)",
+        "ComputeSha256(licensePath)",
+        "licenseText.IndexOf(license, StringComparison.OrdinalIgnoreCase)",
     ):
         if required not in imported_city_gate:
             fail("Imported city art provenance/reuse gate is missing: " + required)
