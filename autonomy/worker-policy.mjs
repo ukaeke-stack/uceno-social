@@ -2,7 +2,7 @@ export function parseLinuxProcessStartTicks(stat) {
   if (typeof stat !== "string") return null;
   const closingParen = stat.lastIndexOf(")");
   if (closingParen < 0) return null;
-  const fields = stat.slice(closingParen + 2).trim().split(/\\s+/);
+  const fields = stat.slice(closingParen + 2).trim().split(/\s+/);
   return fields[19] || null;
 }
 
