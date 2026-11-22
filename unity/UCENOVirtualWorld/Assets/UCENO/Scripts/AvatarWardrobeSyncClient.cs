@@ -81,6 +81,15 @@ namespace UCENO.VirtualWorld
                 error = "This account does not own that wardrobe item.";
                 return false;
             }
+            if (owned.assetVersion > 0 && !string.IsNullOrWhiteSpace(owned.prefabKey))
+            {
+                controller.EquipAddressable(itemId, owned.prefabKey, owned.assetVersion, (success, loadError) =>
+                {
+                    if (success) QueueSaveSlot(owned.slot, itemId);
+                    else Debug.LogWarning("UCENO versioned wardrobe equip failed (" + itemId + "): " + loadError);
+                });
+                return true;
+            }
             if (!controller.TryEquip(itemId, owned.prefabKey, out error)) return false;
             QueueSaveSlot(owned.slot, itemId);
             return true;
@@ -111,15 +120,35 @@ namespace UCENO.VirtualWorld
                     WardrobeLoadResponse response = JsonUtility.FromJson<WardrobeLoadResponse>(request.downloadHandler.text);
                     inventory = response != null && response.inventory != null
                         ? response.inventory : Array.Empty<WardrobeInventoryItem>();
-                    List<KeyValuePair<AvatarWardrobeSlot, string>> selections =
-                        new List<KeyValuePair<AvatarWardrobeSlot, string>>();
+                    // Clear stale local selections first, then resolve each server-owned
+                    // item using its immutable Addressables key/version when available.
+                    controller.ApplyEquipped(Array.Empty<KeyValuePair<AvatarWardrobeSlot, string>>());
                     if (response != null && response.equipped != null)
                     {
                         foreach (WardrobeEquippedItem item in response.equipped)
-                            if (item != null && Enum.TryParse(item.slot, true, out AvatarWardrobeSlot slot))
-                                selections.Add(new KeyValuePair<AvatarWardrobeSlot, string>(slot, item.itemId));
+                        {
+                            if (item == null || !Enum.TryParse(item.slot, true, out AvatarWardrobeSlot slot))
+                                continue;
+                            WardrobeInventoryItem owned = Array.Find(inventory,
+                                candidate => candidate != null && candidate.itemId == item.itemId);
+                            if (owned == null) continue;
+                            if (owned.assetVersion > 0 && !string.IsNullOrWhiteSpace(owned.prefabKey))
+                            {
+                                controller.EquipAddressable(owned.itemId, owned.prefabKey, owned.assetVersion,
+                                    (success, loadError) =>
+                                    {
+                                        if (!success) Debug.LogWarning("UCENO saved wardrobe item could not load (" +
+                                            owned.itemId + "): " + loadError);
+                                    });
+                            }
+                            else if (Enum.TryParse(owned.slot, true, out AvatarWardrobeSlot ownedSlot) &&
+                                !controller.TryEquip(owned.itemId, owned.prefabKey, out string equipError))
+                            {
+                                Debug.LogWarning("UCENO legacy wardrobe item could not load (" +
+                                    owned.itemId + "): " + equipError);
+                            }
+                        }
                     }
-                    controller.ApplyEquipped(selections);
                     loaded = true;
                     loadedUserId = session.UserId;
                 }
