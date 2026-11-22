@@ -114,3 +114,12 @@ This ledger distinguishes source implementation from CI, deployment, and device 
 - Added source-contract regression assertions for world-ID checks. Commits: `62715fe5fe996e21524dbc5efc897407f74f8067` and `02e1cc029b3dc69c386cec91e335e32a82295e5e`.
 - CI results for exact head `02e1cc029b3dc69c386cec91e335e32a82295e5e` have not yet been returned. Do not treat the prior `8435a81` passes as verification of these follow-up changes.
 - No Unity Editor compilation, Addressables publication, Android device test, production migration, deployment or APK build occurred.
+
+
+## Latest engineering checkpoint — 2026-11-22 (treasure policy input validation)
+- Hardened `applyTreasureDiscovery` against malformed runtime inputs: null, primitive and array discovery/progress values now return typed fail-closed errors instead of throwing while dereferencing properties.
+- Treasure progress validation now rejects malformed completion timestamps (non-finite, non-positive or non-numeric values) before accepting a completed-state marker.
+- Added regression tests for malformed discovery payloads, malformed progress objects and invalid completion timestamps.
+- Changes are in commits `ba4779a3fe28869ba344f0107e3f33719aca2069`, `a8f28f5436abdb2736d698abbb43d08cf196a75c`, `c51cc0976fb420374d1b042e5e6da463cce04d94` and `8273613c3bbcc5ffc6d8f82c614de37e4646cc06`. No exact-head CI runs were visible when this checkpoint was recorded; treat these changes as unverified until CI completes.
+- Previous exact checkpoint `5362e1ab4277302c78b3ded496c5f66ceeb30268` passed content-delivery source checks, World Gateway Tests, Activity Tests and World Gateway/Unity Client; the nine-city art gate failed due to missing imported city assets/manifests. Those results do not verify these later policy changes.
+- No production migrations, deployment, Addressables publication, Unity Editor compilation or APK/device test occurred.
