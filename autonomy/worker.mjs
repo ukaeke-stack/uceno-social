@@ -22,7 +22,7 @@ function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: options.cwd,
-      env: { ...process.env, ...(options.env || {}) },
+      env: options.cleanEnv ? options.env : { ...process.env, ...(options.env || {}) },
       stdio: ["ignore", "pipe", "pipe"]
     });
     let stdout = "", stderr = "";
@@ -79,7 +79,7 @@ async function runCycle(state) {
   if (before.code !== 0 || before.stdout.trim()) throw new Error("working tree must be clean before a cycle");
   await log("Starting engineering cycle " + state.cycles);
   const result = await run("codex", ["exec", "--full-auto", "--cd", cfg.workdir, promptForCycle()], {
-    cwd: cfg.workdir, timeout: cfg.timeoutMs, env: { OPENAI_API_KEY: cfg.apiKey }
+    cwd: cfg.workdir, timeout: cfg.timeoutMs, cleanEnv: true, env: { PATH: process.env.PATH, HOME: "/tmp/home", TMPDIR: "/tmp", OPENAI_API_KEY: cfg.apiKey }
   });
   await log("Codex exit=" + result.code + "; output tail: " + (result.stdout + "\n" + result.stderr).slice(-5000));
   if (result.code !== 0) throw new Error("Codex task did not complete successfully");
