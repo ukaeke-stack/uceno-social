@@ -27,6 +27,8 @@ test("wardrobe controller resolves immutable key-plus-version addresses and reje
   assert.match(controller, /foreach \(AsyncOperationHandle<GameObject> handle in pendingAddressableReleases\)/);
   assert.match(controller, /string\.Equals\(item\.addressableKey, expectedAddressableKey/);
   assert.match(controller, /AsyncOperationStatus\.Succeeded/);
+  assert.match(controller, /Func<bool> applyGuard/);
+  assert.match(controller, /applyGuard != null && !applyGuard\(\)/);
   assert.match(controller, /Addressables\.Release\(handle\)/);
   assert.match(controller, /ReleaseAddressableWhenUnused/);
   assert.match(controller, /equippedIds\.ContainsValue\(itemId\)/);
@@ -37,4 +39,6 @@ test("wardrobe sync uses server-owned item version metadata for equip and saved 
   assert.match(sync, /controller\.EquipAddressable\(itemId, owned\.prefabKey, owned\.assetVersion/);
   assert.match(sync, /controller\.EquipAddressable\(owned\.itemId, owned\.prefabKey, owned\.assetVersion/);
   assert.match(sync, /candidate\.itemId == item\.itemId/);
+  assert.match(sync, /session\.UserId == requestedUserId && loaded/);
+  assert.match(sync, /\(\) => session != null && session\.UserId == requestedUserId/);
 });
