@@ -25,6 +25,9 @@ jobs:
       - name: Test worker safety policies
         run: node --test autonomy/worker-policy.test.mjs
       - name: Validate Compose configuration
+        env:
+          OPENAI_API_KEY: ci-placeholder-not-a-secret
+          GITHUB_TOKEN: ci-placeholder-not-a-secret
         run: docker compose -f autonomy/docker-compose.yml config --quiet
       - name: Build worker image
         run: docker build -f autonomy/Dockerfile -t uceno-autonomous-worker:ci .
