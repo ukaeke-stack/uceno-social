@@ -29,6 +29,8 @@ namespace UCENO.VirtualWorld
             new Dictionary<string, int>(StringComparer.Ordinal);
         private readonly Dictionary<string, AsyncOperationHandle<GameObject>> addressableHandles =
             new Dictionary<string, AsyncOperationHandle<GameObject>>(StringComparer.Ordinal);
+        private readonly HashSet<AsyncOperationHandle<GameObject>> pendingAddressableReleases =
+            new HashSet<AsyncOperationHandle<GameObject>>();
         private Dictionary<string, Transform> avatarBones;
         private readonly HashSet<string> ambiguousAvatarBones = new HashSet<string>(StringComparer.Ordinal);
 
@@ -259,7 +261,11 @@ namespace UCENO.VirtualWorld
 
         private IEnumerator ReleasePreviousAddressableHandle(AsyncOperationHandle<GameObject> handle)
         {
+            // Track deferred releases so disabling/destroying this controller cannot
+            // cancel the coroutine and leak the superseded Addressables reference.
+            pendingAddressableReleases.Add(handle);
             yield return null;
+            pendingAddressableReleases.Remove(handle);
             if (handle.IsValid()) Addressables.Release(handle);
         }
 
@@ -267,6 +273,9 @@ namespace UCENO.VirtualWorld
         {
             foreach (AsyncOperationHandle<GameObject> handle in addressableHandles.Values)
                 if (handle.IsValid()) Addressables.Release(handle);
+            foreach (AsyncOperationHandle<GameObject> handle in pendingAddressableReleases)
+                if (handle.IsValid()) Addressables.Release(handle);
+            pendingAddressableReleases.Clear();
             addressableHandles.Clear();
             addressableVersions.Clear();
             addressablePrefabs.Clear();
