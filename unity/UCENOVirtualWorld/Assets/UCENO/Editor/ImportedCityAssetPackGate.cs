@@ -37,7 +37,8 @@ namespace UCENO.VirtualWorld.Editor
         [Serializable] private sealed class SourceManifest { public SourceAsset[] assets; }
         [Serializable] private sealed class SourceAsset
         {
-            public string prefab, sourceName, sourceUrl, license, attribution;\n            public string sourceArchive, sourceArchiveSha256, licenseFile, licenseFileSha256;
+            public string prefab, sourceName, sourceUrl, license, attribution;
+            public string sourceArchive, sourceArchiveSha256, licenseFile, licenseFileSha256;
         }
         [Serializable] private sealed class CityCatalog { public CatalogCity[] cities; }
         [Serializable] private sealed class CatalogCity { public string id; public CatalogLandmark[] landmarks; }
@@ -97,8 +98,7 @@ namespace UCENO.VirtualWorld.Editor
                     .Concat(city.landmarks.Select(l => l.prefab)).ToArray();
                 Require(paths.Distinct(StringComparer.Ordinal).Count() == 12,
                     city.cityId + " reuses a prefab path inside its pack.");
-                Require(manifest.assets.All(a => a != null && !string.IsNullOrWhiteSpace(a.prefab)) &&
-                    manifest.assets.Select(a => a.prefab).Distinct(StringComparer.Ordinal).Count() == 12,
+                Require(manifest.assets.All(a => a != null && !string.IsNullOrWhiteSpace(a.prefab)) &&                    manifest.assets.Select(a => a.prefab).Distinct(StringComparer.Ordinal).Count() == 12,
                     city.cityId + " source manifest contains missing or duplicate prefab records.");
                 var manifestByPrefab = manifest.assets.ToDictionary(a => a.prefab, StringComparer.Ordinal);
                 Require(new HashSet<string>(manifestByPrefab.Keys, StringComparer.Ordinal)
@@ -197,8 +197,7 @@ namespace UCENO.VirtualWorld.Editor
             var provenance = JsonUtility.FromJson<HdriProvenance>(File.ReadAllText(provenancePath));
             Require(provenance != null && provenance.city_id == city.cityId,
                 city.cityId + " HDRI provenance has the wrong or missing city ID.");
-            Require(!string.IsNullOrWhiteSpace(provenance.asset_id) && seenAssetIds.Add(provenance.asset_id),
-                city.cityId + " HDRI source asset ID is missing or reused by another city.");
+            Require(!string.IsNullOrWhiteSpace(provenance.asset_id) && seenAssetIds.Add(provenance.asset_id),                city.cityId + " HDRI source asset ID is missing or reused by another city.");
             Require(provenance.license == "CC0 1.0" && provenance.format == "Radiance HDR (.hdr)" &&
                 provenance.resolution_tier == "1k" && provenance.acquisition_status == "downloaded-and-md5-verified",
                 city.cityId + " HDRI provenance does not establish a verified CC0 1K Radiance download.");
