@@ -74,8 +74,8 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
 
     def test_rejects_more_than_two_chunks(self):
         data = glb({"asset": {"version": "2.0"}})
-        extra = struct.pack("<II", 4, 0x004E4942) + b"\\x00" * 4
-        third = struct.pack("<II", 4, 0x004E4942) + b"\\x00" * 4
+        extra = struct.pack("<II", 4, 0x004E4942) + bytes(4)
+        third = struct.pack("<II", 4, 0x004E4942) + bytes(4)
         data = data + extra + third
         data = data[:8] + struct.pack("<I", len(data)) + data[12:]
         with tempfile.TemporaryDirectory() as directory:
