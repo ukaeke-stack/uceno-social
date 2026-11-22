@@ -36,6 +36,7 @@ namespace UCENO.VirtualWorld
         private bool loaded;
         private bool loading;
         private float nextLoadAttempt;
+        private float nextSaveAttempt;
 
         public void Initialize(WorldSessionClient worldSession, AvatarAppearanceProfile appearanceProfile)
         {
@@ -48,13 +49,16 @@ namespace UCENO.VirtualWorld
             if (!loaded && !loading && session != null && session.IsAuthenticated &&
                 Time.unscaledTime >= nextLoadAttempt)
                 StartCoroutine(LoadRoutine());
+            if (loaded && pendingSave && !saving && session != null && session.IsAuthenticated &&
+                Time.unscaledTime >= nextSaveAttempt)
+                StartCoroutine(SaveRoutine(profile != null ? profile.CurrentPalette : AvatarAppearanceProfile.Palette.Default));
         }
 
         public void Save(AvatarAppearanceProfile.Palette palette)
         {
             if (!loaded || session == null || !session.IsAuthenticated) return;
             pendingSave = true;
-            if (!saving) StartCoroutine(SaveRoutine(palette));
+            if (!saving && Time.unscaledTime >= nextSaveAttempt) StartCoroutine(SaveRoutine(palette));
         }
 
         private IEnumerator LoadRoutine()
@@ -116,7 +120,19 @@ namespace UCENO.VirtualWorld
                     request.timeout = 15;
                     yield return request.SendWebRequest();
                     if (request.result != UnityWebRequest.Result.Success)
-                        Debug.LogWarning("UCENO account appearance save failed: " + request.responseCode);
+                    {
+                        long status = request.responseCode;
+                        Debug.LogWarning("UCENO account appearance save failed: " + status);
+                        if (status == 0 || status == 408 || status == 429 || status >= 500)
+                        {
+                            // Preserve the latest palette and retry transient network/service failures.
+                            pendingSave = true;
+                            nextSaveAttempt = Time.unscaledTime + 10f;
+                            break;
+                        }
+                        // Authentication or validation failures are not retried indefinitely.
+                        pendingSave = false;
+                    }
                 }
                 if (pendingSave && profile != null) palette = profile.CurrentPalette;
             }
