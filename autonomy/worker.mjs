@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile, appendFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { codexEnvironment, parseLinuxProcessStartTicks, reserveDailyCycle } from "./worker-policy.mjs";
+import { assertWorkBranch, buildPushRefspec, codexEnvironment, failureBackoffMs, gitAuthEnvironment, parseLinuxProcessStartTicks, reserveDailyCycle } from "./worker-policy.mjs";
 import { readFile as readProcFile } from "node:fs/promises";
 
 const cfg = {
@@ -25,16 +25,34 @@ function run(command, args, options = {}) {
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.cleanEnv ? options.env : { ...process.env, ...(options.env || {}) },
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],\n      detached: Boolean(options.timeout)\n
     });
     let stdout = "", stderr = "";
     child.stdout.on("data", d => stdout += d.toString());
     child.stderr.on("data", d => stderr += d.toString());
-    const timer = options.timeout ? setTimeout(() => child.kill("SIGTERM"), options.timeout) : null;
-    child.on("error", reject);
+    let timedOut = false;
+    let killTimer = null;
+    const signalGroup = signal => {
+      if (!child.pid) return;
+      try { process.kill(-child.pid, signal); }
+      catch { try { child.kill(signal); } catch {} }
+    };
+    const timer = options.timeout ? setTimeout(() => {
+      timedOut = true;
+      signalGroup("SIGTERM");
+      // Codex may spawn subprocesses; escalate the whole process group if it
+      // does not stop cleanly rather than leaving orphaned work behind.
+      killTimer = setTimeout(() => signalGroup("SIGKILL"), options.killGraceMs || 10000);
+    }, options.timeout) : null;
+    child.on("error", error => {
+      if (timer) clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
+      reject(error);
+    });
     child.on("close", code => {
       if (timer) clearTimeout(timer);
-      resolve({ code: code ?? 1, stdout, stderr });
+      if (killTimer) clearTimeout(killTimer);
+      resolve({ code: timedOut ? 124 : (code ?? 1), stdout, stderr, timedOut });
     });
   });
 }
@@ -54,21 +72,14 @@ async function processStartTicks(pid) {
     return parseLinuxProcessStartTicks(stat); // Linux stat field 22: process start time.
   } catch { return null; }
 }
-function gitAuthEnvironment() {
-  if (!cfg.repoToken) return {};
-  // Keep the authorization header out of argv/process listings. Git reads
-  // this config from the child environment for fetch, push and clone.
-  return {
-    GIT_CONFIG_COUNT: "1",
-    GIT_CONFIG_KEY_0: "http.extraheader",
-    GIT_CONFIG_VALUE_0: "AUTHORIZATION: basic " + Buffer.from("x-access-token:" + cfg.repoToken).toString("base64")
-  };
+function workerGitAuthEnvironment() {
+  return gitAuthEnvironment(cfg.repoToken);
 }
 async function git(args, timeout = 120000) {
   // Disable repository hooks for every Git operation. The token is supplied
   // through Git's environment-based config, never as a command-line argument.
   return run("git", ["-c", "core.hooksPath=/dev/null", ...args], {
-    cwd: cfg.workdir, timeout, env: gitAuthEnvironment()
+    cwd: cfg.workdir, timeout, env: workerGitAuthEnvironment()
   });
 }
 async function ensureCheckout() {
@@ -125,7 +136,7 @@ async function runCycle(state) {
   const head = await git(["rev-parse", "HEAD"]);
   const remote = await git(["remote", "set-url", "origin", cfg.repo]);
   if (remote.code !== 0) throw new Error("trusted origin reset failed before push: " + remote.stderr);
-  const push = await git(["push", "origin", cfg.branch], 300000);
+  const push = await git(["push", "origin", buildPushRefspec(cfg.branch, "infra/uceno-autonomous-development-agent")], 300000);
   if (push.code !== 0) throw new Error("push failed: " + push.stderr.slice(-2000));
   state.lastCommit = head.stdout.trim();
   state.completed++;
