@@ -306,6 +306,20 @@ def main():
         if required not in city_lod_contract:
             fail("Nine-city imported prefab LOD contract is incomplete: " + required)
 
+    content_delivery = read_text(ASSETS / "Scripts/WorldContentDelivery.cs")
+    for required in (
+        "parsedCatalogUrl.Scheme != Uri.UriSchemeHttps",
+        "Addressables.LoadContentCatalogAsync(catalogUrl, true)",
+        "Addressables.Release(catalog)",
+        "Addressables.CheckForCatalogUpdates(false)",
+        "Addressables.DownloadDependenciesAsync(label, false)",
+        "maxConcurrentResidentLabels",
+        "public void ReleaseContent(string label)",
+        "Addressables.UnloadSceneAsync(handle, false)",
+    ):
+        if required not in content_delivery:
+            fail("Addressables delivery security, cache, or lifecycle contract is missing: " + required)
+
     build_command = read_text(ASSETS / "Editor/BuildCommand.cs")
     for required in ("ValidateRemainingCityPacks()", "BuildRemainingCities()",
                      "VerifyNineCitySceneRegistries()", "BuildRemoteAddressablesContent()"):
