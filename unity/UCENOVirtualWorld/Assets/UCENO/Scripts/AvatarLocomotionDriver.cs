@@ -27,21 +27,36 @@ namespace UCENO.VirtualWorld
         private float lastYaw;
         private float accumulatedTurn;
         private float nextTurnAt;
+        private bool voiceEventSubscribed;
 
         public int GestureSequence { get; private set; }
         public string GestureName { get; private set; } = "none";
 
         private void OnEnable()
         {
-            // Only the local player has a PlayerMotor. Remote humanoids receive
-            // their replicated talking state through ApplyRemoteState and must
-            // never mirror this device's microphone activity.
-            if (motor != null) WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking;
+            BindVoiceEvents();
         }
 
         private void OnDisable()
         {
-            if (motor != null) WorldSpatialVoiceClient.LocalTransmitChanged -= SetTalking;
+            UnbindVoiceEvents();
+        }
+
+        private void BindVoiceEvents()
+        {
+            // OnEnable can run before Awake assigns PlayerMotor. Awake calls
+            // this again after resolving the hierarchy; the guard prevents
+            // duplicate subscriptions when the component is re-enabled.
+            if (voiceEventSubscribed || motor == null) return;
+            WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking;
+            voiceEventSubscribed = true;
+        }
+
+        private void UnbindVoiceEvents()
+        {
+            if (!voiceEventSubscribed) return;
+            WorldSpatialVoiceClient.LocalTransmitChanged -= SetTalking;
+            voiceEventSubscribed = false;
         }
 
         private void Awake()
@@ -49,6 +64,7 @@ namespace UCENO.VirtualWorld
             animator = GetComponent<Animator>();
             if (animator == null) animator = GetComponentInChildren<Animator>();
             motor = GetComponentInParent<PlayerMotor>();
+            BindVoiceEvents();
 
             if (animator == null || animator.avatar == null || !animator.avatar.isHuman)
             {
