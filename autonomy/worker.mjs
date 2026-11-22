@@ -2,7 +2,7 @@ import { runProcess } from "./process-runner.mjs";
 import { mkdir, readFile, writeFile, appendFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { assertWorkBranch, buildPushRefspec, codexEnvironment, failureBackoffMs, gitAuthEnvironment, isLiveWorkerLockOwner, parseLinuxProcessStartTicks, reserveDailyCycle } from "./worker-policy.mjs";
+import { assertWorkBranch, buildPushRefspec, codexEnvironment, failureBackoffMs, gitAuthEnvironment, isLiveWorkerLockOwner, parseLinuxProcessStartTicks, reserveDailyCycle, validateWorkerState } from "./worker-policy.mjs";
 import { readFile as readProcFile } from "node:fs/promises";
 
 const cfg = {
@@ -26,8 +26,15 @@ async function log(message) {
   await appendFile(logFile, line);
 }
 async function loadState() {
-  try { return JSON.parse(await readFile(stateFile, "utf8")); }
-  catch { return { day: new Date().toISOString().slice(0, 10), cycles: 0, completed: 0, failed: 0, lastCommit: null }; }
+  let raw;
+  try { raw = await readFile(stateFile, "utf8"); }
+  catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    return { day: new Date().toISOString().slice(0, 10), cycles: 0, completed: 0, failed: 0, lastCommit: null };
+  }
+  // Corruption or an unreadable volume must stop the worker, not silently
+  // reset the daily reservation counter and permit extra paid cycles.
+  return validateWorkerState(JSON.parse(raw));
 }
 async function saveState(state) { await writeFile(stateFile, JSON.stringify(state, null, 2)); }
 async function processStartTicks(pid) {
