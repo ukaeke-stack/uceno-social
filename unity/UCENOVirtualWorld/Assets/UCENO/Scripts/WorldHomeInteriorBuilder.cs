@@ -232,7 +232,7 @@ namespace UCENO.VirtualWorld
             {
                 MeshRenderer renderer = filter.GetComponent<MeshRenderer>();
                 if (filter.sharedMesh == null || renderer == null ||
-                    filter.GetComponent<Collider>() != null || renderer.sharedMaterial == null)
+                    (filter.GetComponent<Collider>() != null && filter.GetComponent<Collider>().enabled) || renderer.sharedMaterial == null)
                     continue;
 
                 Material material = renderer.sharedMaterial;
@@ -295,7 +295,7 @@ namespace UCENO.VirtualWorld
             if (!collider)
             {
                 Collider shape = box.GetComponent<Collider>();
-                if (shape != null) Object.Destroy(shape);
+                if (shape != null)\n                {\n                    shape.enabled = false;\n                    Object.Destroy(shape);\n                }
             }
         }
 
