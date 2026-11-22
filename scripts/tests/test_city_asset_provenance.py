@@ -3,7 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.validate_city_asset_provenance import ProvenanceError, validate_record
+from scripts.validate_city_asset_provenance import (
+    CATEGORY_COUNTS, ProvenanceError, validate_manifest_records, validate_record,
+)
 
 
 class CityAssetProvenanceTests(unittest.TestCase):
@@ -59,6 +61,28 @@ class CityAssetProvenanceTests(unittest.TestCase):
         self.record["sourceUrl"] = "http://example.org/assets/tower"
         with self.assertRaisesRegex(ProvenanceError, "absolute HTTPS"):
             validate_record(self.root, "atlas", self.record)
+
+    def test_rejects_prefab_outside_city_owned_folder(self):
+        self.record["prefab"] = "Assets/UCENO/Cities/verdant/Prefabs/Architecture/tree.prefab"
+        with self.assertRaisesRegex(ProvenanceError, "city-owned"):
+            validate_record(self.root, "atlas", self.record)
+
+    def test_rejects_unsupported_prefab_category(self):
+        self.record["prefab"] = "Assets/UCENO/Cities/atlas/Prefabs/Misc/tower.prefab"
+        with self.assertRaisesRegex(ProvenanceError, "unsupported prefab category"):
+            validate_record(self.root, "atlas", self.record)
+
+    def test_requires_exact_5_4_3_category_distribution(self):
+        records = []
+        for category, count in CATEGORY_COUNTS.items():
+            for index in range(count):
+                record = dict(self.record)
+                record["prefab"] = f"Assets/UCENO/Cities/atlas/Prefabs/{category}/asset-{category}-{index}.prefab"
+                records.append(record)
+        self.assertEqual(validate_manifest_records(self.root, "atlas", records), 12)
+        records[-1] = dict(records[-1], prefab="Assets/UCENO/Cities/atlas/Prefabs/Environment/extra-tree.prefab")
+        with self.assertRaisesRegex(ProvenanceError, "expected 5 architecture"):
+            validate_manifest_records(self.root, "atlas", records)
 
 
 if __name__ == "__main__":
