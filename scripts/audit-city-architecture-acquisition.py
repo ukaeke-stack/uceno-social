@@ -23,26 +23,47 @@ MAX_BYTES = 25 * 1024 * 1024
 
 
 def inspect_glb(path, expected_sha=None):
-    """Validate a GLB 2.0 container and report image embedding evidence."""
-    data = pathlib.Path(path).read_bytes()
-    if len(data) < 20 or len(data) > MAX_BYTES or data[:4] != b"glTF":
+    """Validate a bounded GLB 2.0 container and report image evidence."""
+    path = pathlib.Path(path)
+    size = path.stat().st_size
+    if size < 20 or size > MAX_BYTES:
+        raise ValueError(f"{path}: invalid GLB header or size")
+    with path.open("rb") as stream:
+        data = stream.read(MAX_BYTES + 1)
+    if len(data) != size or data[:4] != b"glTF":
         raise ValueError(f"{path}: invalid GLB header or size")
     version, declared_length = struct.unpack_from("<II", data, 4)
     if version != 2 or declared_length != len(data):
         raise ValueError(f"{path}: invalid GLB 2.0 version or declared length")
+
     offset = 12
     document = None
-    while offset + 8 <= len(data):
+    chunk_index = 0
+    while offset < len(data):
+        if offset + 8 > len(data):
+            raise ValueError(f"{path}: incomplete GLB chunk header")
         chunk_length, chunk_type = struct.unpack_from("<II", data, offset)
         offset += 8
+        if chunk_length == 0 or chunk_length % 4:
+            raise ValueError(f"{path}: GLB chunk length must be positive and 4-byte aligned")
         end = offset + chunk_length
         if end > len(data):
             raise ValueError(f"{path}: chunk extends beyond file boundary")
-        if chunk_type == 0x4E4F534A:
-            if document is not None:
-                raise ValueError(f"{path}: duplicate JSON chunk")
-            document = json.loads(data[offset:end].decode("utf-8").rstrip(" \\x00"))
+        if chunk_index == 0:
+            if chunk_type != 0x4E4F534A:
+                raise ValueError(f"{path}: first GLB chunk must be JSON")
+            try:
+                document = json.loads(data[offset:end].decode("utf-8").rstrip(" \\x00"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValueError(f"{path}: invalid GLB JSON chunk") from exc
+        elif chunk_index == 1:
+            if chunk_type != 0x004E4942:
+                raise ValueError(f"{path}: second GLB chunk, when present, must be BIN")
+        else:
+            raise ValueError(f"{path}: GLB contains more than two chunks")
         offset = end
+        chunk_index += 1
+
     if offset != len(data) or not isinstance(document, dict):
         raise ValueError(f"{path}: malformed GLB chunks or missing JSON")
     if document.get("asset", {}).get("version") != "2.0":
@@ -67,7 +88,6 @@ def inspect_glb(path, expected_sha=None):
         "embedded_image_count": embedded,
         "external_image_count": len(images) - embedded,
     }
-
 
 def safe_artifact_path(base, relative):
     """Resolve a manifest path without allowing absolute or escaping paths."""
