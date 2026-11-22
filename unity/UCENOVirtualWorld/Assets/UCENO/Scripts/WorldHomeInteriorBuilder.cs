@@ -47,7 +47,7 @@ namespace UCENO.VirtualWorld
 
         private static void BuildFloor(Transform root, Material timber, Material seam)
         {
-            AddBox(root, "Timber Floor - Structural Slab", new Vector3(0f, -.12f, 0f),
+            AddBox(root, "Timber Floor", new Vector3(0f, -.12f, 0f),
                 new Vector3(12f, .24f, 10f), timber);
             // Fine plank joints add scale and material breakup without a texture dependency.
             for (int row = 0; row < 20; row++)
@@ -70,15 +70,15 @@ namespace UCENO.VirtualWorld
         private static void BuildShell(Transform root, Material wall, Material accent,
             Material trim, Material glass, Material ceiling, Material metal)
         {
-            AddBox(root, "Back Wall - Warm Plaster", new Vector3(0f, 1.65f, 5f),
+            AddBox(root, "Back Wall", new Vector3(0f, 1.65f, 5f),
                 new Vector3(12f, 3.3f, .20f), wall);
-            AddBox(root, "Left Wall - Warm Plaster", new Vector3(-6f, 1.65f, 0f),
+            AddBox(root, "Left Wall", new Vector3(-6f, 1.65f, 0f),
                 new Vector3(.20f, 3.3f, 10f), wall);
-            AddBox(root, "Right Wall - Feature Finish", new Vector3(6f, 1.65f, 0f),
+            AddBox(root, "Right Wall", new Vector3(6f, 1.65f, 0f),
                 new Vector3(.20f, 3.3f, 10f), accent);
-            AddBox(root, "Front wall left pier", new Vector3(-4.5f, 1.65f, -5f),
+            AddBox(root, "Front Wall Left", new Vector3(-4.5f, 1.65f, -5f),
                 new Vector3(3f, 3.3f, .20f), wall);
-            AddBox(root, "Front wall right pier", new Vector3(4.5f, 1.65f, -5f),
+            AddBox(root, "Front Wall Right", new Vector3(4.5f, 1.65f, -5f),
                 new Vector3(3f, 3.3f, .20f), wall);
             AddBox(root, "Front door lintel", new Vector3(0f, 3.05f, -5f),
                 new Vector3(6f, .5f, .20f), wall);
