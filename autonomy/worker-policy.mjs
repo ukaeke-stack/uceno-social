@@ -21,7 +21,7 @@ export function validateWorkerState(state) {
   if (!state || typeof state !== "object" || Array.isArray(state)) {
     throw new Error("worker state must be a JSON object");
   }
-  if (typeof state.day !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(state.day) ||
+  if (typeof state.day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(state.day) ||
       new Date(state.day + "T00:00:00.000Z").toISOString().slice(0, 10) !== state.day) {
     throw new Error("worker state day is invalid");
   }
