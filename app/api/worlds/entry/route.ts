@@ -143,6 +143,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       accessToken: token,
+      userId: identity.userId,
       tokenType: "Bearer",
       expiresInSeconds: WORLD_TOKEN_TTL_SECONDS,
       worldId: identity.worldId,
