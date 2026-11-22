@@ -54,21 +54,29 @@ async function processStartTicks(pid) {
     return parseLinuxProcessStartTicks(stat); // Linux stat field 22: process start time.
   } catch { return null; }
 }
+function gitAuthEnvironment() {
+  if (!cfg.repoToken) return {};
+  // Keep the authorization header out of argv/process listings. Git reads
+  // this config from the child environment for fetch, push and clone.
+  return {
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: "http.extraheader",
+    GIT_CONFIG_VALUE_0: "AUTHORIZATION: basic " + Buffer.from("x-access-token:" + cfg.repoToken).toString("base64")
+  };
+}
 async function git(args, timeout = 120000) {
-  // Never expose the GitHub token to local Git commands or hooks. Network
-  // operations use a fixed origin and disable hooks to prevent repository
-  // content from executing inside a credential-bearing Git process.
-  const networkOperation = args[0] === "fetch" || args[0] === "push";
-  const auth = networkOperation && cfg.repoToken
-    ? ["-c", "http.extraheader=AUTHORIZATION: basic " + Buffer.from("x-access-token:" + cfg.repoToken).toString("base64")]
-    : [];
-  return run("git", ["-c", "core.hooksPath=/dev/null", ...auth, ...args], { cwd: cfg.workdir, timeout });
+  // Disable repository hooks for every Git operation. The token is supplied
+  // through Git's environment-based config, never as a command-line argument.
+  return run("git", ["-c", "core.hooksPath=/dev/null", ...args], {
+    cwd: cfg.workdir, timeout, env: gitAuthEnvironment()
+  });
 }
 async function ensureCheckout() {
   await mkdir(path.dirname(cfg.workdir), { recursive: true });
   if (!existsSync(path.join(cfg.workdir, ".git"))) {
-    const auth = cfg.repoToken ? ["-c", "http.extraheader=AUTHORIZATION: basic " + Buffer.from("x-access-token:" + cfg.repoToken).toString("base64")] : [];
-    const result = await run("git", ["-c", "core.hooksPath=/dev/null", ...auth, "clone", "--branch", cfg.branch, cfg.repo, cfg.workdir], { timeout: 300000 });
+    const result = await run("git", ["-c", "core.hooksPath=/dev/null", "clone", "--branch", cfg.branch, cfg.repo, cfg.workdir], {
+      timeout: 300000, env: gitAuthEnvironment()
+    });
     if (result.code !== 0) throw new Error("git clone failed: " + result.stderr.slice(-2000));
   }
   const remote = await git(["remote", "set-url", "origin", cfg.repo]);
