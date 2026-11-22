@@ -52,6 +52,15 @@ class CityAssetProvenanceTests(unittest.TestCase):
         with self.assertRaisesRegex(ProvenanceError, "missing or unsafe"):
             validate_record(self.root, "atlas", self.record)
 
+
+    def test_rejects_traversal_out_of_editor_evidence_folder(self):
+        retained_elsewhere = self.source.parent / "outside-editor.zip"
+        retained_elsewhere.write_bytes(b"not editor evidence")
+        self.record["sourceArchive"] = "Assets/UCENO/Cities/atlas/Source/Editor/../outside-editor.zip"
+        self.record["sourceArchiveSha256"] = hashlib.sha256(retained_elsewhere.read_bytes()).hexdigest()
+        with self.assertRaisesRegex(ProvenanceError, "missing or unsafe"):
+            validate_record(self.root, "atlas", self.record)
+
     def test_rejects_noncommercial_or_unknown_license(self):
         self.record["license"] = "CC-BY-NC 4.0"
         with self.assertRaisesRegex(ProvenanceError, "unapproved licence"):
