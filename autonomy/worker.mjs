@@ -86,7 +86,7 @@ async function ensureCheckout() {
   await mkdir(path.dirname(cfg.workdir), { recursive: true });
   if (!existsSync(path.join(cfg.workdir, ".git"))) {
     const result = await run("git", ["-c", "core.hooksPath=/dev/null", "clone", "--branch", cfg.branch, cfg.repo, cfg.workdir], {
-      timeout: 300000, env: gitAuthEnvironment()
+      timeout: 300000, env: workerGitAuthEnvironment()
     });
     if (result.code !== 0) throw new Error("git clone failed: " + result.stderr.slice(-2000));
   }
