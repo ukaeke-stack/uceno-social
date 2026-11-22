@@ -28,6 +28,8 @@ QUERIES = {
         "waterfront mixed use residential building",
         "harbour promenade commercial building",
         "contemporary beachside villa building",
+        "complete coastal apartment hotel exterior building",
+        "modern island residential clubhouse exterior building",
     ],
     "VerdantReach": [
         "biophilic vertical garden tower exterior",
@@ -40,6 +42,8 @@ QUERIES = {
         "eco friendly office building exterior",
         "modern park pavilion building exterior",
         "vertical garden residential tower",
+        "complete botanical research centre exterior building",
+        "sustainable timber residential campus building exterior",
     ],
     "NexusDelta": [
         "modern glass skyscraper exterior",
@@ -52,6 +56,8 @@ QUERIES = {
         "modern shopping centre building exterior",
         "contemporary cinema building exterior",
         "large metropolitan office building",
+        "complete urban convention centre building exterior",
+        "modern metropolitan residential complex exterior building",
     ],
     "AuroraHeights": [
         "modern alpine city residential building exterior",
@@ -64,6 +70,8 @@ QUERIES = {
         "ski resort visitor centre building",
         "alpine residential apartment block",
         "mountain town civic centre exterior",
+        "complete alpine village hotel building exterior",
+        "mountain research observatory visitor centre building",
     ],
     "SaffronDunes": [
         "desert city high rise building exterior",
@@ -76,6 +84,8 @@ QUERIES = {
         "mudbrick residential building exterior",
         "oasis visitor centre building exterior",
         "solar powered commercial building exterior",
+        "complete desert courtyard residential building exterior",
+        "modern oasis cultural centre building exterior",
     ],
     "MonsoonHarbour": [
         "modern waterfront skyscraper exterior",
@@ -88,6 +98,8 @@ QUERIES = {
         "coastal resort hotel building exterior",
         "port authority office building",
         "harbour market building exterior",
+        "complete tropical port administration building exterior",
+        "coastal fish market terminal building exterior",
     ],
     "EclipseCentral": [
         "futuristic illuminated skyscraper tower exterior",
@@ -100,6 +112,8 @@ QUERIES = {
         "futuristic city landmark office skyscraper",
         "modern high rise commercial tower building",
         "glass supertall mixed use skyscraper",
+        "complete 40 metre modern city office skyscraper exterior",
+        "supertall mixed use residential commercial tower building",
     ],
     "OriginPlains": [
         "modern university campus building exterior",
@@ -112,6 +126,8 @@ QUERIES = {
         "contemporary museum building exterior",
         "modern hospital building exterior",
         "university lecture hall building exterior",
+        "complete rural innovation campus research building exterior",
+        "modern agricultural science institute building exterior",
     ],
     "AtlasFrontier": [
         "modern industrial logistics terminal building exterior",
@@ -124,6 +140,8 @@ QUERIES = {
         "logistics distribution centre building",
         "steel industrial workshop building exterior",
         "industrial power station building exterior",
+        "complete logistics distribution terminal building exterior",
+        "modern industrial engineering campus building exterior",
     ],
 }
 UA = "UCENO-city-architecture-discovery/2.0"
