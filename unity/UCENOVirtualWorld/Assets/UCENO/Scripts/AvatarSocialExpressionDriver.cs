@@ -62,7 +62,7 @@ namespace UCENO.VirtualWorld
 
         private void OnDisable()
         {
-            RestoreBlinkChannels();
+            if (blinking) RestoreBlinkChannels();
             blinking = false;
             lookTarget = null;
         }
