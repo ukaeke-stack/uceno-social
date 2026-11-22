@@ -29,6 +29,9 @@ test("private treasure candidate pools are fetched once for all active hunts", a
     begin: async fn => fn({
       unsafe: async (query, params = []) => {
         calls.push({ query, params });
+        if (query.includes("pg_advisory_xact_lock")) return [];
+        if (query.includes("FROM virtual_world_treasure_hunts") &&
+            query.includes("id = ANY($1::uuid[])")) return [{ id: huntA, title: "A" }, { id: huntB, title: "B" }];
         if (query.includes("FROM virtual_world_treasure_hunts") &&
             query.includes("NOT EXISTS")) return [{ id: huntA, title: "A" }, { id: huntB, title: "B" }];
         if (query.includes("FROM virtual_world_treasure_spawn_points")) return points;
@@ -66,6 +69,9 @@ test("private treasure routes reject candidate pools above 10000 instead of usin
   const db = {
     begin: async fn => fn({
       unsafe: async (query, params = []) => {
+        if (query.includes("pg_advisory_xact_lock")) return [];
+        if (query.includes("FROM virtual_world_treasure_hunts") &&
+            query.includes("id = ANY($1::uuid[])")) return [{ id: huntA, title: "Oversized" }];
         if (query.includes("FROM virtual_world_treasure_hunts") &&
             query.includes("NOT EXISTS")) return [{ id: huntA, title: "Oversized" }];
         if (query.includes("FROM virtual_world_treasure_spawn_points")) {
