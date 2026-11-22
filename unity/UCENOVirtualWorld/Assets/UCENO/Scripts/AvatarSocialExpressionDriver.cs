@@ -32,7 +32,6 @@ namespace UCENO.VirtualWorld
         {
             public SkinnedMeshRenderer renderer;
             public int index;
-            public float blinkStartWeight;
         }
 
         public void SetLookTarget(Transform target)
@@ -62,7 +61,6 @@ namespace UCENO.VirtualWorld
 
         private void OnDisable()
         {
-            if (blinking) RestoreBlinkChannels();
             blinking = false;
             lookTarget = null;
         }
@@ -123,7 +121,6 @@ namespace UCENO.VirtualWorld
                     {
                         renderer = skin,
                         index = i,
-                        blinkStartWeight = 0f
                     });
                 }
             }
@@ -139,7 +136,6 @@ namespace UCENO.VirtualWorld
                 blinkStartedAt = Time.time;
                 foreach (BlendShapeChannel channel in blinkChannels)
                     if (channel.renderer != null)
-                        channel.blinkStartWeight = channel.renderer.GetBlendShapeWeight(channel.index);
             }
 
             if (!blinking) return;
@@ -150,23 +146,14 @@ namespace UCENO.VirtualWorld
             {
                 if (channel.renderer != null)
                     channel.renderer.SetBlendShapeWeight(channel.index,
-                        Mathf.Lerp(channel.blinkStartWeight, 100f, weight / 100f));
+                        Mathf.Lerp(channel.renderer.GetBlendShapeWeight(channel.index), 100f, weight / 100f));
             }
 
             if (progress >= 1f)
             {
-                RestoreBlinkChannels();
+                // The zeroed blink curve leaves the Animator's current facial pose intact.
                 blinking = false;
                 ScheduleNextBlink();
-            }
-        }
-
-        private void RestoreBlinkChannels()
-        {
-            foreach (BlendShapeChannel channel in blinkChannels)
-            {
-                if (channel.renderer != null)
-                    channel.renderer.SetBlendShapeWeight(channel.index, channel.blinkStartWeight);
             }
         }
 
