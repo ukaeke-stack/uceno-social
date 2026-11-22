@@ -19,7 +19,7 @@ test("AI citizen requires disclosure, consent for active interactions, and respe
 });
 
 test("AI citizens cannot autonomously transact, transfer credits, alter accounts or moderate", () => {
-  for (const action of ["purchase", "transfer_credits", "change_account", "moderate_user"] as const) {
+  for (const action of ["purchase", "transfer_credits", "change_account", "moderate_user"]) {
     assert.deepEqual(decideCitizenAction({ ...base, action }), {
       allowed: false, reason: "human_authorization_required"
     });
