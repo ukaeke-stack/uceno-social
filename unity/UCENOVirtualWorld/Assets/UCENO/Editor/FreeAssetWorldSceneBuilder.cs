@@ -278,6 +278,13 @@ namespace UCENO.VirtualWorld.Editor
                     .OfType<AnimationClip>()
                     .Where(clip => clip != null && clip.length > 0.01f));
             }
+            // The animation release validator also accepts playable takes embedded
+            // in the licensed base character FBX. Include those exact imported clips
+            // here so the builder and the validator enforce the same source set.
+            importedClips.AddRange(AssetDatabase.LoadAllAssetsAtPath(AvatarPath)
+                .OfType<AnimationClip>()
+                .Where(clip => clip != null && clip.length > 0.01f &&
+                    !clip.name.StartsWith("__preview__", StringComparison.OrdinalIgnoreCase)));
             AnimationClip[] clips = importedClips
                 .GroupBy(clip => clip.name + "|" + AssetDatabase.GetAssetPath(clip), StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First()).ToArray();
