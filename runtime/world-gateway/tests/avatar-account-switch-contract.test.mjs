@@ -30,4 +30,7 @@ test("wardrobe inventory, queued equipment and rendered garments are cleared on 
   assert.match(wardrobe, /inventory = Array\.Empty<WardrobeInventoryItem>\(\)/);
   assert.match(wardrobe, /pendingEquipment\.Clear\(\)/);
   assert.match(wardrobe, /controller\.ApplyEquipped\(Array\.Empty<KeyValuePair<AvatarWardrobeSlot, string>>\(\)\)/);
+  assert.match(wardrobe, /private int accountGeneration/);
+  assert.match(wardrobe, /accountGeneration\+\+/);
+  assert.match(wardrobe, /accountGeneration == requestedGeneration/);
 });
