@@ -157,8 +157,9 @@ async function main() {
     if (isLiveWorkerLockOwner(owner, currentStartTicks, processExists)) {
       throw new Error("another worker process appears active (pid " + owner.pid + ")");
     }
-    // A dead PID or a reused PID with a different start-time token is stale.
-    // If /proc is temporarily unavailable, a live PID is preserved conservatively.
+    // A dead PID, malformed lock, or reused PID with a different start-time token is stale.
+    // Remove only after the liveness check; exclusive creation below resolves concurrent starters.
+    await rm(lock, { force: true });
   }
   const startTicks = await processStartTicks(process.pid);
   await writeFile(lock, JSON.stringify({ pid: process.pid, startTicks, startedAt: new Date().toISOString() }), { flag: "wx" });
