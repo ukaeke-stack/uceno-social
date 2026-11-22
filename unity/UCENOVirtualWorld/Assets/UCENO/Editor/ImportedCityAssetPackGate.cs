@@ -37,7 +37,7 @@ namespace UCENO.VirtualWorld.Editor
         [Serializable] private sealed class SourceManifest { public SourceAsset[] assets; }
         [Serializable] private sealed class SourceAsset
         {
-            public string prefab, sourceName, sourceUrl, license, attribution;
+            public string prefab, sourceName, sourceUrl, license, attribution;\n            public string sourceArchive, sourceArchiveSha256, licenseFile, licenseFileSha256;
         }
         [Serializable] private sealed class CityCatalog { public CatalogCity[] cities; }
         [Serializable] private sealed class CatalogCity { public string id; public CatalogLandmark[] landmarks; }
@@ -123,6 +123,19 @@ namespace UCENO.VirtualWorld.Editor
                     };
                     Require(redistributableDerivativeLicenses.Contains(license, StringComparer.OrdinalIgnoreCase),
                         city.cityId + " uses an unapproved, non-commercial, no-derivatives or unverified licence for " + path);
+
+                    string evidenceRoot = "Assets/UCENO/Cities/" + city.cityId + "/Source/";
+                    string archivePath = ResolveEvidencePath(source.sourceArchive, evidenceRoot, city.cityId, path, "original source archive");
+                    string licensePath = ResolveEvidencePath(source.licenseFile, evidenceRoot, city.cityId, path, "licence document");
+                    Require(IsSha256(source.sourceArchiveSha256) &&
+                        string.Equals(ComputeSha256(archivePath), source.sourceArchiveSha256, StringComparison.OrdinalIgnoreCase),
+                        city.cityId + " original source archive is missing or its SHA-256 does not match the manifest for " + path);
+                    Require(IsSha256(source.licenseFileSha256) &&
+                        string.Equals(ComputeSha256(licensePath), source.licenseFileSha256, StringComparison.OrdinalIgnoreCase),
+                        city.cityId + " retained licence document is missing or its SHA-256 does not match the manifest for " + path);
+                    string licenseText = File.ReadAllText(licensePath);
+                    Require(licenseText.IndexOf(license, StringComparison.OrdinalIgnoreCase) >= 0,
+                        city.cityId + " retained licence document does not identify the declared licence for " + path);
 
                     GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                     Require(prefab != null, city.cityId + " imported prefab is missing: " + path);
@@ -222,6 +235,35 @@ namespace UCENO.VirtualWorld.Editor
             Require(provenance.width >= 1024 && provenance.height >= 512 &&
                 importedTexture.width == provenance.width && importedTexture.height == provenance.height,
                 city.cityId + " imported HDRI dimensions do not match its verified source dimensions.");
+        }
+
+        private static string ResolveEvidencePath(string relativePath, string evidenceRoot,
+            string cityId, string prefabPath, string evidenceKind)
+        {
+            Require(!string.IsNullOrWhiteSpace(relativePath) &&
+                relativePath.StartsWith(evidenceRoot, StringComparison.Ordinal),
+                cityId + " " + evidenceKind + " must be retained under " + evidenceRoot + " for " + prefabPath);
+            string absolutePath = AssetAbsolutePath(relativePath);
+            string absoluteRoot = AssetAbsolutePath(evidenceRoot).TrimEnd(Path.DirectorySeparatorChar) +
+                Path.DirectorySeparatorChar;
+            Require(absolutePath.StartsWith(absoluteRoot, StringComparison.Ordinal) &&
+                File.Exists(absolutePath),
+                cityId + " " + evidenceKind + " is missing or escapes its city source folder for " + prefabPath);
+            return absolutePath;
+        }
+
+        private static bool IsSha256(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value) && value.Length == 64 &&
+                value.All(character => Uri.IsHexDigit(character));
+        }
+
+        private static string ComputeSha256(string path)
+        {
+            using (var stream = File.OpenRead(path))
+            using (var algorithm = SHA256.Create())
+                return BitConverter.ToString(algorithm.ComputeHash(stream))
+                    .Replace("-", "").ToLowerInvariant();
         }
 
         private static string AssetAbsolutePath(string assetPath)
