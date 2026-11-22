@@ -7,6 +7,8 @@ on:
       - "scripts/discover-city-architecture.py"
       - "scripts/acquire-city-architecture.py"
       - "scripts/discover-tevy-city-architecture.py"
+      - "scripts/audit-city-architecture-acquisition.py"
+      - "scripts/tests/test_city_architecture_acquisition_audit.py"
       - "scripts/tests/test_city_architecture_screening.py"
       - "scripts/tests/test_tevy_city_architecture.py"
       - ".github/workflows/uceno-city-architecture-discovery.yml"
