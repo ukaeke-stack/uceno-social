@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile, appendFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { codexEnvironment, parseLinuxProcessStartTicks, reserveDailyCycle } from "./worker-policy.mjs";
 import { readFile as readProcFile } from "node:fs/promises";
 
 const cfg = {
@@ -99,7 +100,7 @@ async function runCycle(state) {
   if (before.code !== 0 || before.stdout.trim()) throw new Error("working tree must be clean before a cycle");
   await log("Starting engineering cycle " + state.cycles);
   const result = await run("codex", ["exec", "--full-auto", "--cd", cfg.workdir, promptForCycle()], {
-    cwd: cfg.workdir, timeout: cfg.timeoutMs, cleanEnv: true, env: { PATH: process.env.PATH, HOME: "/tmp/home", TMPDIR: "/tmp", OPENAI_API_KEY: cfg.apiKey }
+    cwd: cfg.workdir, timeout: cfg.timeoutMs, cleanEnv: true, env: codexEnvironment(process.env.PATH, cfg.apiKey)
   });
   await log("Codex exit=" + result.code + "; output tail: " + (result.stdout + "\n" + result.stderr).slice(-5000));
   if (result.code !== 0) throw new Error("Codex task did not complete successfully");
@@ -147,15 +148,13 @@ async function main() {
   await log("UCENO autonomous worker started; sequential agent, no production privileges.");
   try {
     while (true) {
-      const state = await loadState();
-      const today = new Date().toISOString().slice(0, 10);
-      if (state.day !== today) { state.day = today; state.cycles = 0; }
-      if (state.cycles >= cfg.maxCycles) {
+      const reservation = reserveDailyCycle(await loadState(), new Date(), cfg.maxCycles);
+      const state = reservation.state;
+      if (!reservation.allowed) {
         await log("Daily cycle budget reached; sleeping until next UTC day.");
         await sleep(15 * 60 * 1000);
         continue;
       }
-      state.cycles++;
       // Persist the budget reservation before starting expensive model work so
       // a crash/restart cannot reset or bypass the daily cycle limit.
       await saveState(state);
