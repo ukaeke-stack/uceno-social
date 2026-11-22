@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -135,8 +134,7 @@ namespace UCENO.VirtualWorld
             pendingEquipItemId = null;
             if (success)
             {
-                WardrobeInventoryItem item = Array.Find(sync.Inventory.ToArray(), x => x != null && x.itemId == itemId);
-                status = item == null ? "Wardrobe item equipped." : item.displayName + " equipped.";
+                status = "Wardrobe item equipped.";
             }
             else status = "Equip failed: " + (string.IsNullOrEmpty(error) ? "asset unavailable." : error);
         }
