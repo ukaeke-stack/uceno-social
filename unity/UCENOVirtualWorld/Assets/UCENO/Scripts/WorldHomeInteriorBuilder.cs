@@ -84,7 +84,7 @@ namespace UCENO.VirtualWorld
                 new Vector3(12f, .18f, 10f), ceiling);
 
             AddBox(root, "Entry door leaf", new Vector3(0f, 1.05f, -4.94f),
-                new Vector3(1.12f, 2.10f, .10f), trim);
+                new Vector3(1.12f, 2.10f, .10f), trim, false);
             AddBox(root, "Entry door inset panel", new Vector3(0f, 1.10f, -4.875f),
                 new Vector3(.78f, 1.48f, .025f), accent, false);
             AddBox(root, "Entry door handle", new Vector3(.40f, 1.05f, -4.84f),
@@ -168,8 +168,11 @@ namespace UCENO.VirtualWorld
             Material glass, Material metal, Material stone)
         {
             // Compact enclosed wet-room zone at the front-left, separated from the main living area.
-            AddBox(root, "Bathroom partition left", new Vector3(-4.2f, 1.55f, -2.55f),
-                new Vector3(3.6f, 3.1f, .12f), wall);
+            // Two partition returns preserve a usable 0.8 m bathroom doorway.
+            AddBox(root, "Bathroom partition left return", new Vector3(-5.4f, 1.55f, -2.55f),
+                new Vector3(1.2f, 3.1f, .12f), wall);
+            AddBox(root, "Bathroom partition right return", new Vector3(-3.2f, 1.55f, -2.55f),
+                new Vector3(1.6f, 3.1f, .12f), wall);
             AddBox(root, "Bathroom partition return", new Vector3(-2.45f, 1.55f, -3.75f),
                 new Vector3(.12f, 3.1f, 2.4f), wall);
             AddBox(root, "Bathroom tile floor", new Vector3(-4.15f, .018f, -3.72f),
