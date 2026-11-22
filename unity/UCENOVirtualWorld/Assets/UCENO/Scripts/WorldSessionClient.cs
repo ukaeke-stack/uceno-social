@@ -17,6 +17,7 @@ namespace UCENO.VirtualWorld
     public sealed class WorldEntryExchangeResponse
     {
         public string accessToken;
+        public string userId;
         public string tokenType;
         public int expiresInSeconds;
         public string error;
@@ -37,6 +38,7 @@ namespace UCENO.VirtualWorld
         [SerializeField] private bool androidClient = true;
 
         public string AccessToken { get; private set; }
+        public string UserId { get; private set; }
         public int ExpiresInSeconds { get; private set; }
         public string ApiBaseUrl => apiBaseUrl;
         public string WorldId { get; private set; }
@@ -74,6 +76,7 @@ namespace UCENO.VirtualWorld
         public void ClearSession()
         {
             AccessToken = null;
+            UserId = null;
             ExpiresInSeconds = 0;
             WorldId = null;
             InstanceId = null;
@@ -115,6 +118,7 @@ namespace UCENO.VirtualWorld
 
                 WorldEntryExchangeResponse response = JsonUtility.FromJson<WorldEntryExchangeResponse>(request.downloadHandler.text);
                 if (response == null || string.IsNullOrEmpty(response.accessToken) ||
+                    string.IsNullOrEmpty(response.userId) ||
                     response.tokenType != "Bearer" || response.expiresInSeconds <= 0 ||
                     string.IsNullOrEmpty(response.worldId) || string.IsNullOrEmpty(response.instanceId) ||
                     string.IsNullOrEmpty(response.instanceEndpoint))
@@ -125,6 +129,7 @@ namespace UCENO.VirtualWorld
                 }
 
                 AccessToken = response.accessToken;
+                UserId = response.userId;
                 ExpiresInSeconds = response.expiresInSeconds;
                 WorldId = response.worldId;
                 InstanceId = response.instanceId;
