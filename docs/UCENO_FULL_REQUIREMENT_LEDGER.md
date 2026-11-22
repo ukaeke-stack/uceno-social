@@ -78,3 +78,13 @@ This ledger distinguishes source implementation from CI, deployment, and device 
 - Addressables publication/CDN: not verified.
 - Android APK and physical-device acceptance: not performed.
 - Keep each item above open until evidence is recorded against the exact commit, migration set, environment and test device.
+
+
+## Latest engineering checkpoint — 2026-11-22 (PR #46)
+- Head `4133c35b849ff0ee733287c7e6eb9316d11db793`: all four source/runtime workflows completed successfully (content-delivery source checks, World Gateway Tests, World Gateway Activity Tests, and World Gateway/Unity Client). The Unity workflow's `unity-source-validation` is static source validation, not Unity Editor compilation.
+- The Nine-City Imported Art Release Gate failed as intended. Its log enumerates missing per-city `source-manifest.json` files and configured architecture, environment and landmark prefab files. Do not silence this gate, create empty manifests, or substitute primitive placeholders; only imported, provenance-backed assets with validated metadata can satisfy it.
+- Wardrobe Addressables now retain versioned asset handles while equipped, release superseded handles after deferred object destruction, and track deferred releases for teardown cleanup.
+- Follow-up hardening now tracks in-flight Addressables load handles before yielding and releases them if the avatar/controller is destroyed during a remote load. Regression source-contract assertions were added.
+- Latest source head after that follow-up: `b677fb613475d43e8145e24dbfa2e3fda52d2676`. CI results for this exact head have not yet appeared; do not inherit the prior head's pass status.
+- Wardrobe server GET returns `prefabKey` and `assetVersion` from the catalogue row. Client still requires matching local Unity catalogue entries and actual versioned Addressables keys in the form `<prefabKey>@v<assetVersion>`; catalogue population, published bundles and device loading remain unverified.
+- No production migration, deployment, Addressables publication, Unity Editor compilation or APK/device test was performed. PR remains draft and unmerged.
