@@ -164,18 +164,22 @@ namespace UCENO.VirtualWorld
                 renderer.updateWhenOffscreen = false;
             }
 
+            string previousItemId = equippedIds.TryGetValue(item.slot, out string previousId)
+                ? previousId : null;
             if (equippedObjects.TryGetValue(item.slot, out GameObject previous) && previous != null)
                 Destroy(previous);
             equippedObjects[item.slot] = instance;
             equippedIds[item.slot] = item.itemId;
+            if (!string.IsNullOrEmpty(previousItemId) && previousItemId != item.itemId)
+                StartCoroutine(ReleaseAddressableWhenUnused(previousItemId));
             EquippedChanged?.Invoke(item.slot, item.itemId);
             return true;
         }
 
         /// <summary>
         /// Loads a wardrobe prefab from the remote catalog using an immutable versioned key.
-        /// The completed asset handle is retained for this controller's lifetime so equipped
-        /// meshes cannot lose their source dependencies while instances remain active.
+        /// The completed asset handle remains retained while any slot uses the item and is
+        /// released one frame after its last instance is removed.
         /// </summary>
         public void EquipAddressable(string itemId, string expectedAddressableKey, int assetVersion,
             Action<bool, string> completed)
@@ -239,11 +243,29 @@ namespace UCENO.VirtualWorld
 
         public void Unequip(AvatarWardrobeSlot slot)
         {
+            string previousItemId = equippedIds.TryGetValue(slot, out string previousId)
+                ? previousId : null;
             if (equippedObjects.TryGetValue(slot, out GameObject previous) && previous != null)
                 Destroy(previous);
             equippedObjects.Remove(slot);
             equippedIds.Remove(slot);
+            if (!string.IsNullOrEmpty(previousItemId))
+                StartCoroutine(ReleaseAddressableWhenUnused(previousItemId));
             EquippedChanged?.Invoke(slot, null);
+        }
+
+        private IEnumerator ReleaseAddressableWhenUnused(string itemId)
+        {
+            // Destroy is deferred until the end of the frame. Keep the prefab handle
+            // alive through that boundary, then release it if no slot still uses it.
+            yield return null;
+            if (equippedIds.ContainsValue(itemId)) yield break;
+            addressablePrefabs.Remove(itemId);
+            if (addressableHandles.TryGetValue(itemId, out AsyncOperationHandle<GameObject> handle))
+            {
+                addressableHandles.Remove(itemId);
+                if (handle.IsValid()) Addressables.Release(handle);
+            }
         }
 
         public void ApplyEquipped(IEnumerable<KeyValuePair<AvatarWardrobeSlot, string>> items)
