@@ -10,6 +10,7 @@ const importer = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Editor/Free
 const voice = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldSpatialVoiceClient.cs");
 const presence = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldPresenceClient.cs");
 const validator = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs");
+const wardrobe = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeController.cs");
 
 test("gateway accepts only the supported imported humanoid gesture states", () => {
   for (const gesture of ["none", "wave", "cheer", "dance", "talk", "turn", "interact"])
@@ -49,4 +50,13 @@ test("animation FBXs must be Humanoid and retargeted to the UCENO base Avatar", 
   assert.ok(importer.includes("sourceAvatar = sourceAvatar"));
   assert.ok(validator.includes("sourceAvatar != baseAvatar"));
   assert.ok(validator.includes("Assets/UCENO/Animations/Imported"));
+});
+
+test("wardrobe binding rejects ambiguous skeletons and malformed bind poses", () => {
+  assert.ok(wardrobe.includes("ambiguousAvatarBoneNames"));
+  assert.ok(wardrobe.includes("Avatar rig contains duplicate bone names"));
+  assert.ok(wardrobe.includes("bindposes.Length != renderer.bones.Length"));
+  assert.ok(wardrobe.includes("float.IsNaN(value) || float.IsInfinity(value)"));
+  assert.ok(wardrobe.includes("Mathf.Abs(bindpose.determinant)"));
+  assert.ok(wardrobe.includes("renderer.bones = mappedBones"));
 });
