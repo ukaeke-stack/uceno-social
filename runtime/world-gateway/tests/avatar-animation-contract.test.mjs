@@ -13,40 +13,40 @@ const validator = read("../../../unity/UCENOVirtualWorld/Assets/UCENO/Editor/Hum
 
 test("gateway accepts only the supported imported humanoid gesture states", () => {
   for (const gesture of ["none", "wave", "cheer", "dance", "talk", "turn", "interact"])
-    assert.match(server, new RegExp('"' + gesture + '"'));
+    assert.ok(server.includes('"' + gesture + '"'));
 });
 
 test("avatar builder requires every imported and retargeted animation clip", () => {
   for (const clip of ["idle", "walk", "run", "talk", "turn", "wave", "cheer", "dance", "interact", "sit"])
     assert.ok(builder.includes('FindClip(clips, "' + clip + '")'), "missing required clip " + clip);
-  assert.match(builder, /HumanoidAnimationLibraryValidator\\.Validate\\(\\)/);
-  assert.match(builder, /CreateHumanoidController/);
-  assert.match(builder, /AddGestureState/);
+  assert.ok(builder.includes("HumanoidAnimationLibraryValidator.Validate()"));
+  assert.ok(builder.includes("CreateHumanoidController"));
+  assert.ok(builder.includes("AddGestureState"));
 });
 
 test("runtime humanoid locomotion has no procedural gait fallback", () => {
-  assert.match(driver, /runtimeAnimatorController == null/);
-  assert.match(driver, /SetFloat\\(MoveSpeedHash/);
-  assert.match(driver, /SetTalking\\(bool talking\\)/);
-  assert.doesNotMatch(driver, /Mathf\\.Sin\\(cycle\\)/);
-  assert.doesNotMatch(driver, /ApplyDancePose/);
+  assert.ok(driver.includes("runtimeAnimatorController == null"));
+  assert.ok(driver.includes("SetFloat(MoveSpeedHash"));
+  assert.ok(driver.includes("SetTalking(bool talking)"));
+  assert.ok(!driver.includes("Mathf.Sin(cycle)"));
+  assert.ok(!driver.includes("ApplyDancePose"));
 });
 
 test("talk animation follows real local microphone transmit state", () => {
-  assert.match(voice, /LocalTransmitChanged/);
-  assert.match(voice, /shouldTransmit != lastLocalTransmit/);
-  assert.match(driver, /WorldSpatialVoiceClient\\.LocalTransmitChanged \\+= SetTalking/);
-  assert.match(driver, /if \\(voiceEventSubscribed \\|\\| motor == null\\) return/);
-  assert.match(driver, /private void BindVoiceEvents\\(\\)/);
-  assert.match(driver, /private void UnbindVoiceEvents\\(\\)/);
-  assert.match(driver, /WorldSpatialVoiceClient\\.LocalTransmitChanged -= SetTalking/);
-  assert.match(driver, /BindVoiceEvents\\(\\);/);
-  assert.match(presence, /ApplyRemoteState\\(normalizedSpeed/);
+  assert.ok(voice.includes("LocalTransmitChanged"));
+  assert.ok(voice.includes("shouldTransmit != lastLocalTransmit"));
+  assert.ok(driver.includes("WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking"));
+  assert.ok(driver.includes("if (voiceEventSubscribed || motor == null) return"));
+  assert.ok(driver.includes("private void BindVoiceEvents()"));
+  assert.ok(driver.includes("private void UnbindVoiceEvents()"));
+  assert.ok(driver.includes("WorldSpatialVoiceClient.LocalTransmitChanged -= SetTalking"));
+  assert.ok(driver.includes("BindVoiceEvents();"));
+  assert.ok(presence.includes("ApplyRemoteState(normalizedSpeed"));
 });
 
 test("animation FBXs must be Humanoid and retargeted to the UCENO base Avatar", () => {
-  assert.match(importer, /ModelImporterAvatarSetup\\.CopyFromOther/);
-  assert.match(importer, /sourceAvatar = sourceAvatar/);
-  assert.match(validator, /sourceAvatar != baseAvatar/);
-  assert.match(validator, /Assets\\/UCENO\\/Animations\\/Imported/);
+  assert.ok(importer.includes("ModelImporterAvatarSetup.CopyFromOther"));
+  assert.ok(importer.includes("sourceAvatar = sourceAvatar"));
+  assert.ok(validator.includes("sourceAvatar != baseAvatar"));
+  assert.ok(validator.includes("Assets/UCENO/Animations/Imported"));
 });
