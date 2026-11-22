@@ -20,13 +20,13 @@ requireMarkers("app/api/world-homes/route.ts", [
   "playerState.position", "playerState.rotation"
 ]);
 requireMarkers("app/api/world-events/route.ts", [
-  "ACTIVITY_TYPES", "validSpatialLocation", "activity_type AS \\"activityType\\"",
-  "location_label AS \\"locationLabel\\"", "JSON.stringify(location)"
+  "ACTIVITY_TYPES", "validSpatialLocation", 'activity_type AS "activityType"',
+  'location_label AS "locationLabel"', "JSON.stringify(location)"
 ]);
 requireMarkers("runtime/world-gateway/src/server.ts", [
   'msg.type === "home_enter"', 'msg.type === "home_exit"',
   'msg.type === "event_join"', 'msg.type === "event_exit"',
-  "virtual_home_members", "home.visibility === \\"invite\\"",
+  "virtual_home_members", 'home.visibility === "invite"',
   "attendance_status = 'going'", "starts <= now + 30 * 60 * 1000",
   "homeAnchor", "returnState", "spatial_location_entered",
   "spatial_location_exited", "spatial_location_rejected",
