@@ -8,6 +8,15 @@ export interface CollectibleReward {
 
 export type TeamCollectibleRewards = Map<string, CollectibleReward[]>;
 
+function parseNonNegativeBigInt(value: unknown): bigint | null {
+  if (typeof value === "bigint") return value >= BigInt(0) ? value : null;
+  if (typeof value === "number")
+    return Number.isSafeInteger(value) && value >= 0 ? BigInt(value) : null;
+  if (typeof value !== "string" || !/^(0|[1-9][0-9]*)$/.test(value) || value.length > 19 ||
+      (value.length === 19 && value > "9223372036854775807")) return null;
+  try { return BigInt(value); } catch { return null; }
+}
+
 /**
  * Grants a team's collectible rewards in the caller's existing transaction.
  * Catalog rows are locked once, finite supply is allocated deterministically,
@@ -51,10 +60,11 @@ export async function grantTreasureCollectiblesToUsers(
   for (const reward of rewards) {
     const quantity = Number(reward.quantity);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) continue;
-    const maxSupply = reward.maxSupply === null ? null : BigInt(String(reward.maxSupply));
-    let remaining = maxSupply === null
-      ? null
-      : maxSupply - BigInt(String(reward.mintedCount));
+    const minted = parseNonNegativeBigInt(reward.mintedCount);
+    const maxSupply = reward.maxSupply === null ? null : parseNonNegativeBigInt(reward.maxSupply);
+    if (minted === null || (reward.maxSupply !== null && maxSupply === null) ||
+        (maxSupply !== null && minted > maxSupply)) continue;
+    let remaining = maxSupply === null ? null : maxSupply - minted;
     for (const userId of orderedUsers) {
       if (existingKeys.has(userId + ":" + reward.id)) continue;
       if (remaining !== null && remaining < BigInt(quantity)) continue;
@@ -123,9 +133,11 @@ export async function grantTreasureCollectibles(
       [userId, reward.id, huntId]);
     if (existing.length) continue;
     const quantity = Number(reward.quantity);
-    const minted = BigInt(String(reward.mintedCount));
-    const maxSupply = reward.maxSupply === null ? null : BigInt(String(reward.maxSupply));
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) continue;
+    const minted = parseNonNegativeBigInt(reward.mintedCount);
+    const maxSupply = reward.maxSupply === null ? null : parseNonNegativeBigInt(reward.maxSupply);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100 || minted === null ||
+        (reward.maxSupply !== null && maxSupply === null) ||
+        (maxSupply !== null && minted > maxSupply)) continue;
     if (maxSupply !== null && minted + BigInt(quantity) > maxSupply) continue;
     const inserted = await tx.unsafe(`INSERT INTO virtual_world_user_collectibles
       (user_id, collectible_id, source_treasure_hunt_id, quantity)
