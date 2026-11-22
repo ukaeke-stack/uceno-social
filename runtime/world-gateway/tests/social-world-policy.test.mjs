@@ -30,3 +30,11 @@ test("self and malformed identities are denied", () => {
   assert.equal(canUseSocialWorldCapability({ ...relationship, targetId: "viewer" }, "send_message"), false);
   assert.equal(canUseSocialWorldCapability({ ...relationship, viewerId: "" }, "send_message"), false);
 });
+
+test("runtime validation rejects unknown capabilities and malformed relationship flags", () => {
+  assert.equal(canUseSocialWorldCapability(relationship, "grant_admin"), false);
+  assert.equal(canUseSocialWorldCapability({ ...relationship, isBlocked: "false" }, "send_message"), false);
+  assert.equal(canUseSocialWorldCapability({ ...relationship, followsTarget: undefined }, "send_message"), false);
+  assert.equal(canUseSocialWorldCapability(null, "send_message"), false);
+  assert.equal(canUseSocialWorldCapability(relationship, "enter_private_home", "true"), false);
+});
