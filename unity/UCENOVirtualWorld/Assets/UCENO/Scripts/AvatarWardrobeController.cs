@@ -319,49 +319,10 @@ namespace UCENO.VirtualWorld
             instance.transform.localRotation = Quaternion.identity;
             instance.transform.localScale = Vector3.one;
 
-            SkinnedMeshRenderer[] renderers = instance.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-            if (renderers.Length == 0)
+            if (!TryBindWardrobeInstance(instance, out error))
             {
                 Destroy(instance);
-                error = "Wardrobe prefab must contain at least one SkinnedMeshRenderer.";
                 return false;
-            }
-
-            if (avatarBones == null || avatarBones.Count == 0) RebuildBoneMap();
-            foreach (SkinnedMeshRenderer renderer in renderers)
-            {
-                if (renderer.sharedMesh == null || renderer.bones == null || renderer.bones.Length == 0)
-                {
-                    Destroy(instance);
-                    error = "Wardrobe mesh is missing its mesh or bone weights.";
-                    return false;
-                }
-
-                Transform[] mappedBones = new Transform[renderer.bones.Length];
-                for (int i = 0; i < renderer.bones.Length; i++)
-                {
-                    Transform sourceBone = renderer.bones[i];
-                    if (sourceBone == null || !avatarBones.TryGetValue(sourceBone.name, out mappedBones[i]))
-                    {
-                        Destroy(instance);
-                        error = "Avatar rig is missing garment bone: " +
-                            (sourceBone == null ? "(null)" : sourceBone.name);
-                        return false;
-                    }
-                }
-
-                Transform mappedRoot = null;
-                if (renderer.rootBone != null)
-                    avatarBones.TryGetValue(renderer.rootBone.name, out mappedRoot);
-                if (renderer.rootBone != null && mappedRoot == null)
-                {
-                    Destroy(instance);
-                    error = "Avatar rig is missing the garment root bone.";
-                    return false;
-                }
-                renderer.bones = mappedBones;
-                renderer.rootBone = mappedRoot;
-                renderer.updateWhenOffscreen = false;
             }
 
             if (equippedObjects.TryGetValue(item.slot, out GameObject previous) && previous != null)
