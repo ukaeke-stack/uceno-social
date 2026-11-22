@@ -1,0 +1,31 @@
+name: UCENO Home Interior Source Contract
+
+on:
+  pull_request:
+    paths:
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldHomeInteriorBuilder.cs"
+      - "scripts/tests/test_world_home_interior_source.py"
+      - ".github/workflows/uceno-home-interior-source.yml"
+  push:
+    branches:
+      - "feature/uceno-unity-foundation"
+    paths:
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldHomeInteriorBuilder.cs"
+      - "scripts/tests/test_world_home_interior_source.py"
+      - ".github/workflows/uceno-home-interior-source.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile source-contract tests
+        run: python -m py_compile scripts/tests/test_world_home_interior_source.py
+      - name: Verify home interior source contract
+        run: python -m unittest discover -s scripts/tests -p "test_world_home_interior_source.py" -v
