@@ -18,6 +18,7 @@ namespace UCENO.VirtualWorld
         public string prefabResourcePath;
         [Tooltip("Versioned Addressables address for remotely delivered wardrobe content.")]
         public string addressableKey;
+        [Min(1)] public int assetVersion = 1;
     }
 
     [CreateAssetMenu(menuName = "UCENO/Avatar Wardrobe Catalog", fileName = "AvatarWardrobeCatalog")]
