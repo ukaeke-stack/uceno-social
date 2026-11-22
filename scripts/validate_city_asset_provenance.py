@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify retained source archives and licence documents for imported city prefabs."""
+"""Verify retained source archives, licences, and the 5/4/3 city prefab contract."""
 from __future__ import annotations
 import hashlib
 import json
@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 ALLOWED_LICENSES = {"CC0 1.0", "CC-BY 4.0", "CC-BY 3.0", "CC-BY-SA 4.0", "CC-BY-SA 3.0"}
 CITY_IDS = ("solstice", "verdant", "nexus", "aurora", "saffron", "monsoon", "eclipse", "origin", "atlas")
+CATEGORY_COUNTS = {"Architecture": 5, "Environment": 4, "Landmarks": 3}
 
 
 class ProvenanceError(ValueError):
@@ -36,6 +37,13 @@ def evidence_file(project_root: Path, city_id: str, relative: str, kind: str) ->
 
 def validate_record(project_root: Path, city_id: str, record: dict) -> None:
     prefab = record.get("prefab", "<unknown>")
+    expected_prefix = f"Assets/UCENO/Cities/{city_id}/Prefabs/"
+    if not isinstance(prefab, str) or not prefab.startswith(expected_prefix):
+        raise ProvenanceError(f"{city_id}: prefab must be inside its city-owned Prefabs folder")
+    relative_prefab = prefab[len(expected_prefix):]
+    category = relative_prefab.split("/", 1)[0]
+    if category not in CATEGORY_COUNTS:
+        raise ProvenanceError(f"{city_id}: unsupported prefab category for {prefab}")
     license_id = str(record.get("license", "")).strip()
     if license_id not in ALLOWED_LICENSES:
         raise ProvenanceError(f"{city_id}: unapproved licence for {prefab}")
@@ -61,6 +69,24 @@ def validate_record(project_root: Path, city_id: str, record: dict) -> None:
                 raise ProvenanceError(f"{city_id}: licence document does not identify {license_id} for {prefab}")
 
 
+def validate_manifest_records(project_root: Path, city_id: str, records: list[dict]) -> int:
+    if not isinstance(records, list) or len(records) != sum(CATEGORY_COUNTS.values()):
+        raise ProvenanceError(f"{city_id}: source manifest must contain exactly 12 records")
+    paths = [record.get("prefab") if isinstance(record, dict) else None for record in records]
+    if any(not isinstance(path, str) or not path for path in paths):
+        raise ProvenanceError(f"{city_id}: source manifest contains an invalid prefab path")
+    if len(set(paths)) != 12:
+        raise ProvenanceError(f"{city_id}: source manifest contains duplicate prefab paths")
+    counts = {category: 0 for category in CATEGORY_COUNTS}
+    for record in records:
+        validate_record(project_root, city_id, record)
+        category = record["prefab"][len(f"Assets/UCENO/Cities/{city_id}/Prefabs/"):].split("/", 1)[0]
+        counts[category] += 1
+    if counts != CATEGORY_COUNTS:
+        raise ProvenanceError(f"{city_id}: expected 5 architecture, 4 environment, and 3 landmark records; got {counts}")
+    return len(records)
+
+
 def validate_city(project_root: Path, city_id: str) -> int:
     city_root = project_root / "unity/UCENOVirtualWorld/Assets/UCENO/Cities" / city_id
     manifest_path = city_root / "source-manifest.json"
@@ -68,17 +94,7 @@ def validate_city(project_root: Path, city_id: str) -> int:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise ProvenanceError(f"{city_id}: cannot read source manifest: {error}") from error
-    records = manifest.get("assets")
-    if not isinstance(records, list) or len(records) != 12:
-        raise ProvenanceError(f"{city_id}: source manifest must contain exactly 12 records")
-    prefab_paths = [record.get("prefab") if isinstance(record, dict) else None for record in records]
-    if any(not isinstance(path, str) or not path for path in prefab_paths):
-        raise ProvenanceError(f"{city_id}: source manifest contains an invalid prefab path")
-    if len(set(prefab_paths)) != 12:
-        raise ProvenanceError(f"{city_id}: source manifest contains duplicate prefab paths")
-    for record in records:
-        validate_record(project_root, city_id, record)
-    return len(records)
+    return validate_manifest_records(project_root, city_id, manifest.get("assets"))
 
 
 def validate_all(project_root: Path) -> int:
