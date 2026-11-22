@@ -55,10 +55,17 @@ namespace UCENO.VirtualWorld
 
         public void EquipAddressable(string itemId, string expectedAddressableKey, Action<bool, string> completed)
         {
-            StartCoroutine(EquipAddressableRoutine(itemId, expectedAddressableKey, completed));
+            EquipAddressable(itemId, expectedAddressableKey, 0, completed);
         }
 
-        private IEnumerator EquipAddressableRoutine(string itemId, string expectedAddressableKey, Action<bool, string> completed)
+        public void EquipAddressable(string itemId, string expectedAddressableKey, int expectedAssetVersion,
+            Action<bool, string> completed)
+        {
+            StartCoroutine(EquipAddressableRoutine(itemId, expectedAddressableKey, expectedAssetVersion, completed));
+        }
+
+        private IEnumerator EquipAddressableRoutine(string itemId, string expectedAddressableKey,
+            int expectedAssetVersion, Action<bool, string> completed)
         {
             if (catalog == null || !catalog.TryGet(itemId, out AvatarWardrobeItemDefinition item) ||
                 !Enum.IsDefined(typeof(AvatarWardrobeSlot), item.slot))
@@ -75,6 +82,11 @@ namespace UCENO.VirtualWorld
                 !string.Equals(item.addressableKey, expectedAddressableKey, StringComparison.Ordinal))
             {
                 completed?.Invoke(false, "The local Addressables key does not match the server wardrobe catalogue.");
+                yield break;
+            }
+            if (expectedAssetVersion > 0 && item.assetVersion != expectedAssetVersion)
+            {
+                completed?.Invoke(false, "The local wardrobe asset version does not match the server catalogue.");
                 yield break;
             }
             if (pendingAddressableSlots.Contains(item.slot))
