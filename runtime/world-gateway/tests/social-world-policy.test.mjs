@@ -17,7 +17,7 @@ test("world messaging remains distinct from mutual-connection calling", () => {
 });
 
 test("blocks deny all cross-account world capabilities", () => {
-  for (const capability of ["view_public_presence", "send_message", "start_call", "enter_private_home"] as const)
+  for (const capability of ["view_public_presence", "send_message", "start_call", "enter_private_home"])
     assert.equal(canUseSocialWorldCapability({ ...relationship, isBlocked: true }, capability, true), false);
 });
 
