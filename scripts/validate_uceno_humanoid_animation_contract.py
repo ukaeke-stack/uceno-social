@@ -102,12 +102,18 @@ for token in (
 for token in (
     "MaterialPropertyBlock",
     "private readonly MaterialPropertyBlock propertyBlock",
+    "private readonly List<Renderer> rendererBuffer",
+    "private readonly List<Material> materialSlots",
+    "GetComponentsInChildren(true, rendererBuffer)",
+    "renderer.GetSharedMaterials(materialSlots)",
     "renderer.GetPropertyBlock(propertyBlock, slot)",
     "renderer.SetPropertyBlock(propertyBlock, slot)",
 ):
     require(token in appearance, "avatar appearance profile is missing allocation-safe tinting: " + token)
 apply_body = appearance.split("public void Apply(Palette next)", 1)[1].split("private static bool TryResolveColor", 1)[0]
-require("new MaterialPropertyBlock()" not in apply_body,
+require("new MaterialPropertyBlock()" not in apply_body and
+        "GetComponentsInChildren<Renderer>" not in apply_body and
+        "renderer.sharedMaterials" not in apply_body,
         "avatar appearance Apply must reuse its property block rather than allocate per material slot")
 
 fbxs = sorted(p for p in ANIMATION_ROOT.rglob("*.fbx") if p.is_file())
