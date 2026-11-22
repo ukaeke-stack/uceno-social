@@ -295,7 +295,11 @@ namespace UCENO.VirtualWorld
             if (!collider)
             {
                 Collider shape = box.GetComponent<Collider>();
-                if (shape != null)\n                {\n                    shape.enabled = false;\n                    Object.Destroy(shape);\n                }
+                if (shape != null)
+                {
+                    shape.enabled = false;
+                    Object.Destroy(shape);
+                }
             }
         }
 
