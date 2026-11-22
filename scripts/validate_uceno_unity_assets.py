@@ -271,6 +271,10 @@ def main():
         "ComputeSha256(archivePath)",
         "ComputeSha256(licensePath)",
         "licenseText.IndexOf(license, StringComparison.OrdinalIgnoreCase)",
+        'city.architecturePrefabs.All(path => path.StartsWith(city.assetRoot + "/Architecture/"',
+        'city.environmentPrefabs.All(path => path.StartsWith(city.assetRoot + "/Environment/"',
+        'city.landmarks.All(item => item != null &&',
+        'redistributableDerivativeLicenses.Contains(license, StringComparer.Ordinal)',
     ):
         if required not in imported_city_gate:
             fail("Imported city art provenance/reuse gate is missing: " + required)
