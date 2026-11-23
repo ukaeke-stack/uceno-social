@@ -25,11 +25,16 @@ export async function POST(request: NextRequest) {
   const session = await readSession();
   if (!session) return NextResponse.json({ error: "Sign in to enter a world" }, { status: 401 });
 
-  let body: { worldId?: unknown; clientType?: unknown };
+  let body: { worldId?: unknown; clientType?: unknown; entryKind?: unknown; targetId?: unknown };
   try { body = await request.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
-  if (typeof body.worldId !== "string" || !/^[0-9a-f-]{36}$/i.test(body.worldId) || !validClient(body.clientType))
-    return NextResponse.json({ error: "A valid worldId and supported clientType are required" }, { status: 400 });
+  const entryKind = body.entryKind === undefined ? "world" : body.entryKind;
+  const targetId = body.targetId === undefined ? null : body.targetId;
+  if (typeof body.worldId !== "string" || !/^[0-9a-f-]{36}$/i.test(body.worldId) ||
+      !validClient(body.clientType) || !["world","home","event"].includes(String(entryKind)) ||
+      (targetId !== null && (typeof targetId !== "string" || !/^[0-9a-f-]{36}$/i.test(targetId))) ||
+      (entryKind !== "world" && targetId === null))
+    return NextResponse.json({ error: "A valid worldId, destination and supported clientType are required" }, { status: 400 });
 
   try {
     const sql = getDb();
@@ -60,11 +65,36 @@ export async function POST(request: NextRequest) {
     if (world.visibility === "private" && world.membershipStatus !== "active" && world.ownerUserId !== session.id)
       return NextResponse.json({ error: "World membership is required" }, { status: 403 });
 
+    if (entryKind === "home") {
+      const home = await sql`
+        SELECT h.id FROM virtual_homes h
+        LEFT JOIN virtual_home_members hm ON hm.home_id = h.id AND hm.user_id = ${session.id}::uuid
+        WHERE h.id = ${targetId}::uuid AND h.world_id = ${body.worldId}::uuid
+          AND (h.owner_user_id = ${session.id}::uuid OR hm.user_id IS NOT NULL)
+        LIMIT 1
+      `;
+      if (!home.length) return NextResponse.json({ error: "Home access is unavailable" }, { status: 403 });
+    }
+    if (entryKind === "event") {
+      const event = await sql`
+        SELECT e.id FROM virtual_world_events e
+        JOIN virtual_world_event_attendees a ON a.event_id = e.id
+        WHERE e.id = ${targetId}::uuid AND e.world_id = ${body.worldId}::uuid
+          AND a.user_id = ${session.id}::uuid AND a.attendance_status = 'going'
+          AND e.status = 'scheduled' AND e.starts_at <= NOW() + INTERVAL '30 minutes'
+          AND e.ends_at > NOW()
+        LIMIT 1
+      `;
+      if (!event.length) return NextResponse.json({ error: "Event admission requires an active RSVP and an open admission window" }, { status: 403 });
+    }
+
     const code = randomBytes(32).toString("base64url");
     await sql`
-      INSERT INTO virtual_world_entry_codes (code_hash, user_id, world_id, client_type, expires_at)
+      INSERT INTO virtual_world_entry_codes
+        (code_hash, user_id, world_id, client_type, entry_kind, entry_target_id, expires_at)
       VALUES (${digest(code)}, ${session.id}::uuid, ${body.worldId}::uuid,
-              ${body.clientType}, NOW() + INTERVAL '90 seconds')
+              ${body.clientType}, ${entryKind}, ${targetId}::uuid,
+              NOW() + INTERVAL '90 seconds')
     `;
     return NextResponse.json({ code, expiresInSeconds: CODE_TTL_SECONDS }, {
       headers: { "Cache-Control": "no-store, private" }
@@ -110,7 +140,8 @@ export async function PUT(request: NextRequest) {
           WHERE (b.blocker_id = u.id AND b.blocked_id = w.owner_user_id)
              OR (b.blocker_id = w.owner_user_id AND b.blocked_id = u.id)
         )
-      RETURNING ec.user_id AS "userId", ec.world_id AS "worldId"
+      RETURNING ec.user_id AS "userId", ec.world_id AS "worldId",
+                ec.entry_kind AS "entryKind", ec.entry_target_id AS "entryTargetId"
     `;
     if (!redeemed.length)
       return NextResponse.json({ error: "Entry code is invalid, expired or already used" }, { status: 401 });
@@ -131,6 +162,8 @@ export async function PUT(request: NextRequest) {
     const token = await new SignJWT({
       world_id: identity.worldId,
       client_type: body.clientType,
+      entry_kind: identity.entryKind,
+      entry_target_id: identity.entryTargetId,
       instance_id: assignment.instanceId
     })
       .setProtectedHeader({ alg: "HS256" })
@@ -146,6 +179,8 @@ export async function PUT(request: NextRequest) {
       tokenType: "Bearer",
       expiresInSeconds: WORLD_TOKEN_TTL_SECONDS,
       worldId: identity.worldId,
+      entryKind: identity.entryKind,
+      entryTargetId: identity.entryTargetId,
       instanceId: assignment.instanceId,
       instanceEndpoint: assignment.endpoint,
       region: assignment.region,
