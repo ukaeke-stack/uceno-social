@@ -190,6 +190,12 @@ def inspect_glb(path, expected_sha=None):
             not isinstance(source, int) or isinstance(source, bool) or not 0 <= source < len(document.get("images", []))
         ):
             raise ValueError(f"{path}: texture {index} references an invalid image")
+        sampler = texture.get("sampler")
+        samplers = document.get("samplers", [])
+        if sampler is not None and (
+            not isinstance(sampler, int) or isinstance(sampler, bool) or not 0 <= sampler < len(samplers)
+        ):
+            raise ValueError(f"{path}: texture {index} references an invalid sampler")
 
     digest = hashlib.sha256(data).hexdigest()
     if expected_sha and digest.lower() != str(expected_sha).lower():
@@ -202,9 +208,12 @@ def inspect_glb(path, expected_sha=None):
         buffer_view = item.get("bufferView")
         uri = item.get("uri")
         if buffer_view is not None and (
-            not isinstance(buffer_view, int) or isinstance(buffer_view, bool) or buffer_view < 0
+            not isinstance(buffer_view, int) or isinstance(buffer_view, bool)
+            or not 0 <= buffer_view < len(buffer_views)
         ):
-            raise ValueError(f"{path}: glTF image {index} has an invalid bufferView")
+            raise ValueError(f"{path}: glTF image {index} references an invalid bufferView")
+        if buffer_view is not None and not isinstance(item.get("mimeType"), str):
+            raise ValueError(f"{path}: glTF image {index} bufferView requires mimeType")
         if uri is not None and not isinstance(uri, str):
             raise ValueError(f"{path}: glTF image {index} has an invalid URI")
         if buffer_view is not None or (isinstance(uri, str) and uri.startswith("data:")):
