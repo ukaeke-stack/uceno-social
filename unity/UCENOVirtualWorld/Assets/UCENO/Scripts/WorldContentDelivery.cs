@@ -354,7 +354,7 @@ namespace UCENO.VirtualWorld
                 }
 
                 AsyncOperationHandle<IResourceLocator> catalog =
-                    Addressables.LoadContentCatalogAsync(catalogUrl, true);
+                    Addressables.LoadContentCatalogAsync(catalogUrl, false);
                 yield return catalog;
                 bool catalogLoaded = catalog.Status == AsyncOperationStatus.Succeeded;
                 // The locator remains registered with Addressables after the
