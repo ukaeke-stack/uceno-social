@@ -5,10 +5,13 @@ This checks binary integrity, manifest coverage, LOD presence and embedded
 image evidence. It deliberately does not approve geometry, materials, city fit,
 prefabs or visual quality; those still require the Unity/editor release gate.
 """
+import base64
+import binascii
 import hashlib
 import json
 import pathlib
 import struct
+import urllib.parse
 
 ROOT = pathlib.Path("artifacts")
 TEVY = ROOT / "tevy-city-architecture" / "tevy-acquisition-manifest.json"
@@ -20,6 +23,27 @@ CITIES = (
     "AtlasFrontier",
 )
 MAX_BYTES = 25 * 1024 * 1024
+
+
+def embedded_buffer_length(uri, path, index):
+    """Return the decoded byte length of a self-contained glTF buffer data URI."""
+    if not isinstance(uri, str) or not uri.startswith("data:"):
+        raise ValueError(f"{path}: external buffer URI is not accepted in acquired GLB")
+    try:
+        header, payload = uri[5:].split(",", 1)
+    except ValueError as exc:
+        raise ValueError(f"{path}: buffer {index} has a malformed data URI") from exc
+    parts = header.split(";")
+    media_type = parts[0].lower()
+    if media_type not in {"application/octet-stream", "application/gltf-buffer"}:
+        raise ValueError(f"{path}: buffer {index} data URI has an unsupported media type")
+    if len(parts) > 2 or (len(parts) == 2 and parts[1].lower() != "base64"):
+        raise ValueError(f"{path}: buffer {index} data URI has unsupported parameters")
+    try:
+        decoded = base64.b64decode(payload, validate=True) if len(parts) == 2 else urllib.parse.unquote_to_bytes(payload)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError(f"{path}: buffer {index} data URI payload is invalid") from exc
+    return len(decoded)
 
 
 def inspect_glb(path, expected_sha=None):
@@ -86,20 +110,69 @@ def inspect_glb(path, expected_sha=None):
     buffers = document.get("buffers", [])
     buffer_views = document.get("bufferViews", [])
     accessors = document.get("accessors", [])
-    if len(buffers) > 1:
-        raise ValueError(f"{path}: self-contained GLB must not declare multiple buffers")
-    if buffers:
-        buffer = buffers[0]
+    extensions_used = document.get("extensionsUsed", [])
+    extensions_required = document.get("extensionsRequired", [])
+    for label, values in (("extensionsUsed", extensions_used), ("extensionsRequired", extensions_required)):
+        if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+            raise ValueError(f"{path}: glTF {label} must be an array of non-empty strings")
+        if len(values) != len(set(values)):
+            raise ValueError(f"{path}: glTF {label} contains duplicate entries")
+    if not set(extensions_required).issubset(set(extensions_used)):
+        raise ValueError(f"{path}: extensionsRequired must be a subset of extensionsUsed")
+    meshopt_used = "EXT_meshopt_compression" in extensions_used
+    meshopt_required = "EXT_meshopt_compression" in extensions_required
+
+    buffer_lengths = []
+    buffer_has_data = []
+    placeholder_buffers = set()
+    fallback_buffers = set()
+    for index, buffer in enumerate(buffers):
         if not isinstance(buffer, dict):
-            raise ValueError(f"{path}: glTF buffer 0 must be an object")
-        if buffer.get("uri") is not None:
-            raise ValueError(f"{path}: external buffer URI is not accepted in acquired GLB")
-        declared_buffer_bytes = buffer.get("byteLength")
-        if not isinstance(declared_buffer_bytes, int) or isinstance(declared_buffer_bytes, bool) or declared_buffer_bytes <= 0:
-            raise ValueError(f"{path}: glTF buffer 0 has invalid byteLength")
-        if binary_chunk is None or declared_buffer_bytes > len(binary_chunk):
-            raise ValueError(f"{path}: declared buffer bytes exceed the GLB BIN chunk")
-    elif buffer_views:
+            raise ValueError(f"{path}: glTF buffer {index} must be an object")
+        declared = buffer.get("byteLength")
+        if not isinstance(declared, int) or isinstance(declared, bool) or declared <= 0:
+            raise ValueError(f"{path}: glTF buffer {index} has invalid byteLength")
+        if "uri" in buffer:
+            uri = buffer["uri"]
+            if not isinstance(uri, str):
+                raise ValueError(f"{path}: glTF buffer {index} has an invalid URI")
+            actual_length = embedded_buffer_length(uri, path, index)
+            if actual_length < declared:
+                raise ValueError(f"{path}: embedded buffer {index} is shorter than byteLength")
+            has_data = True
+        elif index == 0:
+            if binary_chunk is None or declared > len(binary_chunk) or len(binary_chunk) - declared > 3:
+                raise ValueError(f"{path}: declared buffer 0 bytes do not match the GLB BIN chunk")
+            has_data = True
+        else:
+            if not meshopt_required:
+                raise ValueError(
+                    f"{path}: buffer {index} without a URI requires EXT_meshopt_compression"
+                )
+            placeholder_buffers.add(index)
+            has_data = False
+
+        buffer_extensions = buffer.get("extensions", {})
+        if not isinstance(buffer_extensions, dict):
+            raise ValueError(f"{path}: glTF buffer {index} extensions must be an object")
+        meshopt_buffer = buffer_extensions.get("EXT_meshopt_compression")
+        if meshopt_buffer is not None:
+            if not isinstance(meshopt_buffer, dict):
+                raise ValueError(f"{path}: glTF buffer {index} meshopt extension must be an object")
+            fallback = meshopt_buffer.get("fallback")
+            if fallback is not None and not isinstance(fallback, bool):
+                raise ValueError(f"{path}: glTF buffer {index} meshopt fallback flag must be boolean")
+            if fallback is True:
+                if index == 0:
+                    raise ValueError(f"{path}: GLB BIN buffer 0 cannot be a meshopt fallback buffer")
+                fallback_buffers.add(index)
+            if fallback is False and index in placeholder_buffers:
+                raise ValueError(f"{path}: buffer {index} cannot omit data while fallback is false")
+
+        buffer_lengths.append(declared)
+        buffer_has_data.append(has_data)
+
+    if buffer_views and not buffers:
         raise ValueError(f"{path}: bufferViews exist without a glTF buffer")
     meshes = document.get("meshes", [])
     materials = document.get("materials", [])
@@ -108,6 +181,15 @@ def inspect_glb(path, expected_sha=None):
     nodes = document.get("nodes", [])
     scenes = document.get("scenes", [])
 
+    meshes = document.get("meshes", [])
+    materials = document.get("materials", [])
+    textures = document.get("textures", [])
+    samplers = document.get("samplers", [])
+    nodes = document.get("nodes", [])
+    scenes = document.get("scenes", [])
+
+    meshopt_compressed_view_count = 0
+    fallback_referenced_buffers = set()
     for index, view in enumerate(buffer_views):
         if not isinstance(view, dict):
             raise ValueError(f"{path}: bufferView {index} must be an object")
@@ -120,8 +202,72 @@ def inspect_glb(path, expected_sha=None):
             raise ValueError(f"{path}: bufferView {index} has invalid byteLength")
         if not isinstance(byte_offset, int) or isinstance(byte_offset, bool) or byte_offset < 0:
             raise ValueError(f"{path}: bufferView {index} has invalid byteOffset")
-        if buffer_index == 0 and buffers and byte_offset + byte_length > buffers[0]["byteLength"]:
+        if byte_offset + byte_length > buffer_lengths[buffer_index]:
             raise ValueError(f"{path}: bufferView {index} exceeds declared buffer bounds")
+
+        view_extensions = view.get("extensions", {})
+        if not isinstance(view_extensions, dict):
+            raise ValueError(f"{path}: bufferView {index} extensions must be an object")
+        meshopt = view_extensions.get("EXT_meshopt_compression")
+        if buffer_index in placeholder_buffers and not isinstance(meshopt, dict):
+            raise ValueError(
+                f"{path}: meshopt fallback buffer {buffer_index} is referenced by an uncompressed bufferView"
+            )
+        if buffer_index in fallback_buffers and not isinstance(meshopt, dict):
+            raise ValueError(
+                f"{path}: meshopt fallback buffer {buffer_index} is referenced by an uncompressed bufferView"
+            )
+        if meshopt is not None:
+            if not meshopt_used or not isinstance(meshopt, dict):
+                raise ValueError(f"{path}: bufferView {index} has an undeclared meshopt compression extension")
+            compressed_buffer = meshopt.get("buffer")
+            compressed_offset = meshopt.get("byteOffset", 0)
+            compressed_length = meshopt.get("byteLength")
+            stride = meshopt.get("byteStride")
+            count = meshopt.get("count")
+            mode = meshopt.get("mode")
+            filter_name = meshopt.get("filter", "NONE")
+            if (not isinstance(compressed_buffer, int) or isinstance(compressed_buffer, bool)
+                    or not 0 <= compressed_buffer < len(buffers)):
+                raise ValueError(f"{path}: bufferView {index} has an invalid meshopt source buffer")
+            if compressed_buffer in placeholder_buffers or compressed_buffer in fallback_buffers:
+                raise ValueError(f"{path}: bufferView {index} meshopt source points to a fallback buffer")
+            if not buffer_has_data[compressed_buffer]:
+                raise ValueError(f"{path}: bufferView {index} meshopt source buffer has no data")
+            if (not isinstance(compressed_offset, int) or isinstance(compressed_offset, bool)
+                    or compressed_offset < 0 or not isinstance(compressed_length, int)
+                    or isinstance(compressed_length, bool) or compressed_length <= 0
+                    or compressed_offset + compressed_length > buffer_lengths[compressed_buffer]):
+                raise ValueError(f"{path}: bufferView {index} meshopt compressed range exceeds source buffer")
+            if (not isinstance(stride, int) or isinstance(stride, bool) or stride <= 0
+                    or stride > 256 or not isinstance(count, int) or isinstance(count, bool) or count <= 0):
+                raise ValueError(f"{path}: bufferView {index} has invalid meshopt stride or count")
+            if mode not in {"ATTRIBUTES", "TRIANGLES", "INDICES"}:
+                raise ValueError(f"{path}: bufferView {index} has an invalid meshopt mode")
+            if filter_name not in {"NONE", "OCTAHEDRAL", "QUATERNION", "EXPONENTIAL"}:
+                raise ValueError(f"{path}: bufferView {index} has an invalid meshopt filter")
+            if byte_length != stride * count:
+                raise ValueError(f"{path}: bufferView {index} meshopt output size does not match stride and count")
+            if view.get("byteStride") is not None and view["byteStride"] != stride:
+                raise ValueError(f"{path}: bufferView {index} byteStride disagrees with meshopt extension")
+            if mode == "ATTRIBUTES" and stride % 4:
+                raise ValueError(f"{path}: bufferView {index} meshopt attribute stride must be divisible by four")
+            if mode == "TRIANGLES" and count % 3:
+                raise ValueError(f"{path}: bufferView {index} meshopt triangle count must be divisible by three")
+            if mode in {"TRIANGLES", "INDICES"} and stride not in {2, 4}:
+                raise ValueError(f"{path}: bufferView {index} meshopt index stride must be two or four")
+            if mode in {"TRIANGLES", "INDICES"} and filter_name != "NONE":
+                raise ValueError(f"{path}: bufferView {index} meshopt index mode cannot use a filter")
+            if filter_name == "OCTAHEDRAL" and stride not in {4, 8}:
+                raise ValueError(f"{path}: bufferView {index} meshopt octahedral filter has invalid stride")
+            if filter_name == "QUATERNION" and stride != 8:
+                raise ValueError(f"{path}: bufferView {index} meshopt quaternion filter has invalid stride")
+            if filter_name == "EXPONENTIAL" and stride % 4:
+                raise ValueError(f"{path}: bufferView {index} meshopt exponential filter has invalid stride")
+            meshopt_compressed_view_count += 1
+            if buffer_index in placeholder_buffers or buffer_index in fallback_buffers:
+                fallback_referenced_buffers.add(buffer_index)
+
         stride = view.get("byteStride")
         if stride is not None and (
             not isinstance(stride, int) or isinstance(stride, bool)
@@ -131,6 +277,10 @@ def inspect_glb(path, expected_sha=None):
         target = view.get("target")
         if target is not None and target not in {34962, 34963}:
             raise ValueError(f"{path}: bufferView {index} has invalid target")
+
+    for index in placeholder_buffers | fallback_buffers:
+        if index not in fallback_referenced_buffers:
+            raise ValueError(f"{path}: meshopt fallback buffer {index} has no compressed bufferView references")
 
     for index, accessor in enumerate(accessors):
         if not isinstance(accessor, dict):
@@ -263,6 +413,8 @@ def inspect_glb(path, expected_sha=None):
         "image_count": len(images),
         "embedded_image_count": embedded,
         "external_image_count": len(images) - embedded,
+        "meshopt_compressed_view_count": meshopt_compressed_view_count,
+        "meshopt_fallback_buffer_count": len(placeholder_buffers | fallback_buffers),
     }
 
 def safe_artifact_path(base, relative):
