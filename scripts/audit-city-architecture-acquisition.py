@@ -78,7 +78,7 @@ def inspect_glb(path, expected_sha=None):
 
     # Validate the actual scene graph and geometry references. A valid GLB
     # header alone is not evidence that Unity can render a building.
-    arrays = ("buffers", "bufferViews", "accessors", "textures", "nodes", "scenes")
+    arrays = ("buffers", "bufferViews", "accessors", "textures", "samplers", "nodes", "scenes")
     for collection in arrays:
         if not isinstance(document.get(collection, []), list):
             raise ValueError(f"{path}: glTF {collection} must be an array")
@@ -104,6 +104,7 @@ def inspect_glb(path, expected_sha=None):
     meshes = document.get("meshes", [])
     materials = document.get("materials", [])
     textures = document.get("textures", [])
+    samplers = document.get("samplers", [])
     nodes = document.get("nodes", [])
     scenes = document.get("scenes", [])
 
@@ -181,6 +182,20 @@ def inspect_glb(path, expected_sha=None):
         for node_index in scene.get("nodes", []):
             if not isinstance(node_index, int) or isinstance(node_index, bool) or not 0 <= node_index < len(nodes):
                 raise ValueError(f"{path}: scene {index} references an invalid node")
+
+    for index, sampler in enumerate(samplers):
+        if not isinstance(sampler, dict):
+            raise ValueError(f"{path}: sampler {index} must be an object")
+        min_filter = sampler.get("minFilter")
+        if min_filter is not None and min_filter not in {9728, 9729, 9984, 9985, 9986, 9987}:
+            raise ValueError(f"{path}: sampler {index} has invalid minFilter")
+        mag_filter = sampler.get("magFilter")
+        if mag_filter is not None and mag_filter not in {9728, 9729}:
+            raise ValueError(f"{path}: sampler {index} has invalid magFilter")
+        for field in ("wrapS", "wrapT"):
+            wrap = sampler.get(field)
+            if wrap is not None and wrap not in {33071, 33648, 10497}:
+                raise ValueError(f"{path}: sampler {index} has invalid {field}")
 
     for index, texture in enumerate(textures):
         if not isinstance(texture, dict):
