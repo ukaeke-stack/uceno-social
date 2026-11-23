@@ -382,6 +382,7 @@ def main():
         fail("FollowCamera is missing bounded pinch/wheel zoom controls.")
 
     avatar = read_text(ASSETS / "Scripts/AvatarLocomotionDriver.cs")
+    voice = read_text(ASSETS / "Scripts/WorldSpatialVoiceClient.cs")
     if "TriggerWave" not in avatar or "TriggerCheer" not in avatar:
         fail("Avatar wave/cheer gesture actions are missing.")
 
@@ -536,7 +537,11 @@ def main():
         fail("Player seated/rest state or desktop toggle is missing.")
     if "motor != null ? motor.IsSeated" not in avatar or "IsSeatedHash" not in avatar or "SetBool(IsSeatedHash, seated)" not in avatar:
         fail("Imported Humanoid seated/rest animation state is missing.")
-    if "if (motor != null) WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking" not in avatar or "IsTalkingHash" not in avatar:
+    if ("WorldSpatialVoiceClient.LocalTransmitChanged += SetTalking" not in avatar or
+            "WorldSpatialVoiceClient.LocalTransmitChanged -= SetTalking" not in avatar or
+            "IsTalkingHash" not in avatar or
+            "peer.microphone.SetMute(!shouldTransmit)" not in voice or
+            "LocalTransmitChanged?.Invoke(shouldTransmit)" not in voice):
         fail("Humanoid talking animation is not connected to the actual microphone transmit state.")
     if "Mathf.Sin(cycle)" in avatar or "ApplyProcedural" in avatar:
         fail("Procedural humanoid gait fallback is not allowed.")
