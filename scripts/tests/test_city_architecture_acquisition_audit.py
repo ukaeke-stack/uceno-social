@@ -20,7 +20,7 @@ def glb(document, binary=None):
     payload += b" " * ((4 - len(payload) % 4) % 4)
     chunks = struct.pack("<II", len(payload), 0x4E4F534A) + payload
     if binary is not None:
-        binary += b"\\x00" * ((4 - len(binary) % 4) % 4)
+        binary += b"\x00" * ((4 - len(binary) % 4) % 4)
         chunks += struct.pack("<II", len(binary), 0x004E4942) + binary
     return b"glTF" + struct.pack("<II", 2, 12 + len(chunks)) + chunks
 
@@ -82,6 +82,27 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                 with self.subTest(document=document):
                     path = pathlib.Path(directory) / f"invalid-mesh-{index}.glb"
                     path.write_bytes(glb(document))
+                    with self.assertRaises(ValueError):
+                        audit.inspect_glb(path)
+
+    def test_rejects_buffer_view_out_of_bounds_and_missing_bin_chunk(self):
+        valid_shape = {
+            "asset": {"version": "2.0"},
+            "buffers": [{"byteLength": 8}],
+            "bufferViews": [{"buffer": 0, "byteLength": 8}],
+        }
+        invalid_bounds = {
+            **valid_shape,
+            "bufferViews": [{"buffer": 0, "byteOffset": 4, "byteLength": 8}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            for name, document, binary in (
+                ("bounds", invalid_bounds, bytes(12)),
+                ("missing-bin", valid_shape, None),
+            ):
+                with self.subTest(name=name):
+                    path = pathlib.Path(directory) / f"{name}.glb"
+                    path.write_bytes(glb(document, binary=binary))
                     with self.assertRaises(ValueError):
                         audit.inspect_glb(path)
 
