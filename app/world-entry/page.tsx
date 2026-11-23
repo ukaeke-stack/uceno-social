@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, Compass, Copy, Globe2, House, MapPin, Users } from "lucide-react";
+import type { CSSProperties } from "react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, Copy, Globe2, House, MapPin, Users } from "lucide-react";
 
 type World = { id: string; cityId: string; name: string; description: string; livePlayers: number; upcomingEvents: number; region: string };
 type City = { id: string; name: string; identity: string; climate: string; architecture: string; districts: {id:string;name:string;role:string}[]; landmarks: {id:string;name:string;kind:string}[]; worlds: World[]; available: boolean; livePlayers: number; upcomingEvents: number };
@@ -52,7 +53,7 @@ export default function WorldEntryPage() {
     catch {setError("Clipboard access failed. Select and copy the code manually.");}
   }
 
-  const cardStyle:React.CSSProperties={background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.13)",borderRadius:18,padding:16};
+  const cardStyle:CSSProperties={background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.13)",borderRadius:18,padding:16};
   const buttonStyle:React.CSSProperties={border:0,borderRadius:14,padding:"13px 16px",fontWeight:700,cursor:"pointer",background:"#8bd6ff",color:"#0b1a2a",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:8};
   return <main style={{minHeight:"100dvh",background:"radial-gradient(ellipse at 15% 0%,#294d78 0%,#111a2c 48%,#090e18 100%)",color:"#f6f8ff",padding:"max(22px,env(safe-area-inset-top)) 18px max(28px,env(safe-area-inset-bottom))",fontFamily:"Arial,sans-serif"}}>
     <div style={{maxWidth:1000,margin:"0 auto"}}>
@@ -72,7 +73,7 @@ export default function WorldEntryPage() {
           {id:"city" as const,label:"Explore Cities",desc:"Choose a city",icon:<Globe2 size={20}/>,disabled:false},
           {id:"people" as const,label:"Join People",desc:"Friends & social spaces",icon:<Users size={20}/>,disabled:true},
           {id:"events" as const,label:"Events",desc:"Activities & gatherings",icon:<CalendarDays size={20}/>,disabled:!data?.cities.some(c=>c.upcomingEvents>0)}
-        ].map(item=><button key={item.id} type="button" disabled={item.disabled} onClick={()=>{setMode(item.id);setEntryCode("");}} style={{...cardStyle,textAlign:"left",color:"inherit",opacity:item.disabled?.48:1,cursor:item.disabled?"not-allowed":"pointer",outline:mode===item.id?"2px solid #8bd6ff":"none"}}>
+        ].map(item=><button key={item.id} type="button" disabled={item.disabled} onClick={()=>{setMode(item.id);setEntryCode("");}} style={{...cardStyle,textAlign:"left",color:"inherit",opacity:item.disabled ? .48 : 1,cursor:item.disabled?"not-allowed":"pointer",outline:mode===item.id?"2px solid #8bd6ff":"none"}}>
           <div style={{color:"#9bdfff",marginBottom:12}}>{item.icon}</div><strong>{item.label}</strong><div style={{fontSize:12,color:"#aebed3",marginTop:5}}>{item.desc}</div>
         </button>)}
       </section>
