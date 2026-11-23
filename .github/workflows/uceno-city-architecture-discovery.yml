@@ -11,6 +11,7 @@ on:
       - "scripts/tests/test_city_architecture_acquisition_audit.py"
       - "scripts/tests/test_city_architecture_screening.py"
       - "scripts/tests/test_tevy_city_architecture.py"
+      - "scripts/tests/test_3d_valley_city_architecture.py"
       - ".github/workflows/uceno-city-architecture-discovery.yml"
   pull_request:
     types: [opened, reopened, synchronize]
@@ -22,6 +23,7 @@ on:
       - "scripts/tests/test_city_architecture_acquisition_audit.py"
       - "scripts/tests/test_city_architecture_screening.py"
       - "scripts/tests/test_tevy_city_architecture.py"
+      - "scripts/tests/test_3d_valley_city_architecture.py"
       - ".github/workflows/uceno-city-architecture-discovery.yml"
 permissions:
   contents: read
