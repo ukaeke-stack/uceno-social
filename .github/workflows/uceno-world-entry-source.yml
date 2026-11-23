@@ -1,0 +1,42 @@
+name: UCENO World Entry Gateway Source Contract
+on:
+  pull_request:
+    paths:
+      - "app/api/worlds/**"
+      - "app/world-entry/**"
+      - "db/migrations/038_virtual_world_last_location.sql"
+      - "db/migrations/039_virtual_world_entry_context.sql"
+      - "runtime/world-gateway/config/world-cities.json"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldSidebarMenu.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldSessionClient.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldHomeClient.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldEventsClient.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs"
+      - "scripts/validate-uceno-world-entry.mjs"
+      - ".github/workflows/uceno-world-entry-source.yml"
+  push:
+    branches: ["feature/uceno-unity-foundation"]
+    paths:
+      - "app/api/worlds/**"
+      - "app/world-entry/**"
+      - "db/migrations/038_virtual_world_last_location.sql"
+      - "db/migrations/039_virtual_world_entry_context.sql"
+      - "runtime/world-gateway/config/world-cities.json"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldSidebarMenu.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldSessionClient.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldHomeClient.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldEventsClient.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs"
+      - "scripts/validate-uceno-world-entry.mjs"
+      - ".github/workflows/uceno-world-entry-source.yml"
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/validate-uceno-world-entry.mjs
