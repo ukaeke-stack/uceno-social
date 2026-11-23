@@ -446,6 +446,52 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
             finally:
                 audit.ROOT = previous_root
 
+    def test_main_writes_complete_rejection_report_before_failing(self):
+        previous = (audit.ROOT, audit.TEVY, audit.ASSETS, audit.OUT)
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            audit.ROOT = root
+            audit.TEVY = root / "tevy-manifest.json"
+            audit.ASSETS = root / "assets-manifest.json"
+            audit.OUT = root / "audit.json"
+            try:
+                city_root = root / "tevy-city-architecture" / "SolsticeBay"
+                city_root.mkdir(parents=True)
+                invalid_data = glb({
+                    "asset": {"version": "2.0"},
+                    "buffers": [{"byteLength": 4}, {"byteLength": 4}],
+                    "bufferViews": [{"buffer": 0, "byteLength": 4}],
+                }, binary=bytes(4))
+                asset = city_root / "invalid-multi-buffer.glb"
+                asset.write_bytes(invalid_data)
+                lods = [{
+                    "lod": level,
+                    "file": "SolsticeBay/invalid-multi-buffer.glb",
+                    "sha256": hashlib.sha256(invalid_data).hexdigest(),
+                    "bytes": len(invalid_data),
+                } for level in (0, 1, 2)]
+                tevy_cities = {
+                    city: {"selected_and_acquired": []}
+                    for city in audit.CITIES
+                }
+                tevy_cities["SolsticeBay"]["selected_and_acquired"] = [{
+                    "slug": "invalid-building",
+                    "lods": lods,
+                }]
+                asset_cities = {city: [] for city in audit.CITIES}
+                audit.TEVY.write_text(json.dumps({"cities": tevy_cities}))
+                audit.ASSETS.write_text(json.dumps({"cities": asset_cities}))
+                with self.assertRaisesRegex(SystemExit, "rejected 1 model"):
+                    audit.main()
+                result = json.loads(audit.OUT.read_text())
+                self.assertEqual(result["audit_status"], "rejected_assets")
+                self.assertEqual(result["totals"]["tevy_invalid_models"], 1)
+                self.assertEqual(result["totals"]["tevy_valid_models"], 0)
+                self.assertEqual(len(result["errors"]), 1)
+                self.assertEqual(result["errors"][0]["slug"], "invalid-building")
+            finally:
+                audit.ROOT, audit.TEVY, audit.ASSETS, audit.OUT = previous
+
 
 if __name__ == "__main__":
     unittest.main()
