@@ -370,6 +370,16 @@ namespace UCENO.VirtualWorld
 
         private void CreateMicrophone(PeerAudio peer)
         {
+            // A device can disappear after EnableVoice checks the device list.
+            // Re-check before indexing to handle OS revocation or route changes.
+            string[] devices = Microphone.devices;
+            if (devices == null || devices.Length == 0)
+            {
+                status = "NO MICROPHONE FOUND";
+                RemovePeer(peer.userId);
+                return;
+            }
+
             peer.microphoneObject = new GameObject("UCENO Voice Microphone " + peer.userId);
             var processing = new AudioProcessingOptions
             {
