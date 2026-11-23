@@ -201,6 +201,24 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         audit.inspect_glb(path)
 
+    def test_rejects_invalid_sampler_definitions(self):
+        invalid = (
+            {"minFilter": 1},
+            {"magFilter": 9987},
+            {"wrapS": 0},
+            None,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, sampler in enumerate(invalid):
+                with self.subTest(sampler=sampler):
+                    path = pathlib.Path(directory) / f"invalid-sampler-{index}.glb"
+                    path.write_bytes(glb({
+                        "asset": {"version": "2.0"},
+                        "samplers": [sampler],
+                    }))
+                    with self.assertRaises(ValueError):
+                        audit.inspect_glb(path)
+
     def test_rejects_non_json_first_chunk(self):
         data = b"glTF" + struct.pack("<II", 2, 24) + struct.pack("<II", 4, 0) + bytes(4)
         with tempfile.TemporaryDirectory() as directory:
