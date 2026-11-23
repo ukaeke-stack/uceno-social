@@ -36,13 +36,16 @@ assert.match(entryPage, /Explore the cities/);
 assert.match(entryPage, /entryKind/);
 assert.match(entryPage, /Request a fresh entry code/);
 assert.match(homePage, /Virtual World/);
-assert.match(homePage, /\\/world-entry/);
+assert.ok(homePage.includes("/world-entry"), "social homepage must link to the world-entry gateway");
 assert.match(entryRoute, /entry_kind: identity.entryKind/);
 assert.match(entryRoute, /Event admission requires an active RSVP/);
 assert.match(stateRoute, /INSERT INTO virtual_world_last_locations/);
 for (const group of ["WORLD NAVIGATION", "SOCIAL", "ACTIVITIES & ECONOMY", "ACCOUNT & SUPPORT"])
   assert.ok(sidebar.includes(group), `sidebar is missing group: ${group}`);
 assert.match(sidebar, /BeginScrollView|GUILayout\.BeginScrollView/);
+assert.ok(sidebar.includes("MakeRoundedTexture"), "sidebar must render a translucent rounded glass panel");
+assert.ok(sidebar.includes("i += 3"), "sidebar must retain the three-column mobile icon grid");
+assert.ok(sidebar.includes("iconDiscTexture"), "sidebar items must use colored circular icon discs");
 assert.match(sidebar, /KeyCode\.Escape/);
 assert.match(sidebar, /\/world-entry/);
 assert.match(builder, /AddComponent<WorldSidebarMenu>/);
