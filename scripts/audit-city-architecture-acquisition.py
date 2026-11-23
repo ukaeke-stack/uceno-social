@@ -38,6 +38,7 @@ def inspect_glb(path, expected_sha=None):
 
     offset = 12
     document = None
+    binary_chunk = None
     chunk_index = 0
     while offset < len(data):
         if offset + 8 > len(data):
@@ -59,6 +60,7 @@ def inspect_glb(path, expected_sha=None):
         elif chunk_index == 1:
             if chunk_type != 0x004E4942:
                 raise ValueError(f"{path}: second GLB chunk, when present, must be BIN")
+            binary_chunk = data[offset:end]
         else:
             raise ValueError(f"{path}: GLB contains more than two chunks")
         offset = end
@@ -84,6 +86,21 @@ def inspect_glb(path, expected_sha=None):
     buffers = document.get("buffers", [])
     buffer_views = document.get("bufferViews", [])
     accessors = document.get("accessors", [])
+    if len(buffers) > 1:
+        raise ValueError(f"{path}: self-contained GLB must not declare multiple buffers")
+    if buffers:
+        buffer = buffers[0]
+        if not isinstance(buffer, dict):
+            raise ValueError(f"{path}: glTF buffer 0 must be an object")
+        if buffer.get("uri") is not None:
+            raise ValueError(f"{path}: external buffer URI is not accepted in acquired GLB")
+        declared_buffer_bytes = buffer.get("byteLength")
+        if not isinstance(declared_buffer_bytes, int) or isinstance(declared_buffer_bytes, bool) or declared_buffer_bytes <= 0:
+            raise ValueError(f"{path}: glTF buffer 0 has invalid byteLength")
+        if binary_chunk is None or declared_buffer_bytes > len(binary_chunk):
+            raise ValueError(f"{path}: declared buffer bytes exceed the GLB BIN chunk")
+    elif buffer_views:
+        raise ValueError(f"{path}: bufferViews exist without a glTF buffer")
     meshes = document.get("meshes", [])
     materials = document.get("materials", [])
     textures = document.get("textures", [])
@@ -96,8 +113,14 @@ def inspect_glb(path, expected_sha=None):
         buffer_index = view.get("buffer")
         if not isinstance(buffer_index, int) or isinstance(buffer_index, bool) or not 0 <= buffer_index < len(buffers):
             raise ValueError(f"{path}: bufferView {index} references an invalid buffer")
-        if not isinstance(view.get("byteLength"), int) or view["byteLength"] <= 0:
+        byte_length = view.get("byteLength")
+        byte_offset = view.get("byteOffset", 0)
+        if not isinstance(byte_length, int) or isinstance(byte_length, bool) or byte_length <= 0:
             raise ValueError(f"{path}: bufferView {index} has invalid byteLength")
+        if not isinstance(byte_offset, int) or isinstance(byte_offset, bool) or byte_offset < 0:
+            raise ValueError(f"{path}: bufferView {index} has invalid byteOffset")
+        if buffer_index == 0 and buffers and byte_offset + byte_length > buffers[0]["byteLength"]:
+            raise ValueError(f"{path}: bufferView {index} exceeds declared buffer bounds")
 
     for index, accessor in enumerate(accessors):
         if not isinstance(accessor, dict):
@@ -107,6 +130,15 @@ def inspect_glb(path, expected_sha=None):
             not isinstance(view_index, int) or isinstance(view_index, bool) or not 0 <= view_index < len(buffer_views)
         ):
             raise ValueError(f"{path}: accessor {index} references an invalid bufferView")
+        count = accessor.get("count")
+        component_type = accessor.get("componentType")
+        accessor_type = accessor.get("type")
+        if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+            raise ValueError(f"{path}: accessor {index} has invalid count")
+        if component_type not in {5120, 5121, 5122, 5123, 5125, 5126}:
+            raise ValueError(f"{path}: accessor {index} has invalid componentType")
+        if accessor_type not in {"SCALAR", "VEC2", "VEC3", "VEC4", "MAT2", "MAT3", "MAT4"}:
+            raise ValueError(f"{path}: accessor {index} has invalid type")
 
     primitive_count = 0
     material_references = set()
