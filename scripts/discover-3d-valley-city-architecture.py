@@ -73,19 +73,39 @@ def request_json(path, params=None, api_key=None):
     raise RuntimeError("3D Valley request retries exhausted")
 
 def reject_reason(item, city):
-    name = str(item.get("name") or "").lower().replace("_", " ").replace("-", " ")
-    tags = " ".join(str(x) for x in item.get("tags", [])).lower()
-    searchable = name + " " + tags
+    if not isinstance(item, dict):
+        return "invalid-asset-record"
+    if not item.get("id"):
+        return "missing-asset-id"
     if item.get("license") != "CC0-1.0":
         return "license-not-explicitly-cc0-1.0"
     if item.get("type") != "model":
         return "not-a-model"
     if item.get("style") != "realistic":
         return "not-realistic-style"
+    name_value = item.get("name")
+    if not isinstance(name_value, str) or not name_value.strip():
+        return "incomplete-asset-metadata"
+    name = name_value.lower().replace("_", " ").replace("-", " ")
     if not any(term in name for term in BUILDING_TERMS):
         return "title-does-not-identify-a-complete-building"
     if any(term in name for term in PART_TERMS):
         return "building-part-or-prop"
+    tags_value = item.get("tags")
+    if not isinstance(tags_value, list) or not all(isinstance(tag, str) and tag.strip() for tag in tags_value):
+        return "incomplete-asset-metadata"
+    searchable = name + " " + " ".join(tags_value).lower()
+    for field in ("download", "preview"):
+        value = item.get(field)
+        if not isinstance(value, str) or not value.startswith("https://"):
+            return "incomplete-source-metadata"
+    if any(field not in item or item.get(field) is None for field in ("tris", "maps", "max_res")):
+        return "incomplete-geometry-metadata"
+    try:
+        if float(item["tris"]) <= 0 or not isinstance(item["maps"], list) or not str(item["max_res"]).strip():
+            return "incomplete-geometry-metadata"
+    except (TypeError, ValueError):
+        return "incomplete-geometry-metadata"
     dims = item.get("size_m")
     if not isinstance(dims, list) or len(dims) < 3:
         return "missing-measured-dimensions"
@@ -93,8 +113,12 @@ def reject_reason(item, city):
         x, y, z = (float(dims[0]), float(dims[1]), float(dims[2]))
     except (TypeError, ValueError):
         return "invalid-measured-dimensions"
+    if not all(map(lambda value: value == value and abs(value) != float("inf"), (x, y, z))):
+        return "invalid-measured-dimensions"
     if min(x, z) < MIN_SPAN_M or y < MIN_HEIGHT_M:
         return "below-full-building-scale-threshold"
+    if city not in RELEVANCE:
+        return "unknown-city-theme"
     if city == "EclipseCentral" and y < 35:
         return "eclipse-tower-below-35m"
     if not any(term in searchable for term in RELEVANCE[city]):
