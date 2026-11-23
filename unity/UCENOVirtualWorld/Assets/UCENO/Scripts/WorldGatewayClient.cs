@@ -261,12 +261,8 @@ namespace UCENO.VirtualWorld
         private bool transferringGateway;
 
         public string ConnectionStatus { get; private set; } = "WAITING";
-        public bool SetVoiceActive(bool active)
-        {
-            if (!connected || socket == null) return false;
-            _ = SendVoiceControlAsync(active ? "voice_join" : "voice_leave");
-            return true;
-        }
+        public bool SetVoiceActive(bool active) =>
+            SendVoiceControl(active ? "voice_join" : "voice_leave");
 
         public bool TryGetRemotePlayerTransform(string userId, out Transform target)
         {
@@ -275,12 +271,6 @@ namespace UCENO.VirtualWorld
                 return false;
             target = remote.root;
             return target != null;
-        }
-
-        private async Task SendVoiceControlAsync(string type)
-        {
-            try { await socket.SendText(JsonUtility.ToJson(new GatewayVoiceControlRequest { type = type })); }
-            catch (Exception error) { Debug.LogWarning("UCENO voice control failed: " + error.Message); }
         }
 
         public int PeerCount => remotePlayers.Count;
