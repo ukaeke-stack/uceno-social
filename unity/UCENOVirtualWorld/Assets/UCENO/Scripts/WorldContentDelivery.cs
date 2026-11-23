@@ -256,14 +256,19 @@ namespace UCENO.VirtualWorld
         {
             foreach (AsyncOperationHandle<IList<UnityEngine.Object>> handle in residentHandles.Values)
                 if (handle.IsValid()) Addressables.Release(handle);
+            // Coroutines stop when this component is destroyed, but Addressables
+            // operations already submitted to ResourceManager continue. Releasing an
+            // unfinished handle here can drop ownership while the operation is still
+            // using it. Release completed operations now and defer unfinished ones
+            // until their completion callback.
             foreach (AsyncOperationHandle<IList<UnityEngine.Object>> handle in pendingLoadHandles.Values)
-                if (handle.IsValid()) Addressables.Release(handle);
+                ReleaseHandleAfterCompletion(handle);
             foreach (AsyncOperationHandle<long> handle in pendingSizeHandles.Values)
-                if (handle.IsValid()) Addressables.Release(handle);
+                ReleaseHandleAfterCompletion(handle);
             foreach (AsyncOperationHandle<IList<IResourceLocation>> handle in pendingLocationHandles.Values)
-                if (handle.IsValid()) Addressables.Release(handle);
+                ReleaseHandleAfterCompletion(handle);
             foreach (AsyncOperationHandle handle in pendingDependencyHandles.Values)
-                if (handle.IsValid()) Addressables.Release(handle);
+                ReleaseHandleAfterCompletion(handle);
             foreach (AsyncOperationHandle<SceneInstance> handle in residentSceneHandles.Values)
             {
                 if (handle.IsValid()) Addressables.UnloadSceneAsync(handle, true);
@@ -303,6 +308,36 @@ namespace UCENO.VirtualWorld
             residencyLoads.Clear();
             ensureInProgress.Clear();
             ensureWaiters.Clear();
+        }
+
+        private static void ReleaseHandleAfterCompletion<T>(AsyncOperationHandle<T> handle)
+        {
+            if (!handle.IsValid()) return;
+            if (handle.IsDone)
+            {
+                Addressables.Release(handle);
+                return;
+            }
+
+            handle.Completed += operation =>
+            {
+                if (operation.IsValid()) Addressables.Release(operation);
+            };
+        }
+
+        private static void ReleaseHandleAfterCompletion(AsyncOperationHandle handle)
+        {
+            if (!handle.IsValid()) return;
+            if (handle.IsDone)
+            {
+                Addressables.Release(handle);
+                return;
+            }
+
+            handle.Completed += operation =>
+            {
+                if (operation.IsValid()) Addressables.Release(operation);
+            };
         }
 
         public void PreloadConfiguredContent(Action<bool, string> completed = null)
