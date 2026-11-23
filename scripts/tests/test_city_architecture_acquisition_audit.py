@@ -185,6 +185,22 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         audit.inspect_glb(path)
 
+    def test_rejects_invalid_image_buffer_view_and_texture_sampler(self):
+        documents = (
+            {"asset": {"version": "2.0"}, "images": [{"bufferView": 0, "mimeType": "image/png"}]},
+            {"asset": {"version": "2.0"}, "buffers": [{"byteLength": 4}],
+             "bufferViews": [{"buffer": 0, "byteLength": 4}],
+             "images": [{"bufferView": 0}]},
+            {"asset": {"version": "2.0"}, "textures": [{"sampler": 0}]},
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, document in enumerate(documents):
+                with self.subTest(document=document):
+                    path = pathlib.Path(directory) / f"invalid-image-reference-{index}.glb"
+                    path.write_bytes(glb(document, binary=bytes(4)))
+                    with self.assertRaises(ValueError):
+                        audit.inspect_glb(path)
+
     def test_rejects_non_json_first_chunk(self):
         data = b"glTF" + struct.pack("<II", 2, 24) + struct.pack("<II", 4, 0) + bytes(4)
         with tempfile.TemporaryDirectory() as directory:
