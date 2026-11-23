@@ -122,6 +122,15 @@ def inspect_glb(path, expected_sha=None):
             raise ValueError(f"{path}: bufferView {index} has invalid byteOffset")
         if buffer_index == 0 and buffers and byte_offset + byte_length > buffers[0]["byteLength"]:
             raise ValueError(f"{path}: bufferView {index} exceeds declared buffer bounds")
+        stride = view.get("byteStride")
+        if stride is not None and (
+            not isinstance(stride, int) or isinstance(stride, bool)
+            or stride < 4 or stride > 252 or stride % 4
+        ):
+            raise ValueError(f"{path}: bufferView {index} has invalid byteStride")
+        target = view.get("target")
+        if target is not None and target not in {34962, 34963}:
+            raise ValueError(f"{path}: bufferView {index} has invalid target")
 
     for index, accessor in enumerate(accessors):
         if not isinstance(accessor, dict):
@@ -138,6 +147,12 @@ def inspect_glb(path, expected_sha=None):
             raise ValueError(f"{path}: accessor {index} has invalid count")
         if component_type not in {5120, 5121, 5122, 5123, 5125, 5126}:
             raise ValueError(f"{path}: accessor {index} has invalid componentType")
+        component_bytes = {5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4}[component_type]
+        accessor_offset = accessor.get("byteOffset", 0)
+        if not isinstance(accessor_offset, int) or isinstance(accessor_offset, bool) or accessor_offset < 0:
+            raise ValueError(f"{path}: accessor {index} has invalid byteOffset")
+        if accessor_offset % component_bytes:
+            raise ValueError(f"{path}: accessor {index} byteOffset is not component-aligned")
         if accessor_type not in {"SCALAR", "VEC2", "VEC3", "VEC4", "MAT2", "MAT3", "MAT4"}:
             raise ValueError(f"{path}: accessor {index} has invalid type")
 
