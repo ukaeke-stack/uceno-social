@@ -136,8 +136,8 @@ class ThreeDValleyCityArchitectureTests(unittest.TestCase):
             "Apartment Facade Module",
             "Office Tower Furniture",
             "Concrete Floor Tile",
-            "Harbour Gate",
-            "Bridge Canopy",
+            "Harbour Hotel Gate",
+            "Harbour Hotel Bridge Canopy",
         )
         for name in component_titles:
             with self.subTest(name=name):
