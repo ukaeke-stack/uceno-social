@@ -302,8 +302,6 @@ namespace UCENO.VirtualWorld.Editor
                 byte[] digest = sha.ComputeHash(Encoding.UTF8.GetBytes(globalId));
                 id = "uceno:" + BitConverter.ToString(digest).Replace("-", "").ToLowerInvariant().Substring(0, 32);
             }
-            // Retain a defensive GUID fallback token for compatibility with older authoring flows.
-            if (string.IsNullOrEmpty(id)) id = "uceno:" + Guid.NewGuid().ToString("N");
             SerializedObject data = new SerializedObject(marker);
             data.FindProperty("objectId").stringValue = id;
             data.ApplyModifiedPropertiesWithoutUndo();
