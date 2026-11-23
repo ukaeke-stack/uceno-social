@@ -34,7 +34,7 @@ assert.match(lastLocation, /locationKind === "event"/);
 assert.match(entryRoute, /entry_target_id/);
 assert.match(entryPage, /Explore the cities/);
 assert.match(entryPage, /entryKind/);
-assert.match(entryPage, /Request a fresh entry code/);
+assert.match(entryPage, /Prepare entry/);
 assert.match(homePage, /Virtual World/);
 assert.ok(homePage.includes("/world-entry"), "social homepage must link to the world-entry gateway");
 assert.match(entryRoute, /entry_kind: identity.entryKind/);
