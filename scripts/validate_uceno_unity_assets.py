@@ -385,6 +385,10 @@ def main():
     voice = read_text(ASSETS / "Scripts/WorldSpatialVoiceClient.cs")
     if "TriggerWave" not in avatar or "TriggerCheer" not in avatar:
         fail("Avatar wave/cheer gesture actions are missing.")
+    if ("string[] devices = Microphone.devices;" not in voice or
+            "if (devices == null || devices.Length == 0)" not in voice or
+            "RemovePeer(peer.userId);" not in voice):
+        fail("Spatial voice must handle microphone removal after the initial device check.")
 
     if "avatarLodGroup.GetLODs().Length < 3" not in builder:
         fail("Imported humanoid prefab is missing its three-level mesh LOD release gate.")
