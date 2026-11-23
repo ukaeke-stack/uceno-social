@@ -13,7 +13,8 @@ type DestinationData = { cities: City[]; homes: Home[] };
 
 export default function WorldEntryPage() {
   const [data,setData] = useState<DestinationData | null>(null);
-  const [last,setLast] = useState<LastLocation | null>(null);\n  const [events,setEvents] = useState<EventSummary[]>([]);
+  const [last,setLast] = useState<LastLocation | null>(null);
+  const [events,setEvents] = useState<EventSummary[]>([]);
   const [selectedWorld,setSelectedWorld] = useState("");
   const [selectedHome,setSelectedHome] = useState("");
   const [mode,setMode] = useState<"continue"|"home"|"city"|"events"|"people">("city");

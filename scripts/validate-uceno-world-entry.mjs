@@ -9,7 +9,9 @@ const [catalogRaw, migration38, migration39, destinations, lastLocation, entryRo
   read("../db/migrations/039_virtual_world_entry_context.sql"),
   read("../app/api/worlds/destinations/route.ts"),
   read("../app/api/worlds/last-location/route.ts"),
-  read("../app/api/worlds/entry/route.ts"),\n  read("../app/world-entry/page.tsx"),\n  read("../app/page.tsx"),
+  read("../app/api/worlds/entry/route.ts"),
+  read("../app/world-entry/page.tsx"),
+  read("../app/page.tsx"),
   read("../app/api/worlds/[worldId]/state/route.ts"),
   read("../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldSessionClient.cs"),
   read("../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs"),
@@ -29,7 +31,12 @@ assert.match(destinations, /heartbeat_at > NOW\(\) - INTERVAL '30 seconds'/);
 assert.match(lastLocation, /A fresh authoritative player checkpoint is required/);
 assert.match(lastLocation, /locationKind === "home"/);
 assert.match(lastLocation, /locationKind === "event"/);
-assert.match(entryRoute, /entry_target_id/);\nassert.match(entryPage, /Explore the cities/);\nassert.match(entryPage, /entryKind/);\nassert.match(entryPage, /Request a fresh entry code/);\nassert.match(homePage, /Virtual World/);\nassert.match(homePage, /\\/world-entry/);
+assert.match(entryRoute, /entry_target_id/);
+assert.match(entryPage, /Explore the cities/);
+assert.match(entryPage, /entryKind/);
+assert.match(entryPage, /Request a fresh entry code/);
+assert.match(homePage, /Virtual World/);
+assert.match(homePage, /\\/world-entry/);
 assert.match(entryRoute, /entry_kind: identity.entryKind/);
 assert.match(entryRoute, /Event admission requires an active RSVP/);
 assert.match(stateRoute, /INSERT INTO virtual_world_last_locations/);
