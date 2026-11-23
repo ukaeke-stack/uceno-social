@@ -296,6 +296,9 @@ class CityArchitectureScreeningTests(unittest.TestCase):
 
 
 class CityArchitectureDiscoveryExpansionTests(unittest.TestCase):
+    def test_underfilled_city_search_checks_two_broad_pages_per_query(self):
+        self.assertEqual(discovery.BROADEN_MAX_PAGES, 2)
+
     def test_catalogue_get_retries_rate_limit_and_honours_retry_after(self):
         from email.message import Message
         from unittest.mock import patch
