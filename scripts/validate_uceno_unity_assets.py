@@ -528,6 +528,13 @@ def main():
         fail("WorldGatewayClient is missing authoritative remote humanoid locomotion updates.")
     if "remote.lastSamplePosition" not in gateway_client or "remote.lastSampleTime" not in gateway_client:
         fail("WorldGatewayClient is missing movement-sample speed estimation.")
+    for required in (
+        "if (socket != connectionSocket) return;",
+        "if (socket != target) return;",
+        "socket.OnMessage += bytes =>",
+    ):
+        if required not in gateway_client:
+            fail("WorldGatewayClient is missing stale-connection callback fencing: " + required)
     if "presence.PeerCount" not in hud or "presence.ConnectionStatus" not in hud:
         fail("World status HUD does not display multiplayer connection status.")
 
