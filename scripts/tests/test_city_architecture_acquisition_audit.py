@@ -37,7 +37,7 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                 {"primitives": [{"attributes": {"POSITION": 0}}]},
             ],
             "materials": [{}],
-            "images": [{"bufferView": 0}, {"uri": "https://example.invalid/a.png"}],
+            "images": [{"bufferView": 0, "mimeType": "image/png"}, {"uri": "https://example.invalid/a.png"}],
         }, binary=bytes(36))
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "model.glb"
