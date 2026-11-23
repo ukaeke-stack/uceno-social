@@ -201,6 +201,31 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         audit.inspect_glb(path)
 
+    def test_rejects_invalid_primitive_topology_and_index_accessor(self):
+        base = {
+            "asset": {"version": "2.0"},
+            "accessors": [
+                {"componentType": 5126, "count": 3, "type": "VEC3"},
+                {"componentType": 5126, "count": 3, "type": "VEC3"},
+            ],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+        }
+        invalid_mode = {
+            **base,
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "mode": 9}]}],
+        }
+        invalid_indices = {
+            **base,
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 1}]}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            for name, document in (("mode", invalid_mode), ("indices", invalid_indices)):
+                with self.subTest(name=name):
+                    path = pathlib.Path(directory) / f"invalid-primitive-{name}.glb"
+                    path.write_bytes(glb(document))
+                    with self.assertRaises(ValueError):
+                        audit.inspect_glb(path)
+
     def test_rejects_invalid_sampler_definitions(self):
         invalid = (
             {"minFilter": 1},
