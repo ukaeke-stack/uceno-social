@@ -578,7 +578,7 @@ def main():
             if qualifying_count >= TARGET_CITY_CANDIDATES:
                 break
 
-        # Broaden only underfilled cities, one page per query, and stop at the
+        # Broaden only underfilled cities, at most two pages per query, and stop at the
         # allocation target. This avoids hundreds of redundant catalogue calls.
         broaden_city_candidates(
             city, queries, raw_by_slug, set(), query_diagnostics,
