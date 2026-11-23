@@ -157,6 +157,12 @@ namespace UCENO.VirtualWorld
             }
         }
 
+        public void OpenMenu()
+        {
+            visible = true;
+            RefreshHomes();
+        }
+
         public void RefreshHomes()
         {
             if (!CanRequest()) return;
