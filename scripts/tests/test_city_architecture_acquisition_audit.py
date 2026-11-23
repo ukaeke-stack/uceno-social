@@ -201,6 +201,25 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         audit.inspect_glb(path)
 
+    def test_rejects_invalid_buffer_view_stride_target_and_accessor_alignment(self):
+        documents = (
+            {"asset": {"version": "2.0"}, "buffers": [{"byteLength": 8}],
+             "bufferViews": [{"buffer": 0, "byteLength": 8, "byteStride": 2}]},
+            {"asset": {"version": "2.0"}, "buffers": [{"byteLength": 8}],
+             "bufferViews": [{"buffer": 0, "byteLength": 8, "target": 1}]},
+            {"asset": {"version": "2.0"}, "buffers": [{"byteLength": 8}],
+             "bufferViews": [{"buffer": 0, "byteLength": 8}],
+             "accessors": [{"bufferView": 0, "byteOffset": 1, "componentType": 5123,
+                            "count": 1, "type": "SCALAR"}]},
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, document in enumerate(documents):
+                with self.subTest(document=document):
+                    path = pathlib.Path(directory) / f"invalid-layout-{index}.glb"
+                    path.write_bytes(glb(document, binary=bytes(8)))
+                    with self.assertRaises(ValueError):
+                        audit.inspect_glb(path)
+
     def test_rejects_invalid_primitive_topology_and_index_accessor(self):
         base = {
             "asset": {"version": "2.0"},
