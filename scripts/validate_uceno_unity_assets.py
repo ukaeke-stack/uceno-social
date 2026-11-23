@@ -474,6 +474,8 @@ def main():
             "ensureObjectStatesLoaded(identity.worldId)" not in gateway_server):
         fail("Gateway is not loading the per-city scene interactable manifest and durable object states.")
     gateway_client = read_text(ASSETS / "Scripts/WorldGatewayClient.cs")
+    if gateway_client.count("private async Task SendVoiceControlAsync(string type)") != 1:
+        fail("WorldGatewayClient must declare exactly one voice-control sender; duplicate declarations break C# compilation.")
     for required in ('packet.type == "object_state"', "item.ApplyServerState", "RequestInteraction"):
         if required not in gateway_client:
             fail("Unity is missing authoritative object-state application/interaction transport: " + required)
