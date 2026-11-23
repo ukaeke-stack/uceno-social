@@ -153,10 +153,15 @@ def inspect_glb(path, expected_sha=None):
                 if not isinstance(accessor_index, int) or isinstance(accessor_index, bool) or not 0 <= accessor_index < len(accessors):
                     raise ValueError(f"{path}: mesh {mesh_index} primitive {primitive_index} has invalid {semantic} accessor")
             indices = primitive.get("indices")
-            if indices is not None and (
-                not isinstance(indices, int) or isinstance(indices, bool) or not 0 <= indices < len(accessors)
-            ):
-                raise ValueError(f"{path}: mesh {mesh_index} primitive {primitive_index} has invalid indices accessor")
+            if indices is not None:
+                if not isinstance(indices, int) or isinstance(indices, bool) or not 0 <= indices < len(accessors):
+                    raise ValueError(f"{path}: mesh {mesh_index} primitive {primitive_index} has invalid indices accessor")
+                index_accessor = accessors[indices]
+                if index_accessor.get("type") != "SCALAR" or index_accessor.get("componentType") not in {5121, 5123, 5125}:
+                    raise ValueError(f"{path}: mesh {mesh_index} primitive {primitive_index} indices must use an unsigned SCALAR accessor")
+            mode = primitive.get("mode", 4)
+            if not isinstance(mode, int) or isinstance(mode, bool) or mode not in {0, 1, 2, 3, 4, 5, 6}:
+                raise ValueError(f"{path}: mesh {mesh_index} primitive {primitive_index} has invalid topology mode")
             material_index = primitive.get("material")
             if material_index is not None:
                 if not isinstance(material_index, int) or isinstance(material_index, bool) or not 0 <= material_index < len(materials):
