@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const read = path => readFile(new URL(path, import.meta.url), "utf8");
-const [catalogRaw, migration38, migration39, destinations, lastLocation, entryRoute,
+const [catalogRaw, migration38, migration39, destinations, lastLocation, entryRoute, entryPage, homePage,
   stateRoute, sessionClient, gatewayClient, sidebar, builder, homeClient, eventsClient] = await Promise.all([
   read("../runtime/world-gateway/config/world-cities.json"),
   read("../db/migrations/038_virtual_world_last_location.sql"),
   read("../db/migrations/039_virtual_world_entry_context.sql"),
   read("../app/api/worlds/destinations/route.ts"),
   read("../app/api/worlds/last-location/route.ts"),
-  read("../app/api/worlds/entry/route.ts"),
+  read("../app/api/worlds/entry/route.ts"),\n  read("../app/world-entry/page.tsx"),\n  read("../app/page.tsx"),
   read("../app/api/worlds/[worldId]/state/route.ts"),
   read("../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldSessionClient.cs"),
   read("../unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldGatewayClient.cs"),
@@ -29,7 +29,7 @@ assert.match(destinations, /heartbeat_at > NOW\(\) - INTERVAL '30 seconds'/);
 assert.match(lastLocation, /A fresh authoritative player checkpoint is required/);
 assert.match(lastLocation, /locationKind === "home"/);
 assert.match(lastLocation, /locationKind === "event"/);
-assert.match(entryRoute, /entry_target_id/);
+assert.match(entryRoute, /entry_target_id/);\nassert.match(entryPage, /Explore the cities/);\nassert.match(entryPage, /entryKind/);\nassert.match(entryPage, /Request a fresh entry code/);\nassert.match(homePage, /Virtual World/);\nassert.match(homePage, /\\/world-entry/);
 assert.match(entryRoute, /entry_kind: identity.entryKind/);
 assert.match(entryRoute, /Event admission requires an active RSVP/);
 assert.match(stateRoute, /INSERT INTO virtual_world_last_locations/);
