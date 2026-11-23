@@ -259,6 +259,7 @@ namespace UCENO.VirtualWorld
         private string transferTokenOverride = "";
         private string pendingTransferActivityId = "";
         private bool transferringGateway;
+        private bool entryContextConsumed;
 
         public string ConnectionStatus { get; private set; } = "WAITING";
         public bool SetVoiceActive(bool active) =>
@@ -826,6 +827,15 @@ namespace UCENO.VirtualWorld
                     localPlayer.SetServerAuthority(true);
                 }
                 ConnectionStatus = "ONLINE";
+                if (!entryContextConsumed && session != null)
+                {
+                    bool requested = false;
+                    if (session.EntryKind == "home" && !string.IsNullOrEmpty(session.EntryTargetId))
+                        requested = RequestHomeEntry(session.EntryTargetId);
+                    else if (session.EntryKind == "event" && !string.IsNullOrEmpty(session.EntryTargetId))
+                        requested = RequestEventJoin(session.EntryTargetId);
+                    entryContextConsumed = requested || session.EntryKind == "world";
+                }
                 RequestActivityDiscovery();
                 return;
             }
