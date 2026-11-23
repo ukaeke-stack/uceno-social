@@ -393,7 +393,7 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                 self.assertEqual(result["tevy_model_count"], 2)
                 self.assertEqual([x["slug"] for x in result["tevy_lods"]], ["valid-building"])
                 self.assertEqual(len(result["tevy_invalid_models"]), 1)
-                self.assertIn("multiple buffers", result["tevy_invalid_models"][0]["error"])
+                self.assertIn("meshopt", result["tevy_invalid_models"][0]["error"])
                 self.assertEqual(len(report["errors"]), 1)
             finally:
                 audit.ROOT = previous_root
@@ -491,6 +491,122 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                 self.assertEqual(result["errors"][0]["slug"], "invalid-building")
             finally:
                 audit.ROOT, audit.TEVY, audit.ASSETS, audit.OUT = previous
+
+    def test_accepts_required_meshopt_glb_with_placeholder_fallback_buffer(self):
+        document = {
+            "asset": {"version": "2.0"},
+            "extensionsUsed": ["EXT_meshopt_compression"],
+            "extensionsRequired": ["EXT_meshopt_compression"],
+            "buffers": [
+                {"byteLength": 4},
+                {
+                    "byteLength": 12,
+                    "extensions": {"EXT_meshopt_compression": {"fallback": True}},
+                },
+            ],
+            "bufferViews": [{
+                "buffer": 1,
+                "byteLength": 12,
+                "extensions": {
+                    "EXT_meshopt_compression": {
+                        "buffer": 0,
+                        "byteOffset": 0,
+                        "byteLength": 4,
+                        "byteStride": 4,
+                        "count": 3,
+                        "mode": "ATTRIBUTES",
+                    }
+                },
+            }],
+        }
+        data = glb(document, binary=bytes(4))
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "meshopt.glb"
+            path.write_bytes(data)
+            result = audit.inspect_glb(path)
+        self.assertEqual(result["meshopt_compressed_view_count"], 1)
+        self.assertEqual(result["meshopt_fallback_buffer_count"], 1)
+
+    def test_accepts_unmarked_meshopt_placeholder_when_extension_is_required(self):
+        document = {
+            "asset": {"version": "2.0"},
+            "extensionsUsed": ["EXT_meshopt_compression"],
+            "extensionsRequired": ["EXT_meshopt_compression"],
+            "buffers": [{"byteLength": 4}, {"byteLength": 12}],
+            "bufferViews": [{
+                "buffer": 1,
+                "byteLength": 12,
+                "extensions": {
+                    "EXT_meshopt_compression": {
+                        "buffer": 0, "byteLength": 4, "byteStride": 4,
+                        "count": 3, "mode": "ATTRIBUTES",
+                    }
+                },
+            }],
+        }
+        data = glb(document, binary=bytes(4))
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "meshopt-unmarked.glb"
+            path.write_bytes(data)
+            result = audit.inspect_glb(path)
+        self.assertEqual(result["meshopt_fallback_buffer_count"], 1)
+
+    def test_rejects_meshopt_placeholder_without_required_extension(self):
+        document = {
+            "asset": {"version": "2.0"},
+            "extensionsUsed": ["EXT_meshopt_compression"],
+            "buffers": [{"byteLength": 4}, {"byteLength": 12}],
+            "bufferViews": [{
+                "buffer": 1, "byteLength": 12,
+                "extensions": {
+                    "EXT_meshopt_compression": {
+                        "buffer": 0, "byteLength": 4, "byteStride": 4,
+                        "count": 3, "mode": "ATTRIBUTES",
+                    }
+                },
+            }],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "meshopt-optional.glb"
+            path.write_bytes(glb(document, binary=bytes(4)))
+            with self.assertRaisesRegex(ValueError, "requires EXT_meshopt_compression"):
+                audit.inspect_glb(path)
+
+    def test_rejects_uncompressed_view_reference_to_meshopt_placeholder(self):
+        document = {
+            "asset": {"version": "2.0"},
+            "extensionsUsed": ["EXT_meshopt_compression"],
+            "extensionsRequired": ["EXT_meshopt_compression"],
+            "buffers": [{"byteLength": 4}, {"byteLength": 12}],
+            "bufferViews": [{"buffer": 1, "byteLength": 12}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "meshopt-uncompressed-view.glb"
+            path.write_bytes(glb(document, binary=bytes(4)))
+            with self.assertRaisesRegex(ValueError, "uncompressed bufferView"):
+                audit.inspect_glb(path)
+
+    def test_rejects_meshopt_compressed_range_outside_source_buffer(self):
+        document = {
+            "asset": {"version": "2.0"},
+            "extensionsUsed": ["EXT_meshopt_compression"],
+            "extensionsRequired": ["EXT_meshopt_compression"],
+            "buffers": [{"byteLength": 4}, {"byteLength": 12}],
+            "bufferViews": [{
+                "buffer": 1, "byteLength": 12,
+                "extensions": {
+                    "EXT_meshopt_compression": {
+                        "buffer": 0, "byteOffset": 2, "byteLength": 4,
+                        "byteStride": 4, "count": 3, "mode": "ATTRIBUTES",
+                    }
+                },
+            }],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "meshopt-range.glb"
+            path.write_bytes(glb(document, binary=bytes(4)))
+            with self.assertRaisesRegex(ValueError, "compressed range exceeds"):
+                audit.inspect_glb(path)
 
 
 if __name__ == "__main__":
