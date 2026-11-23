@@ -735,15 +735,21 @@ namespace UCENO.VirtualWorld
             WebSocket connectionSocket = socket;
             socket.OnOpen += () =>
             {
+                if (socket != connectionSocket) return;
                 connecting = false;
                 connected = true;
                 reconnectAttempts = 0;
                 ConnectionStatus = "AUTHENTICATING";
                 Debug.Log("UCENO authoritative gateway transport opened.");
             };
-            socket.OnMessage += HandleMessage;
+            socket.OnMessage += bytes =>
+            {
+                if (socket != connectionSocket) return;
+                HandleMessage(bytes);
+            };
             socket.OnError += error =>
             {
+                if (socket != connectionSocket) return;
                 Debug.LogWarning("UCENO gateway transport error: " + error);
                 ConnectionStatus = "RETRYING";
             };
@@ -781,6 +787,7 @@ namespace UCENO.VirtualWorld
             try { await target.Connect(); }
             catch (Exception error)
             {
+                if (socket != target) return;
                 connecting = false;
                 connected = false;
                 if (transferringGateway)
