@@ -59,7 +59,10 @@ def request_json(path, params=None, api_key=None):
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             if exc.code not in (429, 500, 502, 503, 504) or attempt == 3:
-                raise
+                detail = exc.read().decode("utf-8", errors="replace")[:2000]
+                raise RuntimeError(
+                    f"3D Valley API returned HTTP {exc.code} for {req.full_url}: {detail}"
+                ) from exc
             retry = exc.headers.get("Retry-After", "")
             try:
                 delay = float(retry) if retry else 2 ** attempt
@@ -87,10 +90,12 @@ def reject_reason(item, city):
     if not isinstance(name_value, str) or not name_value.strip():
         return "incomplete-asset-metadata"
     name = name_value.lower().replace("_", " ").replace("-", " ")
-    if not any(term in name for term in BUILDING_TERMS):
-        return "title-does-not-identify-a-complete-building"
+    # Reject components before testing for a building noun: names such as
+    # "Concrete Floor Tile" contain no building noun but are still props.
     if any(term in name for term in PART_TERMS):
         return "building-part-or-prop"
+    if not any(term in name for term in BUILDING_TERMS):
+        return "title-does-not-identify-a-complete-building"
     tags_value = item.get("tags")
     if not isinstance(tags_value, list) or not all(isinstance(tag, str) and tag.strip() for tag in tags_value):
         return "incomplete-asset-metadata"
