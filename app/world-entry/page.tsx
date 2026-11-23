@@ -8,11 +8,12 @@ type World = { id: string; cityId: string; name: string; description: string; li
 type City = { id: string; name: string; identity: string; climate: string; architecture: string; districts: {id:string;name:string;role:string}[]; landmarks: {id:string;name:string;kind:string}[]; worlds: World[]; available: boolean; livePlayers: number; upcomingEvents: number };
 type Home = { id: string; name: string; worldId: string; cityId: string; visibility: string };
 type LastLocation = { worldId: string; cityId: string; districtId?: string; locationKind: string; targetId?: string; savedAt: string };
+type EventSummary = { id: string; title: string; description: string; startsAt: string; endsAt: string; activityType: string; locationLabel: string; myAttendance?: string };
 type DestinationData = { cities: City[]; homes: Home[] };
 
 export default function WorldEntryPage() {
   const [data,setData] = useState<DestinationData | null>(null);
-  const [last,setLast] = useState<LastLocation | null>(null);
+  const [last,setLast] = useState<LastLocation | null>(null);\n  const [events,setEvents] = useState<EventSummary[]>([]);
   const [selectedWorld,setSelectedWorld] = useState("");
   const [selectedHome,setSelectedHome] = useState("");
   const [mode,setMode] = useState<"continue"|"home"|"city"|"events"|"people">("city");
@@ -32,14 +33,21 @@ export default function WorldEntryPage() {
     }).catch(e=>setError(e instanceof Error?e.message:"Unable to load world destinations"));
   },[]);
 
+  useEffect(() => {
+    if (mode !== "events" || !selectedWorld) { setEvents([]); return; }
+    fetch("/api/world-events?worldId="+encodeURIComponent(selectedWorld),{cache:"no-store"})
+      .then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error||"Events unavailable");return j.events as EventSummary[];})
+      .then(setEvents).catch(e=>setError(e instanceof Error?e.message:"Events unavailable"));
+  },[mode,selectedWorld]);
+
   const selectedCity = useMemo(()=>data?.cities.find(c=>c.worlds.some(w=>w.id===selectedWorld)) ?? null,[data,selectedWorld]);
   const activeWorld = useMemo(()=>data?.cities.flatMap(c=>c.worlds).find(w=>w.id===selectedWorld) ?? null,[data,selectedWorld]);
 
-  async function enter(worldId:string) {
+  async function enter(worldId:string, entryKind:"world"|"home"|"event"="world", targetId?:string) {
     if(!worldId)return;
     setBusy(true);setError("");setEntryCode("");setCopied(false);
     try {
-      const response=await fetch("/api/worlds/entry",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({worldId,clientType:"unity-android"})});
+      const response=await fetch("/api/worlds/entry",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({worldId,clientType:"unity-android",entryKind,targetId})});
       const result=await response.json();
       if(!response.ok)throw new Error(result.error||"Could not prepare world entry");
       setEntryCode(result.code);
@@ -86,7 +94,7 @@ export default function WorldEntryPage() {
       {mode==="home" && <section style={cardStyle}>
         <h2 style={{marginTop:0}}>Choose your residence</h2>
         {!data?.homes.length?<p>No accessible home is registered yet.</p>:<div style={{display:"grid",gap:10}}>{data.homes.map(home=><button key={home.id} onClick={()=>{setSelectedHome(home.id);setSelectedWorld(home.worldId);}} style={{...cardStyle,textAlign:"left",color:"inherit",outline:selectedHome===home.id?"2px solid #8bd6ff":"none"}}><strong>{home.name}</strong><p style={{color:"#aebed3",margin:"5px 0 0",fontSize:13}}>{data.cities.find(c=>c.id===home.cityId)?.name ?? home.cityId} · {home.visibility}</p></button>)}</div>}
-        {selectedHome && <button style={{...buttonStyle,marginTop:14}} disabled={busy} onClick={()=>enter(data?.homes.find(h=>h.id===selectedHome)?.worldId||"")}>Prepare entry <ArrowRight size={17}/></button>}
+        {selectedHome && <button style={{...buttonStyle,marginTop:14}} disabled={busy} onClick={()=>enter(data?.homes.find(h=>h.id===selectedHome)?.worldId||"","home",selectedHome)}>Prepare entry <ArrowRight size={17}/></button>}
       </section>}
 
       {mode==="city" && <section>
@@ -105,7 +113,7 @@ export default function WorldEntryPage() {
         </div>
       </section>}
 
-      {mode==="events" && <section style={cardStyle}><h2 style={{marginTop:0}}>Events & activities</h2><p style={{color:"#c1d0e4"}}>Choose a city with upcoming events to see its published worlds. Event joining still requires an RSVP and an authorized event session.</p>{data?.cities.filter(c=>c.upcomingEvents>0).map(c=><button key={c.id} onClick={()=>{setMode("city");setSelectedWorld(c.worlds[0]?.id||"");}} style={{...cardStyle,display:"block",width:"100%",textAlign:"left",color:"inherit",marginTop:8}}>{c.name} · {c.upcomingEvents} upcoming events</button>)}</section>}
+      {mode==="events" && <section style={cardStyle}><h2 style={{marginTop:0}}>Events & activities</h2><p style={{color:"#c1d0e4"}}>Select an event in the currently selected world. Entry requires an active Going RSVP and an open admission window.</p><label style={{display:"block",margin:"12px 0",fontSize:13}}>World<select value={selectedWorld} onChange={e=>setSelectedWorld(e.target.value)} style={{display:"block",width:"100%",marginTop:6,padding:12,borderRadius:10,background:"#18253a",color:"white"}}>{data?.cities.flatMap(c=>c.worlds.map(w=><option key={w.id} value={w.id}>{c.name} — {w.name}</option>))}</select></label>{events.length===0?<p style={{color:"#aebed3"}}>No scheduled events are available in this world, or you have not RSVP'd Going.</p>:events.map(event=><div key={event.id} style={{...cardStyle,marginTop:10}}><strong>{event.title}</strong><p style={{fontSize:13,color:"#c1d0e4"}}>{event.activityType} · {event.locationLabel} · {new Date(event.startsAt).toLocaleString()}</p><button style={buttonStyle} disabled={busy||event.myAttendance!=="going"} onClick={()=>enter(selectedWorld,"event",event.id)}>{event.myAttendance==="going"?"Enter event":"Going RSVP required"} <ArrowRight size={16}/></button></div>)}</section>}
 
       {mode==="people" && <section style={cardStyle}><h2 style={{marginTop:0}}>Join People</h2><p>Friend-location discovery is not yet connected to this entry screen. Private destinations will remain protected by membership and invitation checks.</p></section>}
 
