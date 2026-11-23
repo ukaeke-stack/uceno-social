@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { readWorldClientSession } from "@/lib/world-client-session";
+import cityCatalog from "../../../../../runtime/world-gateway/config/world-cities.json";
 
 export const runtime = "nodejs";
 
@@ -110,6 +111,14 @@ export async function PUT(request: NextRequest, { params }: Context) {
     if (!await canAccessWorld(worldId, session.id))
       return NextResponse.json({ error: "World is unavailable" }, { status: 404 });
     const sql = getDb();
+    const cityRows = await sql`SELECT city_id AS "cityId" FROM virtual_worlds WHERE id = ${worldId}::uuid LIMIT 1`;
+    const cityId = String(cityRows[0]?.cityId ?? "");
+    const city = cityCatalog.cities.find(item => item.id === cityId);
+    if (!city) return NextResponse.json({ error: "World city is not registered" }, { status: 409 });
+    const px = position.x as number, pz = position.z as number;
+    const district = city.districts.find(item =>
+      Math.hypot(px - item.center.x, pz - item.center.z) <= item.radius
+    );
     const rows = await sql`
       INSERT INTO virtual_world_player_state
         (world_id, user_id, spawn_id, position, rotation, state, updated_at)
@@ -125,6 +134,20 @@ export async function PUT(request: NextRequest, { params }: Context) {
         state = EXCLUDED.state,
         updated_at = NOW()
       RETURNING updated_at AS "updatedAt"
+    `;
+    await sql`
+      INSERT INTO virtual_world_last_locations
+        (user_id, world_id, city_id, district_id, location_kind, target_id,
+         position, rotation, activity_progress, saved_at)
+      VALUES (${session.id}::uuid, ${worldId}::uuid, ${cityId},
+        ${district?.id ?? null}, 'world', NULL,
+        ${JSON.stringify(position)}::jsonb, ${JSON.stringify(rotation)}::jsonb,
+        ${JSON.stringify((state as Record<string, unknown>).activityProgress ?? {})}::jsonb, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET
+        world_id = EXCLUDED.world_id, city_id = EXCLUDED.city_id,
+        district_id = EXCLUDED.district_id, location_kind = 'world', target_id = NULL,
+        position = EXCLUDED.position, rotation = EXCLUDED.rotation,
+        activity_progress = EXCLUDED.activity_progress, saved_at = NOW()
     `;
     return NextResponse.json({ saved: true, updatedAt: rows[0]?.updatedAt }, {
       headers: { "Cache-Control": "no-store, private" }
