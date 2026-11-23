@@ -15,27 +15,30 @@ audit = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(audit)
 
 
-def glb(document):
+def glb(document, binary=None):
     payload = json.dumps(document, separators=(",", ":")).encode()
     payload += b" " * ((4 - len(payload) % 4) % 4)
-    return (
-        b"glTF" + struct.pack("<II", 2, 20 + len(payload))
-        + struct.pack("<II", len(payload), 0x4E4F534A) + payload
-    )
+    chunks = struct.pack("<II", len(payload), 0x4E4F534A) + payload
+    if binary is not None:
+        binary += b"\\x00" * ((4 - len(binary) % 4) % 4)
+        chunks += struct.pack("<II", len(binary), 0x004E4942) + binary
+    return b"glTF" + struct.pack("<II", 2, 12 + len(chunks)) + chunks
 
 
 class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
     def test_reports_embedded_images_and_mesh_material_counts(self):
         data = glb({
             "asset": {"version": "2.0"},
-            "accessors": [{"componentType": 5126, "count": 3, "type": "VEC3"}],
+            "buffers": [{"byteLength": 36}],
+            "bufferViews": [{"buffer": 0, "byteLength": 36}],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3"}],
             "meshes": [
                 {"primitives": [{"attributes": {"POSITION": 0}, "material": 0}]},
                 {"primitives": [{"attributes": {"POSITION": 0}}]},
             ],
             "materials": [{}],
             "images": [{"bufferView": 0}, {"uri": "https://example.invalid/a.png"}],
-        })
+        }, binary=bytes(36))
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "model.glb"
             path.write_bytes(data)
@@ -50,13 +53,15 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
     def test_reports_primitive_and_referenced_material_counts(self):
         data = glb({
             "asset": {"version": "2.0"},
-            "accessors": [{"componentType": 5126, "count": 3, "type": "VEC3"}],
+            "buffers": [{"byteLength": 36}],
+            "bufferViews": [{"buffer": 0, "byteLength": 36}],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3"}],
             "meshes": [{"primitives": [
                 {"attributes": {"POSITION": 0}, "material": 0},
                 {"attributes": {"POSITION": 0}},
             ]}],
             "materials": [{}],
-        })
+        }, binary=bytes(36))
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "building.glb"
             path.write_bytes(data)
