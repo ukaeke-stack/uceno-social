@@ -290,6 +290,12 @@ def load_manifest(path):
     return value
 
 
+def record_rejection(report, city_result, key, rejection):
+    """Retain per-asset failures so one bad download cannot hide other evidence."""
+    city_result.setdefault(key, []).append(rejection)
+    report.setdefault("errors", []).append(rejection)
+
+
 def audit_tevy(manifest, report):
     if manifest is None:
         return
@@ -298,29 +304,54 @@ def audit_tevy(manifest, report):
         if not isinstance(entries, dict):
             raise ValueError(f"Tevy manifest missing city {city}")
         models = entries.get("selected_and_acquired") or []
+        if not isinstance(models, list):
+            raise ValueError(f"Tevy {city}: selected_and_acquired must be an array")
         city_result = report["cities"][city]
         city_result["tevy_model_count"] = len(models)
         seen = set()
         for model in models:
-            slug = model.get("slug")
-            if not slug or slug in seen:
-                raise ValueError(f"Tevy {city}: missing or duplicate model slug")
-            seen.add(slug)
-            lods = {item.get("lod"): item for item in model.get("lods", [])}
-            if set(lods) != {0, 1, 2}:
-                raise ValueError(f"Tevy {city}/{slug}: expected LOD0, LOD1 and LOD2")
-            lod_results = {}
-            for level in (0, 1, 2):
-                item = lods[level]
-                path = safe_artifact_path(ROOT / "tevy-city-architecture", item.get("file"))
-                result = inspect_glb(path, item.get("sha256"))
-                if result["bytes"] != item.get("bytes"):
-                    raise ValueError(f"Tevy {city}/{slug} LOD{level}: byte count mismatch")
-                lod_results[str(level)] = result
-            city_result["tevy_lods"].append({"slug": slug, "lods": lod_results})
-            city_result["tevy_textured_lod0_count"] += int(
-                lod_results["0"]["embedded_image_count"] > 0
-            )
+            slug = model.get("slug") if isinstance(model, dict) else None
+            try:
+                if not isinstance(model, dict):
+                    raise ValueError("Tevy model entry must be an object")
+                if not isinstance(slug, str) or not slug.strip():
+                    raise ValueError("Tevy model is missing a valid slug")
+                if slug in seen:
+                    raise ValueError(f"Tevy {city}: duplicate model slug {slug}")
+                seen.add(slug)
+                lod_items = model.get("lods")
+                if not isinstance(lod_items, list):
+                    raise ValueError(f"Tevy {city}/{slug}: lods must be an array")
+                lods = {}
+                for item in lod_items:
+                    if not isinstance(item, dict):
+                        raise ValueError(f"Tevy {city}/{slug}: LOD entry must be an object")
+                    level = item.get("lod")
+                    if (not isinstance(level, int) or isinstance(level, bool)
+                            or level not in {0, 1, 2} or level in lods):
+                        raise ValueError(f"Tevy {city}/{slug}: invalid or duplicate LOD level")
+                    lods[level] = item
+                if set(lods) != {0, 1, 2}:
+                    raise ValueError(f"Tevy {city}/{slug}: expected LOD0, LOD1 and LOD2")
+                lod_results = {}
+                for level in (0, 1, 2):
+                    item = lods[level]
+                    path = safe_artifact_path(ROOT / "tevy-city-architecture", item.get("file"))
+                    result = inspect_glb(path, item.get("sha256"))
+                    if result["bytes"] != item.get("bytes"):
+                        raise ValueError(f"Tevy {city}/{slug} LOD{level}: byte count mismatch")
+                    lod_results[str(level)] = result
+                city_result["tevy_lods"].append({"slug": slug, "lods": lod_results})
+                city_result["tevy_textured_lod0_count"] += int(
+                    lod_results["0"]["embedded_image_count"] > 0
+                )
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                record_rejection(report, city_result, "tevy_invalid_models", {
+                    "source": "tevy",
+                    "city": city,
+                    "slug": slug,
+                    "error": str(exc),
+                })
 
 
 def audit_3dassets(manifest, report):
@@ -333,27 +364,40 @@ def audit_3dassets(manifest, report):
         city_result = report["cities"][city]
         city_result["3dassets_model_count"] = len(entries)
         for model in entries:
-            path = safe_artifact_path(ROOT / "city-architecture-models", model.get("file"))
-            result = inspect_glb(path, model.get("sha256"))
-            if result["bytes"] != model.get("bytes"):
-                raise ValueError(f"3DAssets {city}/{model.get('slug')}: byte count mismatch")
-            city_result["3dassets_models"].append({
-                "slug": model.get("slug"),
-                **result,
-            })
-            city_result["3dassets_textured_count"] += int(
-                result["embedded_image_count"] > 0
-            )
+            slug = model.get("slug") if isinstance(model, dict) else None
+            try:
+                if not isinstance(model, dict):
+                    raise ValueError("3DAssets model entry must be an object")
+                path = safe_artifact_path(ROOT / "city-architecture-models", model.get("file"))
+                result = inspect_glb(path, model.get("sha256"))
+                if result["bytes"] != model.get("bytes"):
+                    raise ValueError(f"3DAssets {city}/{slug}: byte count mismatch")
+                city_result["3dassets_models"].append({
+                    "slug": slug,
+                    **result,
+                })
+                city_result["3dassets_textured_count"] += int(
+                    result["embedded_image_count"] > 0
+                )
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                record_rejection(report, city_result, "3dassets_invalid_models", {
+                    "source": "3dassets",
+                    "city": city,
+                    "slug": slug,
+                    "error": str(exc),
+                })
 
 
 def main():
     report = {
         "scope": "binary and provenance integrity only; not visual or Unity acceptance",
+        "errors": [],
         "cities": {
             city: {
                 "tevy_model_count": 0, "tevy_textured_lod0_count": 0,
-                "tevy_lods": [], "3dassets_model_count": 0,
-                "3dassets_textured_count": 0, "3dassets_models": [],
+                "tevy_lods": [], "tevy_invalid_models": [],
+                "3dassets_model_count": 0, "3dassets_textured_count": 0,
+                "3dassets_models": [], "3dassets_invalid_models": [],
             } for city in CITIES
         },
     }
@@ -365,20 +409,34 @@ def main():
     audit_3dassets(assets, report)
     report["totals"] = {
         "tevy_models": sum(x["tevy_model_count"] for x in report["cities"].values()),
+        "tevy_valid_models": sum(len(x["tevy_lods"]) for x in report["cities"].values()),
+        "tevy_invalid_models": sum(len(x["tevy_invalid_models"]) for x in report["cities"].values()),
         "tevy_lod_binaries": sum(len(x["tevy_lods"]) * 3 for x in report["cities"].values()),
         "tevy_textured_lod0": sum(x["tevy_textured_lod0_count"] for x in report["cities"].values()),
         "3dassets_models": sum(x["3dassets_model_count"] for x in report["cities"].values()),
+        "3dassets_valid_models": sum(len(x["3dassets_models"]) for x in report["cities"].values()),
+        "3dassets_invalid_models": sum(len(x["3dassets_invalid_models"]) for x in report["cities"].values()),
         "3dassets_textured_models": sum(x["3dassets_textured_count"] for x in report["cities"].values()),
     }
+    invalid_total = report["totals"]["tevy_invalid_models"] + report["totals"]["3dassets_invalid_models"]
+    report["audit_status"] = "rejected_assets" if invalid_total else "passed"
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report["totals"], sort_keys=True))
     for city, value in report["cities"].items():
         print(
-            f"{city}: Tevy {value['tevy_model_count']} models/"
+            f"{city}: Tevy {value['tevy_model_count']} source models/"
+            f"{len(value['tevy_lods'])} valid/{len(value['tevy_invalid_models'])} rejected; "
             f"{value['tevy_textured_lod0_count']} textured LOD0; "
-            f"3DAssets {value['3dassets_model_count']} models/"
+            f"3DAssets {value['3dassets_model_count']} source models/"
+            f"{len(value['3dassets_models'])} valid/"
+            f"{len(value['3dassets_invalid_models'])} rejected; "
             f"{value['3dassets_textured_count']} textured"
+        )
+    if invalid_total:
+        raise SystemExit(
+            f"City asset binary audit rejected {invalid_total} model(s); "
+            f"detailed per-model evidence saved to {OUT}"
         )
 
 
