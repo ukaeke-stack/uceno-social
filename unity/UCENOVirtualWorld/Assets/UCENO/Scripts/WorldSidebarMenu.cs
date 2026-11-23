@@ -147,12 +147,20 @@ namespace UCENO.VirtualWorld
             if (action == "events" && eventsClient != null) { eventsClient.OpenMenu(); return; }
             if (action == "cities" || action == "explore")
             {
-                if (session != null && !string.IsNullOrWhiteSpace(session.ApiBaseUrl))
-                    Application.OpenURL(session.ApiBaseUrl.TrimEnd('/') + "/world-entry");
-                else NavigationRequested?.Invoke(action);
+                OpenSocialPage("/world-entry", action);
                 return;
             }
+            if (action == "chat") { OpenSocialPage("/messages", action); return; }
+            if (action == "people" || action == "friends") { OpenSocialPage("/mutuals", action); return; }
+            if (action == "calls") { OpenSocialPage("/calls", action); return; }
             NavigationRequested?.Invoke(action);
+        }
+
+        private void OpenSocialPage(string path, string fallbackAction)
+        {
+            if (session != null && !string.IsNullOrWhiteSpace(session.ApiBaseUrl))
+                Application.OpenURL(session.ApiBaseUrl.TrimEnd('/') + path);
+            else NavigationRequested?.Invoke(fallbackAction);
         }
     }
 }
