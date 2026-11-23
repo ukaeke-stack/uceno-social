@@ -58,6 +58,7 @@ const checks = [
   ["Dependencies download asynchronously", /DownloadDependenciesAsync\(label, false\)/.test(delivery)],
   ["Concurrent requests for one label share a single download operation", /EnsureContentSharedRoutine/.test(delivery) && /ensureInProgress/.test(delivery) && /ensureWaiters/.test(delivery)],
   ["Pending download-size and dependency handles are released during shutdown", /pendingSizeHandles/.test(delivery) && /pendingDependencyHandles/.test(delivery) && /foreach \(AsyncOperationHandle<long> handle in pendingSizeHandles.Values\)/.test(delivery) && /foreach \(AsyncOperationHandle handle in pendingDependencyHandles.Values\)/.test(delivery)],
+  ["Unfinished Addressables operations retain their handles until completion during component shutdown", /ReleaseHandleAfterCompletion<T>\(AsyncOperationHandle<T> handle\)/.test(delivery) && /ReleaseHandleAfterCompletion\(AsyncOperationHandle handle\)/.test(delivery) && /if \(handle\.IsDone\)[\s\S]*?Addressables\.Release\(handle\)[\s\S]*?handle\.Completed \+= operation[\s\S]*?Addressables\.Release\(operation\)/.test(delivery) && /foreach \(AsyncOperationHandle<IList<UnityEngine.Object>> handle in pendingLoadHandles.Values\)[\s\S]*?ReleaseHandleAfterCompletion\(handle\)/.test(delivery)],
 
 
   ["Remote Addressables catalogs are checked and updated before city labels resolve", /CheckForCatalogUpdates\(false\)/.test(delivery) && /UpdateCatalogs\(catalogCheck.Result, false\)/.test(delivery)],
