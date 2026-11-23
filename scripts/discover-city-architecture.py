@@ -7,6 +7,7 @@ called a city landmark until its source record and binary are independently
 validated.
 """
 import json
+import http.client
 from collections import Counter
 import pathlib
 import re
@@ -272,7 +273,7 @@ def get(url, max_attempts=4, base_delay_seconds=1.5, max_delay_seconds=20):
             except (TypeError, ValueError):
                 delay = base_delay_seconds * (2 ** (attempt - 1))
             time.sleep(min(max(0.0, delay), max_delay_seconds))
-        except (urllib.error.URLError, TimeoutError, ConnectionError):
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException):
             if attempt >= max_attempts:
                 raise
             delay = min(base_delay_seconds * (2 ** (attempt - 1)), max_delay_seconds)

@@ -325,6 +325,33 @@ class CityArchitectureDiscoveryExpansionTests(unittest.TestCase):
         self.assertEqual(request.call_count, 2)
         sleep.assert_called_once_with(3.0)
 
+    def test_catalogue_get_retries_incomplete_chunked_response(self):
+        from unittest.mock import patch
+        import http.client
+
+        class BrokenResponse:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                raise http.client.IncompleteRead(b'{"data":')
+
+        class GoodResponse:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                return b'{"data": []}'
+
+        with patch.object(discovery.urllib.request, "urlopen",
+                          side_effect=[BrokenResponse(), GoodResponse()]) as request, \
+             patch.object(discovery.time, "sleep") as sleep:
+            self.assertEqual(discovery.get("https://3dassets.dev/api/v1/assets"), {"data": []})
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(1.5)
+
     def test_catalogue_get_does_not_retry_permanent_client_errors(self):
         from unittest.mock import patch
         import urllib.error
