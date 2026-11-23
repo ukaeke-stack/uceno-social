@@ -1,6 +1,6 @@
 # UCENO Full Project Requirement Ledger
 
-Last reconciled: 2026-11-22
+Last reconciled: 2026-11-23
 Active engineering line: `fix/mission-treasure-policy-validation` / draft PR #46
 Repository: `ukaeke-stack/uceno-social`
 
@@ -131,3 +131,69 @@ This ledger distinguishes source implementation from CI, deployment, and device 
 - Commits: `e791303a6654941fa0dbb64a213c2edefb3aa365` and `7eef92ba48eee96d2bbe3231d8b6df29199fa176`. These new commits do not yet have exact-head CI results.
 - CI for the immediately preceding policy checkpoint `d16b5ff7b5d80df162ac843210e84d6c0324a42e`: Activity Tests passed; World Gateway Tests passed; content-delivery source checks passed; Unity source validation passed; gateway build and real-process PostgreSQL fencing/failover tests passed. Web-app build was still running when checked. The nine-city art release gate failed because actual imported city prefabs and provenance manifests remain absent.
 - Current PR head is `7eef92ba48eee96d2bbe3231d8b6df29199fa176`, PR #46 remains open/draft and mergeable. No production migration, deployment, Addressables publication, Unity Editor compilation, Android device test or APK build occurred.
+
+
+## Cross-PR reconciliation — 2026-11-23
+
+### Exact open-PR inventory
+
+All currently open repository pull requests were rechecked against their live head commits. None was merged or deployed during this run.
+
+| PR | Current head | Latest relevant verification |
+|---|---|---|
+| #38 — realistic Unity city foundation | `c39160efeaf947af6f98e5c8154c603c8531c4d0` | City asset audit regression passed 28 tests. Gateway, activity, Unity/client and acquisition workflows were still running at this checkpoint. Nine-City Imported Art Release Gate failed because imported city prefabs/manifests remain missing. |
+| #46 — mission/treasure policy | `a01be1b31e72a9bce9116d7b4f8e547b8e5e87ec` | Gateway tests, activity tests, content-delivery checks, gateway build, web build and Unity static-source validation passed. Nine-City Imported Art Release Gate failed. |
+| #47 — persistent autonomous worker | `f9cc2c2becc943f777fa9bf12cb97fafb09a63d8` | Worker validation passed. No external worker, cloud host or credentials were provisioned; those prerequisites remain deferred and do not block scheduled repository engineering. |
+| #45 — stable Unity interactable identities | `6eedf3ac66a939e9a0463b0bf9886064c79ccb1d` | No workflow runs were returned for this exact head; it remains unverified. |
+| #44 — server-authoritative Earned Credits | `db0cec20e13ac87ee9804964ae543734a6696e74` | Gateway, activity, Unity/client and UBA source-handoff workflows passed on 2026-11-19. |
+| #37 — Unity client scaffolding | `679eed1bfff3a490559f3249017b78b9b98a795d` | Historical UCENO CI passed on 2026-10-31. |
+| #29 — Phase 0 capability audit | `24ee172c65d8e538396525f8f4cd25d2fa842787` | Historical UCENO CI passed. |
+| #28 — Social platform roadmap | `1b1a9e5d91d1d1efeba8fba980b4aa2a97e66c14` | Historical UCENO CI passed. |
+| #26 — voice notes / missed-call history | `692dea4d520b7402e48760c793518ec0146fe2e2` | Historical UCENO CI passed on 2026-10-30. |
+| #24 — incoming call actions | `78ca8c587cca882c5b221e66a27da6bc43cf28bb` | Historical UCENO CI passed on 2026-10-29. |
+| #12 — Firebase Android diagnostics | `d038b641d3de4898e04eb1328d7eaa70cffca073` | Historical UCENO CI passed on 2026-10-28. |
+| #2 — inline comments | `f496a751cefb09a4f816844d9d82290043be14b2` | Historical UCENO CI passed on 2026-10-27. |
+
+Historical passes above are not substitutes for reviewing current mainline integration or testing deployed production behavior. Keep all PRs open and unmerged absent explicit authorization.
+
+### City asset audit correction
+
+- The acquisition workflow exposed a valid GLB pattern that the earlier audit rejected: `EXT_meshopt_compression` can use a second, URI-less fallback buffer when the extension is required and every fallback-buffer reference is supplied through a compressed bufferView. The Khronos extension explicitly defines this pattern and requires the placeholder buffer to cover the uncompressed views.
+- The audit now validates the compressed source-buffer index and byte range, output stride/count/size, compression mode/filter constraints, fallback references, and required-extension declaration. It continues across individual bad assets, records per-model rejection evidence, writes the full report, and then fails the audit if any model is rejected. It does not silently accept malformed or external buffers.
+- Added regression coverage for valid marked and unmarked fallback buffers, missing required-extension declarations, uncompressed references to placeholders, compressed-range overflow, and report persistence after rejection.
+- Exact head `c39160efeaf947af6f98e5c8154c603c8531c4d0` passed `python -m py_compile scripts/audit-city-architecture-acquisition.py scripts/tests/test_city_architecture_acquisition_audit.py` and `python scripts/tests/test_city_architecture_acquisition_audit.py -v`: **28 tests passed**. The city discovery/acquisition workflow was still running; no new imported prefab was approved by this source audit.
+- The audit remains a binary/provenance integrity check, not a visual-quality, Unity-import, scene, collision, or prefab acceptance test.
+
+### Verification state matrix
+
+| Product area | Implemented | Tested / CI-verified | Integration-verified | Deployed / device-verified | Current state |
+|---|---|---|---|---|---|
+| Social identity, account and profile bridge | Partial source foundation | Selected gateway/client source checks pass on active branches | Canonical account recovery, profile sync and deletion propagation not proven end-to-end | Not newly verified | **Blocked** on full Social-to-world integration evidence |
+| Avatar appearance, likeness and wardrobe | Appearance/wardrobe source and versioned Addressables loading exist | Regression/source-contract checks pass on PR #46's verified head | Real imported rig, facial clips and cross-session runtime behavior not verified | No Editor/device verification | **Implemented** source-side; integration verification pending |
+| Nine themed cities, architecture and landmarks | City definitions and acquisition/audit tooling exist | Discovery filters and binary audit tests pass | Real scene registry/imported prefabs not verified | No Unity scene/device verification | **Blocked** by missing provenance-backed prefab packs and manifests |
+| Homes and interiors | Source foundations and source-contract checks exist | Home authorization/interior source checks passed on current PR #38 checks | Actual imported interior/furniture scenes not verified | No Editor/device verification | **Implemented** partially; asset and runtime gates open |
+| Addressables/content delivery | Package/configuration, versioned keys, download/cache/retry and lease source exist | Content-delivery CI source checks pass | Remote catalog/bundle/CDN delivery not verified | No publication or device verification | **Implemented** source-side; publication pending |
+| World gateway, registry and persistence | Gateway/session/district persistence source exists | Gateway and Unity/client checks pass on PR #46 head | Local PostgreSQL integration/fencing tests pass in CI; real exported scene registry not verified | Not deployed | **CI-verified**; production/scene integration pending |
+| Multiplayer/presence/failover | Session fencing, reconnect and takeover source exists | Gateway process/database tests pass in CI | Local process failover is covered; deployed multi-host/shard behavior is not | Not deployed/device-tested | **Integration-verified** only in CI's local PostgreSQL environment |
+| Spatial voice and text | Voice HUD/session source exists | Voice HUD source checks pass | Real service interoperability, proximity attenuation and room revocation not verified | No two-device/background-audio verification | **Implemented** partially; device integration pending |
+| Activities, events, missions and treasure | Server-authoritative activity/reward source exists | Activity tests and policy regression tests pass | PostgreSQL-backed CI covers concurrency and reward invariants | Production migrations not applied | **CI-verified**; deployment awaits authorization |
+| AI citizens and assistants | Deterministic policy primitive exists | Policy unit/source checks exist | No live citizen runtime, memory service, navigation or moderation integration verified | Not deployed | **Implemented** policy only; feature integration remains blocked |
+| Earned/Purchased Credits and marketplace | Separate reward/credit foundations and fail-closed policy exist | Gateway/activity and policy checks pass | CI database tests cover selected reward invariants | No production migrations or live provider | **CI-verified** for covered paths; marketplace release blocked |
+| Payments and escrow | Provider metadata/issuance foundation only | Selected policy checks exist | No live Paystack verification/reconciliation | Not activated | **Awaiting user action** for credentials/approval; Paystack live and escrow remain disabled |
+| Moderation, privacy and governance | Admission/block/visibility source controls exist | Selected source tests pass | Cross-product text/voice/home/event/AI/marketplace enforcement not proven | Not fully deployed/verified | **Blocked** on end-to-end safety coverage |
+| Web client | Source exists | Web production build passed on PR #46's exact head | Backend-connected production behavior not verified here | No deployment performed | **CI-verified** build only |
+| Android/mobile | Source integration exists | Static/source checks only | Unity Editor compilation and Android lifecycle not verified | No APK build or physical-device test | **Awaiting user action** for Unity licensing and later device acceptance |
+| Desktop and VR/WebXR | Future architecture direction only | No release-grade checks | Not integrated | Not deployed | **Not implemented** |
+| Documentation, CI and observability | Roadmap, tests and workflow foundations exist | Multiple exact-head workflows pass | Production monitoring/alerting and operational runbooks remain incomplete | Not deployed | **Implemented** partially |
+
+### Outstanding user-dependent items
+
+These are recorded, not blockers to safe scheduled source engineering:
+- Unity licensing and eventual Editor/import/scene review.
+- Human selection or purchase of genuine high-quality architecture/interior/landmark assets where no suitable licensed source can be acquired automatically.
+- Explicit approval before production migrations, deployment, secrets changes, APK builds or payment activation.
+- Cloud-worker hosting/API billing and a dedicated GitHub token only if the separate persistent worker is later chosen; the scheduled repository workflow continues without them.
+
+The city catalogue currently declares `minimumCityCount: 10` and includes Meridian Prime plus the nine themed cities, while the strict imported-art acquisition gate targets the nine named themed cities (108 prefab records). Treat this as a catalogue/specification reconciliation item; do not silently change the 108-prefab gate or add a tenth asset pack without a documented product decision.
+
+No PR was merged, no production migration or deployment was performed, no secrets were changed, no Addressables content was published, no APK was built, and no Paystack or escrow feature was activated.
