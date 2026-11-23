@@ -5,7 +5,7 @@ namespace UCENO.VirtualWorld
 {
     /// <summary>
     /// UCENO's responsive glass-style world sidebar. Mobile navigation uses
-    /// three icon columns, grouped destinations and a vertically scrollable body.
+    /// three icon columns, grouped destinations and a vertically scrollable body. The panel keeps enough transparency to preserve the live world behind it.
     /// Destination admission remains server-authorized by the existing gateway.
     /// </summary>
     public sealed class WorldSidebarMenu : MonoBehaviour
@@ -94,8 +94,8 @@ namespace UCENO.VirtualWorld
 
         private void BuildTextures()
         {
-            glassTexture = MakeRoundedTexture(128, new Color32(12, 25, 48, 224), true);
-            tileTexture = MakeRoundedTexture(64, new Color32(255, 255, 255, 25), true);
+            glassTexture = MakeRoundedTexture(128, new Color32(12, 25, 48, 190), true);
+            tileTexture = MakeRoundedTexture(64, new Color32(255, 255, 255, 34), true);
             iconDiscTexture = MakeCircleTexture(64);
             borderTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
             borderTexture.SetPixel(0, 0, new Color(1f, 1f, 1f, .28f));
