@@ -324,6 +324,128 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "positive and 4-byte aligned"):
                 audit.inspect_glb(path)
 
+    def test_tevy_audit_records_invalid_model_and_continues(self):
+        previous_root = audit.ROOT
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            audit.ROOT = root
+            try:
+                asset_root = root / "tevy-city-architecture"
+                city_root = asset_root / "SolsticeBay"
+                city_root.mkdir(parents=True)
+                valid_data = glb({
+                    "asset": {"version": "2.0"},
+                    "buffers": [{"byteLength": 4}],
+                    "bufferViews": [{"buffer": 0, "byteLength": 4}],
+                }, binary=bytes(4))
+                invalid_data = glb({
+                    "asset": {"version": "2.0"},
+                    "buffers": [{"byteLength": 4}, {"byteLength": 4}],
+                    "bufferViews": [{"buffer": 0, "byteLength": 4}],
+                }, binary=bytes(4))
+                valid_lods = []
+                for level in (0, 1, 2):
+                    filename = f"valid-lod{level}.glb"
+                    (city_root / filename).write_bytes(valid_data)
+                    valid_lods.append({
+                        "lod": level,
+                        "file": f"SolsticeBay/{filename}",
+                        "sha256": hashlib.sha256(valid_data).hexdigest(),
+                        "bytes": len(valid_data),
+                    })
+                (city_root / "invalid-lod0.glb").write_bytes(invalid_data)
+                invalid_lods = [{
+                    "lod": 0,
+                    "file": "SolsticeBay/invalid-lod0.glb",
+                    "sha256": hashlib.sha256(invalid_data).hexdigest(),
+                    "bytes": len(invalid_data),
+                }]
+                for level in (1, 2):
+                    filename = f"invalid-lod{level}.glb"
+                    (city_root / filename).write_bytes(valid_data)
+                    invalid_lods.append({
+                        "lod": level,
+                        "file": f"SolsticeBay/{filename}",
+                        "sha256": hashlib.sha256(valid_data).hexdigest(),
+                        "bytes": len(valid_data),
+                    })
+                cities = {
+                    city: {"selected_and_acquired": []}
+                    for city in audit.CITIES
+                }
+                cities["SolsticeBay"]["selected_and_acquired"] = [
+                    {"slug": "valid-building", "lods": valid_lods},
+                    {"slug": "invalid-multi-buffer", "lods": invalid_lods},
+                ]
+                report = {
+                    "errors": [],
+                    "cities": {
+                        city: {
+                            "tevy_model_count": 0,
+                            "tevy_textured_lod0_count": 0,
+                            "tevy_lods": [],
+                            "tevy_invalid_models": [],
+                        } for city in audit.CITIES
+                    },
+                }
+                audit.audit_tevy({"cities": cities}, report)
+                result = report["cities"]["SolsticeBay"]
+                self.assertEqual(result["tevy_model_count"], 2)
+                self.assertEqual([x["slug"] for x in result["tevy_lods"]], ["valid-building"])
+                self.assertEqual(len(result["tevy_invalid_models"]), 1)
+                self.assertIn("multiple buffers", result["tevy_invalid_models"][0]["error"])
+                self.assertEqual(len(report["errors"]), 1)
+            finally:
+                audit.ROOT = previous_root
+
+    def test_3dassets_audit_records_invalid_model_and_continues(self):
+        previous_root = audit.ROOT
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            audit.ROOT = root
+            try:
+                city_root = root / "city-architecture-models" / "SolsticeBay"
+                city_root.mkdir(parents=True)
+                valid_data = glb({"asset": {"version": "2.0"}})
+                invalid_data = b"not-a-glb"
+                (city_root / "valid.glb").write_bytes(valid_data)
+                (city_root / "invalid.glb").write_bytes(invalid_data)
+                cities = {city: [] for city in audit.CITIES}
+                cities["SolsticeBay"] = [
+                    {
+                        "slug": "valid-building",
+                        "file": "SolsticeBay/valid.glb",
+                        "sha256": hashlib.sha256(valid_data).hexdigest(),
+                        "bytes": len(valid_data),
+                    },
+                    {
+                        "slug": "invalid-binary",
+                        "file": "SolsticeBay/invalid.glb",
+                        "sha256": hashlib.sha256(invalid_data).hexdigest(),
+                        "bytes": len(invalid_data),
+                    },
+                ]
+                report = {
+                    "errors": [],
+                    "cities": {
+                        city: {
+                            "3dassets_model_count": 0,
+                            "3dassets_textured_count": 0,
+                            "3dassets_models": [],
+                            "3dassets_invalid_models": [],
+                        } for city in audit.CITIES
+                    },
+                }
+                audit.audit_3dassets({"cities": cities}, report)
+                result = report["cities"]["SolsticeBay"]
+                self.assertEqual(result["3dassets_model_count"], 2)
+                self.assertEqual([x["slug"] for x in result["3dassets_models"]], ["valid-building"])
+                self.assertEqual(len(result["3dassets_invalid_models"]), 1)
+                self.assertIn("invalid GLB header", result["3dassets_invalid_models"][0]["error"])
+                self.assertEqual(len(report["errors"]), 1)
+            finally:
+                audit.ROOT = previous_root
+
 
 if __name__ == "__main__":
     unittest.main()
