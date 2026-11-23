@@ -5,6 +5,9 @@
  * separate integration steps.
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MISSION_EVENT_KINDS = new Set([
+  "checkpoint_finished", "dance_completed", "sports_completed", "adventure_objective"
+]);
 
 export interface DailyMission {
   id: string;
@@ -37,11 +40,16 @@ export function applyDailyMissionEvent(mission: DailyMission, progress: MissionP
     return { ok: false, code: "invalid_mission_identity" };
   if (mission.id !== progress.missionId || event.missionId !== mission.id || event.userId !== progress.userId)
     return { ok: false, code: "mission_subject_mismatch" };
+  if (!MISSION_EVENT_KINDS.has(mission.eventKind) || !MISSION_EVENT_KINDS.has(event.eventKind))
+    return { ok: false, code: "unsupported_mission_event_kind" };
   if (!Number.isInteger(mission.targetCount) || mission.targetCount < 1 || mission.targetCount > 10000 ||
       !Number.isFinite(mission.startsAt) || !Number.isFinite(mission.endsAt) || mission.endsAt <= mission.startsAt)
     return { ok: false, code: "invalid_mission_schedule" };
   if (!Number.isInteger(progress.count) || progress.count < 0 || progress.count > mission.targetCount ||
-      !Array.isArray(progress.processedEventIds) || progress.processedEventIds.length > 10000)
+      !Array.isArray(progress.processedEventIds) || progress.processedEventIds.length > 10000 ||
+      progress.count !== progress.processedEventIds.length ||
+      !progress.processedEventIds.every(id => typeof id === "string" && UUID.test(id)) ||
+      new Set(progress.processedEventIds).size !== progress.processedEventIds.length)
     return { ok: false, code: "invalid_mission_progress" };
   if (progress.processedEventIds.includes(event.eventId))
     return { ok: true, progress, duplicate: true };
@@ -82,18 +90,24 @@ export interface TreasureProgress {
 }
 export function applyTreasureDiscovery(clues: readonly TreasureClue[], progress: TreasureProgress,
   discovery: TreasureDiscovery): { ok: true; progress: TreasureProgress; completed: boolean } | { ok: false; code: string } {
-  if (!discovery || discovery.source !== "authoritative_gateway")
+  if (!discovery || typeof discovery !== "object" || Array.isArray(discovery) ||
+      discovery.source !== "authoritative_gateway")
     return { ok: false, code: "unverified_treasure_discovery" };
+  if (!progress || typeof progress !== "object" || Array.isArray(progress))
+    return { ok: false, code: "invalid_treasure_progress" };
   if (![progress.huntId, progress.userId, discovery.huntId, discovery.userId, discovery.clueId]
       .every(value => typeof value === "string" && UUID.test(value)) ||
       progress.huntId !== discovery.huntId || progress.userId !== discovery.userId)
     return { ok: false, code: "invalid_treasure_identity" };
   if (!Array.isArray(clues) || clues.length < 2 || clues.length > 100 ||
-      clues.some((clue, index) => !clue || !UUID.test(clue.id) || clue.sequence !== index))
+      clues.some((clue, index) => !clue || !UUID.test(clue.id) || clue.sequence !== index) ||
+      new Set(clues.map(clue => clue.id)).size !== clues.length)
     return { ok: false, code: "invalid_treasure_clue_chain" };
   if (!Number.isInteger(progress.nextSequence) || progress.nextSequence < 0 ||
       progress.nextSequence > clues.length || !Array.isArray(progress.discoveredClueIds) ||
-      progress.discoveredClueIds.length !== progress.nextSequence)
+      progress.discoveredClueIds.length !== progress.nextSequence ||
+      progress.discoveredClueIds.some((id, index) => id !== clues[index]?.id) ||
+      (progress.completedAt !== null && (!Number.isFinite(progress.completedAt) || progress.completedAt <= 0)))
     return { ok: false, code: "invalid_treasure_progress" };
   if (progress.completedAt !== null) return { ok: false, code: "treasure_hunt_completed" };
   if (!Number.isFinite(discovery.discoveredAt) || discovery.discoveredAt <= 0)

@@ -14,6 +14,11 @@ import { resolveInteraction, isInteractionAllowed } from "./interaction-policy.j
 import { isPersistentObjectState } from "./district-object-policy.js";
 import { loadInteractableRegistry, parseCityInteractableManifest, type RegisteredInteractable } from "./interactable-registry-policy.js";
 import { checkpointVersionForSession } from "./session-fence-policy.js";
+import { loadPrivateTreasureHints, recordPrivateTreasureDiscovery } from "./private-treasure-runtime.js";
+import { createTreasureTeam, joinTreasureTeam, loadTeamTreasureHints, recordTeamTreasureDiscovery } from "./team-treasure-runtime.js";
+import { grantTreasureCollectibles } from "./treasure-collectible-runtime.js";
+import { materializeScheduledTreasureHunts } from "./treasure-schedule-runtime.js";
+import { consumeTreasureRequestBudget } from "./treasure-request-policy.js";
 import { shouldPublishWorldSnapshot, WORLD_RELAY_BATCH_SIZE, WORLD_RELAY_POLL_INTERVAL_MS } from "./world-relay-policy.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -28,6 +33,8 @@ const TOKEN_SECRET = process.env.WORLD_TOKEN_SECRET || "";
 const LIVEKIT_URL = process.env.LIVEKIT_URL || "";
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "";
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "";
+const TREASURE_ASSIGNMENT_SECRET = process.env.TREASURE_ASSIGNMENT_SECRET || "";
+const TREASURE_SCHEDULE_MATERIALIZER_ENABLED = process.env.TREASURE_SCHEDULE_MATERIALIZER_ENABLED === "true";
 const TICK_RATE = 20;
 const TICK_MS = 1000 / TICK_RATE;
 const MAX_CLIENTS = Number(process.env.WORLD_INSTANCE_CAPACITY || 64);
@@ -393,6 +400,7 @@ type Player = {
   lastInputAt: number; inputCount: number; inputWindowAt: number;
   lastSequence: number; lastCheckpointAt: number; lastAuthorizationCheck: number; authorizationCheckInProgress: boolean;
   lastInteractionAt: number;
+  treasureRequestBudget: { windowStartedAt: number; requestCount: number };
   lastWardrobeRefreshAt: number;
   voiceActive: boolean;
   lastVoiceSignalAt: number;
@@ -527,8 +535,98 @@ function activityPayload(session: ActivitySession) {
   };
 }
 
+async function isActiveTreasureInteractable(player: Player, target: RegisteredInteractable, now: number): Promise<boolean> {
+  // Older isolated test schemas and pre-migration deployments may not yet have
+  // the authored treasure tables. Do not let an optional feature break normal
+  // world interactions while migrations 037-040 are still unapplied.
+  const schemaReady = await sql`SELECT
+    to_regclass('virtual_world_treasure_hunts') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_clues') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_progress') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_discoveries') IS NOT NULL AND
+    to_regclass('virtual_world_earned_credit_ledger') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_spawn_points') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_assignments') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_global_claims') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_route_discoveries') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_teams') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_team_members') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_team_assignments') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_team_progress') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_team_discoveries') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_team_reward_allocations') IS NOT NULL AND
+    to_regclass('virtual_world_collectible_catalog') IS NOT NULL AND
+    to_regclass('virtual_world_treasure_reward_items') IS NOT NULL AND
+    to_regclass('virtual_world_user_collectibles') IS NOT NULL AS ready`;
+  if (schemaReady[0]?.ready !== true) return false;
+  const rows = await sql`SELECT
+    EXISTS (
+      SELECT 1 FROM virtual_world_treasure_spawn_points AS point
+      JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = point.hunt_id
+      WHERE point.city_id = ${target.cityId} AND point.district_id = ${target.districtId}
+        AND point.interactable_id = ${target.id} AND point.enabled = TRUE
+        AND hunt.enabled = TRUE AND hunt.distribution_mode IN ('personal', 'global')
+        AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
+        AND hunt.starts_at <= to_timestamp(${now / 1000})
+        AND hunt.ends_at > to_timestamp(${now / 1000})
+    ) OR EXISTS (
+      SELECT 1 FROM virtual_world_treasure_teams AS team
+      JOIN virtual_world_treasure_team_members AS member
+        ON member.team_id = team.id AND member.user_id = ${player.id}::uuid
+      JOIN virtual_world_treasure_team_progress AS progress
+        ON progress.team_id = team.id AND progress.completed_at IS NULL
+      JOIN virtual_world_treasure_team_assignments AS assignment
+        ON assignment.team_id = team.id AND assignment.sequence = progress.next_sequence
+      JOIN virtual_world_treasure_spawn_points AS point
+        ON point.hunt_id = assignment.hunt_id AND point.id = assignment.spawn_point_id
+      JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = team.hunt_id
+      WHERE point.city_id = ${target.cityId} AND point.district_id = ${target.districtId}
+        AND point.interactable_id = ${target.id} AND point.enabled = TRUE
+        AND team.status = 'active' AND hunt.enabled = TRUE
+        AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
+        AND hunt.starts_at <= to_timestamp(${now / 1000})
+        AND hunt.ends_at > to_timestamp(${now / 1000})
+    ) OR EXISTS (
+      SELECT 1 FROM virtual_world_treasure_clues AS clue
+      JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = clue.hunt_id
+      WHERE clue.city_id = ${target.cityId} AND clue.district_id = ${target.districtId}
+        AND clue.interactable_id = ${target.id}
+        AND hunt.enabled = TRUE AND hunt.distribution_mode <> 'team'
+        AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
+        AND hunt.starts_at <= to_timestamp(${now / 1000})
+        AND hunt.ends_at > to_timestamp(${now / 1000})
+    ) AS active`;
+  return rows[0]?.active === true;
+}
+
+async function pushPrivateTreasureHints(player: Player): Promise<void> {
+  try {
+    const hints = await loadPrivateTreasureHints(sql, player, Date.now(), TREASURE_ASSIGNMENT_SECRET);
+    if (players.get(player.id) !== player || player.socket.readyState !== WebSocket.OPEN) return;
+    for (const hint of hints) send(player.socket, { type: "treasure_hunt_clue",
+      huntId: hint.huntId, title: hint.title, sequence: hint.sequence, clue: hint.clue });
+    const teamHints = await loadTeamTreasureHints(sql, player, Date.now());
+    if (players.get(player.id) !== player || player.socket.readyState !== WebSocket.OPEN) return;
+    for (const hint of teamHints) send(player.socket, { type: "team_treasure_hunt_clue",
+      teamId: hint.teamId, huntId: hint.huntId, title: hint.title,
+      sequence: hint.sequence, clue: hint.clue });
+  } catch (error) {
+    console.error("private_treasure_hint_push_failed", player.id, error);
+  }
+}
+
 async function recordTreasureDiscovery(player: Player, target: RegisteredInteractable, now: number):
-  Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string }> {
+  Promise<{ discovered: boolean; completed: boolean; rewardEarnedCredits: string; code?: string; huntId?: string; teamId?: string; collectibles?: { code: string; displayName: string; category: string; rarity: string; quantity: number }[] }> {
+  const teamResult = await recordTeamTreasureDiscovery(sql, player, target, now,
+    TREASURE_ASSIGNMENT_SECRET, INSTANCE_ID, PROCESS_ID, processGeneration);
+  if (teamResult.handled) return { discovered: teamResult.discovered,
+    completed: teamResult.completed, rewardEarnedCredits: teamResult.rewardEarnedCredits,
+    code: teamResult.code, huntId: teamResult.huntId, teamId: teamResult.teamId, collectibles: teamResult.collectibles };
+  const privateResult = await recordPrivateTreasureDiscovery(sql, player, target, now,
+    TREASURE_ASSIGNMENT_SECRET, INSTANCE_ID, PROCESS_ID, processGeneration);
+  if (privateResult.handled) return { discovered: privateResult.discovered,
+    completed: privateResult.completed, rewardEarnedCredits: privateResult.rewardEarnedCredits,
+    code: privateResult.code, huntId: privateResult.huntId, collectibles: privateResult.collectibles };
   return sql.begin(async tx => {
     const owner = await tx`SELECT id FROM virtual_world_instances
       WHERE id = ${INSTANCE_ID}::uuid AND owner_process_id = ${PROCESS_ID}::uuid
@@ -545,6 +643,7 @@ async function recordTreasureDiscovery(player: Player, target: RegisteredInterac
       JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = clue.hunt_id
       WHERE clue.city_id = ${target.cityId} AND clue.district_id = ${target.districtId}
         AND clue.interactable_id = ${target.id} AND hunt.enabled = TRUE
+        AND hunt.distribution_mode <> 'team'
         AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
         AND hunt.starts_at <= to_timestamp(${now / 1000})
         AND hunt.ends_at > to_timestamp(${now / 1000})
@@ -596,7 +695,7 @@ async function recordTreasureDiscovery(player: Player, target: RegisteredInterac
         version = version + 1, updated_at = NOW()
       WHERE hunt_id = ${clue.huntId}::uuid AND user_id = ${player.id}::uuid`;
 
-    if (!completed) return { discovered: true, completed: false, rewardEarnedCredits: "0" };
+    if (!completed) return { discovered: true, completed: false, rewardEarnedCredits: "0", huntId: clue.huntId };
     const claimed = await tx`UPDATE virtual_world_treasure_progress
       SET reward_issued_at = NOW(), updated_at = NOW()
       WHERE hunt_id = ${clue.huntId}::uuid AND user_id = ${player.id}::uuid
@@ -615,7 +714,8 @@ async function recordTreasureDiscovery(player: Player, target: RegisteredInterac
         ${clue.huntId}::uuid,
         ${JSON.stringify({ finalClueId: clue.clueId, interactableId: target.id })}::jsonb)
       ON CONFLICT (idempotency_key) DO NOTHING`;
-    return { discovered: true, completed: true, rewardEarnedCredits: reward };
+    const collectibles = await grantTreasureCollectibles(tx, clue.huntId, player.id);
+    return { discovered: true, completed: true, rewardEarnedCredits: reward, collectibles, huntId: clue.huntId };
   });
 }
 
@@ -1104,7 +1204,7 @@ async function loadPlayer(userId: string, worldId: string, cityId: string, token
     moveX: 0, moveZ: 0, sprint: false, seated: false, gesture: "none", gestureSequence: 0, jumpQueued: false,
     lastInputAt: Date.now(), inputCount: 0, inputWindowAt: Date.now(),
     lastSequence: 0, lastCheckpointAt: Date.now(), lastAuthorizationCheck: Date.now(), authorizationCheckInProgress: false,
-    lastInteractionAt: 0, lastWardrobeRefreshAt: 0, voiceActive: false, lastVoiceSignalAt: 0, voiceSignalWindowAt: Date.now(), voiceSignalCount: 0, homeId: null, homeAnchor: null, eventId: null, avatarAppearance, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null,
+    lastInteractionAt: 0, treasureRequestBudget: { windowStartedAt: Date.now(), requestCount: 0 }, lastWardrobeRefreshAt: 0, voiceActive: false, lastVoiceSignalAt: 0, voiceSignalWindowAt: Date.now(), voiceSignalCount: 0, homeId: null, homeAnchor: null, eventId: null, avatarAppearance, wardrobe: wardrobeRows.map(item => ({ slot: item.slot, itemId: item.itemId })), returnState: null,
     activeDistrictId: null, pendingDistrict: null
   };
 }
@@ -1430,6 +1530,130 @@ wss.on("connection", async (socket: WebSocket) => {
       if (players.get(player.id) !== player || player.socket !== socket) return;
       let msg: any;
       try { msg = JSON.parse(raw.toString()); } catch { fail(socket, "invalid_json"); return; }
+      if (msg && ["treasure_team_hunts_request", "treasure_team_create", "treasure_team_join"].includes(msg.type)) {
+        if (!consumeTreasureRequestBudget(player.treasureRequestBudget, Date.now())) {
+          if (msg.type === "treasure_team_hunts_request")
+            send(socket, { type: "team_treasure_hunt_catalog", teamHunts: [], code: "treasure_request_rate_limited" });
+          else send(socket, { type: "treasure_team_rejected", code: "treasure_request_rate_limited" });
+          return;
+        }
+      }
+      if (msg && msg.type === "treasure_team_hunts_request") {
+        if (TREASURE_ASSIGNMENT_SECRET.length < 32) {
+          send(socket, { type: "team_treasure_hunt_catalog", teamHunts: [], code: "treasure_assignment_secret_unavailable" });
+          return;
+        }
+        try {
+          const hunts = await sql`SELECT hunt.id AS "huntId", hunt.title, hunt.ends_at AS "endsAt",
+              COUNT(DISTINCT point.sequence)::integer AS "clueCount"
+            FROM virtual_world_treasure_hunts AS hunt
+            JOIN virtual_world_treasure_spawn_points AS point ON point.hunt_id = hunt.id AND point.enabled = TRUE
+            WHERE hunt.enabled = TRUE AND hunt.distribution_mode = 'team'
+              AND (hunt.world_id IS NULL OR hunt.world_id = ${player.worldId}::uuid)
+              AND hunt.starts_at <= NOW() AND hunt.ends_at > NOW()
+            GROUP BY hunt.id, hunt.title, hunt.ends_at
+            HAVING MIN(point.sequence) = 0 AND MAX(point.sequence) + 1 = COUNT(DISTINCT point.sequence)
+              AND COUNT(DISTINCT point.sequence) BETWEEN 2 AND 100
+            ORDER BY hunt.ends_at ASC, hunt.id LIMIT 20`;
+          send(socket, { type: "team_treasure_hunt_catalog", teamHunts: hunts });
+        } catch (error) {
+          console.error("team_treasure_hunt_catalog_failed", player.id, error);
+          send(socket, { type: "team_treasure_hunt_catalog", teamHunts: [], code: "team_hunts_unavailable" });
+        }
+        return;
+      }
+      if (msg && msg.type === "treasure_team_create") {
+        if (player.homeId || player.eventId || player.returnState || typeof msg.huntId !== "string" ||
+            (msg.maxMembers !== undefined && (!Number.isSafeInteger(msg.maxMembers) || msg.maxMembers < 2 || msg.maxMembers > 20))) {
+          send(socket, { type: "treasure_team_rejected", code: "invalid_team_request" }); return;
+        }
+        try {
+          const result = await createTreasureTeam(sql, msg.huntId, player.id, player.worldId,
+            msg.maxMembers === undefined ? 5 : msg.maxMembers, Date.now(), TREASURE_ASSIGNMENT_SECRET);
+          send(socket, { type: result.ok ? "treasure_team_created" : "treasure_team_rejected", ...result });
+          if (result.ok) void pushPrivateTreasureHints(player);
+        } catch (error) {
+          console.error("treasure_team_create_failed", player.id, error);
+          send(socket, { type: "treasure_team_rejected", code: "team_creation_failed" });
+        }
+        return;
+      }
+      if (msg && msg.type === "treasure_team_join") {
+        if (player.homeId || player.eventId || player.returnState || typeof msg.teamId !== "string") {
+          send(socket, { type: "treasure_team_rejected", code: "invalid_team_request" }); return;
+        }
+        try {
+          const result = await joinTreasureTeam(sql, msg.teamId, player.id, player.worldId, Date.now());
+          send(socket, { type: result.ok ? "treasure_team_joined" : "treasure_team_rejected", ...result });
+          if (result.ok) {
+            void pushPrivateTreasureHints(player);
+            if (result.status === "active") {
+              const memberRows = await sql`SELECT user_id AS "userId" FROM virtual_world_treasure_team_members WHERE team_id = ${msg.teamId}::uuid`;
+              for (const member of memberRows) { const online = players.get(member.userId);
+                if (online && online !== player) void pushPrivateTreasureHints(online); }
+            }
+          }
+        } catch (error) {
+          console.error("treasure_team_join_failed", player.id, error);
+          send(socket, { type: "treasure_team_rejected", code: "team_join_failed" });
+        }
+        return;
+      }
+      if (msg && msg.type === "treasure_inventory_request") {
+        try {
+          const items = await sql`SELECT catalog.code, catalog.display_name AS "displayName",
+              catalog.category, catalog.rarity, inventory.quantity,
+              inventory.awarded_at AS "awardedAt"
+            FROM virtual_world_user_collectibles AS inventory
+            JOIN virtual_world_collectible_catalog AS catalog
+              ON catalog.id = inventory.collectible_id
+            WHERE inventory.user_id = ${player.id}::uuid
+            ORDER BY inventory.awarded_at DESC, inventory.id DESC LIMIT 100`;
+          send(socket, { type: "treasure_inventory", items });
+        } catch (error) {
+          console.error("treasure_inventory_load_failed", player.id, error);
+          send(socket, { type: "treasure_inventory", items: [], code: "inventory_unavailable" });
+        }
+        return;
+      }
+      if (msg && msg.type === "treasure_history_request") {
+        try {
+          const history = await sql`SELECT hunt.id AS "huntId", hunt.title,
+              hunt.distribution_mode AS "distributionMode",
+              progress.next_sequence AS "discoveredClues",
+              progress.completed_at AS "completedAt",
+              progress.reward_issued_at AS "rewardIssuedAt",
+              COALESCE(ledger.amount, 0)::text AS "rewardEarnedCredits",
+              (SELECT COUNT(*)::integer FROM virtual_world_treasure_assignments AS assignment
+                WHERE assignment.hunt_id = hunt.id AND assignment.user_id = ${player.id}::uuid) AS "privateClueCount",
+              (SELECT COUNT(*)::integer FROM virtual_world_treasure_clues AS clue
+                WHERE clue.hunt_id = hunt.id) AS "legacyClueCount"
+            FROM virtual_world_treasure_progress AS progress
+            JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = progress.hunt_id
+            LEFT JOIN virtual_world_earned_credit_ledger AS ledger
+              ON ledger.user_id = progress.user_id AND ledger.source_treasure_hunt_id = hunt.id
+            WHERE progress.user_id = ${player.id}::uuid
+            ORDER BY progress.completed_at DESC NULLS LAST, progress.updated_at DESC LIMIT 100`;
+          const teamRewards = await sql`SELECT allocation.team_id AS "teamId",
+              hunt.id AS "huntId", hunt.title, allocation.amount::text AS "rewardEarnedCredits",
+              allocation.contribution_points AS "contributionPoints",
+              allocation.created_at AS "awardedAt"
+            FROM virtual_world_treasure_team_reward_allocations AS allocation
+            JOIN virtual_world_treasure_teams AS team ON team.id = allocation.team_id
+            JOIN virtual_world_treasure_hunts AS hunt ON hunt.id = team.hunt_id
+            WHERE allocation.user_id = ${player.id}::uuid AND team.status = 'completed'
+            ORDER BY allocation.created_at DESC, allocation.team_id LIMIT 100`;
+          send(socket, { type: "treasure_hunt_history", hunts: history.map((hunt: any) => ({
+            ...hunt,
+            totalClues: Number(hunt.privateClueCount) || Number(hunt.legacyClueCount),
+            discoveredClues: Number(hunt.discoveredClues)
+          })), teamRewards });
+        } catch (error) {
+          console.error("treasure_history_load_failed", player.id, error);
+          send(socket, { type: "treasure_hunt_history", hunts: [], teamRewards: [], code: "history_unavailable" });
+        }
+        return;
+      }
       if (msg && msg.type === "district_content_ready") {
         const pending = player.pendingDistrict;
         if (matchesDistrictTransition(pending, msg.districtId, msg.nonce)) {
@@ -1686,6 +1910,7 @@ wss.on("connection", async (socket: WebSocket) => {
         player.grounded = true; player.seated = false; player.jumpQueued = false;
         send(socket, { type: "spatial_location_exited",
           state: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } });
+    void pushPrivateTreasureHints(player);
         return;
       }
       if (msg && msg.type === "event_join") {
@@ -1781,6 +2006,52 @@ wss.on("connection", async (socket: WebSocket) => {
         if (!isInteractionAllowed(distance, now - player.lastInteractionAt)) {
           send(socket, { type: "interaction_rejected", code: "out_of_range_or_rate_limited" }); return;
         }
+        if (msg.action === "use" &&
+            (target.kind === "object" || target.kind === "furniture" || target.kind === "vehicle") &&
+            await isActiveTreasureInteractable(player, target, now)) {
+          try {
+            const treasure = await recordTreasureDiscovery(player, target, now);
+            if (treasure.discovered) {
+              send(socket, { type: "treasure_clue_discovered", objectId: target.id, huntId: treasure.huntId,
+                teamId: treasure.teamId, completed: treasure.completed,
+                rewardEarnedCredits: treasure.rewardEarnedCredits, collectibles: treasure.collectibles ?? [] });
+              void pushPrivateTreasureHints(player);
+              if (treasure.teamId) {
+                const teamMembers = await sql`SELECT user_id AS "userId" FROM virtual_world_treasure_team_members WHERE team_id = ${treasure.teamId}::uuid`;
+                for (const member of teamMembers) { const online = players.get(member.userId);
+                  if (online && online !== player) void pushPrivateTreasureHints(online); }
+                if (treasure.completed) {
+                  const allocations = await sql`SELECT user_id AS "userId", amount::text AS amount
+                    FROM virtual_world_treasure_team_reward_allocations WHERE team_id = ${treasure.teamId}::uuid`;
+                  if (allocations.length) {
+                    for (const allocation of allocations) {
+                      const recipient = players.get(allocation.userId);
+                      if (recipient) send(recipient.socket, { type: "team_treasure_reward",
+                        huntId: treasure.huntId, teamId: treasure.teamId, rewardEarnedCredits: allocation.amount });
+                    }
+                  } else {
+                    // A completed hunt may exhaust its authored claim cap. Still
+                    // notify every member so clients clear the now-terminal clue.
+                    for (const member of teamMembers) {
+                      const recipient = players.get(member.userId);
+                      if (recipient) send(recipient.socket, { type: "team_treasure_reward",
+                        huntId: treasure.huntId, teamId: treasure.teamId, rewardEarnedCredits: "0" });
+                    }
+                  }
+                }
+              }
+            } else if (treasure.code) {
+              send(socket, { type: "treasure_discovery_rejected", objectId: target.id, code: treasure.code });
+            }
+          } catch (error) {
+            console.error("treasure_discovery_persistence_failed", error);
+            send(socket, { type: "treasure_discovery_rejected", objectId: target.id, code: "persistence_failed" });
+          }
+          // Treasure state is per-player. Never persist or broadcast a shared
+          // opened/used state that reveals another player's hidden discovery.
+          player.lastInteractionAt = now;
+          return;
+        }
         const previousState = target.state;
         const previousActorId = target.actorId;
         const previousOccupantId = target.occupantId;
@@ -1813,21 +2084,6 @@ wss.on("connection", async (socket: WebSocket) => {
             console.error("Could not persist world object state:", error);
             send(socket, { type: "interaction_rejected", code: "state_persistence_failed" });
             return;
-          }
-        }
-        if (msg.action === "use") {
-          try {
-            const treasure = await recordTreasureDiscovery(player, target, now);
-            if (treasure.discovered) send(socket, {
-              type: "treasure_clue_discovered", objectId: target.id,
-              completed: treasure.completed, rewardEarnedCredits: treasure.rewardEarnedCredits
-            });
-            else if (treasure.code) send(socket, {
-              type: "treasure_discovery_rejected", objectId: target.id, code: treasure.code
-            });
-          } catch (error) {
-            console.error("treasure_discovery_persistence_failed", error);
-            send(socket, { type: "treasure_discovery_rejected", objectId: target.id, code: "persistence_failed" });
           }
         }
         player.lastInteractionAt = now;
@@ -2411,6 +2667,27 @@ const heartbeat = async () => {
   }
 };
 setInterval(heartbeat, 3000);
+
+let treasureScheduleInProgress = false;
+if (TREASURE_SCHEDULE_MATERIALIZER_ENABLED && TREASURE_ASSIGNMENT_SECRET.length >= 32) {
+  setInterval(async () => {
+    if (!processAuthority || Date.now() >= processLeaseUntil || treasureScheduleInProgress) return;
+    treasureScheduleInProgress = true;
+    try {
+      const created = await materializeScheduledTreasureHunts(sql, Date.now());
+      if (created > 0) {
+        console.info("treasure_schedules_materialized", { created });
+        for (const player of players.values()) void pushPrivateTreasureHints(player);
+      }
+    } catch (error) {
+      console.error("treasure_schedule_materialization_failed", error);
+    } finally {
+      treasureScheduleInProgress = false;
+    }
+  }, 60_000);
+} else if (TREASURE_SCHEDULE_MATERIALIZER_ENABLED) {
+  console.error("treasure_schedule_materializer_disabled", "TREASURE_ASSIGNMENT_SECRET must contain at least 32 characters");
+}
 
 let objectRefreshInProgress = false;
 setInterval(async () => {

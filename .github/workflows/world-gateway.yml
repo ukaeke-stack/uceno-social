@@ -88,6 +88,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test retained city asset provenance controls
+        run: python -m unittest scripts.tests.test_city_asset_provenance -v
       - name: Validate Unity package manifest
         run: |
           node -e "const p=require('./unity/UCENOVirtualWorld/Packages/manifest.json'); if (!p.dependencies || !p.dependencies['com.endel.nativewebsocket']) process.exit(1);"
@@ -146,9 +151,11 @@ jobs:
           for (const marker of ['BuildConfiguredInteractionObjects(worldRoot, homeFurniturePrefabs)', 'WorldInteractableKind.Seat', 'WorldInteractableKind.Furniture', 'WorldInteractableKind.Door', 'Door Hinge Pivot', 'Door Leaf', 'WorldInteractableRegistryExporter.Export(false)'])
             if (!fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/FreeAssetWorldSceneBuilder.cs', 'utf8').includes(marker))
               throw new Error('Generated playable city is missing registered scene interaction objects: ' + marker);
-          for (const marker of ['StableObjectId(marker)', 'Guid.NewGuid().ToString("N")', 'id.StartsWith("uceno:"', 'SaveScene(scene)'])
+          for (const marker of ['StableObjectId(marker)', 'GlobalObjectId.GetGlobalObjectIdSlow(marker)', 'SHA256.Create()', 'Encoding.UTF8.GetBytes(globalId)', 'id.StartsWith("uceno:"', 'SaveScene(scene)'])
             if (!registryExporter.includes(marker))
-              throw new Error('Scene registry export must assign persistent UCENO IDs and save final additive scenes: ' + marker);
+              throw new Error('Scene registry export must derive persistent IDs from Unity scene identity and save final additive scenes: ' + marker);
+          if (registryExporter.includes('Guid.NewGuid()'))
+            throw new Error('Scene registry export must not use random IDs that change between exports.');
           const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
           for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes.json'])
             if (!exporter.includes(marker)) throw new Error('Missing Unity geometry export behavior: ' + marker);

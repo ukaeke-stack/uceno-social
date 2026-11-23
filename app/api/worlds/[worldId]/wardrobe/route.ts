@@ -58,8 +58,11 @@ export async function PUT(request: NextRequest, { params }: Context) {
     const requested = (body as { equipped: Partial<Record<Slot, string | null>> }).equipped;
     const result = await sql`
       WITH requested AS (
-        SELECT key AS slot, value AS item_id
-        FROM jsonb_each_text(${JSON.stringify(requested)}::jsonb)
+        -- jsonb_each_text turns JSON null into the text "null", not SQL NULL.
+        -- Keep JSON null distinct so unequip requests reach the DELETE branch.
+        SELECT key AS slot,
+          CASE WHEN value = 'null'::jsonb THEN NULL ELSE value #>> '{}' END AS item_id
+        FROM jsonb_each(${JSON.stringify(requested)}::jsonb)
       ),
       invalid AS (
         SELECT r.slot FROM requested r

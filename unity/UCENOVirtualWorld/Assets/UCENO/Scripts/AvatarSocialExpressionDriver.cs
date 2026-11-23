@@ -22,7 +22,9 @@ namespace UCENO.VirtualWorld
         [SerializeField] private float idleHeadPitch = 1.1f;
 
         private Transform head;
-        private Quaternion headBaseRotation;
+        private Quaternion lastAppliedHeadRotation;
+        private Quaternion lastAppliedHeadOffset = Quaternion.identity;
+        private bool hasAppliedHeadOffset;
         private Transform lookTarget;
         private readonly List<BlendShapeChannel> blinkChannels = new List<BlendShapeChannel>();
         private float nextBlinkAt;
@@ -57,7 +59,6 @@ namespace UCENO.VirtualWorld
             if (animator != null && animator.avatar != null && animator.avatar.isHuman)
                 head = animator.GetBoneTransform(HumanBodyBones.Head);
 
-            if (head != null) headBaseRotation = head.localRotation;
             CacheBlinkChannels();
             ScheduleNextBlink();
         }
@@ -93,9 +94,25 @@ namespace UCENO.VirtualWorld
                 }
             }
 
-            Quaternion targetRotation = headBaseRotation * Quaternion.Euler(pitch, yaw, 0f);
-            head.localRotation = Quaternion.Slerp(
-                head.localRotation, targetRotation, 1f - Mathf.Exp(-headTurnSpeed * Time.deltaTime));
+            // Animator has already evaluated the imported Humanoid clip before LateUpdate.
+            // Apply gaze as an additive offset to that frame's animated head pose instead
+            // of resetting the head to its bind pose, which would erase authored talk,
+            // turn and gesture motion whenever social gaze is enabled.
+            Quaternion animatedHeadRotation = head.localRotation;
+            // Some imported clips do not key the head bone. In that case Animator
+            // leaves the previous LateUpdate result in place; remove only our last
+            // gaze offset before calculating this frame so the offset cannot drift.
+            if (hasAppliedHeadOffset &&
+                Quaternion.Angle(animatedHeadRotation, lastAppliedHeadRotation) < 0.001f)
+                animatedHeadRotation = animatedHeadRotation * Quaternion.Inverse(lastAppliedHeadOffset);
+
+            Quaternion requestedOffset = Quaternion.Euler(pitch, yaw, 0f);
+            float blend = 1f - Mathf.Exp(-headTurnSpeed * Time.deltaTime);
+            Quaternion appliedOffset = Quaternion.Slerp(Quaternion.identity, requestedOffset, blend);
+            head.localRotation = animatedHeadRotation * appliedOffset;
+            lastAppliedHeadRotation = head.localRotation;
+            lastAppliedHeadOffset = appliedOffset;
+            hasAppliedHeadOffset = true;
         }
 
         private void CacheBlinkChannels()

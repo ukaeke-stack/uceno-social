@@ -38,6 +38,7 @@ namespace UCENO.VirtualWorld.Editor
         [Serializable] private sealed class SourceAsset
         {
             public string prefab, sourceName, sourceUrl, license, attribution;
+            public string sourceArchive, sourceArchiveSha256, licenseFile, licenseFileSha256;
         }
         [Serializable] private sealed class CityCatalog { public CatalogCity[] cities; }
         [Serializable] private sealed class CatalogCity { public string id; public CatalogLandmark[] landmarks; }
@@ -79,6 +80,14 @@ namespace UCENO.VirtualWorld.Editor
                 Require(city.landmarks != null && city.landmarks.Length == 3,
                     city.cityId + " must have three dedicated landmark prefabs.");
 
+                Require(city.architecturePrefabs.All(path => path.StartsWith(city.assetRoot + "/Architecture/", StringComparison.Ordinal)),
+                    city.cityId + " architecture records must point only to its Architecture folder.");
+                Require(city.environmentPrefabs.All(path => path.StartsWith(city.assetRoot + "/Environment/", StringComparison.Ordinal)),
+                    city.cityId + " environment records must point only to its Environment folder.");
+                Require(city.landmarks.All(item => item != null &&
+                    item.prefab.StartsWith(city.assetRoot + "/Landmarks/", StringComparison.Ordinal)),
+                    city.cityId + " landmark records must point only to its Landmarks folder.");
+
                 var expectedLandmarks = new HashSet<string>(
                     catalogById[city.cityId].landmarks.Select(x => x.id), StringComparer.Ordinal);
                 var actualLandmarks = new HashSet<string>(
@@ -96,9 +105,7 @@ namespace UCENO.VirtualWorld.Editor
                 var paths = city.architecturePrefabs.Concat(city.environmentPrefabs)
                     .Concat(city.landmarks.Select(l => l.prefab)).ToArray();
                 Require(paths.Distinct(StringComparer.Ordinal).Count() == 12,
-                    city.cityId + " reuses a prefab path inside its pack.");
-                Require(manifest.assets.All(a => a != null && !string.IsNullOrWhiteSpace(a.prefab)) &&
-                    manifest.assets.Select(a => a.prefab).Distinct(StringComparer.Ordinal).Count() == 12,
+                    city.cityId + " reuses a prefab path inside its pack.");                Require(manifest.assets.All(a => a != null && !string.IsNullOrWhiteSpace(a.prefab)) &&                    manifest.assets.Select(a => a.prefab).Distinct(StringComparer.Ordinal).Count() == 12,
                     city.cityId + " source manifest contains missing or duplicate prefab records.");
                 var manifestByPrefab = manifest.assets.ToDictionary(a => a.prefab, StringComparer.Ordinal);
                 Require(new HashSet<string>(manifestByPrefab.Keys, StringComparer.Ordinal)
@@ -121,8 +128,21 @@ namespace UCENO.VirtualWorld.Editor
                         "CC0 1.0", "CC-BY 4.0", "CC-BY 3.0",
                         "CC-BY-SA 4.0", "CC-BY-SA 3.0"
                     };
-                    Require(redistributableDerivativeLicenses.Contains(license, StringComparer.OrdinalIgnoreCase),
+                    Require(redistributableDerivativeLicenses.Contains(license, StringComparer.Ordinal),
                         city.cityId + " uses an unapproved, non-commercial, no-derivatives or unverified licence for " + path);
+
+                    string evidenceRoot = "Assets/UCENO/Cities/" + city.cityId + "/Source/";
+                    string archivePath = ResolveEvidencePath(source.sourceArchive, evidenceRoot, city.cityId, path, "original source archive");
+                    string licensePath = ResolveEvidencePath(source.licenseFile, evidenceRoot, city.cityId, path, "licence document");
+                    Require(IsSha256(source.sourceArchiveSha256) &&
+                        string.Equals(ComputeSha256(archivePath), source.sourceArchiveSha256, StringComparison.OrdinalIgnoreCase),
+                        city.cityId + " original source archive is missing or its SHA-256 does not match the manifest for " + path);
+                    Require(IsSha256(source.licenseFileSha256) &&
+                        string.Equals(ComputeSha256(licensePath), source.licenseFileSha256, StringComparison.OrdinalIgnoreCase),
+                        city.cityId + " retained licence document is missing or its SHA-256 does not match the manifest for " + path);
+                    string licenseText = File.ReadAllText(licensePath);
+                    Require(licenseText.IndexOf(license, StringComparison.OrdinalIgnoreCase) >= 0,
+                        city.cityId + " retained licence document does not identify the declared licence for " + path);
 
                     GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
                     Require(prefab != null, city.cityId + " imported prefab is missing: " + path);
@@ -184,9 +204,7 @@ namespace UCENO.VirtualWorld.Editor
             var provenance = JsonUtility.FromJson<HdriProvenance>(File.ReadAllText(provenancePath));
             Require(provenance != null && provenance.city_id == city.cityId,
                 city.cityId + " HDRI provenance has the wrong or missing city ID.");
-            Require(!string.IsNullOrWhiteSpace(provenance.asset_id) && seenAssetIds.Add(provenance.asset_id),
-                city.cityId + " HDRI source asset ID is missing or reused by another city.");
-            Require(provenance.license == "CC0 1.0" && provenance.format == "Radiance HDR (.hdr)" &&
+            Require(!string.IsNullOrWhiteSpace(provenance.asset_id) && seenAssetIds.Add(provenance.asset_id),                city.cityId + " HDRI source asset ID is missing or reused by another city.");            Require(provenance.license == "CC0 1.0" && provenance.format == "Radiance HDR (.hdr)" &&
                 provenance.resolution_tier == "1k" && provenance.acquisition_status == "downloaded-and-md5-verified",
                 city.cityId + " HDRI provenance does not establish a verified CC0 1K Radiance download.");
 
@@ -222,6 +240,35 @@ namespace UCENO.VirtualWorld.Editor
             Require(provenance.width >= 1024 && provenance.height >= 512 &&
                 importedTexture.width == provenance.width && importedTexture.height == provenance.height,
                 city.cityId + " imported HDRI dimensions do not match its verified source dimensions.");
+        }
+
+        private static string ResolveEvidencePath(string relativePath, string evidenceRoot,
+            string cityId, string prefabPath, string evidenceKind)
+        {
+            Require(!string.IsNullOrWhiteSpace(relativePath) &&
+                relativePath.StartsWith(evidenceRoot + "Editor/", StringComparison.Ordinal),
+                cityId + " " + evidenceKind + " must be retained under the editor-only " + evidenceRoot + "Editor/ folder for " + prefabPath);
+            string absolutePath = AssetAbsolutePath(relativePath);
+            string absoluteRoot = AssetAbsolutePath(evidenceRoot + "Editor").TrimEnd(Path.DirectorySeparatorChar) +
+                Path.DirectorySeparatorChar;
+            Require(absolutePath.StartsWith(absoluteRoot, StringComparison.Ordinal) &&
+                File.Exists(absolutePath),
+                cityId + " " + evidenceKind + " is missing or escapes its city source folder for " + prefabPath);
+            return absolutePath;
+        }
+
+        private static bool IsSha256(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value) && value.Length == 64 &&
+                value.All(character => Uri.IsHexDigit(character));
+        }
+
+        private static string ComputeSha256(string path)
+        {
+            using (var stream = File.OpenRead(path))
+            using (var algorithm = SHA256.Create())
+                return BitConverter.ToString(algorithm.ComputeHash(stream))
+                    .Replace("-", "").ToLowerInvariant();
         }
 
         private static string AssetAbsolutePath(string assetPath)

@@ -264,6 +264,19 @@ def main():
         '"CC0 1.0", "CC-BY 4.0", "CC-BY 3.0"',
         '"CC-BY-SA 4.0", "CC-BY-SA 3.0"',
         'city.skyboxTexture.StartsWith("Assets/UCENO/Cities/" + city.cityId',
+        "source.sourceArchiveSha256",
+        "source.licenseFileSha256",
+        "ResolveEvidencePath(source.sourceArchive, evidenceRoot",
+        "ResolveEvidencePath(source.licenseFile, evidenceRoot",
+        'relativePath.StartsWith(evidenceRoot + "Editor/", StringComparison.Ordinal)',
+        'AssetAbsolutePath(evidenceRoot + "Editor").TrimEnd(Path.DirectorySeparatorChar)',
+        "ComputeSha256(archivePath)",
+        "ComputeSha256(licensePath)",
+        "licenseText.IndexOf(license, StringComparison.OrdinalIgnoreCase)",
+        'city.architecturePrefabs.All(path => path.StartsWith(city.assetRoot + "/Architecture/"',
+        'city.environmentPrefabs.All(path => path.StartsWith(city.assetRoot + "/Environment/"',
+        'city.landmarks.All(item => item != null &&',
+        'redistributableDerivativeLicenses.Contains(license, StringComparer.Ordinal)',
     ):
         if required not in imported_city_gate:
             fail("Imported city art provenance/reuse gate is missing: " + required)
@@ -294,6 +307,20 @@ def main():
     for required in ("MinimumLodCount = 3", "GetComponentInChildren<LODGroup>(true)"):
         if required not in city_lod_contract:
             fail("Nine-city imported prefab LOD contract is incomplete: " + required)
+
+    content_delivery = read_text(ASSETS / "Scripts/WorldContentDelivery.cs")
+    for required in (
+        "parsedCatalogUrl.Scheme != Uri.UriSchemeHttps",
+        "Addressables.LoadContentCatalogAsync(catalogUrl, true)",
+        "Addressables.Release(catalog)",
+        "Addressables.CheckForCatalogUpdates(false)",
+        "Addressables.DownloadDependenciesAsync(label, false)",
+        "maxConcurrentResidentLabels",
+        "public void ReleaseContent(string label)",
+        "Addressables.UnloadSceneAsync(handle, false)",
+    ):
+        if required not in content_delivery:
+            fail("Addressables delivery security, cache, or lifecycle contract is missing: " + required)
 
     build_command = read_text(ASSETS / "Editor/BuildCommand.cs")
     for required in ("ValidateRemainingCityPacks()", "BuildRemainingCities()",
