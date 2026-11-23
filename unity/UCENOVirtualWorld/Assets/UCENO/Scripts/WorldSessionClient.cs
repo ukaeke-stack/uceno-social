@@ -25,6 +25,8 @@ namespace UCENO.VirtualWorld
         public string instanceEndpoint;
         public string region;
         public string leaseExpiresAt;
+        public string entryKind;
+        public string entryTargetId;
     }
 
     /// <summary>
@@ -43,6 +45,8 @@ namespace UCENO.VirtualWorld
         public string InstanceId { get; private set; }
         public string InstanceEndpoint { get; private set; }
         public string InstanceRegion { get; private set; }
+        public string EntryKind { get; private set; } = "world";
+        public string EntryTargetId { get; private set; }
         public bool IsAuthenticated => !string.IsNullOrEmpty(AccessToken);
 
         public void RedeemEntryCode(string code, Action<bool, string> completed)
@@ -79,6 +83,8 @@ namespace UCENO.VirtualWorld
             InstanceId = null;
             InstanceEndpoint = null;
             InstanceRegion = null;
+            EntryKind = "world";
+            EntryTargetId = null;
         }
 
         private IEnumerator RedeemRoutine(string code, Action<bool, string> completed)
@@ -130,6 +136,8 @@ namespace UCENO.VirtualWorld
                 InstanceId = response.instanceId;
                 InstanceEndpoint = response.instanceEndpoint;
                 InstanceRegion = response.region;
+                EntryKind = string.IsNullOrEmpty(response.entryKind) ? "world" : response.entryKind;
+                EntryTargetId = response.entryTargetId;
                 completed?.Invoke(true, null);
             }
         }
