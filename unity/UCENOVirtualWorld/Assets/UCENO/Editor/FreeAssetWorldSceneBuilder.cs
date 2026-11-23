@@ -880,6 +880,7 @@ namespace UCENO.VirtualWorld.Editor
             eventsData.ApplyModifiedPropertiesWithoutUndo();
 
             player.AddComponent<WorldActivityHud>();
+            player.AddComponent<WorldSidebarMenu>();
             player.AddComponent<AvatarCustomizationHud>();
 
             WorldStatusHud hud = player.AddComponent<WorldStatusHud>();
