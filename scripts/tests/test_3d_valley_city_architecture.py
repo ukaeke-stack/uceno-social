@@ -33,6 +33,17 @@ def candidate(**overrides):
 
 
 class ThreeDValleyCityArchitectureTests(unittest.TestCase):
+    def test_api_page_limit_respects_provider_maximum(self):
+        params = valley.asset_query_params("coastal apartment building")
+        self.assertEqual(params["limit"], 50)
+        self.assertLessEqual(params["limit"], 50)
+        self.assertEqual(params["style"], "realistic")
+        self.assertEqual(params["format"], "glb")
+
+    def test_api_query_cursor_is_preserved(self):
+        params = valley.asset_query_params("coastal apartment building", "next-page")
+        self.assertEqual(params["cursor"], "next-page")
+
     def test_explicit_cc0_realistic_full_building_for_matching_city_passes(self):
         self.assertIsNone(valley.reject_reason(candidate(), "SolsticeBay"))
 

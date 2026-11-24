@@ -20,6 +20,7 @@ PAGES_PER_QUERY = 3
 MIN_HEIGHT_M = 5.0
 MIN_SPAN_M = 4.0
 MAX_RESULTS_PER_CITY = 40
+API_PAGE_LIMIT = 50  # 3D Valley rejects values above 50.
 CITIES = {
     "SolsticeBay": ["coastal apartment building exterior", "waterfront hotel building", "island villa building", "harbour terminal building"],
     "VerdantReach": ["sustainable green residential tower", "botanical research centre building", "eco campus building exterior", "vertical garden office tower"],
@@ -133,6 +134,15 @@ def reject_reason(item, city):
         return "semantic-match-not-strong-or-good"
     return None
 
+def asset_query_params(query, cursor=None):
+    params = {"q": query, "type": "model", "style": "realistic",
+              "min_size_m": MIN_SPAN_M, "format": "glb",
+              "limit": API_PAGE_LIMIT, "detail": "full"}
+    if cursor:
+        params["cursor"] = cursor
+    return params
+
+
 def main():
     key = os.environ.get("THREE_D_VALLEY_API_KEY", "").strip()
     if not key:
@@ -147,10 +157,7 @@ def main():
         for query in queries:
             cursor = None
             for page in range(1, PAGES_PER_QUERY + 1):
-                params = {"q": query, "type": "model", "style": "realistic",
-                          "min_size_m": MIN_SPAN_M, "format": "glb", "limit": 100, "detail": "full"}
-                if cursor:
-                    params["cursor"] = cursor
+                params = asset_query_params(query, cursor)
                 payload = request_json("/assets", params, key)
                 results = payload.get("results")
                 if not isinstance(results, list):
