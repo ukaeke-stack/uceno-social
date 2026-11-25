@@ -16,6 +16,10 @@ from urllib.parse import urlparse
 
 OUT = pathlib.Path("artifacts/innerscene-architecture-pilot")
 UA = "UCENO-architecture-pilot/1.2"
+CITY_IDS = (
+    "solstice", "verdant", "nexus", "aurora", "saffron",
+    "monsoon", "eclipse", "origin", "atlas",
+)
 MAX_DOWNLOAD_BYTES = 30 * 1024 * 1024
 MAX_SOURCE_PAGE_BYTES = 2 * 1024 * 1024
 ASSETS = [
@@ -163,8 +167,114 @@ ASSETS = [
         "license": "CC0",
         "listed_size_bytes": 20.1 * 1024 * 1024,
         "listed_dimensions_m": [13.336, 11.568, 8.551]
+    },,
+    {
+        "id": "innerscene-a-frame-cabin-73442f48",
+        "name": "A-frame cabin",
+        "asset_class": "architecture",
+        "city_role": "alpine residential and visitor-lodge candidate for Aurora Heights; assignment pending art review",
+        "candidate_city_ids": ["aurora"],
+        "source_page": "https://www.innerscene.com/tools/library/3d-parts/a-frame-cabin-73442f48",
+        "download_url": "https://www.innerscene.com/api/library/a-frame-cabin-73442f48/download",
+        "license": "CC0",
+        "listed_size_bytes": 7.3 * 1024 * 1024,
+        "listed_dimensions_m": [6.540, 9.056, 6.006],
     },
+    {
+        "id": "innerscene-telescope-observatory-dome-4fd84b60",
+        "name": "Telescope observatory dome",
+        "asset_class": "landmark",
+        "city_role": "mountain research observatory candidate for Aurora Heights; assignment pending art review",
+        "candidate_city_ids": ["aurora"],
+        "source_page": "https://www.innerscene.com/tools/library/3d-parts/telescope-observatory-dome-4fd84b60",
+        "download_url": "https://www.innerscene.com/api/library/telescope-observatory-dome-4fd84b60/download",
+        "license": "CC0",
+        "listed_size_bytes": 9.3 * 1024 * 1024,
+        "listed_dimensions_m": [8.7, 9.9, 8.5],
+    },
+    {
+        "id": "innerscene-snow-field-69a03368",
+        "name": "Snow field",
+        "asset_class": "environment",
+        "city_role": "alpine ground-cover environment candidate for Aurora Heights; assignment pending art review",
+        "candidate_city_ids": ["aurora"],
+        "source_page": "https://www.innerscene.com/tools/library/3d-parts/snow-field-69a03368",
+        "download_url": "https://www.innerscene.com/api/library/snow-field-69a03368/download",
+        "license": "CC0",
+        "listed_size_bytes": 3.7 * 1024 * 1024,
+        "listed_dimensions_m": [24.0, 24.0, 1.0],
+    },
+    {
+        "id": "innerscene-sand-dune-68ae30e2",
+        "name": "Sand dune",
+        "asset_class": "environment",
+        "city_role": "desert terrain and landscape candidate for Saffron Dunes; assignment pending art review",
+        "candidate_city_ids": ["saffron"],
+        "source_page": "https://www.innerscene.com/tools/library/3d-parts/sand-dune-68ae30e2",
+        "download_url": "https://www.innerscene.com/api/library/sand-dune-68ae30e2/download",
+        "license": "CC0",
+        "listed_size_bytes": 5.7 * 1024 * 1024,
+        "listed_dimensions_m": [120.0, 120.0, 13.1],
+    },
+    {
+        "id": "innerscene-ottoman-classical-mosque-d1141513",
+        "name": "Ottoman classical mosque, central dome and 2 minarets",
+        "asset_class": "landmark",
+        "city_role": "cultural and courtyard landmark candidate for Saffron Dunes; assignment pending art review",
+        "candidate_city_ids": ["saffron"],
+        "source_page": "https://www.innerscene.com/tools/library/3d-parts/ottoman-classical-mosque-central-dome-and-2-minarets-d1141513",
+        "download_url": "https://www.innerscene.com/api/library/ottoman-classical-mosque-central-dome-and-2-minarets-d1141513/download",
+        "license": "CC0",
+        "listed_size_bytes": 1.7 * 1024 * 1024,
+        "listed_dimensions_m": [63.0, 96.5, 63.66],
+    },
+    {
+        "id": "innerscene-street-market-lane-bb6125c2",
+        "name": "Street market lane with 12 stalls",
+        "asset_class": "architecture",
+        "city_role": "open-air souk and public-realm structure candidate for Saffron Dunes; assignment pending art review",
+        "candidate_city_ids": ["saffron"],
+        "source_page": "https://www.innerscene.com/tools/library/3d-parts/street-market-lane-with-12-stalls-bb6125c2",
+        "download_url": "https://www.innerscene.com/api/library/street-market-lane-with-12-stalls-bb6125c2/download",
+        "license": "CC0",
+        "listed_size_bytes": 2.5 * 1024 * 1024,
+        "listed_dimensions_m": [40.0, 13.0, 3.1],
+    },
+    {
+        "id": "innerscene-canyon-wall-cf1dd925",
+        "name": "Canyon wall",
+        "asset_class": "environment",
+        "city_role": "desert canyon terrain and landscape candidate for Saffron Dunes; assignment pending art review",
+        "candidate_city_ids": ["saffron"],
+        "source_page": "https://www.innerscene.com/tools/library/3d-parts/canyon-wall-cf1dd925",
+        "download_url": "https://www.innerscene.com/api/library/canyon-wall-cf1dd925/download",
+        "license": "CC0",
+        "listed_size_bytes": 7.8 * 1024 * 1024,
+        "listed_dimensions_m": [24.0, 48.0, 37.93],
+    }
 ]
+
+
+
+def city_candidate_coverage(assets=None):
+    """Count source candidates by city and role without treating them as accepted art."""
+    coverage = {
+        city: {"candidate_count": 0, "architecture": 0, "environment": 0, "landmark": 0}
+        for city in CITY_IDS
+    }
+    for asset in ASSETS if assets is None else assets:
+        city_ids = asset.get("candidate_city_ids") or []
+        if not isinstance(city_ids, list) or len(city_ids) != len(set(city_ids)):
+            raise ValueError("Candidate city assignments must be a unique list")
+        asset_class = asset.get("asset_class")
+        if asset_class not in {"architecture", "environment", "landmark"}:
+            raise ValueError(f"Unknown candidate asset class: {asset_class}")
+        for city in city_ids:
+            if city not in coverage:
+                raise ValueError(f"Unknown candidate city: {city}")
+            coverage[city]["candidate_count"] += 1
+            coverage[city][asset_class] += 1
+    return coverage
 
 
 class _TextCollector(HTMLParser):
@@ -374,6 +484,12 @@ def main():
         "stage": "CC0 source page and GLB structure checked; candidate only, not visually or Unity accepted",
         "source": "Innerscene Free Parts Library",
         "asset_count_requested": len(ASSETS),
+        "candidate_city_coverage": city_candidate_coverage(),
+        "coverage_note": "Counts are source candidates only; they are not unique final-city allocations, imported prefabs, visual approvals, or release-gate eligibility.",
+        "cities_without_candidates": [
+            city for city, counts in city_candidate_coverage().items()
+            if counts["candidate_count"] == 0
+        ],
         "assets": [],
     }
     failures = []
