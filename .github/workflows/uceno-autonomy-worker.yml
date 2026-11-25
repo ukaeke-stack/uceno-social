@@ -1,0 +1,37 @@
+name: UCENO Autonomous Worker Validation
+on:
+  pull_request:
+    paths:
+      - "autonomy/**"
+      - ".github/workflows/uceno-autonomy-worker.yml"
+  push:
+    branches:
+      - "infra/uceno-autonomous-development-agent"
+    paths:
+      - "autonomy/**"
+      - ".github/workflows/uceno-autonomy-worker.yml"
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check worker syntax
+        run: node --check autonomy/worker.mjs
+      - name: Check process runner syntax
+        run: node --check autonomy/process-runner.mjs
+      - name: Test worker safety policies and process recovery
+        run: node --test autonomy/worker-policy.test.mjs autonomy/process-runner.test.mjs
+      - name: Validate Compose configuration
+        env:
+          OPENAI_API_KEY: ci-placeholder-not-a-secret
+          GITHUB_TOKEN: ci-placeholder-not-a-secret
+        run: docker compose -f autonomy/docker-compose.yml config --quiet
+      - name: Build worker image
+        run: docker build -f autonomy/Dockerfile -t uceno-autonomous-worker:ci .
+      - name: Smoke-test worker image dependency resolution
+        run: docker run --rm --entrypoint node uceno-autonomous-worker:ci --input-type=module -e "await Promise.all([import('/opt/uceno-worker/worker-policy.mjs'), import('/opt/uceno-worker/process-runner.mjs')])"

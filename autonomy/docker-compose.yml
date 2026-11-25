@@ -1,0 +1,28 @@
+services:
+  uceno-autonomous-worker:
+    build:
+      context: ..
+      dockerfile: autonomy/Dockerfile
+    container_name: uceno-autonomous-worker
+    restart: unless-stopped
+    environment:
+      REPO_URL: https://github.com/ukaeke-stack/uceno-social.git
+      WORK_BRANCH: infra/uceno-autonomous-development-agent
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in host environment}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:?Set GITHUB_TOKEN in host environment}
+      MAX_CYCLES_PER_DAY: ${MAX_CYCLES_PER_DAY:-24}
+      IDLE_MS: ${IDLE_MS:-300000}
+      CYCLE_TIMEOUT_MS: ${CYCLE_TIMEOUT_MS:-2700000}
+    volumes:
+      - uceno-worker-state:/state
+      - uceno-worker-workspace:/workspace
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g
+volumes:
+  uceno-worker-state:
+  uceno-worker-workspace:
