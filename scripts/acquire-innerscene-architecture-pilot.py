@@ -167,7 +167,7 @@ ASSETS = [
         "license": "CC0",
         "listed_size_bytes": 20.1 * 1024 * 1024,
         "listed_dimensions_m": [13.336, 11.568, 8.551]
-    },,
+    },
     {
         "id": "innerscene-a-frame-cabin-73442f48",
         "name": "A-frame cabin",
