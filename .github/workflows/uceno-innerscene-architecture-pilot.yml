@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Test CC0 source-page and GLB structural gates
+        run: python -m unittest scripts.tests.test_innerscene_architecture_pilot -v
       - name: Download and inspect provenance-pinned CC0 GLBs
         run: python scripts/acquire-innerscene-architecture-pilot.py
       - name: Preserve source models and structural inspection report
