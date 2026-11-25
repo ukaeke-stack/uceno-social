@@ -142,14 +142,35 @@ class InnersceneCandidateInventoryTests(unittest.TestCase):
             self.assertTrue(asset["source_page"].startswith(
                 "https://www.innerscene.com/tools/library/3d-parts/"
             ))
-            self.assertEqual(asset["asset_class"], "architecture")
+            self.assertIn(asset["asset_class"], {"architecture", "environment", "landmark"})
             self.assertTrue(set(asset["candidate_city_ids"]).issubset(valid_cities))
             self.assertEqual(len(asset["listed_dimensions_m"]), 3)
 
     def test_candidate_count_expands_without_approving_any_asset(self):
-        self.assertEqual(len(pilot.ASSETS), 12)
+        self.assertEqual(len(pilot.ASSETS), 19)
         self.assertTrue(all("pending art review" in asset["city_role"]
                             for asset in pilot.ASSETS))
+
+
+    def test_all_nine_city_themes_have_source_candidates(self):
+        coverage = pilot.city_candidate_coverage()
+        self.assertEqual(set(coverage), set(pilot.CITY_IDS))
+        self.assertTrue(all(item["candidate_count"] > 0 for item in coverage.values()))
+
+    def test_candidate_coverage_is_classified_and_not_release_approval(self):
+        coverage = pilot.city_candidate_coverage()
+        self.assertEqual(coverage["aurora"]["candidate_count"], 3)
+        self.assertEqual(coverage["saffron"]["candidate_count"], 4)
+        self.assertGreater(coverage["aurora"]["environment"], 0)
+        self.assertGreater(coverage["saffron"]["landmark"], 0)
+        self.assertTrue(all(asset["license"] == "CC0" for asset in pilot.ASSETS))
+        self.assertTrue(all("pending art review" in asset["city_role"] for asset in pilot.ASSETS))
+
+    def test_unknown_candidate_city_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Unknown candidate city"):
+            pilot.city_candidate_coverage([
+                {"candidate_city_ids": ["unknown"], "asset_class": "architecture"}
+            ])
 
 
 if __name__ == "__main__":
