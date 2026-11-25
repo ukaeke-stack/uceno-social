@@ -204,7 +204,7 @@ def verify_source_page(asset, raw_html):
     dimensions = asset.get("listed_dimensions_m") or []
     if len(dimensions) != 3 or any(not isinstance(value, (int, float)) or value <= 0 for value in dimensions):
         raise ValueError("Candidate must declare three positive source dimensions")
-    numeric_tokens = [float(value) for value in re.findall(r"(?<![A-Za-z])\\d+(?:\\.\\d+)?", text)]
+    numeric_tokens = [float(value) for value in re.findall(r"(?<![A-Za-z])\d+(?:\.\d+)?", text)]
     for dimension in dimensions:
         tolerance = max(0.02, float(dimension) * 0.01)
         metre_match = any(abs(token - float(dimension)) <= tolerance for token in numeric_tokens)

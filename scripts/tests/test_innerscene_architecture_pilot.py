@@ -56,6 +56,21 @@ class InnersceneSourceVerificationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not substantiate dimension"):
             pilot.verify_source_page(self.asset, page)
 
+    def test_millimetre_dimensions_are_accepted(self):
+        asset = {
+            "name": "Steel portal-frame factory",
+            "source_page": "https://www.innerscene.com/tools/library/3d-parts/steel-portal-frame-factory",
+            "listed_dimensions_m": [40.8, 44.48, 10.741],
+        }
+        page = """
+        <h1>Steel portal-frame factory</h1>
+        <p>3D model · GLB. Public domain (CC0).</p>
+        <p>Overall 40800 x 44480 x 10741 mm.</p>
+        <p>glTF binary (GLB) mesh, modeled in meters at real-world scale.</p>
+        """
+        result = pilot.verify_source_page(asset, page)
+        self.assertTrue(result["dimensions_verified"])
+
     def test_untrusted_source_host_is_rejected(self):
         asset = dict(self.asset, source_page="https://example.com/model")
         with self.assertRaisesRegex(ValueError, "HTTPS Innerscene"):
