@@ -109,16 +109,16 @@ ASSETS = [
         "listed_dimensions_m": [20.2, 22.841, 24.872]
     },
     {
-        "id": "innerscene-low-rise-office-block-d9ac3f06",
-        "name": "Low-rise office block",
+        "id": "innerscene-two-storey-clt-building-87faa94c",
+        "name": "Two-storey CLT building 6 x 8 m with glulam front frame",
         "asset_class": "architecture",
-        "city_role": "complete four-storey office block; candidate fit for Verdant Reach, Nexus Delta or Origin Plains, pending art review",
-        "candidate_city_ids": ["verdant", "nexus", "origin"],
-        "source_page": "https://www.innerscene.com/tools/library/3d-parts/low-rise-office-block-d9ac3f06",
-        "download_url": "https://www.innerscene.com/api/library/low-rise-office-block-d9ac3f06/download",
+        "city_role": "small mass-timber community building; sustainable Verdant Reach candidate, pending art review",
+        "candidate_city_ids": ["verdant"],
+        "source_page": "https://www.innerscene.com/tools/library/3d-parts/two-storey-clt-building-6-x-8-m-with-glulam-front-frame-87faa94c",
+        "download_url": "https://www.innerscene.com/api/library/two-storey-clt-building-6-x-8-m-with-glulam-front-frame-87faa94c/download",
         "license": "CC0",
-        "listed_size_bytes": 17.3 * 1024 * 1024,
-        "listed_dimensions_m": [61.2, 24.3, 18.7]
+        "listed_size_bytes": 1.2 * 1024 * 1024,
+        "listed_dimensions_m": [8.3, 6.3, 6.428]
     },
     {
         "id": "innerscene-glass-office-skyscraper-40-floors-4b927b20",
@@ -229,16 +229,16 @@ ASSETS = [
         "listed_dimensions_m": [63.0, 96.5, 63.66],
     },
     {
-        "id": "innerscene-street-market-lane-bb6125c2",
-        "name": "Street market lane with 12 stalls",
+        "id": "innerscene-small-neighbourhood-mosque-2e402221",
+        "name": "Small neighbourhood mosque, single dome and one minaret",
         "asset_class": "architecture",
-        "city_role": "open-air souk and public-realm structure candidate for Saffron Dunes; assignment pending art review",
+        "city_role": "complete neighbourhood mosque building for Saffron Dunes; assignment pending art review",
         "candidate_city_ids": ["saffron"],
-        "source_page": "https://www.innerscene.com/tools/library/3d-parts/street-market-lane-with-12-stalls-bb6125c2",
-        "download_url": "https://www.innerscene.com/api/library/street-market-lane-with-12-stalls-bb6125c2/download",
+        "source_page": "https://www.innerscene.com/tools/library/3d-parts/small-neighbourhood-mosque-single-dome-and-one-minaret-2e402221",
+        "download_url": "https://www.innerscene.com/api/library/small-neighbourhood-mosque-single-dome-and-one-minaret-2e402221/download",
         "license": "CC0",
-        "listed_size_bytes": 2.5 * 1024 * 1024,
-        "listed_dimensions_m": [40.0, 13.0, 3.1],
+        "listed_size_bytes": 2.7 * 1024 * 1024,
+        "listed_dimensions_m": [15.7, 17.7, 30.0]
     },
     {
         "id": "innerscene-canyon-wall-cf1dd925",
