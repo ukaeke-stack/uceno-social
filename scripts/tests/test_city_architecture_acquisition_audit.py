@@ -220,6 +220,46 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         audit.inspect_glb(path)
 
+    def test_rejects_accessor_data_outside_buffer_view(self):
+        documents = (
+            {"asset": {"version": "2.0"}, "buffers": [{"byteLength": 12}],
+             "bufferViews": [{"buffer": 0, "byteLength": 12}],
+             "accessors": [{"bufferView": 0, "componentType": 5126,
+                            "count": 2, "type": "VEC3"}]},
+            {"asset": {"version": "2.0"}, "buffers": [{"byteLength": 24}],
+             "bufferViews": [{"buffer": 0, "byteLength": 24, "byteStride": 16}],
+             "accessors": [{"bufferView": 0, "componentType": 5126,
+                            "count": 2, "type": "VEC3"}]},
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, document in enumerate(documents):
+                with self.subTest(index=index):
+                    path = pathlib.Path(directory) / f"accessor-overflow-{index}.glb"
+                    path.write_bytes(glb(document, binary=bytes(document["buffers"][0]["byteLength"])))
+                    with self.assertRaisesRegex(ValueError, "accessor 0 data exceeds"):
+                        audit.inspect_glb(path)
+
+    def test_accepts_accessor_with_valid_interleaved_stride(self):
+        document = {
+            "asset": {"version": "2.0"}, "buffers": [{"byteLength": 28}],
+            "bufferViews": [{"buffer": 0, "byteLength": 28, "byteStride": 16}],
+            "accessors": [{"bufferView": 0, "componentType": 5126,
+                           "count": 2, "type": "VEC3"}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "interleaved.glb"
+            path.write_bytes(glb(document, binary=bytes(28)))
+            audit.inspect_glb(path)
+
+    def test_rejects_accessor_without_buffer_view_or_sparse_data(self):
+        document = {"asset": {"version": "2.0"},
+                    "accessors": [{"componentType": 5126, "count": 3, "type": "VEC3"}]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "missing-data.glb"
+            path.write_bytes(glb(document))
+            with self.assertRaisesRegex(ValueError, "neither bufferView nor sparse"):
+                audit.inspect_glb(path)
+
     def test_rejects_invalid_primitive_topology_and_index_accessor(self):
         base = {
             "asset": {"version": "2.0"},
