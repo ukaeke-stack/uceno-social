@@ -419,6 +419,136 @@ def _validate_accessor_layout(accessor, accessor_index, buffer_views):
         )
 
 
+
+def _validate_gltf_references(document, buffer_views, accessors, meshes, nodes):
+    """Reject invalid glTF cross-references before any downstream indexing."""
+    def items(key):
+        value = document.get(key, [])
+        if not isinstance(value, list):
+            raise ValueError(f"glTF {key} must be an array")
+        return value
+
+    materials = items("materials")
+    textures = items("textures")
+    images = items("images")
+    samplers = items("samplers")
+    cameras = items("cameras")
+    skins = items("skins")
+    animations = items("animations")
+
+    for index, view in enumerate(buffer_views):
+        if "target" in view and view["target"] not in (34962, 34963):
+            raise ValueError(f"bufferView[{index}].target is invalid")
+        if "byteStride" in view:
+            stride = view["byteStride"]
+            if isinstance(stride, bool) or not isinstance(stride, int) or stride < 4 or stride > 252 or stride % 4:
+                raise ValueError(f"bufferView[{index}].byteStride must be 4..252 and 4-byte aligned")
+
+    for index, texture in enumerate(textures):
+        source = texture.get("source")
+        if source is not None:
+            _checked_index(images, source, f"texture[{index}].source")
+        sampler = texture.get("sampler")
+        if sampler is not None:
+            _checked_index(samplers, sampler, f"texture[{index}].sampler")
+        if source is None and not texture.get("extensions"):
+            raise ValueError(f"texture[{index}] has no image source or extension source")
+
+    for index, material in enumerate(materials):
+        pbr = material.get("pbrMetallicRoughness", {})
+        texture_slots = [pbr.get("baseColorTexture"), pbr.get("metallicRoughnessTexture"),
+                         material.get("normalTexture"), material.get("occlusionTexture"),
+                         material.get("emissiveTexture")]
+        for slot_number, slot in enumerate(texture_slots):
+            if slot is not None:
+                _checked_index(textures, slot.get("index"), f"material[{index}].texture[{slot_number}]")
+
+    for index, mesh in enumerate(meshes):
+        primitives = mesh.get("primitives", [])
+        if not isinstance(primitives, list) or not primitives:
+            raise ValueError(f"mesh[{index}] must contain at least one primitive")
+        for primitive_index, primitive in enumerate(primitives):
+            label = f"mesh[{index}].primitive[{primitive_index}]"
+            attributes = primitive.get("attributes", {})
+            if not isinstance(attributes, dict) or "POSITION" not in attributes:
+                raise ValueError(f"{label} must reference a POSITION accessor")
+            for semantic, accessor_index in attributes.items():
+                accessor = _checked_index(accessors, accessor_index, f"{label}.{semantic}")
+                if semantic == "POSITION" and accessor.get("type") != "VEC3":
+                    raise ValueError(f"{label}.POSITION accessor must be VEC3")
+            if "indices" in primitive:
+                index_accessor = _checked_index(accessors, primitive["indices"], f"{label}.indices")
+                if index_accessor.get("type") != "SCALAR" or index_accessor.get("componentType") not in (5121, 5123, 5125):
+                    raise ValueError(f"{label}.indices must use an unsigned SCALAR accessor")
+            if "material" in primitive:
+                _checked_index(materials, primitive["material"], f"{label}.material")
+            if "mode" in primitive and primitive["mode"] not in range(7):
+                raise ValueError(f"{label}.mode is invalid")
+
+    parents = {}
+    for index, node in enumerate(nodes):
+        if "mesh" in node:
+            _checked_index(meshes, node["mesh"], f"node[{index}].mesh")
+        if "camera" in node:
+            _checked_index(cameras, node["camera"], f"node[{index}].camera")
+        if "skin" in node:
+            _checked_index(skins, node["skin"], f"node[{index}].skin")
+        children = node.get("children", [])
+        if not isinstance(children, list):
+            raise ValueError(f"node[{index}].children must be an array")
+        for child in children:
+            child_index = _checked_index(nodes, child, f"node[{index}].children")
+            if child_index == index:
+                raise ValueError(f"node[{index}] cannot be its own child")
+            if child_index in parents:
+                raise ValueError(f"node[{child_index}] has multiple parents")
+            parents[child_index] = index
+
+    for start in range(len(nodes)):
+        seen = set()
+        current = start
+        while current in parents:
+            if current in seen:
+                raise ValueError("glTF node hierarchy contains a cycle")
+            seen.add(current)
+            current = parents[current]
+
+    for skin_index, skin in enumerate(skins):
+        joints = skin.get("joints", [])
+        if not isinstance(joints, list) or not joints:
+            raise ValueError(f"skin[{skin_index}].joints must be a non-empty array")
+        for joint in joints:
+            _checked_index(nodes, joint, f"skin[{skin_index}].joints")
+        if "skeleton" in skin:
+            _checked_index(nodes, skin["skeleton"], f"skin[{skin_index}].skeleton")
+        if "inverseBindMatrices" in skin:
+            accessor = _checked_index(accessors, skin["inverseBindMatrices"], f"skin[{skin_index}].inverseBindMatrices")
+            if accessor.get("type") != "MAT4":
+                raise ValueError(f"skin[{skin_index}].inverseBindMatrices must be MAT4")
+
+    for animation_index, animation in enumerate(animations):
+        samplers_for_animation = animation.get("samplers", [])
+        for sampler_index, sampler in enumerate(samplers_for_animation):
+            input_accessor = _checked_index(accessors, sampler.get("input"), f"animation[{animation_index}].sampler[{sampler_index}].input")
+            output_accessor = _checked_index(accessors, sampler.get("output"), f"animation[{animation_index}].sampler[{sampler_index}].output")
+            if input_accessor.get("type") != "SCALAR":
+                raise ValueError(f"animation[{animation_index}].sampler[{sampler_index}].input must be SCALAR")
+            if sampler.get("interpolation", "LINEAR") not in ("LINEAR", "STEP", "CUBICSPLINE"):
+                raise ValueError(f"animation[{animation_index}].sampler[{sampler_index}].interpolation is invalid")
+        for channel_index, channel in enumerate(animation.get("channels", [])):
+            sampler_index = channel.get("sampler")
+            _checked_index(samplers_for_animation, sampler_index, f"animation[{animation_index}].channel[{channel_index}].sampler")
+            target = channel.get("target", {})
+            if "node" in target:
+                _checked_index(nodes, target["node"], f"animation[{animation_index}].channel[{channel_index}].target.node")
+            if target.get("path") not in ("translation", "rotation", "scale", "weights"):
+                raise ValueError(f"animation[{animation_index}].channel[{channel_index}].target.path is invalid")
+
+    for scene_index, scene in enumerate(items("scenes")):
+        for node_index in scene.get("nodes", []):
+            _checked_index(nodes, node_index, f"scene[{scene_index}].nodes")
+
+
 def parse_glb(path):
     data = path.read_bytes()
     if len(data) < 20:
@@ -486,14 +616,7 @@ def parse_glb(path):
         _validate_accessor_layout(accessor, accessor_index, buffer_views)
     nodes = document.get("nodes", [])
     meshes = document.get("meshes", [])
-    for node_index, node in enumerate(nodes):
-        if "mesh" in node:
-            _checked_index(meshes, node["mesh"], f"node[{node_index}].mesh")
-        for child_index in node.get("children", []):
-            _checked_index(nodes, child_index, f"node[{node_index}].children")
-    for scene_index, scene in enumerate(document.get("scenes", [])):
-        for node_index in scene.get("nodes", []):
-            _checked_index(nodes, node_index, f"scene[{scene_index}].nodes")
+    _validate_gltf_references(document, buffer_views, accessors, meshes, nodes)
     meshes = document.get("meshes", [])
     primitives = [p for m in meshes for p in m.get("primitives", [])]
     materials = document.get("materials", [])
