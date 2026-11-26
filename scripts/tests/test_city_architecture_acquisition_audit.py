@@ -5,6 +5,8 @@ import pathlib
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch
+import io
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
@@ -677,6 +679,75 @@ class PolyHavenCatalogueMatchingTests(unittest.TestCase):
             catalog_audit.matching_terms("HIGH-RISE BUILDING", ("building", "high-rise")),
             ["building", "high-rise"],
         )
+
+
+DOWNLOAD_SPEC = importlib.util.spec_from_file_location(
+    "uceno_polyhaven_downloader",
+    ROOT / "scripts" / "download_polyhaven_assets.py",
+)
+downloader = importlib.util.module_from_spec(DOWNLOAD_SPEC)
+DOWNLOAD_SPEC.loader.exec_module(downloader)
+
+
+class PolyHavenDownloadSafetyTests(unittest.TestCase):
+    def test_dependency_paths_reject_posix_and_windows_traversal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory) / "asset"
+            root.mkdir()
+            for candidate in ("../outside.bin", r"..\\outside.bin", r"C:\\outside.bin", r"\\server\\share\\file.bin"):
+                with self.subTest(candidate=candidate):
+                    with self.assertRaisesRegex(RuntimeError, "Unsafe dependency path"):
+                        downloader.safe_dependency_path(root, candidate)
+            self.assertEqual(
+                downloader.safe_dependency_path(root, "textures/albedo.png"),
+                root / "textures" / "albedo.png",
+            )
+
+    def test_dependency_paths_reject_existing_symlink_escape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory) / "asset"
+            root.mkdir()
+            outside = pathlib.Path(directory) / "outside.bin"
+            outside.write_bytes(b"outside")
+            (root / "linked.bin").symlink_to(outside)
+            with self.assertRaisesRegex(RuntimeError, "escapes its asset directory"):
+                downloader.safe_dependency_path(root, "linked.bin")
+
+    def test_download_records_byte_count_and_sha256_atomically(self):
+        payload = b"verified model payload"
+
+        class Response:
+            def __enter__(self):
+                return io.BytesIO(payload)
+
+            def __exit__(self, *_args):
+                return False
+
+        with tempfile.TemporaryDirectory() as directory:
+            destination = pathlib.Path(directory) / "model.glb"
+            with patch.object(downloader.urllib.request, "urlopen", return_value=Response()):
+                result = downloader.download("https://assets.example/model.glb", destination)
+            self.assertEqual(destination.read_bytes(), payload)
+            self.assertFalse(destination.with_name("model.glb.part").exists())
+            self.assertEqual(result["bytes"], len(payload))
+            self.assertEqual(result["sha256"], hashlib.sha256(payload).hexdigest())
+
+    def test_download_rejects_empty_response(self):
+        class Response:
+            def __enter__(self):
+                return io.BytesIO(b"")
+
+            def __exit__(self, *_args):
+                return False
+
+        with tempfile.TemporaryDirectory() as directory:
+            destination = pathlib.Path(directory) / "empty.glb"
+            with patch.object(downloader.urllib.request, "urlopen", return_value=Response()):
+                with self.assertRaisesRegex(RuntimeError, "Downloaded file is empty"):
+                    downloader.download("https://assets.example/empty.glb", destination)
+            self.assertFalse(destination.exists())
+            self.assertFalse(destination.with_name("empty.glb.part").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
