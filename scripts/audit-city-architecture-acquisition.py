@@ -619,6 +619,7 @@ def main():
         "3dassets_invalid_models": sum(len(x["3dassets_invalid_models"]) for x in report["cities"].values()),
         "3dassets_textured_models": sum(x["3dassets_textured_count"] for x in report["cities"].values()),
     }
+    report["source_quality"] = source_quality_summary(report)
     invalid_total = report["totals"]["tevy_invalid_models"] + report["totals"]["3dassets_invalid_models"]
     report["audit_status"] = "rejected_assets" if invalid_total else "passed"
     OUT.parent.mkdir(parents=True, exist_ok=True)
