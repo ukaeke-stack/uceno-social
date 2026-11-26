@@ -38,8 +38,13 @@ def words(asset: dict) -> str:
 
 def matching_terms(searchable: str, terms: tuple[str, ...]) -> list[str]:
     """Return whole-word catalogue matches; underscores and hyphens are separators."""
-    normalized = re.sub(r"[_-]+", " ", searchable.lower())
-    return [term for term in terms if re.search(r"\b" + re.escape(term) + r"\b", normalized)]
+    normalized = re.sub(r"[_-]+", " ", searchable.casefold())
+    matches = []
+    for term in terms:
+        normalized_term = re.sub(r"[_-]+", " ", term.casefold()).strip()
+        if normalized_term and re.search(r"\b" + re.escape(normalized_term) + r"\b", normalized):
+            matches.append(term)
+    return matches
 
 
 def main():
