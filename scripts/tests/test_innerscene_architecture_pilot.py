@@ -127,7 +127,7 @@ class InnersceneGlbValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "bad-accessor.glb"
             path.write_bytes(payload)
-            with self.assertRaisesRegex(ValueError, "POSITION accessor index out of range"):
+            with self.assertRaisesRegex(ValueError, "primitive attribute POSITION index out of range"):
                 pilot.parse_glb(path)
 
     def test_out_of_range_node_mesh_is_rejected(self):
@@ -149,7 +149,7 @@ class InnersceneGlbValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "bad-image.glb"
             path.write_bytes(payload)
-            with self.assertRaisesRegex(ValueError, "image None bufferView index out of range"):
+            with self.assertRaisesRegex(ValueError, "no embedded BIN chunk"):
                 pilot.parse_glb(path)
 
     def test_missing_materials_are_rejected(self):
