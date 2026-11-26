@@ -373,8 +373,7 @@ def _validate_accessor_layout(accessor, accessor_index, buffer_views):
         raise ValueError(f"{label} sparse accessors are not supported by this acquisition validator")
     if "bufferView" not in accessor:
         raise ValueError(f"{label} must reference a bufferView; sparse-only accessors are not supported")
-    view_index = _checked_index(buffer_views, accessor["bufferView"], f"{label}.bufferView")
-    view = buffer_views[view_index]
+    view = _checked_index(buffer_views, accessor["bufferView"], f"{label}.bufferView")
     component_sizes = {5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4}
     component_type = accessor.get("componentType")
     if isinstance(component_type, bool) or component_type not in component_sizes:
