@@ -563,6 +563,32 @@ def audit_3dassets(manifest, report):
                 })
 
 
+
+def source_quality_summary(report):
+    """Separate binary integrity from import-relevant texture evidence."""
+    textureless = []
+    textured_total = 0
+    verified_total = 0
+    for city, result in report["cities"].items():
+        tevy_count = result["tevy_textured_lod0_count"]
+        assets_count = result["3dassets_textured_count"]
+        textured_total += tevy_count + assets_count
+        verified_total += len(result["tevy_lods"]) + len(result["3dassets_models"])
+        for model in result["3dassets_models"]:
+            if model["embedded_image_count"] == 0:
+                textureless.append({"city": city, "slug": model["slug"]})
+    return {
+        "verified_source_models": verified_total,
+        "models_with_embedded_textures": textured_total,
+        "textureless_3dassets_models": textureless,
+        "status": "blocked_texture_evidence" if textureless else "textures_present",
+        "note": (
+            "Binary integrity does not establish visual approval or Unity import. "
+            "Textureless models remain unsuitable for the imported-art release gate."
+        ),
+    }
+
+
 def main():
     report = {
         "scope": "binary and provenance integrity only; not visual or Unity acceptance",
