@@ -296,6 +296,12 @@ class CityArchitectureScreeningTests(unittest.TestCase):
 
 
 class CityArchitectureDiscoveryExpansionTests(unittest.TestCase):
+    def test_every_city_has_targeted_fallback_queries_without_relaxing_acceptance(self):
+        self.assertEqual(set(discovery.FALLBACK_QUERIES), set(discovery.CITY_RELEVANCE))
+        self.assertTrue(all(len(queries) >= 4 for queries in discovery.FALLBACK_QUERIES.values()))
+        self.assertEqual(discovery.MIN_HEIGHT_M, 5.0)
+        self.assertEqual(discovery.ECLIPSE_MIN_HEIGHT_M, 35.0)
+
     def test_underfilled_city_search_checks_two_broad_pages_per_query(self):
         self.assertEqual(discovery.BROADEN_MAX_PAGES, 2)
 
