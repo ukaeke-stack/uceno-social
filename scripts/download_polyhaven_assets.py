@@ -143,6 +143,24 @@ def verify_manifest(asset_dir: Path, manifest: dict) -> list[str]:
     return errors
 
 
+
+def write_asset_manifest(asset_dir: Path, manifest: dict):
+    """Atomically persist a manifest, then verify it against downloaded payloads."""
+    destination = asset_dir / "asset-manifest.json"
+    temporary = destination.with_name(destination.name + ".part")
+    try:
+        temporary.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        os.replace(temporary, destination)
+        persisted = json.loads(destination.read_text(encoding="utf-8"))
+        errors = verify_manifest(asset_dir, persisted)
+        if errors:
+            raise RuntimeError("Imported asset failed manifest verification: " + "; ".join(errors))
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+    return destination
+
+
 def choose_resolution(root: dict):
     for resolution in ("1k", "2k", "4k", "8k", "16k"):
         value = root.get(resolution)
@@ -201,9 +219,7 @@ def download_asset(asset_id: str, metadata: dict, output_root: Path):
         "file_integrity": integrity,
         "runtime_api_dependency": False,
     }
-    (asset_dir / "asset-manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
+    write_asset_manifest(asset_dir, manifest)
     print(f"Imported model source: {metadata['name']} ({fmt}, {resolution}, {len(downloaded)} files)")
 
 
@@ -267,9 +283,7 @@ def download_texture(asset_id: str, metadata: dict, output_root: Path):
         "file_integrity": integrity,
         "runtime_api_dependency": False,
     }
-    (texture_dir / "asset-manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
+    write_asset_manifest(texture_dir, manifest)
     print(f"Imported PBR texture: {metadata['name']} ({len(downloaded)} maps)")
 
 
@@ -295,9 +309,7 @@ def download_hdri(asset_id: str, metadata: dict, output_root: Path):
         "file_integrity": {filename: integrity},
         "runtime_api_dependency": False,
     }
-    (target_dir / "asset-manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
+    write_asset_manifest(target_dir, manifest)
     print(f"Imported city HDRI: {metadata['name']} ({resolution})")
 
 
