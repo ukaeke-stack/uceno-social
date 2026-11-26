@@ -413,7 +413,7 @@ def _validate_accessor_layout(accessor, accessor_index, buffer_views):
     required_end = accessor_offset + (count - 1) * stride + element_size
     if required_end > view_length:
         raise ValueError(
-            f"{label} data range exceeds bufferView[{view_index}] "
+            f"{label} data range exceeds bufferView[{accessor['bufferView']}] "
             f"(requires {required_end} bytes, has {view_length})"
         )
 
@@ -496,12 +496,12 @@ def _validate_gltf_references(document, buffer_views, accessors, meshes, nodes):
         if not isinstance(children, list):
             raise ValueError(f"node[{index}].children must be an array")
         for child in children:
-            child_index = _checked_index(nodes, child, f"node[{index}].children")
-            if child_index == index:
+            _checked_index(nodes, child, f"node[{index}].children")
+            if child == index:
                 raise ValueError(f"node[{index}] cannot be its own child")
-            if child_index in parents:
-                raise ValueError(f"node[{child_index}] has multiple parents")
-            parents[child_index] = index
+            if child in parents:
+                raise ValueError(f"node[{child}] has multiple parents")
+            parents[child] = index
 
     for start in range(len(nodes)):
         seen = set()
