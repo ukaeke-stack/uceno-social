@@ -578,7 +578,7 @@ def parse_glb(path):
                 raise ValueError("GLB must contain exactly one first-position JSON chunk")
             json_seen = True
             document = json.loads(data[offset:end].decode("utf-8").rstrip(" \t\r\n\0"))
-        elif kind == b"BIN\\0":
+        elif kind == b"BIN\0":
             if not json_seen or binary_seen:
                 raise ValueError("GLB BIN chunk is duplicated or precedes JSON")
             binary_seen = True
