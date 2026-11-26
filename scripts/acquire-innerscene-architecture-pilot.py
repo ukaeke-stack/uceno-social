@@ -10,6 +10,10 @@ import json
 import pathlib
 import re
 import struct
+import time
+import email.utils
+from datetime import datetime, timezone
+import urllib.error
 import urllib.request
 from html.parser import HTMLParser
 from urllib.parse import urlparse
@@ -331,9 +335,38 @@ def verify_source_page(asset, raw_html):
     }
 
 
+def _open_with_retry(request, timeout, attempts=5, base_delay=2, max_delay=60):
+    """Retry rate limits and transient server errors without hammering the publisher."""
+    retryable = {429, 500, 502, 503, 504}
+    for attempt in range(attempts):
+        try:
+            return urllib.request.urlopen(request, timeout=timeout)
+        except urllib.error.HTTPError as error:
+            if error.code not in retryable or attempt == attempts - 1:
+                raise
+            retry_after = error.headers.get("Retry-After") if error.headers else None
+            delay = min(max_delay, base_delay * (2 ** attempt))
+            if retry_after:
+                try:
+                    delay = min(max_delay, max(0, float(retry_after)))
+                except ValueError:
+                    try:
+                        retry_at = email.utils.parsedate_to_datetime(retry_after)
+                        if retry_at.tzinfo is None:
+                            retry_at = retry_at.replace(tzinfo=timezone.utc)
+                        delay = min(max_delay, max(0, (retry_at - datetime.now(timezone.utc)).total_seconds()))
+                    except (TypeError, ValueError, OverflowError):
+                        pass
+            print(f"Publisher returned HTTP {error.code}; retrying in {delay:g}s "
+                  f"(attempt {attempt + 2}/{attempts}).")
+            error.close()
+            time.sleep(delay)
+    raise RuntimeError("Retry loop exhausted unexpectedly")
+
+
 def fetch_source_page(asset):
     request = urllib.request.Request(asset["source_page"], headers={"User-Agent": UA})
-    with urllib.request.urlopen(request, timeout=45) as response:
+    with _open_with_retry(request, timeout=45) as response:
         payload = response.read(MAX_SOURCE_PAGE_BYTES + 1)
     if len(payload) > MAX_SOURCE_PAGE_BYTES:
         raise ValueError("Source page exceeds the 2 MiB metadata cap")
@@ -345,7 +378,7 @@ def download_glb(asset):
     if download.scheme != "https" or download.hostname not in {"www.innerscene.com", "files.innerscene.com"}:
         raise ValueError("Download URL is not an approved HTTPS Innerscene endpoint")
     request = urllib.request.Request(asset["download_url"], headers={"User-Agent": UA})
-    with urllib.request.urlopen(request, timeout=90) as response:
+    with _open_with_retry(request, timeout=90) as response:
         final_url = response.geturl()
         final = urlparse(final_url)
         if final.scheme != "https" or final.hostname != "files.innerscene.com":
