@@ -355,6 +355,18 @@ def download_glb(asset):
         raise ValueError("GLB exceeds the 30 MiB pilot download cap")
     return payload, final_url
 
+def _checked_index(items, index, label):
+    if isinstance(index, bool) or not isinstance(index, int) or index < 0 or index >= len(items):
+        raise ValueError(f"{label} index out of range: {index!r}")
+    return items[index]
+
+
+def _checked_nonnegative_int(value, label):
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{label} must be a non-negative integer")
+    return value
+
+
 def parse_glb(path):
     data = path.read_bytes()
     if len(data) < 20:
@@ -365,25 +377,75 @@ def parse_glb(path):
     offset = 12
     document = None
     binary = None
+    json_seen = False
+    binary_seen = False
     chunks = []
     while offset < len(data):
         if offset + 8 > len(data):
             raise ValueError("Truncated GLB chunk header")
         size, kind = struct.unpack_from("<I4s", data, offset)
         offset += 8
+        if size % 4:
+            raise ValueError("GLB chunk length is not 4-byte aligned")
         end = offset + size
         if end > len(data):
             raise ValueError("Truncated GLB chunk payload")
         chunks.append({"type": kind.decode("ascii", "replace"), "bytes": size})
         if kind == b"JSON":
+            if json_seen or len(chunks) != 1:
+                raise ValueError("GLB must contain exactly one first-position JSON chunk")
+            json_seen = True
             document = json.loads(data[offset:end].decode("utf-8").rstrip(" \t\r\n\0"))
-        elif kind == b"BIN\0":
+        elif kind == b"BIN\\0":
+            if not json_seen or binary_seen:
+                raise ValueError("GLB BIN chunk is duplicated or precedes JSON")
+            binary_seen = True
             binary = data[offset:end]
         offset = end
     if document is None:
         raise ValueError("GLB has no JSON chunk")
+    if not isinstance(document, dict):
+        raise ValueError("GLB JSON root must be an object")
     if document.get("asset", {}).get("version") != "2.0":
         raise ValueError("Embedded glTF asset version is not 2.0")
+    buffers = document.get("buffers", [])
+    if len(buffers) > 1:
+        raise ValueError("GLB must not declare more than one embedded buffer")
+    declared_buffer_length = 0
+    if buffers:
+        buffer = buffers[0]
+        if buffer.get("uri") is not None:
+            raise ValueError("GLB buffer must be embedded, not an external URI")
+        declared_buffer_length = _checked_nonnegative_int(buffer.get("byteLength"), "buffer byteLength")
+        if declared_buffer_length == 0 or binary is None:
+            raise ValueError("GLB buffer metadata does not match an embedded BIN chunk")
+        if declared_buffer_length > len(binary) or len(binary) - declared_buffer_length > 3:
+            raise ValueError("GLB BIN chunk length does not match declared buffer byteLength")
+    buffer_views = document.get("bufferViews", [])
+    for view_index, view in enumerate(buffer_views):
+        buffer_index = view.get("buffer", 0)
+        _checked_index(buffers, buffer_index, f"bufferView[{view_index}].buffer")
+        start = _checked_nonnegative_int(view.get("byteOffset", 0), f"bufferView[{view_index}].byteOffset")
+        length = _checked_nonnegative_int(view.get("byteLength"), f"bufferView[{view_index}].byteLength")
+        if length == 0 or start + length > declared_buffer_length:
+            raise ValueError(f"bufferView[{view_index}] exceeds the declared embedded buffer")
+    accessors = document.get("accessors", [])
+    for accessor_index, accessor in enumerate(accessors):
+        if "bufferView" in accessor:
+            _checked_index(buffer_views, accessor["bufferView"], f"accessor[{accessor_index}].bufferView")
+        count = _checked_nonnegative_int(accessor.get("count"), f"accessor[{accessor_index}].count")
+        if count == 0:
+            raise ValueError(f"accessor[{accessor_index}] has an empty count")
+    nodes = document.get("nodes", [])
+    meshes = document.get("meshes", [])
+    for node_index, node in enumerate(nodes):
+        if "mesh" in node:
+            _checked_index(meshes, node["mesh"], f"node[{node_index}].mesh")
+        for child_index in node.get("children", []):
+            _checked_index(nodes, child_index, f"node[{node_index}].children")
+    for scene_index, scene in enumerate(document.get("scenes", [])):
+        for node_index in scene.get("nodes", []):
+            _checked_index(nodes, node_index, f"scene[{scene_index}].nodes")
     meshes = document.get("meshes", [])
     primitives = [p for m in meshes for p in m.get("primitives", [])]
     materials = document.get("materials", [])
@@ -395,9 +457,6 @@ def parse_glb(path):
         raise ValueError("GLB has no materials")
     if any(image.get("uri") for image in images):
         raise ValueError("GLB references external image files instead of being self-contained")
-    nodes = document.get("nodes", [])
-    accessors = document.get("accessors", [])
-    buffer_views = document.get("bufferViews", [])
     triangles = 0
     triangle_counts_known = True
     uv_primitives = 0
@@ -407,18 +466,22 @@ def parse_glb(path):
         attrs = primitive.get("attributes", {})
         uv_primitives += int("TEXCOORD_0" in attrs)
         normal_primitives += int("NORMAL" in attrs)
+        for attribute_name, accessor_index in attrs.items():
+            _checked_index(accessors, accessor_index, f"primitive attribute {attribute_name}")
         position_index = attrs.get("POSITION")
         if position_index is not None:
-            accessor = accessors[position_index]
+            accessor = _checked_index(accessors, position_index, "POSITION accessor")
             if "min" in accessor and "max" in accessor:
                 position_bounds.append((accessor["min"], accessor["max"]))
+        if "material" in primitive:
+            _checked_index(materials, primitive["material"], "primitive material")
         if primitive.get("mode", 4) != 4:
             continue
         index = primitive.get("indices")
         if index is None:
             count = accessors[position_index].get("count") if position_index is not None else None
         else:
-            count = accessors[index].get("count")
+            count = _checked_index(accessors, index, "primitive indices accessor").get("count")
         if count is None:
             triangle_counts_known = False
         else:
@@ -431,10 +494,10 @@ def parse_glb(path):
         if view_index is None:
             image_checks.append({"name": image.get("name"), "status": "external-uri", "uri": image.get("uri")})
             continue
-        view = buffer_views[view_index]
-        start = int(view.get("byteOffset", 0))
-        end = start + int(view["byteLength"])
-        if end > len(binary):
+        view = _checked_index(buffer_views, view_index, f"image {image.get('name')} bufferView")
+        start = _checked_nonnegative_int(view.get("byteOffset", 0), "image bufferView byteOffset")
+        end = start + _checked_nonnegative_int(view.get("byteLength"), "image bufferView byteLength")
+        if binary is None or end > len(binary):
             raise ValueError(f"Embedded image bufferView exceeds BIN chunk: {image.get('name')}")
         payload = binary[start:end]
         mime = image.get("mimeType", "")

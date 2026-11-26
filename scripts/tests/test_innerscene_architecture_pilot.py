@@ -119,6 +119,39 @@ class InnersceneGlbValidationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "external image files"):
                 pilot.parse_glb(path)
 
+    def test_out_of_range_position_accessor_is_rejected(self):
+        import tempfile
+        document = self.valid_document()
+        document["meshes"][0]["primitives"][0]["attributes"]["POSITION"] = 7
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "bad-accessor.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "POSITION accessor index out of range"):
+                pilot.parse_glb(path)
+
+    def test_out_of_range_node_mesh_is_rejected(self):
+        import tempfile
+        document = self.valid_document()
+        document["nodes"][0]["mesh"] = 4
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "bad-node.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "node\\[0\\].mesh index out of range"):
+                pilot.parse_glb(path)
+
+    def test_out_of_range_image_buffer_view_is_rejected(self):
+        import tempfile
+        document = self.valid_document()
+        document["images"] = [{"bufferView": 9, "mimeType": "image/png"}]
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "bad-image.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "image None bufferView index out of range"):
+                pilot.parse_glb(path)
+
     def test_missing_materials_are_rejected(self):
         import tempfile
         document = self.valid_document()
