@@ -306,6 +306,29 @@ def inspect_glb(path, expected_sha=None):
         if accessor_type not in {"SCALAR", "VEC2", "VEC3", "VEC4", "MAT2", "MAT3", "MAT4"}:
             raise ValueError(f"{path}: accessor {index} has invalid type")
 
+        # Compute glTF element layout, including 4-byte matrix-column padding
+        # for 8-bit and 16-bit component types.
+        columns, rows = {
+            "SCALAR": (1, 1), "VEC2": (1, 2), "VEC3": (1, 3), "VEC4": (1, 4),
+            "MAT2": (2, 2), "MAT3": (3, 3), "MAT4": (4, 4),
+        }[accessor_type]
+        column_bytes = rows * component_bytes
+        if columns > 1 and component_bytes < 4:
+            column_bytes = (column_bytes + 3) // 4 * 4
+        element_bytes = columns * column_bytes
+        if view_index is None:
+            if "sparse" not in accessor:
+                raise ValueError(f"{path}: accessor {index} has neither bufferView nor sparse data")
+        else:
+            view = buffer_views[view_index]
+            stride = view.get("byteStride", element_bytes)
+            if (not isinstance(stride, int) or isinstance(stride, bool)
+                    or stride < element_bytes or stride % component_bytes):
+                raise ValueError(f"{path}: accessor {index} has invalid bufferView stride")
+            required_end = accessor_offset + (count - 1) * stride + element_bytes
+            if required_end > view["byteLength"]:
+                raise ValueError(f"{path}: accessor {index} data exceeds its bufferView bounds")
+
     primitive_count = 0
     material_references = set()
     for mesh_index, mesh in enumerate(meshes):
