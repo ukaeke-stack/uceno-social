@@ -397,17 +397,17 @@ def _validate_accessor_layout(accessor, accessor_index, buffer_views):
     if count == 0:
         raise ValueError(f"{label} has an empty count")
     accessor_offset = _checked_nonnegative_int(accessor.get("byteOffset", 0), f"{label}.byteOffset")
-    view_offset = _checked_nonnegative_int(view.get("byteOffset", 0), f"bufferView[{view_index}].byteOffset")
-    view_length = _checked_nonnegative_int(view.get("byteLength"), f"bufferView[{view_index}].byteLength")
+    view_offset = _checked_nonnegative_int(view.get("byteOffset", 0), f"bufferView[{accessor['bufferView']}].byteOffset")
+    view_length = _checked_nonnegative_int(view.get("byteLength"), f"bufferView[{accessor['bufferView']}].byteLength")
     if accessor_offset % component_size or (view_offset + accessor_offset) % component_size:
         raise ValueError(f"{label} byteOffset is not aligned to its component type")
     if columns > 1 and (view_offset + accessor_offset) % 4:
         raise ValueError(f"{label} matrix byteOffset is not 4-byte aligned")
     stride = view.get("byteStride", element_size)
     if isinstance(stride, bool) or not isinstance(stride, int):
-        raise ValueError(f"bufferView[{view_index}].byteStride must be an integer")
+        raise ValueError(f"bufferView[{accessor['bufferView']}].byteStride must be an integer")
     if "byteStride" in view and (stride < 4 or stride > 252 or stride % 4):
-        raise ValueError(f"bufferView[{view_index}].byteStride must be 4..252 and 4-byte aligned")
+        raise ValueError(f"bufferView[{accessor['bufferView']}].byteStride must be 4..252 and 4-byte aligned")
     if stride < element_size or stride % component_size:
         raise ValueError(f"{label} element does not fit the bufferView byteStride")
     required_end = accessor_offset + (count - 1) * stride + element_size
