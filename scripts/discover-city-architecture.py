@@ -175,6 +175,67 @@ QUERIES = {
         "modern industrial engineering campus building exterior",
     ],
 }
+
+# A second, smaller search vocabulary is used only when the primary catalogue
+# pass still has fewer than the 12 distinct building candidates required per
+# city. These are alternate architectural terms, not relaxed acceptance rules.
+FALLBACK_QUERIES = {
+    "SolsticeBay": [
+        "coastal residential complex exterior building",
+        "waterfront hotel complete exterior architecture",
+        "marina clubhouse complete building",
+        "beach resort reception building exterior",
+    ],
+    "VerdantReach": [
+        "botanical conservatory complete building exterior",
+        "greenhouse research centre building exterior",
+        "eco lodge complete exterior architecture",
+        "vertical garden office building exterior",
+    ],
+    "NexusDelta": [
+        "technology campus complete building exterior",
+        "data centre office building exterior",
+        "metropolitan residential high rise exterior",
+        "urban transit station complete building exterior",
+    ],
+    "AuroraHeights": [
+        "alpine mountain hotel complete building exterior",
+        "ski station visitor centre building exterior",
+        "mountain village chalet complete building",
+        "timber alpine lodge exterior architecture",
+    ],
+    "SaffronDunes": [
+        "desert adobe residential building exterior",
+        "oasis hotel complete building exterior",
+        "solar energy visitor centre building exterior",
+        "desert courtyard cultural centre architecture",
+    ],
+    "MonsoonHarbour": [
+        "tropical port administration building exterior",
+        "canal side apartment building exterior",
+        "coastal fish market complete building",
+        "tropical waterfront resort hotel exterior",
+    ],
+    "EclipseCentral": [
+        "realistic supertall office tower complete exterior",
+        "modern 40 metre skyscraper building",
+        "illuminated metropolitan high rise tower exterior",
+        "mixed use landmark skyscraper architecture",
+    ],
+    "OriginPlains": [
+        "agricultural research institute complete building",
+        "university library exterior architecture",
+        "civic administration centre building exterior",
+        "modern school campus complete building",
+    ],
+    "AtlasFrontier": [
+        "freight logistics terminal complete building exterior",
+        "industrial rail depot building exterior",
+        "power station administration building exterior",
+        "large manufacturing warehouse complete building",
+    ],
+}
+
 UA = "UCENO-city-architecture-discovery/2.0"
 MAX_BYTES = 25 * 1024 * 1024
 INITIAL_MAX_PAGES = 2
@@ -584,6 +645,14 @@ def main():
         broaden_city_candidates(
             city, queries, raw_by_slug, set(), query_diagnostics,
             target_candidates=TARGET_CITY_CANDIDATES,
+            max_pages_per_query=BROADEN_MAX_PAGES,
+        )
+        # If the broad primary vocabulary still cannot supply the 12 unique
+        # building candidates required for this city, try alternate terms.
+        # The same strict rejection_reason() policy remains in force.
+        broaden_city_candidates(
+            city, FALLBACK_QUERIES[city], raw_by_slug, set(), query_diagnostics,
+            target_candidates=12,
             max_pages_per_query=BROADEN_MAX_PAGES,
         )
 
