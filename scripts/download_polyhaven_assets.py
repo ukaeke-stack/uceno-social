@@ -7,13 +7,15 @@ does not make runtime requests to Poly Haven.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 API = "https://api.polyhaven.com"
 USER_AGENT = "UCENO-Virtual-World-AssetPipeline/1.0 (+https://github.com/ukaeke-stack/uceno-social)"
@@ -47,15 +49,47 @@ def safe_name(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
 
 
+def safe_dependency_path(asset_dir: Path, relative_name: str) -> Path:
+    """Resolve a Poly Haven include path without allowing POSIX or Windows traversal."""
+    if not isinstance(relative_name, str) or not relative_name.strip():
+        raise RuntimeError("Poly Haven dependency path must be a non-empty string")
+    posix = PurePosixPath(relative_name)
+    windows = PureWindowsPath(relative_name)
+    if (posix.is_absolute() or windows.is_absolute() or windows.drive
+            or ".." in posix.parts or ".." in windows.parts):
+        raise RuntimeError(f"Unsafe dependency path from Poly Haven: {relative_name}")
+    root = asset_dir.resolve()
+    target = (root / Path(*posix.parts)).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise RuntimeError(f"Dependency path escapes its asset directory: {relative_name}") from exc
+    return target
+
+
 def download(url: str, destination: Path):
+    """Download atomically and return byte-count and SHA-256 provenance."""
     destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(destination.name + ".part")
+    digest = hashlib.sha256()
+    byte_count = 0
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=180) as response, destination.open("wb") as output:
-        while True:
-            chunk = response.read(1024 * 1024)
-            if not chunk:
-                break
-            output.write(chunk)
+    try:
+        with urllib.request.urlopen(req, timeout=180) as response, temporary.open("wb") as output:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                output.write(chunk)
+                digest.update(chunk)
+                byte_count += len(chunk)
+        if byte_count == 0:
+            raise RuntimeError(f"Downloaded file is empty: {destination.name}")
+        os.replace(temporary, destination)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+    return {"bytes": byte_count, "sha256": digest.hexdigest()}
 
 
 def choose_resolution(root: dict):
@@ -89,18 +123,17 @@ def download_asset(asset_id: str, metadata: dict, output_root: Path):
     url_suffix = Path(urllib.parse.urlparse(source_url).path).suffix.lower()
     suffix = url_suffix if url_suffix in (".fbx", ".gltf", ".glb") else (".fbx" if fmt == "fbx" else ".gltf")
     model_path = asset_dir / (safe_name(metadata["name"]) + suffix)
-    download(source_url, model_path)
-
     downloaded = [model_path.name]
+    integrity = {model_path.name: download(source_url, model_path)}
     includes = record.get("include") or {}
+    if not isinstance(includes, dict):
+        raise RuntimeError(f"Poly Haven dependency manifest is not an object for {metadata['name']}")
     for relative_name, file_record in includes.items():
         if not isinstance(file_record, dict) or not file_record.get("url"):
             continue
-        relative_path = PurePosixPath(relative_name)
-        if relative_path.is_absolute() or ".." in relative_path.parts:
-            raise RuntimeError(f"Unsafe dependency path from Poly Haven: {relative_name}")
-        target = asset_dir.joinpath(*relative_path.parts)
-        download(file_record["url"], target)
+        target = safe_dependency_path(asset_dir, relative_name)
+        relative_path = target.relative_to(asset_dir.resolve())
+        integrity[str(relative_path)] = download(file_record["url"], target)
         downloaded.append(str(relative_path))
 
     manifest = {
@@ -114,6 +147,7 @@ def download_asset(asset_id: str, metadata: dict, output_root: Path):
         "polycount": metadata.get("polycount"),
         "lods": bool(metadata.get("lods", False)),
         "files": downloaded,
+        "file_integrity": integrity,
         "runtime_api_dependency": False,
     }
     (asset_dir / "asset-manifest.json").write_text(
@@ -127,6 +161,7 @@ def download_texture(asset_id: str, metadata: dict, output_root: Path):
     texture_dir = output_root / "Textures" / safe_name(metadata["name"])
     texture_dir.mkdir(parents=True, exist_ok=True)
     downloaded = []
+    integrity = {}
     resolutions_used = []
 
     # Poly Haven's API uses map names as top-level keys. Its naming varies
@@ -163,7 +198,7 @@ def download_texture(asset_id: str, metadata: dict, output_root: Path):
             continue
         ext = Path(urllib.parse.urlparse(record["url"]).path).suffix.lower() or ".jpg"
         filename = f"{safe_name(metadata['name'])}_{output_name}{ext}"
-        download(record["url"], texture_dir / filename)
+        integrity[filename] = download(record["url"], texture_dir / filename)
         downloaded.append(filename)
 
     if not downloaded:
@@ -178,6 +213,7 @@ def download_texture(asset_id: str, metadata: dict, output_root: Path):
         "authors": metadata.get("authors", {}),
         "texture_resolutions": sorted(set(resolutions_used)),
         "maps": downloaded,
+        "file_integrity": integrity,
         "runtime_api_dependency": False,
     }
     (texture_dir / "asset-manifest.json").write_text(
@@ -196,7 +232,7 @@ def download_hdri(asset_id: str, metadata: dict, output_root: Path):
     target_dir = output_root / "HDRI"
     target_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{safe_name(metadata['name'])}_{resolution}{suffix}"
-    download(record["url"], target_dir / filename)
+    integrity = download(record["url"], target_dir / filename)
     manifest = {
         "name": metadata["name"],
         "asset_id": asset_id,
@@ -205,6 +241,7 @@ def download_hdri(asset_id: str, metadata: dict, output_root: Path):
         "authors": metadata.get("authors", {}),
         "resolution": resolution,
         "file": filename,
+        "file_integrity": {filename: integrity},
         "runtime_api_dependency": False,
     }
     (target_dir / "asset-manifest.json").write_text(
