@@ -33,6 +33,21 @@ def candidate(**overrides):
 
 
 class ThreeDValleyCityArchitectureTests(unittest.TestCase):
+    def test_rate_limit_reset_message_is_respected(self):
+        delay = valley.rate_limit_wait_seconds(
+            {}, '{"message":"Rate limit reached. It resets in 1542 s."}', 0
+        )
+        self.assertEqual(delay, 1543.0)
+
+    def test_retry_after_and_reset_use_the_longer_wait(self):
+        delay = valley.rate_limit_wait_seconds(
+            {"Retry-After": "30"}, '{"message":"resets in 12 s"}', 1
+        )
+        self.assertEqual(delay, 30.0)
+
+    def test_rate_limit_without_reset_metadata_uses_backoff(self):
+        self.assertEqual(valley.rate_limit_wait_seconds({}, "rate limited", 2), 4.0)
+
     def test_api_page_limit_respects_provider_maximum(self):
         params = valley.asset_query_params("coastal apartment building")
         self.assertEqual(params["limit"], 50)
