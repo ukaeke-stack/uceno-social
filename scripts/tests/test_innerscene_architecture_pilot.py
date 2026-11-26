@@ -4,6 +4,8 @@ import json
 import pathlib
 import struct
 import unittest
+import urllib.error
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
@@ -11,6 +13,43 @@ SPEC = importlib.util.spec_from_file_location(
 )
 pilot = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(pilot)
+
+
+class InnersceneRetryTests(unittest.TestCase):
+    def test_rate_limit_retries_and_honours_retry_after(self):
+        response = object()
+        throttled = urllib.error.HTTPError(
+            "https://www.innerscene.com/model", 429, "Too Many Requests",
+            {"Retry-After": "0"}, None
+        )
+        with patch.object(pilot.urllib.request, "urlopen", side_effect=[throttled, response]) as opener, \
+             patch.object(pilot.time, "sleep") as sleep:
+            result = pilot._open_with_retry(object(), timeout=10)
+        self.assertIs(result, response)
+        self.assertEqual(opener.call_count, 2)
+        sleep.assert_called_once_with(0)
+
+    def test_non_retryable_http_error_fails_immediately(self):
+        missing = urllib.error.HTTPError(
+            "https://www.innerscene.com/model", 404, "Not Found", {}, None
+        )
+        with patch.object(pilot.urllib.request, "urlopen", side_effect=missing) as opener, \
+             patch.object(pilot.time, "sleep") as sleep:
+            with self.assertRaises(urllib.error.HTTPError):
+                pilot._open_with_retry(object(), timeout=10)
+        opener.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_retry_attempts_are_bounded(self):
+        throttled = urllib.error.HTTPError(
+            "https://www.innerscene.com/model", 429, "Too Many Requests", {}, None
+        )
+        with patch.object(pilot.urllib.request, "urlopen", side_effect=throttled) as opener, \
+             patch.object(pilot.time, "sleep") as sleep:
+            with self.assertRaises(urllib.error.HTTPError):
+                pilot._open_with_retry(object(), timeout=10, attempts=3, base_delay=1)
+        self.assertEqual(opener.call_count, 3)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [1, 2])
 
 
 class InnersceneSourceVerificationTests(unittest.TestCase):
