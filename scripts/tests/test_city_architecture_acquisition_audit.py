@@ -651,3 +651,32 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+CATALOG_SPEC = importlib.util.spec_from_file_location(
+    "uceno_polyhaven_catalog_audit",
+    ROOT / "scripts" / "audit_polyhaven_city_asset_catalog.py",
+)
+catalog_audit = importlib.util.module_from_spec(CATALOG_SPEC)
+CATALOG_SPEC.loader.exec_module(catalog_audit)
+
+
+class PolyHavenCatalogueMatchingTests(unittest.TestCase):
+    def test_matches_whole_words_in_names_and_normalizes_separators(self):
+        terms = ("building", "office", "tower")
+        self.assertEqual(
+            catalog_audit.matching_terms("Modern_building-office block", terms),
+            ["building", "office"],
+        )
+
+    def test_rejects_partial_word_matches(self):
+        self.assertEqual(
+            catalog_audit.matching_terms("towering offices and buildings", ("tower", "office", "building")),
+            [],
+        )
+
+    def test_matching_is_case_insensitive(self):
+        self.assertEqual(
+            catalog_audit.matching_terms("HIGH-RISE BUILDING", ("building", "high-rise")),
+            ["building", "high-rise"],
+        )
