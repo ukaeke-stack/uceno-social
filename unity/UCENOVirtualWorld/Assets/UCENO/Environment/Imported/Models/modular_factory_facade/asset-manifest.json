@@ -32,5 +32,87 @@
     "textures/modular_factory_facade_brick_nor_gl_1k.png",
     "textures/modular_factory_facade_doors_rough_1k.png"
   ],
+  "file_integrity": {
+    "modular_factory_facade.fbx": {
+      "bytes": 3767196,
+      "sha256": "648ef0405c670dc5b2777907bfaa284223a351d268d0b9f227f4be7f2e476f2f"
+    },
+    "textures/modular_factory_facade_doors_nor_gl_1k.png": {
+      "bytes": 4485734,
+      "sha256": "d43071cd087a65e49b32d4d626514e58b3fae48c252053a3ceb0076c371252f8"
+    },
+    "textures/modular_factory_facade_garage_nor_gl_1k.png": {
+      "bytes": 4694227,
+      "sha256": "67908705338fef9198138a19817705ae6da248d91b184bb920bec48ab75ed2ad"
+    },
+    "textures/modular_factory_facade_trim_01_diff_1k.png": {
+      "bytes": 6090548,
+      "sha256": "211f7df2132a9d89bc19a3ce880768621dea2f6ee9447b129225f2e7fcd7537f"
+    },
+    "textures/modular_factory_facade_brick_diff_1k.png": {
+      "bytes": 2236869,
+      "sha256": "08de23b32b85545e55a86d26c2af7f9e7e88ea7313c84d46ebae7a4511aa9218"
+    },
+    "textures/modular_factory_facade_garage_rough_1k.png": {
+      "bytes": 1569816,
+      "sha256": "cfdad255812c626766b538b51e33ce89ac16e600a99ca0b1341630fc6f4effe1"
+    },
+    "textures/modular_factory_facade_windows_alpha_1k.png": {
+      "bytes": 857712,
+      "sha256": "6acaa83811b54dec07aaf7139a77fb132a022c3cf017a00174d2f9d67e13af4b"
+    },
+    "textures/modular_factory_facade_doors_diff_1k.png": {
+      "bytes": 5447504,
+      "sha256": "368dfc40ecd95840d874ceacd5b9dc3dbb2ba3217df1fe2d1b910648d844ad68"
+    },
+    "textures/modular_factory_facade_windows_diff_1k.png": {
+      "bytes": 5772527,
+      "sha256": "7dcba265db1ff2659c0c170cce53319fd07fddbdb644e0dee076121767af4b65"
+    },
+    "textures/modular_factory_facade_doors_metal_1k.png": {
+      "bytes": 391285,
+      "sha256": "1c051c7ce382ab4bde9ae4d4ed15880693b4cf6835269e2651915a741caebae8"
+    },
+    "textures/modular_factory_facade_brick_rough_1k.png": {
+      "bytes": 2375677,
+      "sha256": "7d047377b54b4551e5f8fc17d517cce2be56530f0afa080d9975d2c03c092abe"
+    },
+    "textures/modular_factory_facade_trim_01_rough_1k.png": {
+      "bytes": 1836232,
+      "sha256": "a129385d61a52ac4ffd2cd9ef91f0b686d4b229e5f8b1222faaeaea20550d6e1"
+    },
+    "textures/modular_factory_facade_windows_nor_gl_1k.png": {
+      "bytes": 4727012,
+      "sha256": "7bca73d31c0b3041a6a53bb14a57da8067e80771686315ff2d20230a61361314"
+    },
+    "textures/modular_factory_facade_trim_01_nor_gl_1k.png": {
+      "bytes": 5470617,
+      "sha256": "e279fb7b627a6a829f0de16fa5337deda180a26aff39bd3375b833216ecd5f37"
+    },
+    "textures/modular_factory_facade_brick_disp_1k.png": {
+      "bytes": 2222116,
+      "sha256": "fe291301bb8b6d2314ee6138a9b7812334f8898f726acdfed7db8a3933417675"
+    },
+    "textures/modular_factory_facade_garage_metal_1k.png": {
+      "bytes": 68723,
+      "sha256": "79c10da6c45fe5eb08020611b70ac31901dac110a1753999d9693d02760a3320"
+    },
+    "textures/modular_factory_facade_garage_diff_1k.png": {
+      "bytes": 5325499,
+      "sha256": "2f5116c9ee3ebd8a0c98a86899a147d285a6e955c26636b33f6a2e24d88964df"
+    },
+    "textures/modular_factory_facade_windows_rough_1k.png": {
+      "bytes": 1619107,
+      "sha256": "edf82ddc7f514e43362bf6cdb142a88e7838335c085bf3fca21cee0ac79d0d21"
+    },
+    "textures/modular_factory_facade_brick_nor_gl_1k.png": {
+      "bytes": 5620433,
+      "sha256": "ea1f2705733ca9a5cf670bbef9488c9bf05dbf63ae3084a89847a86396d736a4"
+    },
+    "textures/modular_factory_facade_doors_rough_1k.png": {
+      "bytes": 1586977,
+      "sha256": "251b28428da628115483659934baf102ba4e9e2bd8cf07f2fbfe060a51c96eac"
+    }
+  },
   "runtime_api_dependency": false
 }

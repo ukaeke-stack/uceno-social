@@ -17,5 +17,27 @@
     "textures/GothicBed_01_nor_gl_1k.exr",
     "textures/GothicBed_01_roughness_1k.jpg"
   ],
+  "file_integrity": {
+    "gothic_bed_01.fbx": {
+      "bytes": 920572,
+      "sha256": "aaba4817451ddf7bcf40b69617064af61c21f49f704380b5e6533243db1417a1"
+    },
+    "textures/GothicBed_01_diff_1k.jpg": {
+      "bytes": 116672,
+      "sha256": "f7e8611a731a87a42a35d92e59f78b848ac20475827b79cb8aa34df0dd5bcbd5"
+    },
+    "textures/GothicBed_01_metallic_1k.exr": {
+      "bytes": 4784,
+      "sha256": "2cd7f3309eda8ed96b5dba973b2dbd57d8520b9a960dcbf89e0d3ac5413219b9"
+    },
+    "textures/GothicBed_01_nor_gl_1k.exr": {
+      "bytes": 1314922,
+      "sha256": "41c1c8d05f1c697223a32d75d7c6d49aa45f6ec6fe558edfcabeb5503f0bdb6a"
+    },
+    "textures/GothicBed_01_roughness_1k.jpg": {
+      "bytes": 107427,
+      "sha256": "5d10f42d4445042e95ccd51a72129672fd5d934e8da1955e6b5dba0c49b1b0ef"
+    }
+  },
   "runtime_api_dependency": false
 }

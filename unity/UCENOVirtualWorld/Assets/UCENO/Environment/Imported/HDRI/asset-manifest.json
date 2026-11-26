@@ -8,5 +8,11 @@
   },
   "resolution": "1k",
   "file": "modern_buildings_1k.hdr",
+  "file_integrity": {
+    "modern_buildings_1k.hdr": {
+      "bytes": 1628718,
+      "sha256": "67964eec8e1eee3db82b585fb11740437a7964048bca7cf9bc1ba7e42022cb8f"
+    }
+  },
   "runtime_api_dependency": false
 }

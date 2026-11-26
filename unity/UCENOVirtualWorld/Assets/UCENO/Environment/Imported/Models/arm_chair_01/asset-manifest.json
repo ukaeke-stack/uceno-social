@@ -17,5 +17,27 @@
     "textures/Armchair_01_nor_gl_1k.exr",
     "textures/Armchair_01_roughness_1k.jpg"
   ],
+  "file_integrity": {
+    "arm_chair_01.fbx": {
+      "bytes": 251612,
+      "sha256": "055113eb7a583d827b5ce3fd2251cf391ee0b9fb924bc36c55e846f121959e37"
+    },
+    "textures/Armchair_01_diff_1k.jpg": {
+      "bytes": 184246,
+      "sha256": "db30fc9ab61ac50c91ab7573583d2855a2910df1ecade02b89e3e8ab8d4e4c2d"
+    },
+    "textures/Armchair_01_metallic_1k.exr": {
+      "bytes": 4784,
+      "sha256": "b88f1b9344bbbe330342b7eaed575e99c6cebd0c59c7c898793876d106cbc357"
+    },
+    "textures/Armchair_01_nor_gl_1k.exr": {
+      "bytes": 2069578,
+      "sha256": "cc438c7521b06122ca9a02f2452e401cbcabbb4e9886848969132dd3aee58c47"
+    },
+    "textures/Armchair_01_roughness_1k.jpg": {
+      "bytes": 100070,
+      "sha256": "c39efcacd7ed717b259106ff5309d6a1188d5cb8e706a36f149e1a3e5eef8d13"
+    }
+  },
   "runtime_api_dependency": false
 }

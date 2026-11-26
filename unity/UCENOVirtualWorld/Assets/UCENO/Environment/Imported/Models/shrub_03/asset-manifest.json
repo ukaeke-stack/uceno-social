@@ -17,5 +17,27 @@
     "textures/shrub_03_diff_1k.jpg",
     "textures/shrub_03_rough_1k.exr"
   ],
+  "file_integrity": {
+    "shrub_03.fbx": {
+      "bytes": 290956,
+      "sha256": "81cf3b341356b2938faec4f7935c0e694b923db1a5bca39660afa6fcfc22dcc7"
+    },
+    "textures/shrub_03_nor_gl_1k.exr": {
+      "bytes": 1020480,
+      "sha256": "5ba37d3cdc3a7c535d5d32153dd0a5c89350ad42d38d7c3baee0bfc623fba1f8"
+    },
+    "textures/shrub_03_alpha_1k.png": {
+      "bytes": 79069,
+      "sha256": "daef00278879a024fd05216aaa1376067a5f25f1b911d08d9bbdc50fda4a0d66"
+    },
+    "textures/shrub_03_diff_1k.jpg": {
+      "bytes": 481841,
+      "sha256": "3cadc7aba46d3aabbd7d6d2b1d04aa32e2a7da0bc87c2d38ef3cb1ee42cb03ec"
+    },
+    "textures/shrub_03_rough_1k.exr": {
+      "bytes": 314173,
+      "sha256": "1528aba336f0f34e4c86b63b81cf4bb42ff058d1765e5400bd3d0085ca963757"
+    }
+  },
   "runtime_api_dependency": false
 }
