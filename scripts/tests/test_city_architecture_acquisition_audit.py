@@ -649,9 +649,6 @@ class CityArchitectureAcquisitionAuditTests(unittest.TestCase):
                 audit.inspect_glb(path)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 CATALOG_SPEC = importlib.util.spec_from_file_location(
     "uceno_polyhaven_catalog_audit",
@@ -680,3 +677,6 @@ class PolyHavenCatalogueMatchingTests(unittest.TestCase):
             catalog_audit.matching_terms("HIGH-RISE BUILDING", ("building", "high-rise")),
             ["building", "high-rise"],
         )
+
+if __name__ == "__main__":
+    unittest.main()
