@@ -794,5 +794,26 @@ class PolyHavenDownloadSafetyTests(unittest.TestCase):
 
 
 
+    def test_manifest_writer_persists_only_verified_payloads(self):
+        payload = b"persisted asset"
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / "model.glb").write_bytes(payload)
+            manifest = {
+                "files": ["model.glb"],
+                "file_integrity": {
+                    "model.glb": {
+                        "bytes": len(payload),
+                        "sha256": hashlib.sha256(payload).hexdigest(),
+                    }
+                },
+            }
+            path = downloader.write_asset_manifest(root, manifest)
+            self.assertTrue(path.is_file())
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8")), manifest)
+            self.assertFalse(path.with_name(path.name + ".part").exists())
+
+
+
 if __name__ == "__main__":
     unittest.main()
