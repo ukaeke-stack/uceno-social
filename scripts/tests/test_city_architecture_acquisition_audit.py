@@ -694,7 +694,7 @@ class PolyHavenDownloadSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory) / "asset"
             root.mkdir()
-            for candidate in ("../outside.bin", r"..\\outside.bin", r"C:\\outside.bin", r"\\server\\share\\file.bin"):
+            for candidate in ("../outside.bin", r"..\outside.bin", r"C:\outside.bin", r"\\server\share\file.bin"):
                 with self.subTest(candidate=candidate):
                     with self.assertRaisesRegex(RuntimeError, "Unsafe dependency path"):
                         downloader.safe_dependency_path(root, candidate)
