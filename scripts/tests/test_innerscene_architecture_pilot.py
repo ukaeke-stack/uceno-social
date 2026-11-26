@@ -178,10 +178,12 @@ class InnersceneGlbValidationTests(unittest.TestCase):
     def test_matrix_accessor_accounts_for_four_byte_column_padding(self):
         import tempfile
         document = self.valid_document()
-        document["buffers"][0]["byteLength"] = 12
-        document["bufferViews"][0]["byteLength"] = 12
+        document["buffers"][0]["byteLength"] = 48
+        document["bufferViews"].append({
+            "buffer": 0, "byteOffset": 36, "byteLength": 12
+        })
         document["accessors"].append({
-            "bufferView": 0, "componentType": 5121, "count": 1, "type": "MAT3"
+            "bufferView": 1, "componentType": 5121, "count": 1, "type": "MAT3"
         })
         payload = self.make_glb(document)
         with tempfile.TemporaryDirectory() as directory:
