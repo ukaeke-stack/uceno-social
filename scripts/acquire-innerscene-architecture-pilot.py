@@ -367,6 +367,58 @@ def _checked_nonnegative_int(value, label):
     return value
 
 
+def _validate_accessor_layout(accessor, accessor_index, buffer_views):
+    label = f"accessor[{accessor_index}]"
+    if "sparse" in accessor:
+        raise ValueError(f"{label} sparse accessors are not supported by this acquisition validator")
+    if "bufferView" not in accessor:
+        raise ValueError(f"{label} must reference a bufferView; sparse-only accessors are not supported")
+    view_index = _checked_index(buffer_views, accessor["bufferView"], f"{label}.bufferView")
+    view = buffer_views[view_index]
+    component_sizes = {5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4}
+    component_type = accessor.get("componentType")
+    if isinstance(component_type, bool) or component_type not in component_sizes:
+        raise ValueError(f"{label}.componentType is invalid or unsupported")
+    component_size = component_sizes[component_type]
+    dimensions = {
+        "SCALAR": (1, 1), "VEC2": (1, 2), "VEC3": (1, 3), "VEC4": (1, 4),
+        "MAT2": (2, 2), "MAT3": (3, 3), "MAT4": (4, 4),
+    }
+    accessor_type = accessor.get("type")
+    if accessor_type not in dimensions:
+        raise ValueError(f"{label}.type is invalid")
+    columns, rows = dimensions[accessor_type]
+    if columns == 1:
+        element_size = rows * component_size
+    else:
+        column_size = rows * component_size
+        column_stride = (column_size + 3) // 4 * 4 if component_size < 4 else column_size
+        element_size = columns * column_stride
+    count = _checked_nonnegative_int(accessor.get("count"), f"{label}.count")
+    if count == 0:
+        raise ValueError(f"{label} has an empty count")
+    accessor_offset = _checked_nonnegative_int(accessor.get("byteOffset", 0), f"{label}.byteOffset")
+    view_offset = _checked_nonnegative_int(view.get("byteOffset", 0), f"bufferView[{view_index}].byteOffset")
+    view_length = _checked_nonnegative_int(view.get("byteLength"), f"bufferView[{view_index}].byteLength")
+    if accessor_offset % component_size or (view_offset + accessor_offset) % component_size:
+        raise ValueError(f"{label} byteOffset is not aligned to its component type")
+    if columns > 1 and (view_offset + accessor_offset) % 4:
+        raise ValueError(f"{label} matrix byteOffset is not 4-byte aligned")
+    stride = view.get("byteStride", element_size)
+    if isinstance(stride, bool) or not isinstance(stride, int):
+        raise ValueError(f"bufferView[{view_index}].byteStride must be an integer")
+    if "byteStride" in view and (stride < 4 or stride > 252 or stride % 4):
+        raise ValueError(f"bufferView[{view_index}].byteStride must be 4..252 and 4-byte aligned")
+    if stride < element_size or stride % component_size:
+        raise ValueError(f"{label} element does not fit the bufferView byteStride")
+    required_end = accessor_offset + (count - 1) * stride + element_size
+    if required_end > view_length:
+        raise ValueError(
+            f"{label} data range exceeds bufferView[{view_index}] "
+            f"(requires {required_end} bytes, has {view_length})"
+        )
+
+
 def parse_glb(path):
     data = path.read_bytes()
     if len(data) < 20:
@@ -431,11 +483,7 @@ def parse_glb(path):
             raise ValueError(f"bufferView[{view_index}] exceeds the declared embedded buffer")
     accessors = document.get("accessors", [])
     for accessor_index, accessor in enumerate(accessors):
-        if "bufferView" in accessor:
-            _checked_index(buffer_views, accessor["bufferView"], f"accessor[{accessor_index}].bufferView")
-        count = _checked_nonnegative_int(accessor.get("count"), f"accessor[{accessor_index}].count")
-        if count == 0:
-            raise ValueError(f"accessor[{accessor_index}] has an empty count")
+        _validate_accessor_layout(accessor, accessor_index, buffer_views)
     nodes = document.get("nodes", [])
     meshes = document.get("meshes", [])
     for node_index, node in enumerate(nodes):
