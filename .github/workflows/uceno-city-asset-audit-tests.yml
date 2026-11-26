@@ -23,6 +23,6 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile audit and regression tests
-        run: python -m py_compile scripts/audit-city-architecture-acquisition.py scripts/audit_polyhaven_city_asset_catalog.py scripts/tests/test_city_architecture_acquisition_audit.py
+        run: python -m py_compile scripts/audit-city-architecture-acquisition.py scripts/audit_polyhaven_city_asset_catalog.py scripts/download_polyhaven_assets.py scripts/tests/test_city_architecture_acquisition_audit.py
       - name: Run city asset audit regression tests
         run: python scripts/tests/test_city_architecture_acquisition_audit.py -v
