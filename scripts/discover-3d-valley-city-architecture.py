@@ -71,7 +71,7 @@ def rate_limit_wait_seconds(headers, response_body, attempt):
             delays.append(max(0.0, float(retry_after)))
     except (TypeError, ValueError):
         pass
-    reset = re.search(r"resets? in\\s+(\\d+(?:\\.\\d+)?)\\s*s", response_body, re.IGNORECASE)
+    reset = re.search(r"resets? in\s+(\d+(?:\.\d+)?)\s*s", response_body, re.IGNORECASE)
     if reset:
         delays.append(max(0.0, float(reset.group(1))) + 1.0)
     return max(delays) if delays else float(2 ** attempt)
