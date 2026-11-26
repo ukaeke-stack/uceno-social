@@ -79,12 +79,15 @@ class InnersceneSourceVerificationTests(unittest.TestCase):
 
 class InnersceneGlbValidationTests(unittest.TestCase):
     @staticmethod
-    def make_glb(document):
+    def make_glb(document, binary=None):
         payload = json.dumps(document, separators=(",", ":")).encode("utf-8")
         payload += b" " * ((4 - len(payload) % 4) % 4)
-        total = 12 + 8 + len(payload)
-        return (b"glTF" + struct.pack("<II", 2, total) +
-                struct.pack("<II", len(payload), 0x4E4F534A) + payload)
+        chunks = [struct.pack("<II", len(payload), 0x4E4F534A) + payload]
+        if binary is not None:
+            binary += b"\\0" * ((4 - len(binary) % 4) % 4)
+            chunks.append(struct.pack("<II", len(binary), 0x004E4942) + binary)
+        total = 12 + sum(len(chunk) for chunk in chunks)
+        return b"glTF" + struct.pack("<II", 2, total) + b"".join(chunks)
 
     def valid_document(self):
         return {
@@ -144,12 +147,14 @@ class InnersceneGlbValidationTests(unittest.TestCase):
     def test_out_of_range_image_buffer_view_is_rejected(self):
         import tempfile
         document = self.valid_document()
+        document["buffers"] = [{"byteLength": 4}]
+        document["bufferViews"] = [{"buffer": 0, "byteLength": 4}]
         document["images"] = [{"bufferView": 9, "mimeType": "image/png"}]
-        payload = self.make_glb(document)
+        payload = self.make_glb(document, binary=b"\\x89PNG")
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "bad-image.glb"
             path.write_bytes(payload)
-            with self.assertRaisesRegex(ValueError, "no embedded BIN chunk"):
+            with self.assertRaisesRegex(ValueError, "image None bufferView index out of range"):
                 pilot.parse_glb(path)
 
     def test_missing_materials_are_rejected(self):
