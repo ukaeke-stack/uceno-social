@@ -23,6 +23,7 @@ MAX_RESULTS_PER_CITY = 40
 API_PAGE_LIMIT = 50  # 3D Valley rejects values above 50.
 CATEGORY_PAGE_LIMIT = 100
 MAX_CATEGORY_SCAN_PAGES = 40  # 4,000 models; current Buildings inventory is about 3,500.
+MAX_RATE_LIMIT_WAIT_SECONDS = 1800  # Never spend more than 30 minutes waiting in a 45-minute CI job.
 # Keep the theme-specific searches first, then add shorter catalogue terms.
 # The API's semantic search often returns no rows for long compound phrases;
 # broad discovery is safe because reject_reason() still enforces CC0, realistic
@@ -61,6 +62,21 @@ RELEVANCE = {
 BUILDING_TERMS = ("building", "tower", "skyscraper", "high rise", "office", "apartment", "hotel", "house", "villa", "campus", "terminal", "centre", "center", "factory", "warehouse", "laboratory", "library", "hospital", "school", "mall", "market", "lodge", "chalet", "resort", "church", "mosque", "station", "hangar", "workshop", "civic", "museum", "university")
 PART_TERMS = ("panel", "wall", "window", "door", "column", "beam", "roof section", "facade", "module", "stair", "floor tile", "prop", "furniture", "bridge", "sculpture", "sign", "fence", "gate", "canopy")
 
+def rate_limit_wait_seconds(headers, response_body, attempt):
+    """Respect provider reset metadata instead of retrying a known exhausted quota."""
+    delays = []
+    retry_after = headers.get("Retry-After", "")
+    try:
+        if retry_after:
+            delays.append(max(0.0, float(retry_after)))
+    except (TypeError, ValueError):
+        pass
+    reset = re.search(r"resets? in\\s+(\\d+(?:\\.\\d+)?)\\s*s", response_body, re.IGNORECASE)
+    if reset:
+        delays.append(max(0.0, float(reset.group(1))) + 1.0)
+    return max(delays) if delays else float(2 ** attempt)
+
+
 def request_json(path, params=None, api_key=None):
     url = BASE + path
     if params:
@@ -74,17 +90,28 @@ def request_json(path, params=None, api_key=None):
             with urllib.request.urlopen(req, timeout=45) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:2000]
             if exc.code not in (429, 500, 502, 503, 504) or attempt == 3:
-                detail = exc.read().decode("utf-8", errors="replace")[:2000]
                 raise RuntimeError(
                     f"3D Valley API returned HTTP {exc.code} for {req.full_url}: {detail}"
                 ) from exc
-            retry = exc.headers.get("Retry-After", "")
-            try:
-                delay = float(retry) if retry else 2 ** attempt
-            except ValueError:
-                delay = 2 ** attempt
-            time.sleep(min(delay, 20))
+            if exc.code == 429:
+                delay = rate_limit_wait_seconds(exc.headers, detail, attempt)
+                if delay > MAX_RATE_LIMIT_WAIT_SECONDS:
+                    raise RuntimeError(
+                        f"3D Valley rate limit remains active for {delay:.0f}s, "
+                        f"exceeding the {MAX_RATE_LIMIT_WAIT_SECONDS}s CI wait budget; "
+                        f"preserving partial evidence and refusing a paid-tier upgrade: {detail}"
+                    ) from exc
+                print(f"3D Valley rate limit reached; waiting {delay:.0f}s for provider reset")
+                time.sleep(delay)
+            else:
+                retry = exc.headers.get("Retry-After", "")
+                try:
+                    delay = float(retry) if retry else 2 ** attempt
+                except ValueError:
+                    delay = 2 ** attempt
+                time.sleep(min(delay, 20))
         except (urllib.error.URLError, TimeoutError):
             if attempt == 3:
                 raise
