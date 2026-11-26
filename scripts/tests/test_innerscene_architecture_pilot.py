@@ -246,6 +246,65 @@ class InnersceneGlbValidationTests(unittest.TestCase):
                 pilot.parse_glb(path)
 
 
+
+    def test_invalid_index_accessor_reference_is_rejected(self):
+        import tempfile
+        document = self.valid_document()
+        document["meshes"][0]["primitives"][0]["indices"] = 9
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "bad-indices.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "primitive\\[0\\].indices index out of range"):
+                pilot.parse_glb(path)
+
+    def test_invalid_scene_node_reference_is_rejected(self):
+        import tempfile
+        document = self.valid_document()
+        document["scenes"][0]["nodes"] = [8]
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "bad-scene.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "scene\\[0\\].nodes index out of range"):
+                pilot.parse_glb(path)
+
+    def test_node_hierarchy_cycle_is_rejected(self):
+        import tempfile
+        document = self.valid_document()
+        document["nodes"].append({"children": [0]})
+        document["nodes"][0]["children"] = [1]
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "node-cycle.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "hierarchy contains a cycle"):
+                pilot.parse_glb(path)
+
+    def test_texture_image_reference_is_checked(self):
+        import tempfile
+        document = self.valid_document()
+        document["textures"] = [{"source": 4}]
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "bad-texture.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "texture\\[0\\].source index out of range"):
+                pilot.parse_glb(path)
+
+    def test_multiple_node_parents_are_rejected(self):
+        import tempfile
+        document = self.valid_document()
+        document["nodes"] = [{"children": [1]}, {"mesh": 0}, {"children": [1]}]
+        document["scenes"][0]["nodes"] = [0, 2]
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "multiple-parents.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "has multiple parents"):
+                pilot.parse_glb(path)
+
+
 class InnersceneCandidateInventoryTests(unittest.TestCase):
     def test_candidate_ids_are_unique_and_city_ids_are_valid(self):
         valid_cities = {"solstice", "verdant", "nexus", "aurora", "saffron",
