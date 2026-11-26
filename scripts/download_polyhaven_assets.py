@@ -150,11 +150,11 @@ def write_asset_manifest(asset_dir: Path, manifest: dict):
     temporary = destination.with_name(destination.name + ".part")
     try:
         temporary.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-        os.replace(temporary, destination)
-        persisted = json.loads(destination.read_text(encoding="utf-8"))
+        persisted = json.loads(temporary.read_text(encoding="utf-8"))
         errors = verify_manifest(asset_dir, persisted)
         if errors:
             raise RuntimeError("Imported asset failed manifest verification: " + "; ".join(errors))
+        os.replace(temporary, destination)
     except Exception:
         temporary.unlink(missing_ok=True)
         raise
