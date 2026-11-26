@@ -21,16 +21,29 @@ MIN_HEIGHT_M = 5.0
 MIN_SPAN_M = 4.0
 MAX_RESULTS_PER_CITY = 40
 API_PAGE_LIMIT = 50  # 3D Valley rejects values above 50.
+# Keep the theme-specific searches first, then add shorter catalogue terms.
+# The API's semantic search often returns no rows for long compound phrases;
+# broad discovery is safe because reject_reason() still enforces CC0, realistic
+# style, complete-building title, measured scale and city-theme relevance.
 CITIES = {
-    "SolsticeBay": ["coastal apartment building exterior", "waterfront hotel building", "island villa building", "harbour terminal building"],
-    "VerdantReach": ["sustainable green residential tower", "botanical research centre building", "eco campus building exterior", "vertical garden office tower"],
-    "NexusDelta": ["modern glass skyscraper building", "urban mixed use office tower", "metropolitan apartment building", "modern shopping mall building"],
-    "AuroraHeights": ["alpine resort hotel building", "mountain village apartment building", "timber chalet lodge building", "mountain civic centre building"],
-    "SaffronDunes": ["desert courtyard house building", "oasis hotel building", "adobe cultural centre building", "solar office tower building"],
-    "MonsoonHarbour": ["tropical waterfront apartment building", "port terminal building", "coastal resort hotel building", "harbour market building"],
-    "EclipseCentral": ["supertall glass skyscraper building", "35 metre office tower building", "modern metropolitan landmark tower"],
-    "OriginPlains": ["university campus building", "modern hospital building", "public library building", "research laboratory building"],
-    "AtlasFrontier": ["industrial logistics terminal building", "modern factory building", "industrial research laboratory building", "warehouse building exterior"],
+    "SolsticeBay": ["coastal apartment building exterior", "waterfront hotel building", "island villa building", "harbour terminal building",
+                    "coastal building", "waterfront apartment", "villa", "hotel building", "harbour building"],
+    "VerdantReach": ["sustainable green residential tower", "botanical research centre building", "eco campus building exterior", "vertical garden office tower",
+                     "green building", "sustainable building", "botanical building", "research campus", "eco office"],
+    "NexusDelta": ["modern glass skyscraper building", "urban mixed use office tower", "metropolitan apartment building", "modern shopping mall building",
+                   "skyscraper", "office tower", "apartment building", "shopping mall", "commercial building"],
+    "AuroraHeights": ["alpine resort hotel building", "mountain village apartment building", "timber chalet lodge building", "mountain civic centre building",
+                      "alpine building", "mountain lodge", "chalet", "ski resort building", "mountain hotel"],
+    "SaffronDunes": ["desert courtyard house building", "oasis hotel building", "adobe cultural centre building", "solar office tower building",
+                     "desert building", "courtyard house", "adobe building", "oasis hotel", "solar office"],
+    "MonsoonHarbour": ["tropical waterfront apartment building", "port terminal building", "coastal resort hotel building", "harbour market building",
+                       "harbour building", "port terminal", "tropical hotel", "waterfront apartment", "coastal market building"],
+    "EclipseCentral": ["supertall glass skyscraper building", "35 metre office tower building", "modern metropolitan landmark tower",
+                       "skyscraper", "office tower", "commercial tower", "glass high rise"],
+    "OriginPlains": ["university campus building", "modern hospital building", "public library building", "research laboratory building",
+                     "university building", "hospital", "public library", "school building", "research building"],
+    "AtlasFrontier": ["industrial logistics terminal building", "modern factory building", "industrial research laboratory building", "warehouse building exterior",
+                      "industrial building", "factory", "warehouse", "workshop building", "logistics terminal"],
 }
 RELEVANCE = {
     "SolsticeBay": ("coastal", "waterfront", "harbour", "harbor", "marina", "beach", "island", "villa", "apartment", "hotel"),
