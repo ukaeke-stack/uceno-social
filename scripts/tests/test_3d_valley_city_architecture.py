@@ -55,6 +55,16 @@ class ThreeDValleyCityArchitectureTests(unittest.TestCase):
         self.assertEqual(params["style"], "realistic")
         self.assertEqual(params["format"], "glb")
 
+    def test_buildings_category_scan_obeys_provider_page_limit(self):
+        params = valley.building_catalogue_params()
+        self.assertEqual(params["limit"], 50)
+        self.assertLessEqual(params["limit"], 50)
+        self.assertEqual(params["category"], "buildings")
+
+    def test_buildings_category_scan_preserves_cursor(self):
+        params = valley.building_catalogue_params("next-category-page")
+        self.assertEqual(params["cursor"], "next-category-page")
+
     def test_api_query_cursor_is_preserved(self):
         params = valley.asset_query_params("coastal apartment building", "next-page")
         self.assertEqual(params["cursor"], "next-page")

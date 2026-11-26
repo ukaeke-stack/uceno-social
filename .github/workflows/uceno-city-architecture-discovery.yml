@@ -28,8 +28,9 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: uceno-city-architecture-discovery-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Push and pull_request events for the same branch share one queue.
+  group: uceno-city-architecture-discovery-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: false
 jobs:
   discover-and-acquire:
     runs-on: ubuntu-latest

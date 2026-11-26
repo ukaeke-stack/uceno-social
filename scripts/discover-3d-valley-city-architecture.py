@@ -21,7 +21,7 @@ MIN_HEIGHT_M = 5.0
 MIN_SPAN_M = 4.0
 MAX_RESULTS_PER_CITY = 40
 API_PAGE_LIMIT = 50  # 3D Valley rejects values above 50.
-CATEGORY_PAGE_LIMIT = 100
+CATEGORY_PAGE_LIMIT = API_PAGE_LIMIT  # Keep category scans within the provider's documented 1–50 limit.
 MAX_CATEGORY_SCAN_PAGES = 40  # 4,000 models; current Buildings inventory is about 3,500.
 MAX_RATE_LIMIT_WAIT_SECONDS = 1800  # Never spend more than 30 minutes waiting in a 45-minute CI job.
 # Keep the theme-specific searches first, then add shorter catalogue terms.
