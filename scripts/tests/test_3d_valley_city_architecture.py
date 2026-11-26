@@ -44,6 +44,23 @@ class ThreeDValleyCityArchitectureTests(unittest.TestCase):
         params = valley.asset_query_params("coastal apartment building", "next-page")
         self.assertEqual(params["cursor"], "next-page")
 
+    def test_city_search_includes_shorter_catalogue_queries(self):
+        expected = {
+            "SolsticeBay": "villa",
+            "VerdantReach": "green building",
+            "NexusDelta": "skyscraper",
+            "AuroraHeights": "mountain lodge",
+            "SaffronDunes": "courtyard house",
+            "MonsoonHarbour": "port terminal",
+            "EclipseCentral": "office tower",
+            "OriginPlains": "hospital",
+            "AtlasFrontier": "warehouse",
+        }
+        self.assertEqual(set(valley.CITIES), set(expected))
+        for city, query in expected.items():
+            with self.subTest(city=city):
+                self.assertIn(query, valley.CITIES[city])
+
     def test_explicit_cc0_realistic_full_building_for_matching_city_passes(self):
         self.assertIsNone(valley.reject_reason(candidate(), "SolsticeBay"))
 
