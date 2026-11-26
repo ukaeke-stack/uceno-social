@@ -83,6 +83,8 @@ class InnersceneGlbValidationTests(unittest.TestCase):
         payload = json.dumps(document, separators=(",", ":")).encode("utf-8")
         payload += b" " * ((4 - len(payload) % 4) % 4)
         chunks = [struct.pack("<II", len(payload), 0x4E4F534A) + payload]
+        if binary is None and document.get("buffers"):
+            binary = b"\\0" * document["buffers"][0]["byteLength"]
         if binary is not None:
             binary += b"\\0" * ((4 - len(binary) % 4) % 4)
             chunks.append(struct.pack("<II", len(binary), 0x004E4942) + binary)
@@ -96,7 +98,12 @@ class InnersceneGlbValidationTests(unittest.TestCase):
             "nodes": [{"mesh": 0}],
             "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
             "materials": [{}],
-            "accessors": [{"count": 3, "min": [0, 0, 0], "max": [1, 2, 3]}],
+            "buffers": [{"byteLength": 36}],
+            "bufferViews": [{"buffer": 0, "byteLength": 36}],
+            "accessors": [{
+                "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
+                "min": [0, 0, 0], "max": [1, 2, 3]
+            }],
         }
 
     def test_valid_glb_reports_hash_geometry_and_materials(self):
@@ -110,6 +117,67 @@ class InnersceneGlbValidationTests(unittest.TestCase):
         self.assertEqual(result["material_count"], 1)
         self.assertEqual(result["position_span_xyz_m"], [1, 2, 3])
         self.assertEqual(result["sha256"], hashlib.sha256(payload).hexdigest())
+
+    def test_accessor_count_cannot_overrun_buffer_view(self):
+        import tempfile
+        document = self.valid_document()
+        document["bufferViews"][0]["byteLength"] = 35
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "overflow.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "data range exceeds bufferView"):
+                pilot.parse_glb(path)
+
+    def test_valid_interleaved_accessor_stride_is_accepted(self):
+        import tempfile
+        document = self.valid_document()
+        document["buffers"][0]["byteLength"] = 44
+        document["bufferViews"][0]["byteLength"] = 44
+        document["bufferViews"][0]["byteStride"] = 16
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "interleaved.glb"
+            path.write_bytes(payload)
+            result = pilot.parse_glb(path)
+        self.assertEqual(result["gltf_version"], "2.0")
+
+    def test_accessor_without_buffer_view_is_rejected(self):
+        import tempfile
+        document = self.valid_document()
+        del document["accessors"][0]["bufferView"]
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "no-view.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "must reference a bufferView"):
+                pilot.parse_glb(path)
+
+    def test_sparse_accessor_is_rejected_until_sparse_validation_is_supported(self):
+        import tempfile
+        document = self.valid_document()
+        document["accessors"][0]["sparse"] = {"count": 1, "indices": {}, "values": {}}
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "sparse.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "sparse accessors are not supported"):
+                pilot.parse_glb(path)
+
+    def test_matrix_accessor_accounts_for_four_byte_column_padding(self):
+        import tempfile
+        document = self.valid_document()
+        document["buffers"][0]["byteLength"] = 12
+        document["bufferViews"][0]["byteLength"] = 12
+        document["accessors"][0].update({
+            "componentType": 5121, "count": 1, "type": "MAT3"
+        })
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "matrix-padding.glb"
+            path.write_bytes(payload)
+            result = pilot.parse_glb(path)
+        self.assertEqual(result["gltf_version"], "2.0")
 
     def test_external_texture_uri_is_rejected(self):
         import tempfile
@@ -147,10 +215,8 @@ class InnersceneGlbValidationTests(unittest.TestCase):
     def test_out_of_range_image_buffer_view_is_rejected(self):
         import tempfile
         document = self.valid_document()
-        document["buffers"] = [{"byteLength": 4}]
-        document["bufferViews"] = [{"buffer": 0, "byteLength": 4}]
         document["images"] = [{"bufferView": 9, "mimeType": "image/png"}]
-        payload = self.make_glb(document, binary=b"\\x89PNG")
+        payload = self.make_glb(document)
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "bad-image.glb"
             path.write_bytes(payload)
