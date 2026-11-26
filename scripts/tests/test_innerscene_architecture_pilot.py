@@ -84,9 +84,9 @@ class InnersceneGlbValidationTests(unittest.TestCase):
         payload += b" " * ((4 - len(payload) % 4) % 4)
         chunks = [struct.pack("<II", len(payload), 0x4E4F534A) + payload]
         if binary is None and document.get("buffers"):
-            binary = b"\\0" * document["buffers"][0]["byteLength"]
+            binary = b"\0" * document["buffers"][0]["byteLength"]
         if binary is not None:
-            binary += b"\\0" * ((4 - len(binary) % 4) % 4)
+            binary += b"\0" * ((4 - len(binary) % 4) % 4)
             chunks.append(struct.pack("<II", len(binary), 0x004E4942) + binary)
         total = 12 + sum(len(chunk) for chunk in chunks)
         return b"glTF" + struct.pack("<II", 2, total) + b"".join(chunks)
@@ -141,6 +141,17 @@ class InnersceneGlbValidationTests(unittest.TestCase):
             path.write_bytes(payload)
             result = pilot.parse_glb(path)
         self.assertEqual(result["gltf_version"], "2.0")
+
+    def test_accessor_rejects_stride_smaller_than_element(self):
+        import tempfile
+        document = self.valid_document()
+        document["bufferViews"][0]["byteStride"] = 8
+        payload = self.make_glb(document)
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "short-stride.glb"
+            path.write_bytes(payload)
+            with self.assertRaisesRegex(ValueError, "byteStride"):
+                pilot.parse_glb(path)
 
     def test_accessor_without_buffer_view_is_rejected(self):
         import tempfile
