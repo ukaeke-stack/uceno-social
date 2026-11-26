@@ -749,5 +749,50 @@ class PolyHavenDownloadSafetyTests(unittest.TestCase):
             self.assertFalse(destination.with_name("empty.glb.part").exists())
 
 
+    def test_manifest_verification_accepts_matching_payload(self):
+        payload = b"manifest verified"
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / "model.glb").write_bytes(payload)
+            manifest = {
+                "files": ["model.glb"],
+                "file_integrity": {
+                    "model.glb": {
+                        "bytes": len(payload),
+                        "sha256": hashlib.sha256(payload).hexdigest(),
+                    }
+                },
+            }
+            self.assertEqual(downloader.verify_manifest(root, manifest), [])
+
+    def test_manifest_verification_detects_modified_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / "model.glb").write_bytes(b"modified")
+            manifest = {
+                "files": ["model.glb"],
+                "file_integrity": {
+                    "model.glb": {"bytes": 8, "sha256": hashlib.sha256(b"original").hexdigest()}
+                },
+            }
+            errors = downloader.verify_manifest(root, manifest)
+            self.assertTrue(any("SHA-256 mismatch" in error for error in errors))
+
+    def test_manifest_verification_rejects_traversal_and_missing_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            manifest = {
+                "files": ["../outside.glb", "missing.glb"],
+                "file_integrity": {
+                    "../outside.glb": {"bytes": 1, "sha256": "0" * 64},
+                    "missing.glb": {"bytes": 1, "sha256": "0" * 64},
+                },
+            }
+            errors = downloader.verify_manifest(root, manifest)
+            self.assertTrue(any("Unsafe dependency path" in error for error in errors))
+            self.assertTrue(any("payload file is missing" in error for error in errors))
+
+
+
 if __name__ == "__main__":
     unittest.main()
