@@ -4,6 +4,7 @@ on:
     branches: [feature/uceno-unity-foundation]
     paths:
       - "scripts/acquire-innerscene-architecture-pilot.py"
+      - "scripts/tests/test_innerscene_architecture_pilot.py"
       - ".github/workflows/uceno-innerscene-architecture-pilot.yml"
   workflow_dispatch:
 permissions:
