@@ -92,6 +92,57 @@ def download(url: str, destination: Path):
     return {"bytes": byte_count, "sha256": digest.hexdigest()}
 
 
+
+def verify_manifest(asset_dir: Path, manifest: dict) -> list[str]:
+    """Verify every declared asset payload against its recorded size and SHA-256."""
+    if not isinstance(manifest, dict):
+        return ["manifest must be a JSON object"]
+    declared = manifest.get("files") or manifest.get("maps")
+    if declared is None and isinstance(manifest.get("file"), str):
+        declared = [manifest["file"]]
+    if not isinstance(declared, list) or not declared:
+        return ["manifest must declare at least one payload file"]
+    integrity = manifest.get("file_integrity")
+    if not isinstance(integrity, dict):
+        return ["manifest has no file_integrity object"]
+    errors = []
+    for name in declared:
+        if not isinstance(name, str) or not name:
+            errors.append(f"invalid payload path: {name!r}")
+            continue
+        try:
+            path = safe_dependency_path(asset_dir, name)
+        except RuntimeError as error:
+            errors.append(str(error))
+            continue
+        record = integrity.get(name)
+        if not isinstance(record, dict):
+            errors.append(f"{name}: missing integrity record")
+            continue
+        expected_size = record.get("bytes")
+        expected_hash = record.get("sha256")
+        if not isinstance(expected_size, int) or expected_size < 1:
+            errors.append(f"{name}: invalid recorded byte count")
+            continue
+        if not isinstance(expected_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_hash):
+            errors.append(f"{name}: invalid SHA-256 record")
+            continue
+        if not path.is_file():
+            errors.append(f"{name}: payload file is missing")
+            continue
+        actual_size = path.stat().st_size
+        if actual_size != expected_size:
+            errors.append(f"{name}: byte count mismatch (expected {expected_size}, got {actual_size})")
+            continue
+        digest = hashlib.sha256()
+        with path.open("rb") as payload:
+            for chunk in iter(lambda: payload.read(1024 * 1024), b""):
+                digest.update(chunk)
+        if digest.hexdigest() != expected_hash:
+            errors.append(f"{name}: SHA-256 mismatch")
+    return errors
+
+
 def choose_resolution(root: dict):
     for resolution in ("1k", "2k", "4k", "8k", "16k"):
         value = root.get(resolution)
