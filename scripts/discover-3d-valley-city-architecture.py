@@ -21,6 +21,8 @@ MIN_HEIGHT_M = 5.0
 MIN_SPAN_M = 4.0
 MAX_RESULTS_PER_CITY = 40
 API_PAGE_LIMIT = 50  # 3D Valley rejects values above 50.
+CATEGORY_PAGE_LIMIT = 100
+MAX_CATEGORY_SCAN_PAGES = 40  # 4,000 models; current Buildings inventory is about 3,500.
 # Keep the theme-specific searches first, then add shorter catalogue terms.
 # The API's semantic search often returns no rows for long compound phrases;
 # broad discovery is safe because reject_reason() still enforces CC0, realistic
@@ -89,7 +91,7 @@ def request_json(path, params=None, api_key=None):
             time.sleep(2 ** attempt)
     raise RuntimeError("3D Valley request retries exhausted")
 
-def reject_reason(item, city):
+def reject_reason(item, city, allow_missing_semantic_match=False):
     if not isinstance(item, dict):
         return "invalid-asset-record"
     if not item.get("id"):
@@ -144,7 +146,10 @@ def reject_reason(item, city):
         return "insufficient-city-theme-relevance"
     match = str(item.get("match") or "").lower()
     if match not in ("strong", "good"):
-        return "semantic-match-not-strong-or-good"
+        # Category-wide results have no semantic score; exact city-theme terms
+        # are still required by the local relevance check above.
+        if match or not allow_missing_semantic_match:
+            return "semantic-match-not-strong-or-good"
     return None
 
 def asset_query_params(query, cursor=None):
@@ -156,6 +161,40 @@ def asset_query_params(query, cursor=None):
     return params
 
 
+
+def building_catalogue_params(cursor=None):
+    """Browse the complete Buildings category instead of relying only on semantic search."""
+    params = {
+        "type": "model", "category": "buildings", "style": "realistic",
+        "format": "glb", "limit": CATEGORY_PAGE_LIMIT, "detail": "full",
+    }
+    if cursor:
+        params["cursor"] = cursor
+    return params
+
+
+def fetch_building_catalogue(api_key):
+    """Fetch every Buildings page with stable de-duplication."""
+    assets, diagnostics = {}, []
+    cursor = None
+    for page in range(1, MAX_CATEGORY_SCAN_PAGES + 1):
+        payload = request_json("/assets", building_catalogue_params(cursor), api_key)
+        results = payload.get("results")
+        if not isinstance(results, list):
+            raise RuntimeError("Unexpected 3D Valley Buildings catalogue response: results array missing")
+        diagnostics.append({"page": page, "results": len(results)})
+        for item in results:
+            if isinstance(item, dict) and item.get("id"):
+                assets.setdefault(item["id"], item)
+        cursor = payload.get("next_cursor")
+        if not cursor:
+            return list(assets.values()), diagnostics
+    raise RuntimeError(
+        f"3D Valley Buildings catalogue exceeded the {MAX_CATEGORY_SCAN_PAGES}-page safety limit; "
+        "inventory scan is incomplete and cannot be treated as exhaustive"
+    )
+
+
 def main():
     key = os.environ.get("THREE_D_VALLEY_API_KEY", "").strip()
     if not key:
@@ -165,6 +204,13 @@ def main():
               "policy": "CC0-1.0, realistic style, full-building title, measured scale, city relevance; no paid generation",
               "cities": {}, "unique_asset_ids": []}
     globally_seen = set()
+    # Semantic queries miss much of the catalogue. Add a single paginated
+    # Buildings-category scan, then apply the same strict local quality gates.
+    catalogue_items, catalogue_diagnostics = fetch_building_catalogue(key)
+    report["building_catalogue_scan"] = {
+        "category": "buildings", "pages": catalogue_diagnostics,
+        "unique_assets": len(catalogue_items), "complete": True,
+    }
     for city, queries in CITIES.items():
         accepted, rejected, diagnostics = {}, [], []
         for query in queries:
@@ -201,12 +247,32 @@ def main():
                     break
             if len(accepted) >= MAX_RESULTS_PER_CITY:
                 break
+        catalogue_rejections = {}
+        for item in catalogue_items:
+            reason = reject_reason(item, city, allow_missing_semantic_match=True)
+            if reason:
+                catalogue_rejections[reason] = catalogue_rejections.get(reason, 0) + 1
+                continue
+            asset_id = item["id"]
+            candidate = {
+                "id": asset_id, "name": item.get("name"), "license": item.get("license"),
+                "style": item.get("style"), "tags": item.get("tags", []),
+                "size_m": item.get("size_m"), "triangles": item.get("tris"),
+                "maps": item.get("maps", []), "max_res": item.get("max_res"),
+                "download": item.get("download"), "preview": item.get("preview"),
+                "source_url": "https://3dvalley.com",
+                "match": item.get("match") or "category-scan",
+                "similarity": item.get("similarity"),
+                "discovery_method": "buildings-category-scan",
+            }
+            accepted.setdefault(asset_id, candidate)
         # Keep duplicate source models visible in every relevant city, but report overlap.
         for asset_id in accepted:
             globally_seen.add(asset_id)
         report["cities"][city] = {"candidate_count": len(accepted),
             "candidates": sorted(accepted.values(), key=lambda x: (-(x.get("similarity") or 0), x["id"])),
             "rejected_count": len(rejected), "rejections_sample": rejected[:100],
+            "catalogue_scan_rejection_counts": catalogue_rejections,
             "query_diagnostics": diagnostics}
         print(f"{city}: {len(accepted)} qualifying candidates; {len(rejected)} rejected")
     report["unique_asset_ids"] = sorted(globally_seen)
