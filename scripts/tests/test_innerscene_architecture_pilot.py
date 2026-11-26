@@ -180,8 +180,8 @@ class InnersceneGlbValidationTests(unittest.TestCase):
         document = self.valid_document()
         document["buffers"][0]["byteLength"] = 12
         document["bufferViews"][0]["byteLength"] = 12
-        document["accessors"][0].update({
-            "componentType": 5121, "count": 1, "type": "MAT3"
+        document["accessors"].append({
+            "bufferView": 0, "componentType": 5121, "count": 1, "type": "MAT3"
         })
         payload = self.make_glb(document)
         with tempfile.TemporaryDirectory() as directory:
@@ -209,7 +209,7 @@ class InnersceneGlbValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "bad-accessor.glb"
             path.write_bytes(payload)
-            with self.assertRaisesRegex(ValueError, "primitive attribute POSITION index out of range"):
+            with self.assertRaisesRegex(ValueError, "mesh\\[0\\].primitive\\[0\\].POSITION index out of range"):
                 pilot.parse_glb(path)
 
     def test_out_of_range_node_mesh_is_rejected(self):
