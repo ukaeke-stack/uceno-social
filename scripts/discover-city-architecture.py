@@ -440,10 +440,10 @@ def rejection_reason(item, city):
     if city != "EclipseCentral" and not words_present(searchable, POSITIVE_TERMS):
         return "not-recognized-as-a-whole-building"
     relevance_text = searchable + " " + " ".join(tags)
-    if not words_present(relevance_text, CITY_THEME_ANCHORS.get(city, ())):
-        return "insufficient-city-theme-anchor"
     if not words_present(relevance_text, CITY_RELEVANCE.get(city, ())):
         return "insufficient-city-relevance"
+    if not words_present(relevance_text, CITY_THEME_ANCHORS.get(city, ())):
+        return "insufficient-city-theme-anchor"
     size = as_number((item.get("stats") or {}).get("fileSize"))
     if size is not None and size > MAX_BYTES:
         return "over-25-mib-android-acquisition-cap"
