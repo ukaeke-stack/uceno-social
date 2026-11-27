@@ -36,7 +36,13 @@ export async function GET(_request: NextRequest, { params }: Context) {
                   ELSE hm.permission END AS permission,
              EXISTS (SELECT 1 FROM user_blocks b
                WHERE (b.blocker_id = h.owner_user_id AND b.blocked_id = ${session.id}::uuid)
-                  OR (b.blocker_id = ${session.id}::uuid AND b.blocked_id = h.owner_user_id)) AS blocked
+                  OR (b.blocker_id = ${session.id}::uuid AND b.blocked_id = h.owner_user_id)) AS blocked,
+             EXISTS (SELECT 1 FROM follows owner_follows
+               JOIN follows viewer_follows
+                 ON viewer_follows.follower_id = owner_follows.following_id
+                AND viewer_follows.following_id = owner_follows.follower_id
+               WHERE owner_follows.follower_id = h.owner_user_id
+                 AND owner_follows.following_id = ${session.id}::uuid) AS "isMutualFriend"
       FROM virtual_homes h
       JOIN virtual_worlds w ON w.id = h.world_id
       LEFT JOIN virtual_world_memberships wm
@@ -51,7 +57,8 @@ export async function GET(_request: NextRequest, { params }: Context) {
         (home.worldVisibility === "private" &&
           home.worldMembership !== "active" && home.worldOwnerId !== session.id) ||
         (home.ownerUserId !== session.id &&
-          (home.visibility !== "invite" || !home.permission))) {
+          !((home.visibility === "invite" && !!home.permission) ||
+            (home.visibility === "friends" && home.isMutualFriend)))) {
       return NextResponse.json({ error: "Home is unavailable" }, { status: 404 });
     }
     const { ownerUserId: _ownerUserId, worldStatus: _worldStatus,
@@ -86,7 +93,7 @@ export async function PUT(request: NextRequest, { params }: Context) {
   if ((!hasTransform && !hasFurnishing && !hasVisibility) ||
       (hasTransform && (!isValidHomeTransform(body.transform) || !withinBytes(body.transform, 4000))) ||
       (hasFurnishing && (!isValidHomeFurnishing(body.furnishing) || !withinBytes(body.furnishing, 12000))) ||
-      (hasVisibility && body.visibility !== "private" && body.visibility !== "invite")) {
+      (hasVisibility && !["private", "invite", "friends"].includes(String(body.visibility)))) {
     return NextResponse.json({ error: "Provide a valid bounded transform or furnishing layout" }, { status: 400 });
   }
 
@@ -124,7 +131,19 @@ export async function PUT(request: NextRequest, { params }: Context) {
             AND COALESCE(wm.status, 'none') NOT IN ('banned', 'suspended')
             AND (w.visibility <> 'private' OR wm.status = 'active'
               OR w.owner_user_id = ${session.id}::uuid)
-            AND (h.owner_user_id = ${session.id}::uuid OR h.visibility = 'invite')
+            AND (h.owner_user_id = ${session.id}::uuid
+              OR (h.visibility = 'invite' AND EXISTS (
+                SELECT 1 FROM virtual_home_members hm
+                WHERE hm.home_id = h.id AND hm.user_id = ${session.id}::uuid
+              ))
+              OR (h.visibility = 'friends' AND EXISTS (
+                SELECT 1 FROM follows owner_follows
+                JOIN follows viewer_follows
+                  ON viewer_follows.follower_id = owner_follows.following_id
+                 AND viewer_follows.following_id = owner_follows.follower_id
+                WHERE owner_follows.follower_id = h.owner_user_id
+                  AND owner_follows.following_id = ${session.id}::uuid
+              )))
         )
         AND NOT EXISTS (
           SELECT 1 FROM user_blocks b
