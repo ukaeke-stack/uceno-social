@@ -89,7 +89,7 @@ class TevyCityArchitectureTests(unittest.TestCase):
             description="A complete house in a Greek island village and harbour",
         )
         self.assertEqual(tevy.screen(candidate, "AuroraHeights"),
-                         "insufficient-city-theme-anchor")
+                         "insufficient-city-relevance")
 
     def test_city_specific_building_candidate_passes_relevance_gate(self):
         alpine = record(name="Alpine Ski Lodge", tags=["alpine", "mountain", "ski", "lodge"])
