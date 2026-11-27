@@ -153,10 +153,10 @@ def screen(record, city):
     # catalogue scarcity cannot silently mislabel assets across districts.
     if city not in CITIES:
         return "insufficient-city-relevance"
-    if not any(contains_term(text, term) for term in CITY_THEME_ANCHORS.get(city, ())):
-        return "insufficient-city-theme-anchor"
     if not any(contains_term(text, term) for term in CITIES[city]):
         return "insufficient-city-relevance"
+    if not any(contains_term(text, term) for term in CITY_THEME_ANCHORS.get(city, ())):
+        return "insufficient-city-theme-anchor"
     return None
 
 def score(record, city):
