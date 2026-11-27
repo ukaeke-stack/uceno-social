@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldHomeInteriorBuilder.cs"
+      - "app/api/world-homes/route.ts"
+      - "app/api/world-homes/[homeId]/route.ts"
+      - "runtime/world-gateway/src/server.ts"
       - "scripts/tests/test_world_home_interior_source.py"
       - ".github/workflows/uceno-home-interior-source.yml"
   push:
