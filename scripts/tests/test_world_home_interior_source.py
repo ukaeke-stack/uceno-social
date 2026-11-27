@@ -4,6 +4,9 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldHomeInteriorBuilder.cs"
 CODE = SOURCE.read_text(encoding="utf-8")
+HOME_LIST = (ROOT / "app/api/world-homes/route.ts").read_text(encoding="utf-8")
+HOME_DETAIL = (ROOT / "app/api/world-homes/[homeId]/route.ts").read_text(encoding="utf-8")
+GATEWAY = (ROOT / "runtime/world-gateway/src/server.ts").read_text(encoding="utf-8")
 
 
 def method_body(name, return_type="void"):
@@ -26,6 +29,23 @@ def method_body(name, return_type="void"):
 
 
 class HomeInteriorSourceContractTests(unittest.TestCase):
+    def test_friends_visibility_requires_mutual_follow_in_home_list(self):
+        self.assertIn('h.visibility = \'friends\'', HOME_LIST)
+        self.assertIn('owner_follows.follower_id = h.owner_user_id', HOME_LIST)
+        self.assertIn('owner_follows.following_id = ${session.id}::uuid', HOME_LIST)
+        self.assertIn('viewer_follows.following_id = owner_follows.follower_id', HOME_LIST)
+        self.assertIn('["private", "invite", "friends"]', HOME_LIST)
+
+    def test_friends_visibility_is_rechecked_on_home_detail_and_edit(self):
+        self.assertIn('AS "isMutualFriend"', HOME_DETAIL)
+        self.assertIn('home.visibility === "friends" && home.isMutualFriend', HOME_DETAIL)
+        self.assertIn("h.visibility = 'friends'", HOME_DETAIL)
+
+    def test_gateway_enforces_friends_visibility_server_side(self):
+        self.assertIn("AS is_mutual_friend", GATEWAY)
+        self.assertIn('home.visibility === "friends" && home.is_mutual_friend', GATEWAY)
+
+
     def test_home_builds_complete_room_zones(self):
         for feature in ("BuildFloor", "BuildShell", "BuildKitchen", "BuildBathroom",
                         "BuildLighting", "BuildArchitecturalDetails"):
