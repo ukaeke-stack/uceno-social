@@ -152,6 +152,24 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         )
         self.assertIsNone(discovery.rejection_reason(laboratory, "AtlasFrontier"))
 
+    def test_generic_greek_island_village_is_not_assigned_to_alpine_city(self):
+        title = "Cube House Medium (Greek Island Village and Harbour)"
+        summary = "A complete cube house in a Greek island village and harbour."
+        dimensions = [5.13, 6.16, 4.519]
+        candidate = asset(title, dimensions, summary=summary)
+        self.assertEqual(discovery.rejection_reason(candidate, "AuroraHeights"),
+                         "insufficient-city-theme-anchor")
+        self.assertIsNone(discovery.rejection_reason(candidate, "SolsticeBay"))
+        detail = {
+            "title": title,
+            "category": "buildings",
+            "description": summary,
+            "tags": [{"slug": "realistic"}, {"slug": "exterior"}],
+            "stats": {"sizeMeters": dimensions},
+        }
+        with self.assertRaisesRegex(ValueError, "target-city-specific theme anchor"):
+            acquisition.validate_complete_building(detail, "AuroraHeights")
+
     def test_city_relevance_rejects_an_unrelated_complete_building(self):
         coastal = asset(
             "Coastal Hotel Building", [18, 12, 14],

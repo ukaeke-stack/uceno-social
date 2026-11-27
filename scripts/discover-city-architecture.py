@@ -317,6 +317,22 @@ CITY_RELEVANCE = {
                       "power station", "laboratory", "assay"),
 }
 
+# A city must match a distinctive architectural or environmental theme anchor.
+# Generic words such as "village", "residential", "hotel" or "office" alone
+# cannot assign a model to an unrelated city.
+CITY_THEME_ANCHORS = {
+    "SolsticeBay": ("waterfront", "coastal", "harbour", "harbor", "marina", "beach", "island", "ferry", "hanok", "korean"),
+    "VerdantReach": ("green", "garden", "sustainable", "biophilic", "eco", "botanical", "vertical garden", "greenhouse", "arboretum"),
+    "NexusDelta": ("skyscraper", "high rise", "high-rise", "office", "commercial", "mixed use", "mixed-use", "glass", "urban", "financial", "metropolitan", "corporate", "technology", "data centre", "data center"),
+    "AuroraHeights": ("alpine", "mountain", "ski", "snow", "resort", "lodge", "chalet", "timber"),
+    "SaffronDunes": ("desert", "adobe", "arid", "sand", "solar", "oasis", "mudbrick", "courtyard", "middle eastern", "arabic"),
+    "MonsoonHarbour": ("harbour", "harbor", "port", "waterfront", "coastal", "tropical", "marina", "ferry", "terminal", "quay", "dock", "canal", "monsoon"),
+    "EclipseCentral": ("skyscraper", "supertall", "high rise", "high-rise", "tower", "office", "commercial", "skyline", "metropolitan", "city"),
+    "OriginPlains": ("university", "campus", "school", "library", "museum", "civic", "hospital", "classroom", "college", "courthouse", "research", "education"),
+    "AtlasFrontier": ("industrial", "factory", "warehouse", "hangar", "logistics", "workshop", "manufacturing", "terminal", "plant", "steel", "power station", "laboratory", "assay", "depot"),
+}
+
+
 def get(url, max_attempts=4, base_delay_seconds=1.5, max_delay_seconds=20):
     """Fetch catalogue JSON with bounded retries for transient provider failures."""
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
@@ -424,6 +440,8 @@ def rejection_reason(item, city):
     if city != "EclipseCentral" and not words_present(searchable, POSITIVE_TERMS):
         return "not-recognized-as-a-whole-building"
     relevance_text = searchable + " " + " ".join(tags)
+    if not words_present(relevance_text, CITY_THEME_ANCHORS.get(city, ())):
+        return "insufficient-city-theme-anchor"
     if not words_present(relevance_text, CITY_RELEVANCE.get(city, ())):
         return "insufficient-city-relevance"
     size = as_number((item.get("stats") or {}).get("fileSize"))

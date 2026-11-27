@@ -82,6 +82,15 @@ class TevyCityArchitectureTests(unittest.TestCase):
         generic = record(name="Modern Office Building", tags=["building", "office"])
         self.assertEqual(tevy.screen(generic, "AuroraHeights"), "insufficient-city-relevance")
 
+    def test_generic_greek_island_village_does_not_qualify_for_alpine_city(self):
+        candidate = record(
+            name="Cube House Medium (Greek Island Village and Harbour)",
+            tags=["village", "island"],
+            description="A complete house in a Greek island village and harbour",
+        )
+        self.assertEqual(tevy.screen(candidate, "AuroraHeights"),
+                         "insufficient-city-theme-anchor")
+
     def test_city_specific_building_candidate_passes_relevance_gate(self):
         alpine = record(name="Alpine Ski Lodge", tags=["alpine", "mountain", "ski", "lodge"])
         self.assertIsNone(tevy.screen(alpine, "AuroraHeights"))

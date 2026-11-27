@@ -29,6 +29,20 @@ CITIES = {
     "OriginPlains": ("university", "campus", "school", "library", "museum", "civic", "hospital", "classroom", "college", "office"),
     "AtlasFrontier": ("industrial", "factory", "warehouse", "hangar", "logistics", "workshop", "manufacturing", "terminal", "plant", "office"),
 }
+# Stronger city-specific anchors prevent generic catalogue terms from assigning
+# a building to the wrong climate, culture or urban typology.
+CITY_THEME_ANCHORS = {
+    "SolsticeBay": ("waterfront", "coastal", "harbour", "harbor", "marina", "beach", "island", "ferry", "hanok", "korean"),
+    "VerdantReach": ("green", "garden", "sustainable", "biophilic", "eco", "botanical", "vertical garden", "greenhouse", "arboretum"),
+    "NexusDelta": ("skyscraper", "high rise", "high-rise", "office", "commercial", "mixed use", "mixed-use", "glass", "urban", "financial", "metropolitan", "corporate", "technology", "data centre", "data center"),
+    "AuroraHeights": ("alpine", "mountain", "ski", "snow", "resort", "lodge", "chalet", "timber"),
+    "SaffronDunes": ("desert", "adobe", "arid", "sand", "solar", "oasis", "mudbrick", "courtyard", "middle eastern", "arabic"),
+    "MonsoonHarbour": ("harbour", "harbor", "port", "waterfront", "coastal", "tropical", "marina", "ferry", "terminal", "quay", "dock", "canal", "monsoon"),
+    "EclipseCentral": ("skyscraper", "supertall", "high rise", "high-rise", "tower", "office", "commercial", "skyline", "metropolitan", "city"),
+    "OriginPlains": ("university", "campus", "school", "library", "museum", "civic", "hospital", "classroom", "college", "courthouse", "research", "education"),
+    "AtlasFrontier": ("industrial", "factory", "warehouse", "hangar", "logistics", "workshop", "manufacturing", "terminal", "plant", "steel", "power station", "laboratory", "assay", "depot"),
+}
+
 NON_OCCUPIABLE = (
     "power pylon", "transmission pylon", "pylon", "tv tower", "television tower",
     "broadcast tower", "radio tower", "harbour crane", "harbor crane", "crane",
@@ -137,7 +151,11 @@ def screen(record, city):
     # A generic building is not automatically suitable for every city.
     # Require at least one explicit city-theme term before acquisition so
     # catalogue scarcity cannot silently mislabel assets across districts.
-    if city not in CITIES or not any(contains_term(text, term) for term in CITIES[city]):
+    if city not in CITIES:
+        return "insufficient-city-relevance"
+    if not any(contains_term(text, term) for term in CITY_THEME_ANCHORS.get(city, ())):
+        return "insufficient-city-theme-anchor"
+    if not any(contains_term(text, term) for term in CITIES[city]):
         return "insufficient-city-relevance"
     return None
 
