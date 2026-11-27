@@ -214,10 +214,10 @@ def validate_complete_building(detail, city):
         if not words_present(searchable, TOWER_TERMS):
             raise ValueError("Eclipse Central candidate is not a skyscraper/office tower")
     relevance_text = searchable + " " + " ".join(tags)
-    if not words_present(relevance_text, CITY_THEME_ANCHORS.get(city, ())):
-        raise ValueError("Asset does not match a target-city-specific theme anchor")
     if not words_present(relevance_text, CITY_RELEVANCE.get(city, ())):
         raise ValueError("Asset is not relevant to the target city")
+    if not words_present(relevance_text, CITY_THEME_ANCHORS.get(city, ())):
+        raise ValueError("Asset does not match a target-city-specific theme anchor")
     return dims
 
 def main():
