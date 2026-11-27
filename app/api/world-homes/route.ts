@@ -50,7 +50,18 @@ export async function GET(request: NextRequest) {
       LEFT JOIN virtual_home_members hm
         ON hm.home_id = h.id AND hm.user_id = ${session.id}::uuid
       WHERE h.world_id = ${worldId}::uuid
-        AND (h.owner_user_id = ${session.id}::uuid OR (h.visibility = 'invite' AND hm.user_id IS NOT NULL))
+        AND (
+          h.owner_user_id = ${session.id}::uuid
+          OR (h.visibility = 'invite' AND hm.user_id IS NOT NULL)
+          OR (h.visibility = 'friends' AND EXISTS (
+            SELECT 1 FROM follows owner_follows
+            JOIN follows viewer_follows
+              ON viewer_follows.follower_id = owner_follows.following_id
+             AND viewer_follows.following_id = owner_follows.follower_id
+            WHERE owner_follows.follower_id = h.owner_user_id
+              AND owner_follows.following_id = ${session.id}::uuid
+          ))
+        )
         AND NOT EXISTS (SELECT 1 FROM user_blocks b
           WHERE (b.blocker_id = h.owner_user_id AND b.blocked_id = ${session.id}::uuid)
              OR (b.blocker_id = ${session.id}::uuid AND b.blocked_id = h.owner_user_id))
@@ -81,7 +92,7 @@ export async function POST(request: NextRequest) {
   }
   const furnishing = body.furnishing ?? [];
   if (!isValidHomeFurnishing(furnishing) || !boundedJson(furnishing, 12000) ||
-      (body.visibility !== undefined && body.visibility !== "private" && body.visibility !== "invite")) {
+      (body.visibility !== undefined && !["private", "invite", "friends"].includes(String(body.visibility)))) {
     return NextResponse.json({ error: "Invalid home layout, furnishing or visibility settings" }, { status: 400 });
   }
 
