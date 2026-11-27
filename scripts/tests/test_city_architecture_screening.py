@@ -92,7 +92,7 @@ class CityArchitectureScreeningTests(unittest.TestCase):
         detail = {
             "title": "Modular Residential Building",
             "category": "buildings",
-            "description": "realistic exterior complete apartment building",
+            "description": "realistic exterior complete urban apartment building",
             "tags": [{"slug": "realistic"}, {"slug": "exterior"}, {"slug": "modular"}],
             "stats": {"sizeMeters": [18, 24, 16]},
         }
