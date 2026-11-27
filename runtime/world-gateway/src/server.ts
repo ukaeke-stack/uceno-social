@@ -1473,6 +1473,12 @@ wss.on("connection", async (socket: WebSocket) => {
               w.visibility AS "worldVisibility", w.owner_user_id AS "worldOwnerId",
               COALESCE(wm.status, 'none') AS "membershipStatus",
               hm.permission,
+              EXISTS (SELECT 1 FROM follows owner_follows
+                JOIN follows visitor_follows
+                  ON visitor_follows.follower_id = owner_follows.following_id
+                 AND visitor_follows.following_id = owner_follows.follower_id
+                WHERE owner_follows.follower_id = h.owner_user_id
+                  AND owner_follows.following_id = ${player.id}::uuid) AS is_mutual_friend,
               EXISTS (SELECT 1 FROM user_blocks b
                 WHERE (b.blocker_id = h.owner_user_id AND b.blocked_id = ${player.id}::uuid)
                    OR (b.blocker_id = ${player.id}::uuid AND b.blocked_id = h.owner_user_id)) AS blocked
@@ -1491,7 +1497,8 @@ wss.on("connection", async (socket: WebSocket) => {
             (home.worldVisibility !== "private" || home.membershipStatus === "active" ||
               home.worldOwnerId === player.id) &&
             (home.ownerUserId === player.id ||
-              (home.visibility === "invite" && !!home.permission));
+              (home.visibility === "invite" && !!home.permission) ||
+              (home.visibility === "friends" && home.is_mutual_friend));
           const anchor = allowed ? readSpatialTransform(home.transform) : null;
           if (!allowed || !anchor) {
             send(socket, { type: "spatial_location_rejected", code: "home_access_denied_or_invalid_anchor" }); return;
