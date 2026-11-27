@@ -39,7 +39,7 @@ CITY_THEMES = {
     "MonsoonHarbour": ("harbour", "harbor", "rain", "tropical", "dock"),
     "EclipseCentral": ("urban", "downtown", "skyscraper", "plaza", "metro"),
     "OriginPlains": ("farm", "agriculture", "village", "grassland", "ranch"),
-    "AtlasFrontier": ("mining", "frontier", "quarry", "energy", "物流"),
+    "AtlasFrontier": ("mining", "frontier", "quarry", "energy", "logistics"),
 }
 
 
