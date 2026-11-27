@@ -1,0 +1,28 @@
+name: UCENO Poly Haven city discovery checks
+on:
+  pull_request:
+    paths:
+      - "scripts/discover_polyhaven_city_assets_v2.py"
+      - "scripts/tests/test_discover_polyhaven_city_assets_v2.py"
+      - ".github/workflows/polyhaven-city-discovery.yml"
+  push:
+    branches:
+      - "feature/uceno-city-catalog-discovery-v2-clean"
+    paths:
+      - "scripts/discover_polyhaven_city_assets_v2.py"
+      - "scripts/tests/test_discover_polyhaven_city_assets_v2.py"
+      - ".github/workflows/polyhaven-city-discovery.yml"
+permissions:
+  contents: read
+jobs:
+  discovery-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile discovery code and tests
+        run: python -m compileall -q scripts/discover_polyhaven_city_assets_v2.py scripts/tests/test_discover_polyhaven_city_assets_v2.py
+      - name: Test city coverage and candidate matching
+        run: python -m unittest scripts.tests.test_discover_polyhaven_city_assets_v2 -v
