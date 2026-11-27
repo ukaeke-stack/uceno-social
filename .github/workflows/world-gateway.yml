@@ -152,7 +152,7 @@ jobs:
           if (registryExporter.includes('Guid.NewGuid()'))
             throw new Error('Scene registry export must not use random IDs that change between exports.');
           const exporter = fs.readFileSync('./unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCollisionGeometryExporter.cs', 'utf8');
-          for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes.json'])
+          for (const marker of ['GetComponentsInChildren<Collider>', 'collider.bounds', 'uceno-city-collision-boxes-'])
             if (!exporter.includes(marker)) throw new Error('Missing Unity geometry export behavior: ' + marker);
           const eventsApi = fs.readFileSync('./app/api/world-events/route.ts', 'utf8');
           if (!eventsApi.includes('if (!await canAccessWorld(body.worldId, session.id))'))
