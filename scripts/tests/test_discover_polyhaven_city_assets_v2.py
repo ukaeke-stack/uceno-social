@@ -1,7 +1,8 @@
 import unittest
 
 from scripts.discover_polyhaven_city_assets_v2 import (
-    CITY_THEMES, ROLE_TERMS, hits, searchable_text,
+    CITY_THEMES, ROLE_TERMS, building_screen, hits, searchable_text,
+    summarize_city_coverage,
 )
 
 
