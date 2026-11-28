@@ -45,5 +45,48 @@ class CityAssetDiscoveryTests(unittest.TestCase):
         self.assertEqual(hits(text, ROLE_TERMS["vegetation"]), ["tree"])
 
 
+
+    def test_modular_facade_is_rejected_as_a_building_candidate(self):
+        asset = {
+            "name": "Modular Urban Apartments Facade",
+            "category": "Architecture/Facades & Modules/Building Facades",
+            "categories": ["buildings"],
+        }
+        self.assertEqual(building_screen(asset), "reject-component-or-modular-title")
+
+    def test_whole_building_title_still_requires_review_and_import(self):
+        asset = {
+            "name": "Modern Residential Tower",
+            "category": "Architecture/Buildings",
+            "categories": ["buildings"],
+        }
+        self.assertEqual(
+            building_screen(asset),
+            "candidate-needs-dimensions-visual-and-unity-import-review",
+        )
+
+    def test_non_architecture_prop_is_not_a_building_candidate(self):
+        asset = {
+            "name": "City Bench",
+            "category": "Furniture/Seating/Benches",
+        }
+        self.assertEqual(building_screen(asset), "not-building-category")
+
+    def test_city_coverage_keeps_all_nine_cities_and_separates_possible_matches(self):
+        coverage = summarize_city_coverage([{
+            "possible_city_theme_matches": {"SolsticeBay": ["coastal"]},
+            "roles": {"vegetation": ["tree"]},
+            "building_screen": "not-whole-building-title",
+        }])
+        self.assertEqual(set(coverage), set(CITY_THEMES))
+        self.assertEqual(coverage["SolsticeBay"]["candidate_count"], 1)
+        self.assertEqual(coverage["SolsticeBay"]["roles"]["vegetation"], 1)
+        self.assertEqual(coverage["VerdantReach"]["candidate_count"], 0)
+        self.assertEqual(
+            coverage["SolsticeBay"]["unverified_whole_building_screen_candidates"], 0
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main()

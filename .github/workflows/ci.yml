@@ -2,6 +2,13 @@ name: UCENO CI
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_android:
+        description: "Compile an Android debug APK only after explicit authorization."
+        required: false
+        type: boolean
+        default: false
   pull_request:
     branches: [main]
 jobs:
@@ -28,6 +35,7 @@ jobs:
         run: UCENO_BASE_URL=http://127.0.0.1:3000 npm run test:smoke
 
   android-shell:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_android == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
