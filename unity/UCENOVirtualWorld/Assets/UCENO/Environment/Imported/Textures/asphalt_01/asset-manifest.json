@@ -1,0 +1,43 @@
+{
+  "name": "Asphalt 01",
+  "asset_id": "asphalt_01",
+  "source": "https://polyhaven.com/a/asphalt_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Dario Barresi": "Processing ",
+    "Charlotte Baglioni": "Photography"
+  },
+  "texture_resolutions": [
+    "1k"
+  ],
+  "maps": [
+    "asphalt_01_diff.jpg",
+    "asphalt_01_nor_gl.png",
+    "asphalt_01_rough.jpg",
+    "asphalt_01_ao.jpg",
+    "asphalt_01_arm.jpg"
+  ],
+  "file_integrity": {
+    "asphalt_01_diff.jpg": {
+      "bytes": 739513,
+      "sha256": "99b6f6bdfbd09279f3f550ac9593336df541aa2319537566eeb3e737d8512010"
+    },
+    "asphalt_01_nor_gl.png": {
+      "bytes": 5938626,
+      "sha256": "347d6376e7df8b2255b2fb1d998cb57bd276dec313ddbb78b20d0ccffe364531"
+    },
+    "asphalt_01_rough.jpg": {
+      "bytes": 344964,
+      "sha256": "147891957807bb03cc565c9daa8a16a4af7713449a0f475c638f78f833ad0646"
+    },
+    "asphalt_01_ao.jpg": {
+      "bytes": 1105060,
+      "sha256": "b151d385dd3c6cfe2f6a53caec2a3e7547ad48d59f84a52c1b7cd07b112d506c"
+    },
+    "asphalt_01_arm.jpg": {
+      "bytes": 1086945,
+      "sha256": "932de16bf05f7c9058b333d57600fec8584d3129c04d42e39da2539eee749ae3"
+    }
+  },
+  "runtime_api_dependency": false
+}

@@ -1,0 +1,35 @@
+{
+  "city_id": "nexus",
+  "city_label": "Nexus Delta",
+  "asset_id": "modern_buildings_night",
+  "name": "Modern Buildings Night",
+  "creator_contributions": {
+    "Greg Zaal": "All"
+  },
+  "source_page": "https://polyhaven.com/a/modern_buildings_night",
+  "api_file_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/modern_buildings_night_1k.hdr",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "api_terms": "https://polyhaven.com/our-api",
+  "format": "Radiance HDR (.hdr)",
+  "resolution_tier": "1k",
+  "expected_size_bytes": 1655510,
+  "verified_md5": "3067e8d9e8e961e6a11ff45c055a5fbd",
+  "verified_sha256": "a690048dcecabf5ed1ad773f7abdec7cce7b1fea4d89b17f054a18f3e0fa2919",
+  "actual_size_bytes": 1655510,
+  "width": 1024,
+  "height": 512,
+  "file": "unity/UCENOVirtualWorld/Assets/UCENO/Cities/nexus/Textures/Skybox/nexus_environment.hdr",
+  "catalogue_description": "Free 16K unclipped HDRI of a Berlin riverside at night, high-contrast artificial lights, warm glass interiors and cool blue sky reflecting on water.",
+  "category": "Streets & Town/Streets & Alleys/City Streets",
+  "tags": [
+    "building",
+    "europe",
+    "river",
+    "architecture",
+    "lamp"
+  ],
+  "acquisition_status": "downloaded-and-md5-verified",
+  "unity_import_status": "not-yet-imported",
+  "visual_acceptance_status": "pending"
+}

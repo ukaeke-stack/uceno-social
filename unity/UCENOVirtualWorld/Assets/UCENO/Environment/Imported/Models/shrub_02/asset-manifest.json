@@ -1,0 +1,48 @@
+{
+  "name": "Shrub 02",
+  "asset_id": "shrub_02",
+  "source": "https://polyhaven.com/a/shrub_02",
+  "license": "CC0 1.0",
+  "authors": {
+    "Rico Cilliers": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 52317,
+  "lods": true,
+  "files": [
+    "shrub_02.fbx",
+    "textures/shrub_02_rough_1k.exr",
+    "textures/shrub_02_alpha_1k.png",
+    "textures/shrub_02_diff_1k.jpg",
+    "textures/shrub_02_mask_1k.png",
+    "textures/shrub_02_nor_gl_1k.exr"
+  ],
+  "file_integrity": {
+    "shrub_02.fbx": {
+      "bytes": 832300,
+      "sha256": "7bd42e635ed83a9341a9953280845dc2685615a4a4a5441e31eedd39d5431ec8"
+    },
+    "textures/shrub_02_rough_1k.exr": {
+      "bytes": 303276,
+      "sha256": "a9f6cda20dc287fb27ab5c9a399284ae02e8abf032ad324f3083ebcf7f1987a5"
+    },
+    "textures/shrub_02_alpha_1k.png": {
+      "bytes": 91741,
+      "sha256": "5c2c31bac311051db77443e1780078403c2df0a832c40fe6ed7bcd982695cdf0"
+    },
+    "textures/shrub_02_diff_1k.jpg": {
+      "bytes": 395120,
+      "sha256": "9956eff294034d70516d867e9668428a23d782feb3d4c34061dce5e44bacd5a8"
+    },
+    "textures/shrub_02_mask_1k.png": {
+      "bytes": 12041,
+      "sha256": "5079f3b1136b10f715934f401c7f75b3fa015e24c92680f8758e09f8f0cdf7e2"
+    },
+    "textures/shrub_02_nor_gl_1k.exr": {
+      "bytes": 1050955,
+      "sha256": "e7a55808cea62a123f3f27a92d83a0d55aaadfe64bc7f75853f8f49f37fd63c9"
+    }
+  },
+  "runtime_api_dependency": false
+}

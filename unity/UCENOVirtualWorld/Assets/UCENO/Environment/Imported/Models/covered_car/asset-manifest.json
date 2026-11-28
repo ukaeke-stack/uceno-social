@@ -1,0 +1,43 @@
+{
+  "name": "Covered Car",
+  "asset_id": "covered_car",
+  "source": "https://polyhaven.com/a/covered_car",
+  "license": "CC0 1.0",
+  "authors": {
+    "MP": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 12592,
+  "lods": false,
+  "files": [
+    "covered_car.fbx",
+    "textures/covered_car_metal_1k.exr",
+    "textures/covered_car_nor_gl_1k.exr",
+    "textures/covered_car_rough_1k.exr",
+    "textures/covered_car_diff_1k.jpg"
+  ],
+  "file_integrity": {
+    "covered_car.fbx": {
+      "bytes": 422700,
+      "sha256": "765bbe9634d8dede608e9980ee8e8f706aac874f9aecdc739d43f9e0913bd595"
+    },
+    "textures/covered_car_metal_1k.exr": {
+      "bytes": 190014,
+      "sha256": "77e5bf87d307c2ed8896c068b924c8a991c4233d7d00324d3711eae98697749b"
+    },
+    "textures/covered_car_nor_gl_1k.exr": {
+      "bytes": 1565470,
+      "sha256": "18df4570385edb95edba7f53da172ec704f4e4e9a81d9aecae63588288cabbfe"
+    },
+    "textures/covered_car_rough_1k.exr": {
+      "bytes": 783683,
+      "sha256": "e87d218a9ed739d71ca9af8d0b180279d8947a8783f7d581360bc158bec3b677"
+    },
+    "textures/covered_car_diff_1k.jpg": {
+      "bytes": 558004,
+      "sha256": "c4616a5c7c1327e4bc127b600e59d9dcb2123f8926f1570a1ca4a068d97f4d34"
+    }
+  },
+  "runtime_api_dependency": false
+}

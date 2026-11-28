@@ -1,0 +1,396 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
+
+namespace UCENO.VirtualWorld
+{
+    /// <summary>
+    /// Replaces modular skinned-mesh clothing while binding garment bones to the
+    /// current avatar rig. Prefabs must be authored against the same Humanoid bone
+    /// naming contract and registered in AvatarWardrobeCatalog.
+    /// </summary>
+    [DisallowMultipleComponent]
+    public sealed class AvatarWardrobeController : MonoBehaviour
+    {
+        [SerializeField] private Animator avatarAnimator;
+        [SerializeField] private Transform garmentRoot;
+        [SerializeField] private AvatarWardrobeCatalog catalog;
+
+        private readonly Dictionary<AvatarWardrobeSlot, GameObject> equippedObjects =
+            new Dictionary<AvatarWardrobeSlot, GameObject>();
+        private readonly Dictionary<AvatarWardrobeSlot, string> equippedIds =
+            new Dictionary<AvatarWardrobeSlot, string>();
+        private readonly Dictionary<AvatarWardrobeSlot, AsyncOperationHandle<GameObject>> addressableHandles =
+            new Dictionary<AvatarWardrobeSlot, AsyncOperationHandle<GameObject>>();
+        private readonly Dictionary<AvatarWardrobeSlot, AsyncOperationHandle<GameObject>> pendingAddressableHandles =
+            new Dictionary<AvatarWardrobeSlot, AsyncOperationHandle<GameObject>>();
+        private readonly HashSet<AvatarWardrobeSlot> pendingAddressableSlots =
+            new HashSet<AvatarWardrobeSlot>();
+        private Dictionary<string, Transform> avatarBones;
+        private HashSet<string> ambiguousAvatarBoneNames;
+
+        public event Action<AvatarWardrobeSlot, string> EquippedChanged;
+
+        private void Awake()
+        {
+            if (avatarAnimator == null) avatarAnimator = GetComponentInChildren<Animator>();
+            if (avatarAnimator == null) avatarAnimator = GetComponentInParent<Animator>();
+            if (garmentRoot == null) garmentRoot = avatarAnimator != null ? avatarAnimator.transform : transform;
+            if (catalog == null) catalog = Resources.Load<AvatarWardrobeCatalog>("UCENO/AvatarWardrobeCatalog");
+            RebuildBoneMap();
+        }
+
+        public string GetEquippedId(AvatarWardrobeSlot slot) =>
+            equippedIds.TryGetValue(slot, out string id) ? id : null;
+
+        /// <summary>
+        /// Loads a wardrobe prefab by its versioned Addressables address. The
+        /// catalog entry must be downloaded through WorldContentDelivery first;
+        /// the retained handle keeps remote bundle dependencies alive while worn.
+        /// </summary>
+        public void EquipAddressable(string itemId, Action<bool, string> completed = null)
+        {
+            EquipAddressable(itemId, null, completed);
+        }
+
+        public void EquipAddressable(string itemId, string expectedAddressableKey, Action<bool, string> completed)
+        {
+            EquipAddressable(itemId, expectedAddressableKey, 0, completed);
+        }
+
+        public void EquipAddressable(string itemId, string expectedAddressableKey, int expectedAssetVersion,
+            Action<bool, string> completed)
+        {
+            StartCoroutine(EquipAddressableRoutine(itemId, expectedAddressableKey, expectedAssetVersion, completed));
+        }
+
+        private IEnumerator EquipAddressableRoutine(string itemId, string expectedAddressableKey,
+            int expectedAssetVersion, Action<bool, string> completed)
+        {
+            if (catalog == null || !catalog.TryGet(itemId, out AvatarWardrobeItemDefinition item) ||
+                !Enum.IsDefined(typeof(AvatarWardrobeSlot), item.slot))
+            {
+                completed?.Invoke(false, "Wardrobe item is not in the local catalogue.");
+                yield break;
+            }
+            if (string.IsNullOrWhiteSpace(item.addressableKey))
+            {
+                completed?.Invoke(false, "Wardrobe item has no versioned Addressables address.");
+                yield break;
+            }
+            if (string.IsNullOrWhiteSpace(item.deliveryLabel))
+            {
+                completed?.Invoke(false, "Wardrobe item has no configured WorldContentDelivery label.");
+                yield break;
+            }
+            if (!string.IsNullOrWhiteSpace(expectedAddressableKey) &&
+                !string.Equals(item.addressableKey, expectedAddressableKey, StringComparison.Ordinal))
+            {
+                completed?.Invoke(false, "The local Addressables key does not match the server wardrobe catalogue.");
+                yield break;
+            }
+            if (expectedAssetVersion > 0 && item.assetVersion != expectedAssetVersion)
+            {
+                completed?.Invoke(false, "The local wardrobe asset version does not match the server catalogue.");
+                yield break;
+            }
+            if (pendingAddressableSlots.Contains(item.slot))
+            {
+                completed?.Invoke(false, "A wardrobe load is already running for this slot.");
+                yield break;
+            }
+            if (avatarAnimator == null || avatarAnimator.avatar == null || !avatarAnimator.avatar.isValid ||
+                !avatarAnimator.avatar.isHuman)
+            {
+                completed?.Invoke(false, "A valid Humanoid avatar rig is required.");
+                yield break;
+            }
+
+            WorldContentDelivery delivery = FindObjectOfType<WorldContentDelivery>();
+            if (delivery == null)
+            {
+                completed?.Invoke(false, "World content delivery service is unavailable.");
+                yield break;
+            }
+
+            pendingAddressableSlots.Add(item.slot);
+            bool deliveryFinished = false;
+            bool contentReady = false;
+            string deliveryError = null;
+            delivery.EnsureContent(item.deliveryLabel, (ok, message) =>
+            {
+                contentReady = ok;
+                deliveryError = message;
+                deliveryFinished = true;
+            });
+            while (!deliveryFinished) yield return null;
+            if (!contentReady)
+            {
+                pendingAddressableSlots.Remove(item.slot);
+                completed?.Invoke(false, "Wardrobe content delivery failed: " +
+                    (string.IsNullOrEmpty(deliveryError) ? "unknown delivery error." : deliveryError));
+                yield break;
+            }
+
+            AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(item.addressableKey);
+            pendingAddressableHandles[item.slot] = handle;
+            yield return handle;
+            pendingAddressableHandles.Remove(item.slot);
+            if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
+            {
+                if (handle.IsValid()) Addressables.Release(handle);
+                pendingAddressableSlots.Remove(item.slot);
+                completed?.Invoke(false, "Addressables could not load wardrobe asset: " + item.addressableKey);
+                yield break;
+            }
+
+            GameObject instance = Instantiate(handle.Result, garmentRoot, false);
+            instance.name = "Equipped_" + item.itemId;
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+
+            string bindError;
+            if (!TryBindWardrobeInstance(instance, out bindError))
+            {
+                Destroy(instance);
+                Addressables.Release(handle);
+                pendingAddressableSlots.Remove(item.slot);
+                completed?.Invoke(false, bindError);
+                yield break;
+            }
+
+            if (equippedObjects.TryGetValue(item.slot, out GameObject previous) && previous != null)
+                Destroy(previous);
+            ReleaseAddressableHandle(item.slot);
+            equippedObjects[item.slot] = instance;
+            equippedIds[item.slot] = item.itemId;
+            addressableHandles[item.slot] = handle;
+            pendingAddressableSlots.Remove(item.slot);
+            EquippedChanged?.Invoke(item.slot, item.itemId);
+            completed?.Invoke(true, null);
+        }
+
+        private bool TryBindWardrobeInstance(GameObject instance, out string error)
+        {
+            error = null;
+            SkinnedMeshRenderer[] renderers = instance.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            if (renderers.Length == 0)
+            {
+                error = "Wardrobe prefab must contain at least one SkinnedMeshRenderer.";
+                return false;
+            }
+            if (avatarBones == null || avatarBones.Count == 0) RebuildBoneMap();
+            foreach (SkinnedMeshRenderer renderer in renderers)
+            {
+                if (renderer.sharedMesh == null || renderer.bones == null || renderer.bones.Length == 0)
+                {
+                    error = "Wardrobe mesh is missing its mesh or bone weights.";
+                    return false;
+                }
+                Matrix4x4[] bindposes = renderer.sharedMesh.bindposes;
+                if (bindposes == null || bindposes.Length != renderer.bones.Length)
+                {
+                    error = "Wardrobe mesh bind-pose count does not match its bone array.";
+                    return false;
+                }
+                for (int bindposeIndex = 0; bindposeIndex < bindposes.Length; bindposeIndex++)
+                {
+                    Matrix4x4 bindpose = bindposes[bindposeIndex];
+                    for (int element = 0; element < 16; element++)
+                    {
+                        float value = bindpose[element];
+                        if (float.IsNaN(value) || float.IsInfinity(value))
+                        {
+                            error = "Wardrobe mesh contains a non-finite bind-pose matrix.";
+                            return false;
+                        }
+                    }
+                    if (Mathf.Abs(bindpose.determinant) < 0.0000001f)
+                    {
+                        error = "Wardrobe mesh contains a singular bind-pose matrix.";
+                        return false;
+                    }
+                }
+                Transform[] mappedBones = new Transform[renderer.bones.Length];
+                for (int i = 0; i < renderer.bones.Length; i++)
+                {
+                    Transform sourceBone = renderer.bones[i];
+                    if (sourceBone == null)
+                    {
+                        error = "Wardrobe mesh contains a null bone reference.";
+                        return false;
+                    }
+                    if (ambiguousAvatarBoneNames != null && ambiguousAvatarBoneNames.Contains(sourceBone.name))
+                    {
+                        error = "Avatar rig contains duplicate bone names; refusing ambiguous garment binding: " +
+                            sourceBone.name;
+                        return false;
+                    }
+                    if (!avatarBones.TryGetValue(sourceBone.name, out mappedBones[i]))
+                    {
+                        error = "Avatar rig is missing garment bone: " + sourceBone.name;
+                        return false;
+                    }
+                }
+                Transform mappedRoot = null;
+                if (renderer.rootBone != null)
+                    avatarBones.TryGetValue(renderer.rootBone.name, out mappedRoot);
+                if (renderer.rootBone != null && mappedRoot == null)
+                {
+                    error = "Avatar rig is missing the garment root bone.";
+                    return false;
+                }
+                renderer.bones = mappedBones;
+                renderer.rootBone = mappedRoot;
+                renderer.updateWhenOffscreen = false;
+            }
+            return true;
+        }
+
+        private void ReleaseAddressableHandle(AvatarWardrobeSlot slot)
+        {
+            if (!addressableHandles.TryGetValue(slot, out AsyncOperationHandle<GameObject> handle))
+                return;
+            addressableHandles.Remove(slot);
+            if (handle.IsValid()) Addressables.Release(handle);
+        }
+
+        private void OnDestroy()
+        {
+            foreach (AsyncOperationHandle<GameObject> handle in addressableHandles.Values)
+                if (handle.IsValid()) Addressables.Release(handle);
+            foreach (AsyncOperationHandle<GameObject> handle in pendingAddressableHandles.Values)
+                if (handle.IsValid()) Addressables.Release(handle);
+            addressableHandles.Clear();
+            pendingAddressableHandles.Clear();
+        }
+
+        public bool TryEquip(string itemId, out string error) =>
+            TryEquip(itemId, null, out error);
+
+        public bool TryEquip(string itemId, string expectedPrefabKey, out string error)
+        {
+            error = null;
+            if (catalog == null)
+            {
+                error = "Wardrobe catalog is not assigned.";
+                return false;
+            }
+            if (!catalog.TryGet(itemId, out AvatarWardrobeItemDefinition item) ||
+                !Enum.IsDefined(typeof(AvatarWardrobeSlot), item.slot))
+            {
+                error = "Wardrobe item is not in the local catalog.";
+                return false;
+            }
+            if (!string.IsNullOrEmpty(expectedPrefabKey) &&
+                !string.Equals(item.prefabResourcePath, expectedPrefabKey, StringComparison.Ordinal))
+            {
+                error = "The local wardrobe prefab does not match the server catalogue."; 
+                return false;
+            }
+            if (equippedIds.TryGetValue(item.slot, out string alreadyEquipped) &&
+                alreadyEquipped == item.itemId &&
+                equippedObjects.TryGetValue(item.slot, out GameObject existingObject) && existingObject != null)
+                return true;
+            if (string.IsNullOrWhiteSpace(item.prefabResourcePath))
+            {
+                error = "Wardrobe item has no prefab resource path.";
+                return false;
+            }
+            GameObject prefab = Resources.Load<GameObject>(item.prefabResourcePath);
+            if (prefab == null)
+            {
+                error = "Wardrobe prefab is missing: " + item.prefabResourcePath;
+                return false;
+            }
+            if (avatarAnimator == null || avatarAnimator.avatar == null || !avatarAnimator.avatar.isHuman)
+            {
+                error = "A valid Humanoid avatar rig is required.";
+                return false;
+            }
+
+            GameObject instance = Instantiate(prefab, garmentRoot, false);
+            instance.name = "Equipped_" + item.itemId;
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+
+            if (!TryBindWardrobeInstance(instance, out error))
+            {
+                Destroy(instance);
+                return false;
+            }
+
+            if (equippedObjects.TryGetValue(item.slot, out GameObject previous) && previous != null)
+                Destroy(previous);
+            ReleaseAddressableHandle(item.slot);
+            equippedObjects[item.slot] = instance;
+            equippedIds[item.slot] = item.itemId;
+            EquippedChanged?.Invoke(item.slot, item.itemId);
+            return true;
+        }
+
+        public void Unequip(AvatarWardrobeSlot slot)
+        {
+            if (equippedObjects.TryGetValue(slot, out GameObject previous) && previous != null)
+                Destroy(previous);
+            equippedObjects.Remove(slot);
+            equippedIds.Remove(slot);
+            ReleaseAddressableHandle(slot);
+            EquippedChanged?.Invoke(slot, null);
+        }
+
+        public void ApplyEquipped(IEnumerable<KeyValuePair<AvatarWardrobeSlot, string>> items)
+        {
+            if (items == null) return;
+            Dictionary<AvatarWardrobeSlot, string> requested =
+                new Dictionary<AvatarWardrobeSlot, string>();
+            foreach (KeyValuePair<AvatarWardrobeSlot, string> item in items)
+                requested[item.Key] = item.Value;
+
+            foreach (AvatarWardrobeSlot slot in Enum.GetValues(typeof(AvatarWardrobeSlot)))
+            {
+                if (!requested.TryGetValue(slot, out string itemId) || string.IsNullOrEmpty(itemId))
+                {
+                    if (equippedIds.ContainsKey(slot)) Unequip(slot);
+                    continue;
+                }
+                if (equippedIds.TryGetValue(slot, out string currentId) && currentId == itemId &&
+                    equippedObjects.TryGetValue(slot, out GameObject current) && current != null)
+                    continue;
+                if (catalog != null && catalog.TryGet(itemId, out AvatarWardrobeItemDefinition definition) &&
+                    !string.IsNullOrWhiteSpace(definition.addressableKey))
+                {
+                    EquipAddressable(itemId, (ok, error) =>
+                    {
+                        if (!ok) Debug.LogWarning("UCENO wardrobe item could not be applied (" + itemId + "): " + error);
+                    });
+                }
+                else if (!TryEquip(itemId, out string error))
+                    Debug.LogWarning("UCENO wardrobe item could not be applied (" + itemId + "): " + error);
+            }
+        }
+
+        private void RebuildBoneMap()
+        {
+            avatarBones = new Dictionary<string, Transform>(StringComparer.Ordinal);
+            ambiguousAvatarBoneNames = new HashSet<string>(StringComparer.Ordinal);
+            Transform root = avatarAnimator != null ? avatarAnimator.transform : transform;
+            foreach (Transform bone in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (ambiguousAvatarBoneNames.Contains(bone.name)) continue;
+                if (avatarBones.ContainsKey(bone.name))
+                {
+                    avatarBones.Remove(bone.name);
+                    ambiguousAvatarBoneNames.Add(bone.name);
+                    continue;
+                }
+                avatarBones.Add(bone.name, bone);
+            }
+        }
+    }
+}

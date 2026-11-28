@@ -1,0 +1,43 @@
+{
+  "name": "Round Wooden Table 01",
+  "asset_id": "round_wooden_table_01",
+  "source": "https://polyhaven.com/a/round_wooden_table_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Ulan Cabanilla": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 8640,
+  "lods": false,
+  "files": [
+    "round_wooden_table_01.fbx",
+    "textures/round_wooden_table_01_nor_gl_1k.exr",
+    "textures/round_wooden_table_01_metal_1k.exr",
+    "textures/round_wooden_table_01_diff_1k.jpg",
+    "textures/round_wooden_table_01_rough_1k.jpg"
+  ],
+  "file_integrity": {
+    "round_wooden_table_01.fbx": {
+      "bytes": 271900,
+      "sha256": "342d9bfb9720f30e0f2a7c4e49e1010ecd4a916dd86110365a3a844d8442ba98"
+    },
+    "textures/round_wooden_table_01_nor_gl_1k.exr": {
+      "bytes": 510743,
+      "sha256": "1e5b19bfcdcb028e7441e516ed1fd93f055fc167e3b7ca8ccfee721d8ba27267"
+    },
+    "textures/round_wooden_table_01_metal_1k.exr": {
+      "bytes": 27006,
+      "sha256": "e7678b89587b24a510120a06dcbb5dcacd013a97d6f0c7b4d91b345a6df7394f"
+    },
+    "textures/round_wooden_table_01_diff_1k.jpg": {
+      "bytes": 117911,
+      "sha256": "d83659d8d584bbadf160760b825f990c6264901e33051643d19fcd389b0d19ae"
+    },
+    "textures/round_wooden_table_01_rough_1k.jpg": {
+      "bytes": 93349,
+      "sha256": "04a4a7695f78877f79f0f6fed4e6d770b564d5583760952a86286fd9d451e006"
+    }
+  },
+  "runtime_api_dependency": false
+}

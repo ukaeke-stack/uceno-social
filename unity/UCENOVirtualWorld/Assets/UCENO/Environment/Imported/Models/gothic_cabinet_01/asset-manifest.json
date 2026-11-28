@@ -1,0 +1,43 @@
+{
+  "name": "Gothic Cabinet 01",
+  "asset_id": "GothicCabinet_01",
+  "source": "https://polyhaven.com/a/GothicCabinet_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Kirill Sannikov": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 12170,
+  "lods": false,
+  "files": [
+    "gothic_cabinet_01.fbx",
+    "textures/GothicCabinet_01_nor_gl_1k.exr",
+    "textures/GothicCabinet_01_roughness_1k.jpg",
+    "textures/GothicCabinet_01_metallic_1k.exr",
+    "textures/GothicCabinet_01_diff_1k.jpg"
+  ],
+  "file_integrity": {
+    "gothic_cabinet_01.fbx": {
+      "bytes": 600604,
+      "sha256": "2fde4308163191d5d1c09e792a9adbce54e6033a4d3b36971fe19d00a31d2567"
+    },
+    "textures/GothicCabinet_01_nor_gl_1k.exr": {
+      "bytes": 1041181,
+      "sha256": "9ace1d38b7bd858700a4b81b1f0b42ed5a3a82da9eb20fa03fa481729450a4c3"
+    },
+    "textures/GothicCabinet_01_roughness_1k.jpg": {
+      "bytes": 163883,
+      "sha256": "ee16692dce947bb8c9171fec02164354e02dab25cd81779df71c4703451faf12"
+    },
+    "textures/GothicCabinet_01_metallic_1k.exr": {
+      "bytes": 125226,
+      "sha256": "41b738191a128c07a9c6ea2b0d382f97b79679df5efa73dd7d4c75e25ab88cb5"
+    },
+    "textures/GothicCabinet_01_diff_1k.jpg": {
+      "bytes": 136344,
+      "sha256": "9b9586d9a840045d3f27ea4237ec56d713212fb877aceb2d0fc1cb75c7d59b98"
+    }
+  },
+  "runtime_api_dependency": false
+}

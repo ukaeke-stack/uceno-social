@@ -1,0 +1,69 @@
+{
+  "name": "Modular Chainlink Fence",
+  "asset_id": "modular_chainlink_fence",
+  "source": "https://polyhaven.com/a/modular_chainlink_fence",
+  "license": "CC0 1.0",
+  "authors": {
+    "James Ray Cock": "All",
+    "Amal Kumar": "Fence Wire Material"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 89232,
+  "lods": false,
+  "files": [
+    "modular_chainlink_fence.fbx",
+    "textures/modular_chainlink_fence_wire_alpha_1k.png",
+    "textures/modular_chainlink_fence_wire_metal_1k.png",
+    "textures/modular_chainlink_fence_posts_metal_1k.png",
+    "textures/modular_chainlink_fence_posts_diff_1k.png",
+    "textures/modular_chainlink_fence_wire_rough_1k.png",
+    "textures/modular_chainlink_fence_posts_nor_gl_1k.png",
+    "textures/modular_chainlink_fence_wire_diff_1k.png",
+    "textures/modular_chainlink_fence_wire_nor_gl_1k.png",
+    "textures/modular_chainlink_fence_posts_rough_1k.png"
+  ],
+  "file_integrity": {
+    "modular_chainlink_fence.fbx": {
+      "bytes": 2210012,
+      "sha256": "346f90a8a73bf83d25355033fef676eda0bdabda320bf1f98c2d26a016c77058"
+    },
+    "textures/modular_chainlink_fence_wire_alpha_1k.png": {
+      "bytes": 162276,
+      "sha256": "92ea700345a61f78fdbc3d4ff2ba4ea580f7fdfa167b3963b1167e9aaba88255"
+    },
+    "textures/modular_chainlink_fence_wire_metal_1k.png": {
+      "bytes": 163952,
+      "sha256": "d1a54216bb0ea88e280159c29b713de64ea1d7f5f754462585a5b378288a38ce"
+    },
+    "textures/modular_chainlink_fence_posts_metal_1k.png": {
+      "bytes": 102461,
+      "sha256": "d99efc435bee3e27dd99ac038c14ea3b55fd6726282cffa3d0f39b90e5b2969e"
+    },
+    "textures/modular_chainlink_fence_posts_diff_1k.png": {
+      "bytes": 4794629,
+      "sha256": "7c28a984bda0bad5472e8120994defd8767231896622dc99c5c31d19495c872f"
+    },
+    "textures/modular_chainlink_fence_wire_rough_1k.png": {
+      "bytes": 77077,
+      "sha256": "10aa4825de2c8d9113c494060e745c71191fdf60397501a39ca002384bc0f50e"
+    },
+    "textures/modular_chainlink_fence_posts_nor_gl_1k.png": {
+      "bytes": 4069915,
+      "sha256": "00c9c833ec4357fd5405a03ef97a8a08ad763788bd3b7bdaa7fe62df1efdb226"
+    },
+    "textures/modular_chainlink_fence_wire_diff_1k.png": {
+      "bytes": 904994,
+      "sha256": "4769cd159ec7475c57b05ef94db4d7152a12432b650d04ee2fb47bbcbfe37525"
+    },
+    "textures/modular_chainlink_fence_wire_nor_gl_1k.png": {
+      "bytes": 2010348,
+      "sha256": "9ead91529d9b84ae89713b1f565d1b3d6fcac79b8093b1434ed4ff8174e57857"
+    },
+    "textures/modular_chainlink_fence_posts_rough_1k.png": {
+      "bytes": 1489484,
+      "sha256": "8e2687767fc9a28a1db64d3f1f99514d95ebc03c67f055bf1e2a3bf6009eac34"
+    }
+  },
+  "runtime_api_dependency": false
+}

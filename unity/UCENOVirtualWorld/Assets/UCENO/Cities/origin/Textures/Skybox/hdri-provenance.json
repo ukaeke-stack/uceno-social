@@ -1,0 +1,36 @@
+{
+  "city_id": "origin",
+  "city_label": "Origin Plains",
+  "asset_id": "wide_street_01",
+  "name": "Wide Street 01",
+  "creator_contributions": {
+    "Sergej Majboroda": "All"
+  },
+  "source_page": "https://polyhaven.com/a/wide_street_01",
+  "api_file_url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/wide_street_01_1k.hdr",
+  "license": "CC0 1.0",
+  "license_url": "https://polyhaven.com/license",
+  "api_terms": "https://polyhaven.com/our-api",
+  "format": "Radiance HDR (.hdr)",
+  "resolution_tier": "1k",
+  "expected_size_bytes": 1474393,
+  "verified_md5": "5138acea259b7b72b0dce4fdff0d27ce",
+  "verified_sha256": "7f1d096001e9d206a7ad03666049af5c5705ba800337eb2bd35c1a31e3625d36",
+  "actual_size_bytes": 1474393,
+  "width": 1024,
+  "height": 512,
+  "file": "unity/UCENOVirtualWorld/Assets/UCENO/Cities/origin/Textures/Skybox/origin_environment.hdr",
+  "catalogue_description": "Free, unclipped 16K HDRI of a sunlit wide city avenue at midday - clear sky, strong directional sunlight, high contrast and neutral asphalt tones.",
+  "category": "Streets & Town/Streets & Alleys/City Streets",
+  "tags": [
+    "sun",
+    "road",
+    "street",
+    "asphalt",
+    "city",
+    "backplates"
+  ],
+  "acquisition_status": "downloaded-and-md5-verified",
+  "unity_import_status": "not-yet-imported",
+  "visual_acceptance_status": "pending"
+}

@@ -1,0 +1,59 @@
+{
+  "name": "Pachira Aquatica 01",
+  "asset_id": "pachira_aquatica_01",
+  "source": "https://polyhaven.com/a/pachira_aquatica_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Rob Tuytel": "scanning",
+    "Rico Cilliers": "modeling"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 76914,
+  "lods": false,
+  "files": [
+    "pachira_aquatica_01.fbx",
+    "textures/pachira_aquatica_01_leaves_rough_1k.png",
+    "textures/pachira_aquatica_01_bark_diff_1k.png",
+    "textures/pachira_aquatica_01_bark_rough_1k.png",
+    "textures/pachira_aquatica_01_leaves_nor_gl_1k.png",
+    "textures/pachira_aquatica_01_bark_nor_gl_1k.png",
+    "textures/pachira_aquatica_01_leaves_diff_1k.png",
+    "textures/pachira_aquatica_01_leaves_alpha_1k.png"
+  ],
+  "file_integrity": {
+    "pachira_aquatica_01.fbx": {
+      "bytes": 2481564,
+      "sha256": "50952ca5953057eccb6d9451a75fa5c346b4d03dc408fbc638729aef6e624702"
+    },
+    "textures/pachira_aquatica_01_leaves_rough_1k.png": {
+      "bytes": 635400,
+      "sha256": "2b56562d5fa240ac595017563ec79177f87205545971af5988f11a46f6bd48c5"
+    },
+    "textures/pachira_aquatica_01_bark_diff_1k.png": {
+      "bytes": 3685483,
+      "sha256": "8e1ac0c6016719b00f77ff15b3db405c39f3c45f16f1b9333703c375785551ad"
+    },
+    "textures/pachira_aquatica_01_bark_rough_1k.png": {
+      "bytes": 1198995,
+      "sha256": "980a822f63eaca375fa2dd57ac0c650c1351d19e31f01ba9f52edba273e3296c"
+    },
+    "textures/pachira_aquatica_01_leaves_nor_gl_1k.png": {
+      "bytes": 3250605,
+      "sha256": "89e9b5258250b86d45ffc6326a2a06a5ff0022336118f45a5e9b3558955547bf"
+    },
+    "textures/pachira_aquatica_01_bark_nor_gl_1k.png": {
+      "bytes": 3764086,
+      "sha256": "dc38bf0955259d12bdd5a7d063bea9e8c28c9a3f8d3abd9a2d4ba4b29e3c1f21"
+    },
+    "textures/pachira_aquatica_01_leaves_diff_1k.png": {
+      "bytes": 2501917,
+      "sha256": "2779f7c46abcc97649d290d61bde45ff8b9082b2ff09ba38e86df6bb1a9e4d17"
+    },
+    "textures/pachira_aquatica_01_leaves_alpha_1k.png": {
+      "bytes": 68381,
+      "sha256": "2021600eca558c0b38d342168f0086550143fc7f676113b3dc5b47f56f4e3a82"
+    }
+  },
+  "runtime_api_dependency": false
+}

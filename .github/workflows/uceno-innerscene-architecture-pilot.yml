@@ -1,0 +1,31 @@
+name: UCENO Innerscene Architecture Pilot
+on:
+  push:
+    branches: [feature/uceno-unity-foundation]
+    paths:
+      - "scripts/acquire-innerscene-architecture-pilot.py"
+      - "scripts/tests/test_innerscene_architecture_pilot.py"
+      - ".github/workflows/uceno-innerscene-architecture-pilot.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acquire-and-inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test CC0 source-page and GLB structural gates
+        run: python -m unittest scripts.tests.test_innerscene_architecture_pilot -v
+      - name: Download and inspect provenance-pinned CC0 GLBs
+        run: python scripts/acquire-innerscene-architecture-pilot.py
+      - name: Preserve source models and structural inspection report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uceno-innerscene-architecture-pilot
+          path: artifacts/innerscene-architecture-pilot/
+          if-no-files-found: warn
+          retention-days: 30

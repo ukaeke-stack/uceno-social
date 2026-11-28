@@ -1,0 +1,43 @@
+{
+  "name": "Sofa 01",
+  "asset_id": "Sofa_01",
+  "source": "https://polyhaven.com/a/Sofa_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Kirill Sannikov": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 4101,
+  "lods": false,
+  "files": [
+    "sofa_01.fbx",
+    "textures/Sofa_01_nor_gl_1k.exr",
+    "textures/Sofa_01_diff_1k.jpg",
+    "textures/Sofa_01_roughness_1k.jpg",
+    "textures/Sofa_01_metallic_1k.exr"
+  ],
+  "file_integrity": {
+    "sofa_01.fbx": {
+      "bytes": 191292,
+      "sha256": "796d9ac01196985fc579df01b64878321bbf9c529bbe83ab41433da3f1fb7466"
+    },
+    "textures/Sofa_01_nor_gl_1k.exr": {
+      "bytes": 1486121,
+      "sha256": "8383cc49139360aa3c163c2baa70f585fcda7fc7704e71bedbca916c53fa7e17"
+    },
+    "textures/Sofa_01_diff_1k.jpg": {
+      "bytes": 134925,
+      "sha256": "1772047e7887a9ec44878e0720eda0829abfa744dec6ca03b492a31c4dc51cab"
+    },
+    "textures/Sofa_01_roughness_1k.jpg": {
+      "bytes": 99983,
+      "sha256": "d691a01d97c30a5d4b4a1a61ad674078f56bb5d9957d511a279989d45e3aaeba"
+    },
+    "textures/Sofa_01_metallic_1k.exr": {
+      "bytes": 4784,
+      "sha256": "804310733753f262ea07a5fa367e4c0b19d76a29d123890d8ab582e83790e777"
+    }
+  },
+  "runtime_api_dependency": false
+}

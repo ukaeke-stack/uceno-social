@@ -1,0 +1,43 @@
+name: UCENO content delivery source checks
+
+on:
+  pull_request:
+    paths:
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldContentDelivery.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json"
+      - "runtime/world-gateway/config/world-cities.json"
+      - "runtime/world-gateway/config/world-districts.json"
+      - "runtime/world-gateway/src/city-catalog-policy.ts"
+      - "runtime/world-gateway/tests/city-catalog-policy.test.mjs"
+      - "runtime/world-gateway/tests/district-policy.test.mjs"
+      - "unity/UCENOVirtualWorld/Packages/manifest.json"
+      - "docs/virtual-world/REMOTE_CONTENT_DELIVERY*"
+      - "scripts/validate-uceno-content-delivery.mjs"
+      - ".github/workflows/uceno-content-delivery-source.yml"
+  push:
+    branches:
+      - feature/uceno-unity-foundation
+    paths:
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Scripts/WorldContentDelivery.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/WorldCityScenePipeline.cs"
+      - "unity/UCENOVirtualWorld/Assets/UCENO/Editor/city-scene-asset-profiles.json"
+      - "runtime/world-gateway/config/world-cities.json"
+      - "runtime/world-gateway/config/world-districts.json"
+      - "runtime/world-gateway/src/city-catalog-policy.ts"
+      - "runtime/world-gateway/tests/city-catalog-policy.test.mjs"
+      - "runtime/world-gateway/tests/district-policy.test.mjs"
+      - "unity/UCENOVirtualWorld/Packages/manifest.json"
+      - "docs/virtual-world/REMOTE_CONTENT_DELIVERY*"
+      - "scripts/validate-uceno-content-delivery.mjs"
+      - ".github/workflows/uceno-content-delivery-source.yml"
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/validate-uceno-content-delivery.mjs

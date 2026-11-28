@@ -1,0 +1,42 @@
+{
+  "name": "Sparse Grass",
+  "asset_id": "sparse_grass",
+  "source": "https://polyhaven.com/a/sparse_grass",
+  "license": "CC0 1.0",
+  "authors": {
+    "Amal Kumar": "All"
+  },
+  "texture_resolutions": [
+    "1k"
+  ],
+  "maps": [
+    "sparse_grass_diff.jpg",
+    "sparse_grass_nor_gl.png",
+    "sparse_grass_rough.jpg",
+    "sparse_grass_ao.jpg",
+    "sparse_grass_arm.jpg"
+  ],
+  "file_integrity": {
+    "sparse_grass_diff.jpg": {
+      "bytes": 955945,
+      "sha256": "ae94f2b34597b9108eefd88217f55eccaec6d6b382e858a478ee92df90e66617"
+    },
+    "sparse_grass_nor_gl.png": {
+      "bytes": 6096327,
+      "sha256": "6b46042ca4b8890067a1f930b40580b9f21a5096d7e9ecd883fa4af223dc1b3a"
+    },
+    "sparse_grass_rough.jpg": {
+      "bytes": 463340,
+      "sha256": "9ebe6d03a9551c17d1802835c92c1442acb8f5d38d4874ee8c37770f11c4bed1"
+    },
+    "sparse_grass_ao.jpg": {
+      "bytes": 1029726,
+      "sha256": "6916d55e1de6a0bbebd6360a28548163a8da1ad217f63624e44db70b22563f7a"
+    },
+    "sparse_grass_arm.jpg": {
+      "bytes": 978007,
+      "sha256": "209f6793060a176272ace42cabab21fdf21fe963f79267988320614b374414a8"
+    }
+  },
+  "runtime_api_dependency": false
+}

@@ -1,0 +1,103 @@
+name: UCENO city architecture source discovery and acquisition
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/uceno-unity-foundation]
+    paths:
+      - "scripts/discover-city-architecture.py"
+      - "scripts/acquire-city-architecture.py"
+      - "scripts/discover-tevy-city-architecture.py"
+      - "scripts/audit-city-architecture-acquisition.py"
+      - "scripts/tests/test_city_architecture_acquisition_audit.py"
+      - "scripts/tests/test_city_architecture_screening.py"
+      - "scripts/tests/test_tevy_city_architecture.py"
+      - "scripts/tests/test_3d_valley_city_architecture.py"
+      - ".github/workflows/uceno-city-architecture-discovery.yml"
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - "scripts/discover-city-architecture.py"
+      - "scripts/acquire-city-architecture.py"
+      - "scripts/discover-tevy-city-architecture.py"
+      - "scripts/audit-city-architecture-acquisition.py"
+      - "scripts/tests/test_city_architecture_acquisition_audit.py"
+      - "scripts/tests/test_city_architecture_screening.py"
+      - "scripts/tests/test_tevy_city_architecture.py"
+      - "scripts/tests/test_3d_valley_city_architecture.py"
+      - ".github/workflows/uceno-city-architecture-discovery.yml"
+permissions:
+  contents: read
+concurrency:
+  # Push and pull_request events for the same branch share one queue.
+  group: uceno-city-architecture-discovery-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  discover-and-acquire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60  # Allows a documented provider quota reset without purchasing API credits.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test strict city-building discovery and acquisition filters
+        run: python -m unittest discover -s scripts/tests -p "test_*city_architecture*.py"
+      - id: tevy
+        name: Discover, pin and checksum-verify CC0 Tevy building GLBs
+        continue-on-error: true
+        run: python scripts/discover-tevy-city-architecture.py
+      - id: valley
+        name: Discover strict CC0 realistic building candidates from 3D Valley
+        if: always()
+        continue-on-error: true
+        env:
+          THREE_D_VALLEY_API_KEY: ${{ secrets.THREE_D_VALLEY_API_KEY }}
+        run: python scripts/discover-3d-valley-city-architecture.py
+      - id: discover
+        name: Discover independent 3DAssets.dev city candidates
+        if: always()
+        continue-on-error: true
+        run: python scripts/discover-city-architecture.py
+      - id: acquire
+        name: Acquire and verify 3DAssets.dev full-building GLBs
+        if: always() && hashFiles('artifacts/city-architecture-candidates/nine-city-candidates.json') != ''
+        continue-on-error: true
+        run: python scripts/acquire-city-architecture.py
+      - id: audit
+        name: Audit acquired GLB integrity, LODs and embedded texture evidence
+        if: always()
+        continue-on-error: true
+        run: python scripts/audit-city-architecture-acquisition.py
+      - name: Preserve discovery and partial acquisition evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uceno-city-architecture-source-acquisition
+          path: |
+            artifacts/tevy-city-architecture/
+            artifacts/3d-valley-city-architecture/
+            artifacts/city-architecture-candidates/
+            artifacts/city-architecture-models/
+            artifacts/city-architecture-quality-audit.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Fail workflow when acquisition is incomplete
+        if: always()
+        env:
+          TEVY_OUTCOME: ${{ steps.tevy.outcome }}
+          DISCOVERY_OUTCOME: ${{ steps.discover.outcome }}
+          ACQUISITION_OUTCOME: ${{ steps.acquire.outcome }}
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+          VALLEY_OUTCOME: ${{ steps.valley.outcome }}
+        run: |
+          failed=0
+          for result in "$TEVY_OUTCOME" "$DISCOVERY_OUTCOME" "$ACQUISITION_OUTCOME" "$AUDIT_OUTCOME" "$VALLEY_OUTCOME"; do
+            if [ "$result" != "success" ]; then
+              echo "::error::City asset pipeline stage did not complete successfully: $result"
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "Partial acquisition evidence was uploaded, but the pipeline is not release-ready."
+            exit 1
+          fi

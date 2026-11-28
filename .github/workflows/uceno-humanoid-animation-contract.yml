@@ -1,0 +1,44 @@
+name: UCENO Humanoid Animation Source Contract
+
+on:
+  push:
+    branches:
+      - feature/uceno-unity-foundation
+    paths:
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Animations/Imported/**'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported/**'
+      - 'scripts/validate_uceno_humanoid_animation_contract.py'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarAppearanceProfile.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeHud.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeCatalog.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeController.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeSyncClient.cs'
+      - '.github/workflows/uceno-humanoid-animation-contract.yml'
+  pull_request:
+    paths:
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Editor/HumanoidAnimationLibraryValidator.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Animations/Imported/**'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Characters/Imported/**'
+      - 'scripts/validate_uceno_humanoid_animation_contract.py'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarAppearanceProfile.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeHud.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeCatalog.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeController.cs'
+      - 'unity/UCENOVirtualWorld/Assets/UCENO/Scripts/AvatarWardrobeSyncClient.cs'
+      - '.github/workflows/uceno-humanoid-animation-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  humanoid-animation-source:
+    name: Validate humanoid animation release-gate source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check retargeting and imported-clip validation contract
+        run: python scripts/validate_uceno_humanoid_animation_contract.py

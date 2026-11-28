@@ -1,0 +1,48 @@
+{
+  "name": "Street Lamp 01",
+  "asset_id": "street_lamp_01",
+  "source": "https://polyhaven.com/a/street_lamp_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Josh Dean": "All"
+  },
+  "format": "fbx",
+  "texture_resolution": "1k",
+  "polycount": 30610,
+  "lods": false,
+  "files": [
+    "street_lamp_01.fbx",
+    "textures/street_lamp_01_metal_1k.exr",
+    "textures/street_lamp_01_rough_1k.exr",
+    "textures/street_lamp_01_diff_1k.jpg",
+    "textures/street_lamp_01_opacity_1k.png",
+    "textures/street_lamp_01_nor_gl_1k.exr"
+  ],
+  "file_integrity": {
+    "street_lamp_01.fbx": {
+      "bytes": 941804,
+      "sha256": "86ecce0d067aecde0d22c9903664bf4b223ca0aef5128e16967c0b55dc434fac"
+    },
+    "textures/street_lamp_01_metal_1k.exr": {
+      "bytes": 376865,
+      "sha256": "781e4139e854d2be69ecf03c1eb62187b2dcf064382a12ce5f72d73cf4e6ab91"
+    },
+    "textures/street_lamp_01_rough_1k.exr": {
+      "bytes": 648423,
+      "sha256": "a880a955c5a2c1a0f24f7490b0c4fc467fa425b1502dd02dfcdf444d2cdf67fe"
+    },
+    "textures/street_lamp_01_diff_1k.jpg": {
+      "bytes": 307889,
+      "sha256": "3e9d3471b33eb1f8075ed741c2b1932103598626d057ca12ef38005ea5fcb165"
+    },
+    "textures/street_lamp_01_opacity_1k.png": {
+      "bytes": 277215,
+      "sha256": "e6f24fe077212093a16d501759db4ca7150f924b74b945f7f8bfa4f7e164eb7c"
+    },
+    "textures/street_lamp_01_nor_gl_1k.exr": {
+      "bytes": 1023429,
+      "sha256": "feb5dbd7a4ffcb748d27b02a061cfc5c4d9c0f4e98fd3eb09ae4c124dcacdd66"
+    }
+  },
+  "runtime_api_dependency": false
+}

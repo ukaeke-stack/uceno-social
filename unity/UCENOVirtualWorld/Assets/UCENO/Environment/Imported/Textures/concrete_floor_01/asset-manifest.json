@@ -1,0 +1,42 @@
+{
+  "name": "Concrete Floor 01",
+  "asset_id": "concrete_floor_01",
+  "source": "https://polyhaven.com/a/concrete_floor_01",
+  "license": "CC0 1.0",
+  "authors": {
+    "Rob Tuytel": "All"
+  },
+  "texture_resolutions": [
+    "1k"
+  ],
+  "maps": [
+    "concrete_floor_01_diff.jpg",
+    "concrete_floor_01_nor_gl.png",
+    "concrete_floor_01_rough.jpg",
+    "concrete_floor_01_ao.jpg",
+    "concrete_floor_01_arm.jpg"
+  ],
+  "file_integrity": {
+    "concrete_floor_01_diff.jpg": {
+      "bytes": 755740,
+      "sha256": "db7c800f1464359b5f359fc743e82ac51b34e014fdfd53844f4af34bb1949229"
+    },
+    "concrete_floor_01_nor_gl.png": {
+      "bytes": 2014994,
+      "sha256": "09fa589bbac227f3d16fbbfe561df3536d19411e2765df287470c2afb299b71f"
+    },
+    "concrete_floor_01_rough.jpg": {
+      "bytes": 354529,
+      "sha256": "f5239e1c6db5f0ddb4c2397e881a5938ab511386aab19a23c20d40f4ab2c181b"
+    },
+    "concrete_floor_01_ao.jpg": {
+      "bytes": 405919,
+      "sha256": "015e278a4466ae9860be7515085ac8e67747685b52b5aa36101ef5d9b803271d"
+    },
+    "concrete_floor_01_arm.jpg": {
+      "bytes": 177301,
+      "sha256": "44e3a0d18db295998c8af56ecc80095821e719e134974609aa92e5436709dabd"
+    }
+  },
+  "runtime_api_dependency": false
+}
